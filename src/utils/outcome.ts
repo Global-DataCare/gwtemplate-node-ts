@@ -1,5 +1,6 @@
 // src/utils/outcome.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 
 import { OperationOutcome } from 'gdc-common-utils-ts/models/operation-outcome';
 import { IssueLevel, IssueTypeCode } from 'gdc-common-utils-ts/models/issue';
@@ -22,7 +23,7 @@ export function createOperationOutcome(
   const diagnostics = diagnosticsText || `${issueLevel}: ${issueType}`;
 
   return {
-    resourceType: 'OperationOutcome',
+    resourceType: ResourceTypesFhirR4.OperationOutcome,
     issue: [{
       severity: issueLevel,
       code: issueType,

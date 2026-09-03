@@ -67,8 +67,9 @@ Peer + CouchDB + GW CORE + PostgreSQL + IPFS + CCAAS
 Reconciliación de canales y chaincodes, escritura, lectura y reinicio
 ```
 
-La evidencia encadena una Host VC verificada, el grant real de dos usos para el
-peer, un grant independiente de un uso para el cliente GW, la emisión de
+La evidencia encadena una Host VC verificada, una identidad administradora del
+MSP gestionada por la entidad gobernadora de la red, su definición pública saneada, el
+grant real de dos usos para el peer, un grant independiente de un uso para el cliente GW, la emisión de
 MSP/TLS y del certificado cliente vinculada al SHA-256 del identificador de esa
 VC, la admisión dinámica por
 el reconciliador, los Secrets, la instalación Helm,
@@ -89,7 +90,9 @@ canales, lectura, autorización y persistencia PostgreSQL/IPFS.
   certificados MSP/TLS del peer y el certificado cliente independiente del GW.
 
 La `HostingServiceCredential` autoriza el alta, pero no es un certificado de
-Fabric. Después de verificarla, la autoridad registra un identificador y un
+Fabric. Después de verificarla, la autoridad asigna el MSP, genera y conserva
+su identidad administradora y exporta únicamente la definición MSP pública.
+También registra un identificador y un
 secreto de enrolamiento limitado a dos usos en la ICA de Fabric para MSP/TLS,
 más otro identificador de un uso para el cliente GW. El helper
 añade una ventana operativa de caducidad y rechaza el grant una vez vencida;

@@ -1,3 +1,6 @@
+import { GatewayInternalResourceTypes } from 'gdc-common-utils-ts/constants/gateway-response';
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
+import { HttpStatusCodes } from 'gdc-common-utils-ts/constants/http';
 import { v4 as uuidv4 } from 'uuid';
 import type { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
 import type { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
@@ -79,15 +82,15 @@ export async function processTenantDidDocumentBinding(
       data: [{
         type: OrganizationDidBindingEntryTypes.Response,
         resource: {
-          resourceType: 'Document',
+          resourceType: GatewayInternalResourceTypes.Document,
           didDocument: {
             ...(tenantConfig.didDocument || {}),
             alsoKnownAs: aliases,
           },
         },
-        response: { status: '200' },
+        response: { status: String(HttpStatusCodes.Ok) },
       }],
-      resourceType: 'Bundle',
+      resourceType: ResourceTypesFhirR4.Bundle,
       type: 'batch-response',
       total: 1,
     },

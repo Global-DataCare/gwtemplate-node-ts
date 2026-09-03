@@ -1,16 +1,19 @@
 // src/api-examples/communication.examples.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
+import { GatewayResponseEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 
 import { CommunicationCategoryCodes, HealthcareBasicSections } from 'gdc-common-utils-ts/constants/index';
 import { Format } from 'gdc-common-utils-ts/constants/Schemas';
 
 const IPS_BUNDLE_LIGHT_EXAMPLE = {
-  resourceType: 'Bundle',
+  resourceType: ResourceTypesFhirR4.Bundle,
   type: 'document',
   entry: [
     {
       resource: {
-        resourceType: 'Composition',
+        resourceType: ResourceTypesFhirR4.Composition,
         status: 'final',
         type: {
           coding: [{
@@ -24,9 +27,9 @@ const IPS_BUNDLE_LIGHT_EXAMPLE = {
 } as const;
 
 export const COMMUNICATION_INGESTION_ENTRY_EXAMPLE = {
-  type: 'Communication-ingestion-request-v1.0',
+  type: GatewayResponseEntryTypes.CommunicationIngestionRequest,
   resource: {
-    resourceType: 'Communication',
+    resourceType: ResourceTypesFhirR4.Communication,
     status: 'completed',
     subject: { reference: 'Patient/did:web:api.acme.org:individual:123' },
     category: [{
@@ -67,12 +70,12 @@ export const COMMUNICATION_INGESTION_MESSAGE_EXAMPLE = {
   aud: 'did:web:gateway.acme.org',
   type: 'application/fhir+json; fhirVersion=4.0',
   body: {
-    resourceType: 'Bundle',
+    resourceType: ResourceTypesFhirR4.Bundle,
     type: 'batch',
     entry: [
       {
         request: {
-          method: 'POST',
+          method: HttpRequestMethods.Post,
           url: 'individual/org.hl7.fhir.r4/Communication',
         },
         ...COMMUNICATION_INGESTION_ENTRY_EXAMPLE,

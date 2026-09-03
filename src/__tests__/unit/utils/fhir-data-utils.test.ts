@@ -1,4 +1,5 @@
 // TDD contract: write this test red first; make it green only with the complete real behavior.
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 import { describe, expect, it } from '@jest/globals';
 import {
   extractTokenCode,
@@ -32,14 +33,14 @@ describe('fhir-data-utils', () => {
     expect(pickLatestIsoDate(['2026-01-01T00:00:00Z', '2026-01-02T00:00:00Z'])).toBe('2026-01-02T00:00:00Z');
 
     const resource = {
-      resourceType: 'Observation',
+      resourceType: ResourceTypesFhirR4.Observation,
       id: 'obs-1',
       identifier: [{ value: 'urn:uuid:obs-1' }],
     };
 
     expect(resolveBundleEntryKey(undefined, resource)).toBe('urn:uuid:obs-1');
     expect(resolveBundleEntryFullUrl(undefined, { resource })).toBe('urn:uuid:obs-1');
-    expect(resolveBundleEntryFullUrl('Observation/obs-1', { resource: { resourceType: 'Observation', id: 'obs-1' } }))
+    expect(resolveBundleEntryFullUrl('Observation/obs-1', { resource: { resourceType: ResourceTypesFhirR4.Observation, id: 'obs-1' } }))
       .toBe('Observation/obs-1');
   });
 });

@@ -1,4 +1,6 @@
 // Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 import { invokeExpress } from './helpers/invokeExpress';
 import { startServer, resetServerConfig } from '../../server';
 import { getTenantVaultId, generateTenantCollectionNameFromClaims } from '../../utils/tenant';
@@ -52,7 +54,7 @@ describe('RelatedPerson subject-scoped search API', () => {
         [ClaimsOrganizationSchemaorg.identifierValue]: 'A0011223344',
         [ClaimsServiceSchemaorg.category]: Sector.SYSTEM,
       };
-      const tenantClaims = testPayloadCreateTenant1.body.data[0].meta.claims as any;
+      const tenantClaims = testPayloadCreateTenant1.body.data[0].resource.meta.claims as any;
       const tenantVaultId = getTenantVaultId(tenantClaims[ClaimsServiceSchemaorg.category], testTenant1TenantId);
       await kmsService.provisionKeys(tenantVaultId);
       const protectedTenant = await kmsService.protectConfidentialData({
@@ -77,7 +79,7 @@ describe('RelatedPerson subject-scoped search API', () => {
       delete fixture.body.entry[0].meta;
       const route = `/${testTenant1TenantId}/cds-ES/v1/${Sector.HEALTH_CARE}/individual/org.hl7.fhir.api/RelatedPerson`;
       expect((await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: `${route}/_batch`,
         headers: { 'content-type': 'application/json', authorization: authenticatedActor.authorizationHeader },
         body: fixture,
@@ -86,12 +88,12 @@ describe('RelatedPerson subject-scoped search API', () => {
 
       const searchThid = `${fixture.thid}-search`;
       expect((await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: `${route}/_search`,
         headers: { 'content-type': 'application/json', authorization: authenticatedActor.authorizationHeader },
         body: {
           thid: searchThid,
-          body: { resourceType: 'Parameters', parameter: [{ name: 'patient', valueString: subject }] },
+          body: { resourceType: ResourceTypesFhirR4.Parameters, parameter: [{ name: 'patient', valueString: subject }] },
         },
       })).status).toBe(202);
       const result = await poll(app, `${route}/_search-response`, searchThid);
@@ -99,7 +101,7 @@ describe('RelatedPerson subject-scoped search API', () => {
 
       expect(responseBody.total).toBe(1);
       expect(responseBody.data).toHaveLength(1);
-      expect(responseBody.data[0].resource.resource).toMatchObject({ resourceType: 'RelatedPerson' });
+      expect(responseBody.data[0].resource.resource).toMatchObject({ resourceType: ResourceTypesFhirR4.RelatedPerson });
       expect(responseBody.data[0].resource.data).toBeUndefined();
     } finally {
       queueAdapter.stop();
@@ -110,7 +112,7 @@ describe('RelatedPerson subject-scoped search API', () => {
 async function poll(app: any, url: string, thid: string): Promise<any> {
   for (let attempt = 0; attempt < 50; attempt += 1) {
     const response = await invokeExpress(app, {
-      method: 'POST', url, headers: { 'content-type': 'application/json' }, body: { thid },
+      method: HttpRequestMethods.Post, url, headers: { 'content-type': 'application/json' }, body: { thid },
     });
     if (response.status === 200) return JSON.parse(response.text);
     await new Promise((resolve) => setTimeout(resolve, 50));

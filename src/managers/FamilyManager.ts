@@ -1,5 +1,7 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/managers/FamilyManager.ts
+import { GatewayRequestEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
+import { HttpStatusCodes } from 'gdc-common-utils-ts/constants/http';
 import { createHash } from 'crypto';
 
 import { v4 as uuidv4 } from 'uuid';
@@ -17,7 +19,7 @@ import { IncludedResource } from 'gdc-common-utils-ts/models/jsonapi';
 import { ClaimsRecord } from 'gdc-common-utils-ts/models/resource-document';
 import { ClaimsOfferSchemaorg, ClaimsOrderSchemaorg, ClaimsOrganizationSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { Sector } from 'gdc-common-utils-ts/models/urlPath';
-import { getBundleResponseTypeForAction } from '../utils/bundle';
+import { BundleType, getBundleResponseTypeForAction } from '../utils/bundle';
 import { getClaimValue, normalizeContextualizedClaims } from '../utils/claims';
 import { formatMissingRequiredClaimDiagnostic, toExternalClaimLabel } from '../utils/claim-contract';
 import {
@@ -57,6 +59,8 @@ import {
 } from '../constants/domain';
 import { buildSearchResponseEntries } from '../utils/didcomm-response';
 import { GatewayResponseEntryTypes } from '../shared/gateway-response-types';
+import { FamilyRegistrationStatus, GatewayClaim } from '../shared/gateway-claim-contract';
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 
 type FamilyRegistrationContent = {
   status: EntityLifecycleStatus;
@@ -116,7 +120,7 @@ export class FamilyManager {
 
     const responseBundle: BundleJsonApi = {
       data: responseEntries,
-      resourceType: 'Bundle',
+      resourceType: ResourceTypesFhirR4.Bundle,
       type: getBundleResponseTypeForAction(job.action),
       total: responseEntries.length,
     };
@@ -232,8 +236,8 @@ export class FamilyManager {
   }
 
   private async processFamilyRegistrationEntry(job: JobRequest, entry: BundleEntry, environment?: string): Promise<BundleEntry | ErrorEntry> {
-    const entryType = entry.type || 'Family-registration-form-v1.0';
-    const rawClaims = entry?.meta?.claims;
+    const entryType = entry.type || GatewayRequestEntryTypes.FamilyRegistrationForm;
+    const rawClaims = entry?.resource?.meta?.claims ?? entry?.meta?.claims;
     const rawClaimsObject = (rawClaims && typeof rawClaims === 'object') ? rawClaims as Record<string, unknown> : {};
     const normalizedRawClaims: ClaimsRecord | undefined = Object.keys(rawClaimsObject).length > 0
       ? (normalizeContextualizedClaims(rawClaimsObject) as ClaimsRecord)
@@ -295,17 +299,14 @@ export class FamilyManager {
         if (existing.length > 0) {
           const secureExisting = existing[0] as ConfidentialStorageDoc;
           const existingContent = await this.kmsService.unprotectConfidentialData<FamilyRegistrationContent>(secureExisting, tenantVaultId);
-          const regStatus = existingContent?.status === EntityLifecycleStatus.Active ? 'already_exists' : 'resume_required';
+          const regStatus = existingContent?.status === EntityLifecycleStatus.Active ? FamilyRegistrationStatus.Existing : FamilyRegistrationStatus.ResumeRequired;
           return {
-            type: 'Family-registration-offer-v1.0',
-            meta: {
-              claims: {
+            type: GatewayResponseEntryTypes.FamilyRegistrationOffer,
+            resource: { resourceType: ResourceTypesFhirR4.Organization, id: secureExisting.id, meta: { claims: {
                 ...(existingContent?.claims || {}),
-                'org.schema.FamilyRegistration.status': regStatus,
-              },
-            },
-            resource: { resourceType: 'Organization', id: secureExisting.id },
-            response: { status: '200' },
+                [GatewayClaim.FamilyRegistrationStatus]: regStatus,
+              } } },
+            response: { status: String(HttpStatusCodes.Ok) },
           };
       }
     }
@@ -320,17 +321,14 @@ export class FamilyManager {
       if (existing.length > 0) {
         const secureExisting = existing[0] as ConfidentialStorageDoc;
         const existingContent = await this.kmsService.unprotectConfidentialData<FamilyRegistrationContent>(secureExisting, tenantVaultId);
-        const regStatus = existingContent?.status === EntityLifecycleStatus.Active ? 'already_exists' : 'resume_required';
+        const regStatus = existingContent?.status === EntityLifecycleStatus.Active ? FamilyRegistrationStatus.Existing : FamilyRegistrationStatus.ResumeRequired;
         return {
-          type: 'Family-registration-offer-v1.0',
-          meta: {
-            claims: {
+          type: GatewayResponseEntryTypes.FamilyRegistrationOffer,
+          resource: { resourceType: ResourceTypesFhirR4.Organization, id: secureExisting.id, meta: { claims: {
               ...(existingContent?.claims || {}),
-              'org.schema.FamilyRegistration.status': regStatus,
-            },
-          },
-          resource: { resourceType: 'Organization', id: secureExisting.id },
-          response: { status: '200' },
+              [GatewayClaim.FamilyRegistrationStatus]: regStatus,
+            } } },
+          response: { status: String(HttpStatusCodes.Ok) },
         };
       }
     }
@@ -399,10 +397,9 @@ export class FamilyManager {
     await this.vaultRepository.put(tenantCollectionName, [secureDoc], INDIVIDUAL_SECTION);
 
     return {
-      type: 'Family-registration-offer-v1.0',
-      meta: { claims: { ...processedClaims, 'org.schema.FamilyRegistration.status': 'new_created' } },
-      resource: { resourceType: 'Organization', id: familyDocId },
-      response: { status: '201' },
+      type: GatewayResponseEntryTypes.FamilyRegistrationOffer,
+      resource: { resourceType: ResourceTypesFhirR4.Organization, id: familyDocId, meta: { claims: { ...processedClaims, [GatewayClaim.FamilyRegistrationStatus]: FamilyRegistrationStatus.Created } } },
+      response: { status: String(HttpStatusCodes.Created) },
     };
   }
 
@@ -448,7 +445,7 @@ export class FamilyManager {
     return {
       type: documentReferenceEntry.type,
       resource: documentReferenceEntry.resource as any,
-      response: { status: '200' },
+      response: { status: String(HttpStatusCodes.Ok) },
     };
   }
 
@@ -516,7 +513,7 @@ export class FamilyManager {
 
   private async processFamilyOrderEntry(job: JobRequest, entry: BundleEntry, environment?: string): Promise<BundleEntry | ErrorEntry> {
     const entryType = entry.type || 'Family-order-request-v1.0';
-    const rawClaims = entry?.meta?.claims;
+    const rawClaims = entry?.resource?.meta?.claims ?? entry?.meta?.claims;
     const claims: ClaimsRecord | undefined = rawClaims ? (normalizeContextualizedClaims(rawClaims) as ClaimsRecord) : rawClaims;
     if (!claims) {
       throw new ManagerError('Malformed order entry: missing meta.claims', IssueType.Required);
@@ -702,10 +699,9 @@ export class FamilyManager {
     await this.vaultRepository.put(tenantCollectionName, [secureCommunicationDoc], getEnvSectionId('communications'));
 
     return {
-      type: 'Family-order-response-v1.0',
-      meta: { claims: paymentCommunication.claims },
-      resource: invoiceBundle as any,
-      response: { status: '201' },
+      type: GatewayResponseEntryTypes.FamilyOrder,
+      resource: { ...(invoiceBundle as any), meta: { ...((invoiceBundle as any).meta || {}), claims: paymentCommunication.claims } },
+      response: { status: String(HttpStatusCodes.Created) },
     };
   }
 
@@ -826,18 +822,22 @@ export class FamilyManager {
     await this.vaultRepository.put(tenantCollectionName, [secureCommunicationDoc], getEnvSectionId('communications'));
 
     return {
-      type: 'Family-order-response-v1.0',
-      meta: { claims: paymentCommunication.claims },
-      resource: invoiceBundle as any,
-      response: { status: '201' },
+      type: GatewayResponseEntryTypes.FamilyOrder,
+      resource: { ...(invoiceBundle as any), meta: { ...((invoiceBundle as any).meta || {}), claims: paymentCommunication.claims } },
+      response: { status: String(HttpStatusCodes.Created) },
     };
   }
 
   private handleError(error: any, entryType: string = 'unknown', meta?: any): ErrorEntry {
+    const { claims, ...entryMeta } = meta || {};
+    const canonicalMetadata = {
+      ...(Object.keys(entryMeta).length > 0 ? { meta: entryMeta } : {}),
+      ...(claims ? { resource: { resourceType: ResourceTypesFhirR4.OperationOutcome, meta: { claims } } } : {}),
+    };
     if (error instanceof ManagerError) {
       return {
         type: entryType,
-        meta,
+        ...canonicalMetadata,
         response: {
           status: error.status,
           outcome: createOperationOutcome(IssueLevel.Error, error.code, error.message),
@@ -847,9 +847,9 @@ export class FamilyManager {
     this.logger.error('Unexpected error during family processing:', error);
     return {
       type: entryType,
-      meta,
+      ...canonicalMetadata,
       response: {
-        status: '500',
+        status: String(HttpStatusCodes.InternalServerError),
         outcome: createOperationOutcome(IssueLevel.Error, IssueType.Exception, 'An unexpected internal server error occurred.'),
       },
     };
@@ -861,7 +861,7 @@ export class FamilyManager {
    * browser-independent card recovery contract used by product BFFs.
    */
   private async processFamilySearchEntry(job: JobRequest, entry: BundleEntry, environment?: string): Promise<BundleEntry | ErrorEntry> {
-    const rawClaims = entry?.meta?.claims;
+    const rawClaims = entry?.resource?.meta?.claims ?? entry?.meta?.claims;
     const claims: ClaimsRecord | undefined = rawClaims ? (normalizeContextualizedClaims(rawClaims) as ClaimsRecord) : rawClaims;
     if (!claims) {
       throw new ManagerError('Malformed entry: missing meta.claims', IssueType.Required);
@@ -899,35 +899,30 @@ export class FamilyManager {
 
     if (!foundResult) {
       return {
-        type: 'Family-search-result-v1.0',
-        meta: {
-          claims: {
-            'org.schema.FamilyRegistration.status': 'not_found',
+        type: GatewayResponseEntryTypes.FamilySearch,
+        resource: { meta: { claims: {
+            [GatewayClaim.FamilyRegistrationStatus]: FamilyRegistrationStatus.NotFound,
             [ClaimsOrganizationSchemaorg.alternateName]: nickname,
-          },
-        },
-        response: { status: '200' },
+          } } },
+        response: { status: String(HttpStatusCodes.Ok) },
       };
     }
 
     const decryptedContent = await this.kmsService.unprotectConfidentialData<FamilyRegistrationContent>(foundResult, tenantVaultId);
-    const regStatus = decryptedContent?.status === EntityLifecycleStatus.Active ? 'already_exists' : 'resume_required';
+    const regStatus = decryptedContent?.status === EntityLifecycleStatus.Active ? FamilyRegistrationStatus.Existing : FamilyRegistrationStatus.ResumeRequired;
 
     return {
-      type: 'Family-search-result-v1.0',
-      meta: {
-        claims: {
+      type: GatewayResponseEntryTypes.FamilySearch,
+      resource: { resourceType: ResourceTypesFhirR4.Organization, id: foundResult.id, meta: { claims: {
           ...decryptedContent?.claims,
-          'org.schema.FamilyRegistration.status': regStatus,
-        },
-      },
-      resource: { resourceType: 'Organization', id: foundResult.id },
-      response: { status: '200' },
+          [GatewayClaim.FamilyRegistrationStatus]: regStatus,
+        } } },
+      response: { status: String(HttpStatusCodes.Ok) },
     };
   }
 
   private async processFamilyPurgeEntry(job: JobRequest, entry: BundleEntry): Promise<BundleEntry | ErrorEntry> {
-    const rawClaims = entry?.meta?.claims;
+    const rawClaims = entry?.resource?.meta?.claims ?? entry?.meta?.claims;
     const claims: ClaimsRecord | undefined = rawClaims ? (normalizeContextualizedClaims(rawClaims) as ClaimsRecord) : rawClaims;
     if (!claims) {
       throw new ManagerError('Malformed entry: missing meta.claims', IssueType.Required);
@@ -973,15 +968,12 @@ export class FamilyManager {
     });
 
     return {
-      type: 'Family-purge-response-v1.0',
-      meta: {
-        claims: {
+      type: GatewayResponseEntryTypes.FamilyPurge,
+      resource: { resourceType: ResourceTypesFhirR4.Organization, id: foundResult.id, meta: { claims: {
           [ClaimsOrganizationSchemaorg.alternateName]: nickname,
-          'org.schema.FamilyRegistration.status': 'purged',
-        },
-      },
-      resource: { resourceType: 'Organization', id: foundResult.id },
-      response: { status: '200' },
+          [GatewayClaim.FamilyRegistrationStatus]: FamilyRegistrationStatus.Purged,
+        } } },
+      response: { status: String(HttpStatusCodes.Ok) },
     };
   }
 
@@ -1111,7 +1103,7 @@ export class FamilyManager {
   }
 
   private async processFamilyDisableEntry(job: JobRequest, entry: BundleEntry): Promise<BundleEntry | ErrorEntry> {
-    const rawClaims = entry?.meta?.claims;
+    const rawClaims = entry?.resource?.meta?.claims ?? entry?.meta?.claims;
     const claims: ClaimsRecord | undefined = rawClaims ? (normalizeContextualizedClaims(rawClaims) as ClaimsRecord) : rawClaims;
     if (!claims) {
       throw new ManagerError('Malformed entry: missing meta.claims', IssueType.Required);
@@ -1154,15 +1146,12 @@ export class FamilyManager {
     await this.vaultRepository.put(tenantCollectionName, [secureUpdatedDoc], INDIVIDUAL_SECTION);
 
     return {
-      type: 'Family-disable-response-v1.0',
-      meta: {
-        claims: {
+      type: GatewayResponseEntryTypes.FamilyDisable,
+      resource: { resourceType: ResourceTypesFhirR4.Organization, id: foundResult.id, meta: { claims: {
           [ClaimsOrganizationSchemaorg.alternateName]: nickname,
-          'org.schema.FamilyRegistration.status': 'disabled',
-        },
-      },
-      resource: { resourceType: 'Organization', id: foundResult.id },
-      response: { status: '200' },
+          [GatewayClaim.FamilyRegistrationStatus]: FamilyRegistrationStatus.Disabled,
+        } } },
+      response: { status: String(HttpStatusCodes.Ok) },
     };
   }
 
@@ -1307,24 +1296,23 @@ export class FamilyManager {
       entries.push({
         fullUrl: `Organization/${document.id}`,
         resource: {
-          resourceType: 'Organization',
+          resourceType: ResourceTypesFhirR4.Organization,
           id: document.id,
           meta: {
             claims: {
               ...claims,
-              'org.schema.FamilyRegistration.status': content?.status === EntityLifecycleStatus.Active
-                ? 'already_exists'
-                : 'resume_required',
+              [GatewayClaim.FamilyRegistrationStatus]: content?.status === EntityLifecycleStatus.Active
+                ? FamilyRegistrationStatus.Existing
+                : FamilyRegistrationStatus.ResumeRequired,
             },
           },
         },
       });
     }
     return {
-      type: 'Family-owner-directory-result-v1.0',
-      meta: { claims: { 'org.schema.FamilyRegistration.resultCount': String(entries.length) } },
-      resource: { resourceType: 'Bundle', type: 'searchset', entry: entries } as any,
-      response: { status: '200' },
+      type: GatewayResponseEntryTypes.FamilyOwnerDirectory,
+      resource: { resourceType: ResourceTypesFhirR4.Bundle, type: BundleType.Searchset, entry: entries, meta: { claims: { [GatewayClaim.FamilyRegistrationResultCount]: String(entries.length) } } } as any,
+      response: { status: String(HttpStatusCodes.Ok) },
     };
   }
 

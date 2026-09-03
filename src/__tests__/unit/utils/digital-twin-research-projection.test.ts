@@ -1,4 +1,5 @@
 // TDD contract: write this test red first; make it green only with the complete real behavior.
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 import {
   DIGITAL_TWIN_SEARCH_DATE_CLAIM,
   DIGITAL_TWIN_SEARCH_LANGUAGE_CLAIM,
@@ -41,7 +42,7 @@ describe('digital twin research projection', () => {
   it('removes free text and replaces identifiers and subject references consistently', () => {
     const twinSubjectId = 'urn:uuid:00000000-0000-4000-8000-000000000001';
     const projected = projectClaimsForDigitalTwin({
-      resourceType: 'MedicationStatement',
+      resourceType: ResourceTypesFhirR4.MedicationStatement,
       twinSubjectId,
       claims: {
         '@context': 'org.hl7.fhir.r4',

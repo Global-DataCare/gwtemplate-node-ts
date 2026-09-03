@@ -1,6 +1,7 @@
 // TDD contract: write this test red first; make it green only with the complete real behavior.
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/__tests__/unit/managers/ObservationManager.test.ts
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 
 import { describe, expect, it, jest, beforeEach } from '@jest/globals';
 import { ObservationManager } from '../../../managers/ObservationManager';
@@ -32,7 +33,7 @@ describe('ObservationManager', () => {
     sector: 'health-care',
     section: 'individual',
     format: 'org.hl7.fhir.api',
-    resourceType: 'Observation',
+    resourceType: ResourceTypesFhirR4.Observation,
     action: '_batch',
     content: {
       jti: 'jti-observation-1',
@@ -42,10 +43,10 @@ describe('ObservationManager', () => {
       exp: Math.floor(Date.now() / 1000) + 300,
       type: 'org.hl7.fhir.api.Bundle',
       body: {
-        resourceType: 'Bundle',
+        resourceType: ResourceTypesFhirR4.Bundle,
         type: 'batch',
         entry: [{
-          type: 'Observation',
+          type: ResourceTypesFhirR4.Observation,
           meta: {
             claims: {
               '@context': 'org.hl7.fhir.api',

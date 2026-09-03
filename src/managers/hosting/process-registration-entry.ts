@@ -1,3 +1,5 @@
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
+import { HttpStatusCodes } from 'gdc-common-utils-ts/constants/http';
 import type { BundleEntry, ErrorEntry } from 'gdc-common-utils-ts/models/bundle';
 import type { DidCommDecodedMetadata } from 'gdc-common-utils-ts/models/confidential-message';
 import type { ClaimsRecord } from 'gdc-common-utils-ts/models/resource-document';
@@ -38,7 +40,7 @@ type ProcessRegistrationEntryDeps = Readonly<{
 export async function processRegistrationEntry(
   deps: ProcessRegistrationEntryDeps,
 ): Promise<BundleEntry | ErrorEntry> {
-  const rawClaims = deps.entry?.meta?.claims;
+  const rawClaims = deps.entry?.resource?.meta?.claims ?? deps.entry?.meta?.claims;
   const claims = rawClaims ? normalizeContextualizedClaims(rawClaims) : rawClaims;
   const entryType = deps.entry.type || 'Organization-unknown';
 
@@ -94,12 +96,12 @@ export async function processRegistrationEntry(
 
     return {
       type: BundleEntryType.OrgRegistrationOffer,
-      meta: { claims: processedClaims },
       resource: {
-        resourceType: 'Organization',
+        resourceType: ResourceTypesFhirR4.Organization,
         id: organization.id,
+        meta: { claims: processedClaims },
       },
-      response: { status: '201' },
+      response: { status: String(HttpStatusCodes.Created) },
     };
   } catch (error: any) {
     console.log('--- DEBUG: Caught error in processRegistrationEntry ---', error);

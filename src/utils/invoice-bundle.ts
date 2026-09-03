@@ -1,3 +1,4 @@
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 import { Buffer } from 'buffer';
 import { hashUblInvoiceXml } from './ubl-invoice';
 
@@ -82,12 +83,12 @@ export function buildGatewayInvoiceBundle(
   const structuredXml = buildInvoiceXml(input);
   const xmlHash = hashUblInvoiceXml(structuredXml).hashHex;
   return {
-    resourceType: 'Bundle',
+    resourceType: ResourceTypesFhirR4.Bundle,
     type: 'collection',
     entry: [
       {
         resource: {
-          resourceType: 'Invoice',
+          resourceType: ResourceTypesFhirR4.Invoice,
           id: input.invoiceId,
           status: 'issued',
           identifier: [{ value: input.invoiceId }],
@@ -109,7 +110,7 @@ export function buildGatewayInvoiceBundle(
       },
       {
         resource: {
-          resourceType: 'DocumentReference',
+          resourceType: ResourceTypesFhirR4.DocumentReference,
           id: `${input.invoiceId}-pdf`,
           status: 'current',
           identifier: [{ value: `${input.invoiceId}-pdf` }],
@@ -129,7 +130,7 @@ export function buildGatewayInvoiceBundle(
       },
       {
         resource: {
-          resourceType: 'DocumentReference',
+          resourceType: ResourceTypesFhirR4.DocumentReference,
           id: `${input.invoiceId}-json`,
           status: 'current',
           identifier: [{ value: `${input.invoiceId}-json` }],

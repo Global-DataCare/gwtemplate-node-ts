@@ -40,6 +40,7 @@ JSON
 
 AUTHORIZATION_JSON="${WORK}/authorization.json" \
 CA_URL="https://fabric-ica.example.invalid:7054" \
+CA_NAME='fabric-ica-hostexample' \
 CA_ADMIN_HOME="${WORK}/ca-admin" \
 CLIENT_ENROLLMENT_OUTPUT_FILE="${WORK}/client-grant.json" \
 HOST_CLIENT_ENROLLMENT_SECRET='client-secret-must-not-print' \
@@ -48,11 +49,13 @@ NOW_EPOCH_SECONDS=1700000000 \
 
 jq -e '
   .specVersion == "gdc.fabric.host-client-enrollment-grant/v1" and
+  .caName == "fabric-ica-hostexample" and
   .mspId == "HostExampleMSP" and .hostCredentialId == "urn:uuid:host-credential" and
   .maxEnrollments == 1 and .issuedAt == "2023-11-14T22:13:20Z" and
   .expiresAt == "2023-11-14T22:28:20Z"
 ' "${WORK}/client-grant.json" >/dev/null
 grep -Fq -- '--id.type client' "${WORK}/ca.calls"
+grep -Fq -- '--caname fabric-ica-hostexample' "${WORK}/ca.calls"
 credential_digest="$(printf '%s' 'urn:uuid:host-credential' | shasum -a 256 | awk '{print $1}')"
 grep -Fq -- "gdc.hostCredentialSha256=${credential_digest}:ecert" "${WORK}/ca.calls"
 ! grep -Fq -- 'gdc.hostCredentialId=' "${WORK}/ca.calls"

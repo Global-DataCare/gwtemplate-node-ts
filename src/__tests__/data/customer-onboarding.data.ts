@@ -1,6 +1,7 @@
 // TDD contract: write this test red first; make it green only with the complete real behavior.
 // src/__tests__/data/customer-onboarding.data.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
 
 import { ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { JobAction, Resource, Format, Section, Sector } from 'gdc-common-utils-ts/models/urlPath';
@@ -63,7 +64,7 @@ export const testIndividualConsentSignedOnboardingEntry =     {
         }
     },
     request: {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: testCustomerOnboardingRelativePath
     },
     type: 'IndividualTerms',
@@ -94,7 +95,7 @@ export const testIndividualOnboardingBatchEntries = [
             }
         },
         request: {
-            method: 'POST',
+            method: HttpRequestMethods.Post,
             url: testCustomerOnboardingRelativePath
         },
         type: 'PersonalIdentity',

@@ -1,6 +1,9 @@
 // Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/__tests__/unit/managers/CompositionManager.test.ts
+import { GatewayResponseEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 
 import { describe, expect, it, jest, beforeEach } from '@jest/globals';
 import {
@@ -16,7 +19,6 @@ import {
 } from 'gdc-common-utils-ts/constants/index';
 import { getSubjectScopedSectionId } from '../../../utils/individual-sections';
 import {
-  COMPOSITION_BATCH_ENTRY_EXAMPLE,
   COMPOSITION_SEARCH_BUNDLE_EXAMPLE,
   COMPOSITION_SEARCH_PARAMETERS_EXAMPLE,
 } from '../../../api-examples';
@@ -24,7 +26,11 @@ import { buildOrganizationDidWeb, buildProfessionalDidWeb } from 'gdc-common-uti
 import {
   EXAMPLE_HOST_PUBLIC_HOSTNAME,
   EXAMPLE_ROUTE_VERSION,
+  EXAMPLE_SUBJECT_DID,
   EXAMPLE_TENANT_ROUTE_CONTEXT,
+  EXAMPLE_TENANT_SERVICE_DID,
+  EXAMPLE_LICENSE_SEAT_UUID_ACTIVE,
+  EXAMPLE_PROFESSIONAL_DID,
 } from 'gdc-common-utils-ts/examples/shared';
 import {
   ExampleEmployeeEmails,
@@ -32,6 +38,11 @@ import {
 } from 'gdc-common-utils-ts/examples/employee';
 import { getDigitalTwinSubjectAliasSectionId } from '../../../utils/digital-twin-research-projection';
 import { extractBundleSearchResources } from 'gdc-common-utils-ts/utils/organization-employee-lifecycle';
+import { CompositionClaim } from 'gdc-common-utils-ts/models/interoperable-claims/composition-claims';
+import {
+  EXAMPLE_RESEARCHER_WORKING_SELECTION_SUBJECT_ID,
+  buildResearcherWorkingSelectionBundle,
+} from 'gdc-common-utils-ts/examples/researcher-working-selection';
 
 const HOSTED_ORGANIZATION_DID = buildOrganizationDidWeb({
   hostDidWeb: `did:web:${EXAMPLE_HOST_PUBLIC_HOSTNAME}`,
@@ -45,7 +56,7 @@ const OPERATIONAL_EMPLOYEE_DID = buildProfessionalDidWeb({
   email: ExampleEmployeeEmails.SharedProfessional,
   role: ExampleEmployeeRoles.Doctor,
 });
-const REGISTERED_TWIN_SUBJECT = 'urn:uuid:00000000-0000-4000-8000-000000000101';
+const REGISTERED_TWIN_SUBJECT = EXAMPLE_RESEARCHER_WORKING_SELECTION_SUBJECT_ID;
 
 /**
  * Flow contract: authorized callers search one tenant's pseudonymous twins;
@@ -94,31 +105,21 @@ describe('CompositionManager', () => {
     sector: 'animal-research',
     section: 'digitaltwin',
     format: 'org.hl7.fhir.api',
-    resourceType: 'Composition',
+    resourceType: ResourceTypesFhirR4.Composition,
     action: '_batch',
     content: {
       jti: 'jti-comp-1',
       thid: 'thid-comp-1',
-      iss: 'did:web:clinic.example.com:employee:loader',
+      iss: EXAMPLE_PROFESSIONAL_DID,
       aud: 'did:web:api.example.com',
       exp: Math.floor(Date.now() / 1000) + 300,
       type: 'org.hl7.fhir.api.Bundle',
       body: {
-        resourceType: 'Bundle',
+        resourceType: ResourceTypesFhirR4.Bundle,
         type: 'batch',
-        entry: [
-          {
-            ...COMPOSITION_BATCH_ENTRY_EXAMPLE,
-            meta: {
-              ...(COMPOSITION_BATCH_ENTRY_EXAMPLE as any).meta,
-              claims: {
-                ...(COMPOSITION_BATCH_ENTRY_EXAMPLE as any).meta.claims,
-                '@type': 'Composition:ResearcherWorkingSelection',
-                'Composition.subject': REGISTERED_TWIN_SUBJECT,
-              },
-            },
-          },
-        ],
+        entry: buildResearcherWorkingSelectionBundle({
+          subjectId: REGISTERED_TWIN_SUBJECT,
+        }).entry,
       } as any,
     } as any,
     ...overrides,
@@ -152,12 +153,12 @@ describe('CompositionManager', () => {
 
   it('rejects a digital-twin working selection whose author differs from the authenticated employee', async () => {
     const entry = structuredClone((createJob().content as any).body.entry[0]);
-    entry.meta.claims['Composition.author'] = `${OPERATIONAL_EMPLOYEE_DID}:another`;
+    entry.resource.meta.claims[CompositionClaim.Author] = `${OPERATIONAL_EMPLOYEE_DID}:another`;
     const response = await manager.process(createJob({
       content: {
         ...(createJob().content as any),
         meta: { bearer: { jwt: { payload: { sub: OPERATIONAL_EMPLOYEE_DID } } } },
-        body: { resourceType: 'Bundle', type: 'batch', entry: [entry] },
+        body: { resourceType: ResourceTypesFhirR4.Bundle, type: 'batch', entry: [entry] },
       } as any,
     }));
 
@@ -169,11 +170,11 @@ describe('CompositionManager', () => {
 
   it('rejects a direct canonical digital-twin Composition write', async () => {
     const entry = structuredClone((createJob().content as any).body.entry[0]);
-    delete entry.meta.claims['@type'];
+    delete entry.resource.meta.claims['@type'];
     const response = await manager.process(createJob({
       content: {
         ...(createJob().content as any),
-        body: { resourceType: 'Bundle', type: 'batch', entry: [entry] },
+        body: { resourceType: ResourceTypesFhirR4.Bundle, type: 'batch', entry: [entry] },
       } as any,
     }));
 
@@ -187,12 +188,12 @@ describe('CompositionManager', () => {
     const sourceSubject = 'did:web:patient.example.org:individual:real-subject';
     const response = await manager.process(createJob({
       section: 'individual',
-      resourceType: 'ResearchSubject',
+      resourceType: ResourceTypesFhirR4.ResearchSubject,
       action: '_purge',
       content: {
         ...(createJob().content as any),
         body: {
-          resourceType: 'Parameters',
+          resourceType: ResourceTypesFhirR4.Parameters,
           parameter: [{ name: 'subject', valueString: sourceSubject }],
         },
       } as any,
@@ -206,11 +207,11 @@ describe('CompositionManager', () => {
 
   it('rejects a working selection whose subject is an operational DID', async () => {
     const entry = structuredClone((createJob().content as any).body.entry[0]);
-    entry.meta.claims['Composition.subject'] = 'did:web:patient.example.org:individual:real-subject';
+    entry.resource.meta.claims[CompositionClaim.Subject] = EXAMPLE_SUBJECT_DID;
     const response = await manager.process(createJob({
       content: {
         ...(createJob().content as any),
-        body: { resourceType: 'Bundle', type: 'batch', entry: [entry] },
+        body: { resourceType: ResourceTypesFhirR4.Bundle, type: 'batch', entry: [entry] },
       } as any,
     }));
 
@@ -223,11 +224,11 @@ describe('CompositionManager', () => {
   it('rejects an invented UUID URN that is absent from the private alias registry', async () => {
     mockVaultRepository.getContainersInSection.mockResolvedValue([] as any);
     const entry = structuredClone((createJob().content as any).body.entry[0]);
-    entry.meta.claims['Composition.subject'] = 'urn:uuid:00000000-0000-4000-8000-000000000999';
+    entry.resource.meta.claims[CompositionClaim.Subject] = `urn:uuid:${EXAMPLE_LICENSE_SEAT_UUID_ACTIVE}`;
     const response = await manager.process(createJob({
       content: {
         ...(createJob().content as any),
-        body: { resourceType: 'Bundle', type: 'batch', entry: [entry] },
+        body: { resourceType: ResourceTypesFhirR4.Bundle, type: 'batch', entry: [entry] },
       } as any,
     }));
 
@@ -242,12 +243,12 @@ describe('CompositionManager', () => {
       content: {
         ...(createJob().content as any),
         body: {
-          resourceType: 'Bundle',
+          resourceType: ResourceTypesFhirR4.Bundle,
           type: 'batch',
           data: [
             {
               resource: {
-                resourceType: 'OperationOutcome',
+                resourceType: ResourceTypesFhirR4.OperationOutcome,
                 issue: [
                   {
                     severity: 'warning',
@@ -283,7 +284,7 @@ describe('CompositionManager', () => {
 
     const response = await manager.process(job);
     const data = (response.body as any).data;
-    expect(data[0].type).toBe('Composition-search-response-v1.0');
+    expect(data[0].type).toBe(GatewayResponseEntryTypes.CompositionSearch);
     expect(extractBundleSearchResources(response)).toHaveLength(1);
   });
 
@@ -300,7 +301,7 @@ describe('CompositionManager', () => {
 
     const response = await manager.process(job);
     const data = (response.body as any).data;
-    expect(data[0].type).toBe('Composition-search-response-v1.0');
+    expect(data[0].type).toBe(GatewayResponseEntryTypes.CompositionSearch);
     expect(extractBundleSearchResources(response)).toHaveLength(2);
   });
 
@@ -312,16 +313,16 @@ describe('CompositionManager', () => {
       content: {
         ...(createJob().content as any),
         body: {
-          resourceType: 'Bundle',
+          resourceType: ResourceTypesFhirR4.Bundle,
           type: 'batch',
           entry: [
             {
               request: {
-                method: 'POST',
+                method: HttpRequestMethods.Post,
                 url: 'Bundle/_search',
               },
               resource: {
-                resourceType: 'Parameters',
+                resourceType: ResourceTypesFhirR4.Parameters,
                 parameter: [
                   ...COMPOSITION_SEARCH_PARAMETERS_EXAMPLE.parameter,
                 ],
@@ -334,7 +335,7 @@ describe('CompositionManager', () => {
 
     const response = await manager.process(job);
     const data = (response.body as any).data;
-    expect(data[0].type).toBe('Composition-search-response-v1.0');
+    expect(data[0].type).toBe(GatewayResponseEntryTypes.CompositionSearch);
     expect(extractBundleSearchResources(response)).toHaveLength(1);
   });
 
@@ -346,11 +347,11 @@ describe('CompositionManager', () => {
           {
             id: 'composition-summary-001',
             'Composition.identifier': 'composition-summary-001',
-            'Composition.subject': subjectDid,
-            'Composition.section': HealthcareBasicSections.HistoryOfMedicationUse.attributeValue,
-            'Composition.date': '2026-06-01T10:00:00Z',
-            'Composition.author': 'did:web:provider.example.org',
-            'Composition.type': HealthcareBasicSections.PatientSummaryDocument.attributeValue,
+            [CompositionClaim.Subject]: subjectDid,
+            [CompositionClaim.Section]: HealthcareBasicSections.HistoryOfMedicationUse.attributeValue,
+            [CompositionClaim.Date]: '2026-06-01T10:00:00Z',
+            [CompositionClaim.Author]: EXAMPLE_TENANT_SERVICE_DID,
+            [CompositionClaim.Type]: HealthcareBasicSections.PatientSummaryDocument.attributeValue,
           },
         ] as any;
       }
@@ -366,7 +367,7 @@ describe('CompositionManager', () => {
       content: {
         ...(createJob().content as any),
         body: {
-          resourceType: 'Parameters',
+          resourceType: ResourceTypesFhirR4.Parameters,
           parameter: [
             { name: 'subject', valueString: subjectDid },
           ],
@@ -376,7 +377,7 @@ describe('CompositionManager', () => {
 
     const response = await manager.process(job);
     const data = (response.body as any).data;
-    expect(data[0].type).toBe('Bundle-summary-response-v1.0');
+    expect(data[0].type).toBe(GatewayResponseEntryTypes.BundleSummary);
     expect(data[0].resource.resourceType).toBe('Bundle');
     expect(data[0].resource.type).toBe('document');
   });
@@ -387,12 +388,12 @@ describe('CompositionManager', () => {
       sector: 'health-care',
       section: 'digitaltwin',
       format: 'org.hl7.fhir.r4',
-      resourceType: 'ResearchSubject',
+      resourceType: ResourceTypesFhirR4.ResearchSubject,
       action: '$summary',
       content: {
         ...(createJob().content as any),
         body: {
-          resourceType: 'Parameters',
+          resourceType: ResourceTypesFhirR4.Parameters,
           parameter: [{ name: 'subject', valueString: operationalSubjectDid }],
         },
       } as any,
@@ -409,11 +410,11 @@ describe('CompositionManager', () => {
           {
             id: 'composition-twin-summary-001',
             'Composition.identifier': 'urn:uuid:composition-twin-summary-001',
-            'Composition.subject': subjectDid,
-            'Composition.section': HealthcareBasicSections.HistoryOfMedicationUse.attributeValue,
-            'Composition.date': '2026-06-01T10:00:00Z',
-            'Composition.author': 'did:web:provider.example.org',
-            'Composition.type': HealthcareBasicSections.PatientSummaryDocument.attributeValue,
+            [CompositionClaim.Subject]: subjectDid,
+            [CompositionClaim.Section]: HealthcareBasicSections.HistoryOfMedicationUse.attributeValue,
+            [CompositionClaim.Date]: '2026-06-01T10:00:00Z',
+            [CompositionClaim.Author]: EXAMPLE_TENANT_SERVICE_DID,
+            [CompositionClaim.Type]: HealthcareBasicSections.PatientSummaryDocument.attributeValue,
           },
         ] as any;
       }
@@ -437,12 +438,12 @@ describe('CompositionManager', () => {
       sector: 'health-care',
       section: 'digitaltwin',
       format: 'org.hl7.fhir.r4',
-      resourceType: 'ResearchSubject',
+      resourceType: ResourceTypesFhirR4.ResearchSubject,
       action: '$summary',
       content: {
         ...(createJob().content as any),
         body: {
-          resourceType: 'Parameters',
+          resourceType: ResourceTypesFhirR4.Parameters,
           parameter: [
             { name: 'subject', valueString: subjectDid },
           ],
@@ -452,7 +453,7 @@ describe('CompositionManager', () => {
 
     const response = await manager.process(job);
     const data = (response.body as any).data;
-    expect(data[0].type).toBe('Bundle-summary-response-v1.0');
+    expect(data[0].type).toBe(GatewayResponseEntryTypes.BundleSummary);
     expect(data[0].resource.resourceType).toBe('Bundle');
     expect(data[0].resource.type).toBe('document');
     expect(data[0].resource.entry[0].fullUrl).toMatch(/^urn:uuid:/);
@@ -467,9 +468,9 @@ describe('CompositionManager', () => {
         return [{
           id: 'composition-immunization-summary-001',
           'Composition.identifier': 'urn:uuid:composition-immunization-summary-001',
-          'Composition.subject': subjectDid,
-          'Composition.section': HealthcareBasicSections.Immunizations.attributeValue,
-          'Composition.type': HealthcareBasicSections.PatientSummaryDocument.attributeValue,
+          [CompositionClaim.Subject]: subjectDid,
+          [CompositionClaim.Section]: HealthcareBasicSections.Immunizations.attributeValue,
+          [CompositionClaim.Type]: HealthcareBasicSections.PatientSummaryDocument.attributeValue,
         }] as any;
       }
       if (sectionId === getSubjectScopedSectionId(subjectDid, 'individual', DataCollectionIds.immunizations)) {
@@ -506,7 +507,7 @@ describe('CompositionManager', () => {
       content: {
         ...(createJob().content as any),
         body: {
-          resourceType: 'Parameters',
+          resourceType: ResourceTypesFhirR4.Parameters,
           parameter: [{ name: 'subject', valueString: subjectDid }],
         },
       } as any,
@@ -535,7 +536,7 @@ describe('CompositionManager', () => {
             'org.hl7.fhir.r4.Composition.subject': subjectDid,
             'org.hl7.fhir.r4.Composition.section': HealthcareBasicSections.VitalSigns.attributeValue,
             'org.hl7.fhir.r4.Composition.date': '2026-06-01T10:00:00Z',
-            'org.hl7.fhir.r4.Composition.author': 'did:web:provider.example.org',
+            'org.hl7.fhir.r4.Composition.author': EXAMPLE_TENANT_SERVICE_DID,
             'org.hl7.fhir.r4.Composition.type': HealthcareBasicSections.PatientSummaryDocument.attributeValue,
           },
         ] as any;
@@ -560,12 +561,12 @@ describe('CompositionManager', () => {
       sector: 'health-care',
       section: 'digitaltwin',
       format: 'org.hl7.fhir.api',
-      resourceType: 'ResearchSubject',
+      resourceType: ResourceTypesFhirR4.ResearchSubject,
       action: '$summary',
       content: {
         ...(createJob().content as any),
         body: {
-          resourceType: 'Parameters',
+          resourceType: ResourceTypesFhirR4.Parameters,
           parameter: [
             { name: 'subject', valueString: subjectDid },
           ],
@@ -576,22 +577,22 @@ describe('CompositionManager', () => {
     const response = await manager.process(job);
     const data = (response.body as any).data;
     const bundle = data[0].resource;
-    expect(data[0].type).toBe('Bundle-summary-response-v1.0');
+    expect(data[0].type).toBe(GatewayResponseEntryTypes.BundleSummary);
     expect(bundle.resourceType).toBe('Bundle');
     expect(bundle.type).toBe('document');
     expect(bundle.entry[0].fullUrl).toMatch(/^urn:uuid:/);
     expect(bundle.entry[0].resource).toEqual(expect.objectContaining({
-      resourceType: 'Composition',
+      resourceType: ResourceTypesFhirR4.Composition,
       id: expect.any(String),
       meta: {
         claims: expect.objectContaining({
-          'Composition.subject': subjectDid,
+          [CompositionClaim.Subject]: subjectDid,
         }),
       },
     }));
     const nonCompositionEntry = bundle.entry.find((entry: any) => entry.resource?.resourceType === 'Observation');
     expect(nonCompositionEntry.resource).toEqual({
-      resourceType: 'Observation',
+      resourceType: ResourceTypesFhirR4.Observation,
       id: 'observation-twin-summary-api-001',
       meta: {
         claims: expect.objectContaining({
@@ -607,16 +608,16 @@ describe('CompositionManager', () => {
 
   it('declares the searchable digital twin IPS section to resource map', () => {
     expect(TWIN_COMPOSITION_SECTION_RESOURCE_CONFIG[HealthcareBasicSections.HistoryOfMedicationUse.attributeValue]).toEqual([
-      { collectionIds: [DataCollectionIds.medications], resourceType: 'MedicationStatement' },
+      { collectionIds: [DataCollectionIds.medications], resourceType: ResourceTypesFhirR4.MedicationStatement },
     ]);
     expect(TWIN_COMPOSITION_SECTION_RESOURCE_CONFIG[HealthcareBasicSections.VitalSigns.attributeValue]).toEqual([
-      { collectionIds: [DataCollectionIds.observations], resourceType: 'Observation' },
+      { collectionIds: [DataCollectionIds.observations], resourceType: ResourceTypesFhirR4.Observation },
     ]);
     expect(TWIN_COMPOSITION_SECTION_RESOURCE_CONFIG[HealthcareBasicSections.AdvanceDirectives.attributeValue]).toEqual([
-      { collectionIds: [DataCollectionIds.consents], resourceType: 'Consent' },
+      { collectionIds: [DataCollectionIds.consents], resourceType: ResourceTypesFhirR4.Consent },
     ]);
     expect(TWIN_COMPOSITION_SECTION_RESOURCE_CONFIG[HealthcareSummarySections.PregnancyHistory.attributeValue]).toEqual([
-      { collectionIds: [DataCollectionIds.observations], resourceType: 'Observation' },
+      { collectionIds: [DataCollectionIds.observations], resourceType: ResourceTypesFhirR4.Observation },
     ]);
   });
 
@@ -647,8 +648,8 @@ describe('CompositionManager', () => {
       }] as any;
       if (sectionId === compositionSectionId) return [{
         id: 'composition-basic-search',
-        'Composition.subject': subjectDid,
-        'Composition.section': `${medicationSection},${resultSection}`,
+        [CompositionClaim.Subject]: subjectDid,
+        [CompositionClaim.Section]: `${medicationSection},${resultSection}`,
       }] as any;
       return [] as any;
     });
@@ -658,7 +659,7 @@ describe('CompositionManager', () => {
       content: {
         ...(createJob().content as any),
         body: {
-          resourceType: 'Parameters',
+          resourceType: ResourceTypesFhirR4.Parameters,
           parameter: [
             { name: 'section', valueString: medicationSection },
             { name: 'section', valueString: resultSection },
@@ -680,7 +681,7 @@ describe('CompositionManager', () => {
       content: {
         ...(createJob().content as any),
         body: {
-          resourceType: 'Parameters',
+          resourceType: ResourceTypesFhirR4.Parameters,
           parameter: [
             { name: 'section', valueString: HealthcareBasicSections.Results.attributeValue },
             { name: 'date-from', valueDate: '2026-08-20' },
@@ -697,7 +698,7 @@ describe('CompositionManager', () => {
       title: 'History of Medication Use / MedicationStatement',
       subjectDid: 'did:web:api.acme.org:research-subject:med-001',
       sectionToken: HealthcareBasicSections.HistoryOfMedicationUse.attributeValue,
-      resourceType: 'MedicationStatement',
+      resourceType: ResourceTypesFhirR4.MedicationStatement,
       sectionIdSuffix: 'medications',
       displayClaimKey: 'MedicationStatement.code-display',
       displayValue: 'Paracetamol 500 MG Oral Tablet',
@@ -711,7 +712,7 @@ describe('CompositionManager', () => {
       title: 'Allergies and Intolerances / AllergyIntolerance',
       subjectDid: 'did:web:api.acme.org:research-subject:alg-001',
       sectionToken: HealthcareBasicSections.AllergiesAndIntolerances.attributeValue,
-      resourceType: 'AllergyIntolerance',
+      resourceType: ResourceTypesFhirR4.AllergyIntolerance,
       sectionIdSuffix: 'allergies',
       displayClaimKey: 'AllergyIntolerance.code-display',
       displayValue: 'Penicillin allergy',
@@ -725,7 +726,7 @@ describe('CompositionManager', () => {
       title: 'Problem List / Condition',
       subjectDid: 'did:web:api.acme.org:research-subject:cond-001',
       sectionToken: HealthcareBasicSections.ProblemList.attributeValue,
-      resourceType: 'Condition',
+      resourceType: ResourceTypesFhirR4.Condition,
       sectionIdSuffix: 'conditions',
       displayClaimKey: 'Condition.code-display',
       displayValue: 'Type 2 diabetes mellitus',
@@ -739,7 +740,7 @@ describe('CompositionManager', () => {
       title: 'Results / Observation',
       subjectDid: 'did:web:api.acme.org:research-subject:result-observation-001',
       sectionToken: HealthcareBasicSections.Results.attributeValue,
-      resourceType: 'Observation',
+      resourceType: ResourceTypesFhirR4.Observation,
       sectionIdSuffix: 'observations',
       displayClaimKey: 'Observation.code-display',
       displayValue: 'Hemoglobin [Mass/volume] in Blood',
@@ -781,7 +782,7 @@ describe('CompositionManager', () => {
       title: 'Immunizations / Immunization',
       subjectDid: 'did:web:api.acme.org:research-subject:imm-001',
       sectionToken: HealthcareBasicSections.Immunizations.attributeValue,
-      resourceType: 'Immunization',
+      resourceType: ResourceTypesFhirR4.Immunization,
       sectionIdSuffix: 'immunizations',
       displayClaimKey: 'Immunization.code-display',
       displayValue: 'COVID-19 vaccine',
@@ -795,7 +796,7 @@ describe('CompositionManager', () => {
       title: 'Functional Status / Condition',
       subjectDid: 'did:web:api.acme.org:research-subject:func-001',
       sectionToken: HealthcareBasicSections.FunctionalStatus.attributeValue,
-      resourceType: 'Condition',
+      resourceType: ResourceTypesFhirR4.Condition,
       sectionIdSuffix: 'conditions',
       displayClaimKey: 'Condition.code-display',
       displayValue: 'Reduced mobility',
@@ -837,7 +838,7 @@ describe('CompositionManager', () => {
       title: 'Social History / Observation',
       subjectDid: 'did:web:api.acme.org:research-subject:social-001',
       sectionToken: HealthcareBasicSections.SocialHistory.attributeValue,
-      resourceType: 'Observation',
+      resourceType: ResourceTypesFhirR4.Observation,
       sectionIdSuffix: 'observations',
       displayClaimKey: 'Observation.code-display',
       displayValue: 'Tobacco smoking status',
@@ -851,7 +852,7 @@ describe('CompositionManager', () => {
       title: 'Vital Signs / Observation',
       subjectDid: 'did:web:api.acme.org:research-subject:vs-001',
       sectionToken: HealthcareBasicSections.VitalSigns.attributeValue,
-      resourceType: 'Observation',
+      resourceType: ResourceTypesFhirR4.Observation,
       sectionIdSuffix: 'observations',
       displayClaimKey: 'Observation.code-display',
       displayValue: 'Blood pressure panel',
@@ -865,7 +866,7 @@ describe('CompositionManager', () => {
       title: 'Advance Directives / Consent',
       subjectDid: 'did:web:api.acme.org:research-subject:consent-001',
       sectionToken: HealthcareBasicSections.AdvanceDirectives.attributeValue,
-      resourceType: 'Consent',
+      resourceType: ResourceTypesFhirR4.Consent,
       sectionIdSuffix: 'consents',
       displayClaimKey: 'Consent.code-display',
       displayValue: 'Advance healthcare directive',
@@ -879,7 +880,7 @@ describe('CompositionManager', () => {
       title: 'History of Past Illness / Condition',
       subjectDid: 'did:web:api.acme.org:research-subject:past-001',
       sectionToken: HealthcareBasicSections.HistoryOfPastIllness.attributeValue,
-      resourceType: 'Condition',
+      resourceType: ResourceTypesFhirR4.Condition,
       sectionIdSuffix: 'conditions',
       displayClaimKey: 'Condition.code-display',
       displayValue: 'Asthma',
@@ -893,7 +894,7 @@ describe('CompositionManager', () => {
       title: 'Pregnancy History / Observation',
       subjectDid: 'did:web:api.acme.org:research-subject:preg-001',
       sectionToken: HealthcareSummarySections.PregnancyHistory.attributeValue,
-      resourceType: 'Observation',
+      resourceType: ResourceTypesFhirR4.Observation,
       sectionIdSuffix: 'observations',
       displayClaimKey: 'Observation.code-display',
       displayValue: 'Pregnancy status',
@@ -907,7 +908,7 @@ describe('CompositionManager', () => {
       title: 'Goals and Preferences / Consent',
       subjectDid: 'did:web:api.acme.org:research-subject:goal-001',
       sectionToken: HealthcareSummarySections.GoalsAndPreferences.attributeValue,
-      resourceType: 'Consent',
+      resourceType: ResourceTypesFhirR4.Consent,
       sectionIdSuffix: 'consents',
       displayClaimKey: 'Consent.code-display',
       displayValue: 'Goals of care preferences',
@@ -977,9 +978,9 @@ describe('CompositionManager', () => {
           return [
             {
               id: expectedCompositionId,
-              'Composition.subject': subjectDid,
-              'Composition.section': sectionToken,
-              'Composition.type': HealthcareBasicSections.PatientSummaryDocument.attributeValue,
+              [CompositionClaim.Subject]: subjectDid,
+              [CompositionClaim.Section]: sectionToken,
+              [CompositionClaim.Type]: HealthcareBasicSections.PatientSummaryDocument.attributeValue,
             },
           ] as any;
         }
@@ -991,7 +992,7 @@ describe('CompositionManager', () => {
         content: {
           ...(createJob().content as any),
           body: {
-            resourceType: 'Parameters',
+            resourceType: ResourceTypesFhirR4.Parameters,
             parameter: [
               { name: 'section', valueString: sectionToken },
               { name: searchParameterName, valueString: searchValue },
@@ -1002,7 +1003,7 @@ describe('CompositionManager', () => {
 
       const response = await manager.process(job);
       const data = (response.body as any).data;
-      expect(data[0].type).toBe('Composition-search-response-v1.0');
+      expect(data[0].type).toBe(GatewayResponseEntryTypes.CompositionSearch);
       const matches = extractBundleSearchResources(response);
       expect(matches).toHaveLength(1);
       expect(matches[0].id).toBe(expectedCompositionId);
@@ -1025,21 +1026,21 @@ describe('CompositionManager', () => {
       if (sectionId === compositionSectionId) {
         return [{
           id: 'composition-research-subject-001',
-          'Composition.subject': subjectDid,
-          'Composition.section': HealthcareBasicSections.HistoryOfMedicationUse.attributeValue,
-          'Composition.type': HealthcareBasicSections.PatientSummaryDocument.attributeValue,
+          [CompositionClaim.Subject]: subjectDid,
+          [CompositionClaim.Section]: HealthcareBasicSections.HistoryOfMedicationUse.attributeValue,
+          [CompositionClaim.Type]: HealthcareBasicSections.PatientSummaryDocument.attributeValue,
         }] as any;
       }
       return [] as any;
     });
 
     const response = await twinManager.process(createJob({
-      resourceType: 'ResearchSubject',
+      resourceType: ResourceTypesFhirR4.ResearchSubject,
       action: '_search',
       content: {
         ...(createJob().content as any),
         body: {
-          resourceType: 'Parameters',
+          resourceType: ResourceTypesFhirR4.Parameters,
           parameter: [
             { name: 'section', valueString: HealthcareBasicSections.HistoryOfMedicationUse.attributeValue },
             { name: 'MedicationStatement.code', valueString: 'RXNORM|161' },
@@ -1049,15 +1050,15 @@ describe('CompositionManager', () => {
     }));
 
     const entry = (response.body as any).data[0];
-    expect(entry.type).toBe('ResearchSubject-search-response-v1.0');
+    expect(entry.type).toBe(GatewayResponseEntryTypes.ResearchSubjectSearch);
     expect(extractBundleSearchResources(response)[0]).toMatchObject({
-      resourceType: 'ResearchSubject',
+      resourceType: ResourceTypesFhirR4.ResearchSubject,
       'ResearchSubject.identifier': subjectDid,
       'ResearchSubject.status': 'candidate',
       composition: {
-        resourceType: 'Composition',
+        resourceType: ResourceTypesFhirR4.Composition,
         id: 'composition-research-subject-001',
-        'Composition.subject': subjectDid,
+        [CompositionClaim.Subject]: subjectDid,
       },
     });
   });
@@ -1087,9 +1088,9 @@ describe('CompositionManager', () => {
         return [
           {
             id: 'comp-med-combo-1',
-            'Composition.subject': subjectDid,
-            'Composition.section': HealthcareBasicSections.HistoryOfMedicationUse.attributeValue,
-            'Composition.type': HealthcareBasicSections.PatientSummaryDocument.attributeValue,
+            [CompositionClaim.Subject]: subjectDid,
+            [CompositionClaim.Section]: HealthcareBasicSections.HistoryOfMedicationUse.attributeValue,
+            [CompositionClaim.Type]: HealthcareBasicSections.PatientSummaryDocument.attributeValue,
           },
         ] as any;
       }
@@ -1101,7 +1102,7 @@ describe('CompositionManager', () => {
       content: {
         ...(createJob().content as any),
         body: {
-          resourceType: 'Parameters',
+          resourceType: ResourceTypesFhirR4.Parameters,
           parameter: [
             { name: 'section', valueString: HealthcareBasicSections.HistoryOfMedicationUse.attributeValue },
             { name: 'MedicationStatement.code-display', valueString: 'paracetamol' },
@@ -1140,9 +1141,9 @@ describe('CompositionManager', () => {
         return [
           {
             id: 'comp-obs-combo-1',
-            'Composition.subject': subjectDid,
-            'Composition.section': HealthcareBasicSections.VitalSigns.attributeValue,
-            'Composition.type': HealthcareBasicSections.PatientSummaryDocument.attributeValue,
+            [CompositionClaim.Subject]: subjectDid,
+            [CompositionClaim.Section]: HealthcareBasicSections.VitalSigns.attributeValue,
+            [CompositionClaim.Type]: HealthcareBasicSections.PatientSummaryDocument.attributeValue,
           },
         ] as any;
       }
@@ -1154,7 +1155,7 @@ describe('CompositionManager', () => {
       content: {
         ...(createJob().content as any),
         body: {
-          resourceType: 'Parameters',
+          resourceType: ResourceTypesFhirR4.Parameters,
           parameter: [
             { name: 'section', valueString: HealthcareBasicSections.VitalSigns.attributeValue },
             { name: 'Observation.code-display', valueString: 'pressure' },
@@ -1188,20 +1189,20 @@ describe('CompositionManager', () => {
           {
             id: selectionCompositionId,
             'Composition.identifier': selectionCompositionId,
-            'Composition.subject': subjectDid,
-            'Composition.section': HealthcareBasicSections.HistoryOfMedicationUse.attributeValue,
-            'Composition.type': HealthcareBasicSections.PatientSummaryDocument.attributeValue,
-            'Composition.author': OPERATIONAL_EMPLOYEE_DID,
+            [CompositionClaim.Subject]: subjectDid,
+            [CompositionClaim.Section]: HealthcareBasicSections.HistoryOfMedicationUse.attributeValue,
+            [CompositionClaim.Type]: HealthcareBasicSections.PatientSummaryDocument.attributeValue,
+            [CompositionClaim.Author]: OPERATIONAL_EMPLOYEE_DID,
             meta: { tag: [selectionTag] },
             tag: [selectionTag],
           },
           {
             id: `${selectionCompositionId}-another-employee`,
             'Composition.identifier': `${selectionCompositionId}-another-employee`,
-            'Composition.subject': subjectDid,
-            'Composition.section': HealthcareBasicSections.HistoryOfMedicationUse.attributeValue,
-            'Composition.type': HealthcareBasicSections.PatientSummaryDocument.attributeValue,
-            'Composition.author': `${OPERATIONAL_EMPLOYEE_DID}:another`,
+            [CompositionClaim.Subject]: subjectDid,
+            [CompositionClaim.Section]: HealthcareBasicSections.HistoryOfMedicationUse.attributeValue,
+            [CompositionClaim.Type]: HealthcareBasicSections.PatientSummaryDocument.attributeValue,
+            [CompositionClaim.Author]: `${OPERATIONAL_EMPLOYEE_DID}:another`,
             meta: { tag: [selectionTag] },
             tag: [selectionTag],
           },
@@ -1216,7 +1217,7 @@ describe('CompositionManager', () => {
         ...(createJob().content as any),
         meta: { bearer: { jwt: { payload: { sub: OPERATIONAL_EMPLOYEE_DID } } } },
         body: {
-          resourceType: 'Parameters',
+          resourceType: ResourceTypesFhirR4.Parameters,
           parameter: [
             { name: 'section', valueString: HealthcareBasicSections.HistoryOfMedicationUse.attributeValue },
             { name: 'Composition.meta-tag', valueCoding: { system: 'urn:research:tag:score', code: '10' } },
@@ -1226,7 +1227,7 @@ describe('CompositionManager', () => {
     }));
 
     const data = (response.body as any).data;
-    expect(data[0].type).toBe('Composition-search-response-v1.0');
+    expect(data[0].type).toBe(GatewayResponseEntryTypes.CompositionSearch);
     const matches = extractBundleSearchResources(response);
     expect(matches).toHaveLength(1);
     expect(matches[0].id).toBe(selectionCompositionId);

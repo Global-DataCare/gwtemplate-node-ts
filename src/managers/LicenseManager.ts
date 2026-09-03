@@ -1,5 +1,7 @@
 // src/managers/LicenseManager.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
+import { GatewayResponseEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
+import { HttpStatusCodes } from 'gdc-common-utils-ts/constants/http';
 
 import { v4 as uuidv4 } from 'uuid';
 import { OrganizationEmployeeSearchResponseEntryTypes } from 'gdc-common-utils-ts';
@@ -46,6 +48,7 @@ import {
   LICENSE_USER_CLASS_INDIVIDUAL,
 } from '../constants/domain';
 import type { ITenantsManager } from './ITenantsManager';
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 
 /**
  * Manages the business logic for creating device activation licenses.
@@ -185,10 +188,10 @@ export class LicenseManager implements IJobProcessor {
         type: 'transaction-response',
         total: quantity,
         data: [{
-          type: 'LicenseGenerationResult',
-          response: { status: '201' }, // 201 Created
+          type: GatewayResponseEntryTypes.LicenseGeneration,
+          response: { status: String(HttpStatusCodes.Created) }, // 201 Created
           resource: {
-            resourceType: 'OperationOutcome',
+            resourceType: ResourceTypesFhirR4.OperationOutcome,
             issue: [{
               severity: 'information',
               code: 'informational',
@@ -237,10 +240,10 @@ export class LicenseManager implements IJobProcessor {
         ));
       } catch (e: any) {
         responseEntries.push({
-          type: 'License-search-response-v1.0',
-          meta: { claims: extractLicenseSearchMetaClaims(entry) },
+          type: GatewayResponseEntryTypes.LicenseSearch,
+          resource: { meta: { claims: extractLicenseSearchMetaClaims(entry) } },
           response: {
-            status: '400',
+            status: String(HttpStatusCodes.BadRequest),
             outcome: createOperationOutcome(IssueLevel.Error, IssueType.Invalid, e?.message || String(e)),
           },
         } as any);
@@ -248,7 +251,7 @@ export class LicenseManager implements IJobProcessor {
     }
 
     const responseBundle: BundleJsonApi = {
-      resourceType: 'Bundle',
+      resourceType: ResourceTypesFhirR4.Bundle,
       type: 'batch-response',
       total: responseEntries.length,
       data: responseEntries,
@@ -291,8 +294,8 @@ export class LicenseManager implements IJobProcessor {
 
     for (const entry of entries) {
       const rawClaims =
-        (entry?.meta?.claims as Record<string, any> | undefined) ??
-        (entry?.resource?.meta?.claims as Record<string, any> | undefined);
+        (entry?.resource?.meta?.claims as Record<string, any> | undefined) ??
+        (entry?.meta?.claims as Record<string, any> | undefined);
 
       try {
         if (!rawClaims || typeof rawClaims !== 'object') throw new Error('Missing meta.claims for License/_issue entry.');
@@ -346,11 +349,12 @@ export class LicenseManager implements IJobProcessor {
         };
 
         responseEntries.push({
-          type: 'License:Issued',
-          response: { status: '201' },
-          meta: { claims: responseClaims, licenseId, maxDevices },
+          type: GatewayResponseEntryTypes.LicenseIssued,
+          response: { status: String(HttpStatusCodes.Created) },
+          meta: { licenseId, maxDevices },
           resource: {
-            resourceType: 'OperationOutcome',
+            resourceType: ResourceTypesFhirR4.OperationOutcome,
+            meta: { claims: responseClaims },
             issue: [
               {
                 severity: 'information',
@@ -364,10 +368,10 @@ export class LicenseManager implements IJobProcessor {
         } as any);
       } catch (e: any) {
         responseEntries.push({
-          type: 'License:Issued',
-          meta: { claims: rawClaims || {} },
+          type: GatewayResponseEntryTypes.LicenseIssued,
+          resource: { resourceType: ResourceTypesFhirR4.OperationOutcome, meta: { claims: rawClaims || {} } },
           response: {
-            status: '400',
+            status: String(HttpStatusCodes.BadRequest),
             outcome: createOperationOutcome(IssueLevel.Error, IssueType.Invalid, e?.message || String(e)),
           },
         } as any);
@@ -375,7 +379,7 @@ export class LicenseManager implements IJobProcessor {
     }
 
     const responseBundle: BundleJsonApi = {
-      resourceType: 'Bundle',
+      resourceType: ResourceTypesFhirR4.Bundle,
       type: 'batch-response',
       data: responseEntries,
     };

@@ -1,8 +1,13 @@
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 /**
  * Flow contract: activate a tenant, purchase a professional seat through the
  * explicit Offer and host Order boundary, restart KMS, then prove that the
  * tenant can still create an employee with authoritative asynchronous readback.
  */
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
+import { DeviceAppTypes, DeviceUserClasses } from 'gdc-common-utils-ts/constants/device';
+import { BundleTypes } from 'gdc-common-utils-ts/models/bundle-editor-types';
 import * as express from 'express';
 import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
 import { CryptographyService } from 'gdc-common-utils-ts/CryptographyService';
@@ -85,15 +90,15 @@ describe('Tenant KMS rehydration after activate route story', () => {
     createPayload.body.data[0].resource = {
       meta: {
         claims: {
-          ...(createPayload.body.data[0].meta?.claims || {}),
+          ...(createPayload.body.data[0].resource?.meta?.claims || {}),
         },
       },
     };
     createPayload.body.data[0].meta = {};
-    createPayload.body.data[0].request = { method: 'POST' };
+    createPayload.body.data[0].request = { method: HttpRequestMethods.Post };
 
     const submit = await invokeExpress(restartedHarness.app, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       url: employeeUrl,
       headers: { 'content-type': 'application/json' },
       body: createPayload,
@@ -121,13 +126,17 @@ async function purchaseEmployeeSeat(
     type: 'application/didcomm-plain+json',
     thid: 'employee-kms-seat-offer-thid',
     body: {
-      resourceType: 'Bundle',
-      type: 'batch',
-      data: [buildLicensePurchaseEntry({ quantity: 1, userClass: 'employee', type: 'web' })],
+      resourceType: ResourceTypesFhirR4.Bundle,
+      type: BundleTypes.batch,
+      data: [buildLicensePurchaseEntry({
+        quantity: 1,
+        userClass: DeviceUserClasses.Employee,
+        type: DeviceAppTypes.Web,
+      })],
     },
   };
   const offerSubmit = await invokeExpress(app, {
-    method: 'POST',
+    method: HttpRequestMethods.Post,
     url: `/${tenantId}/cds-es/v1/health-care/entity/org.schema/Offer/_create`,
     headers: { 'content-type': 'application/json' },
     body: offerPayload,
@@ -135,7 +144,7 @@ async function purchaseEmployeeSeat(
   expect(offerSubmit.status).toBe(202);
   await queueAdapter.waitForEmptyQueue();
   const offerPoll = await pollJsonBody(app, offerSubmit.headers.location, offerPayload.thid);
-  const offerId = String(offerPoll.body.data[0].meta?.claims?.[ClaimsOfferSchemaorg.identifier] || '');
+  const offerId = String(offerPoll.body.data[0].resource?.meta?.claims?.[ClaimsOfferSchemaorg.identifier] || '');
   expect(offerPoll.body.data[0].response.status).toBe('201');
   expect(offerId).toBeTruthy();
 
@@ -149,7 +158,7 @@ async function purchaseEmployeeSeat(
     [ClaimsOrderSchemaorg.partOfInvoice]: 'employee-kms-seat-invoice',
   } } };
   const orderSubmit = await invokeExpress(app, {
-    method: 'POST',
+    method: HttpRequestMethods.Post,
     url: '/host/cds-es/v1/test/registry/org.schema/Order/_batch',
     headers: { 'content-type': 'application/json' },
     body: orderPayload,
@@ -241,7 +250,7 @@ async function buildHarness(
 async function onboardViaActivateAndOrder(app: express.Express, queueAdapter: QueueAdapterMem): Promise<string> {
   const activationPayload = buildActivationPayload() as any;
   const activationSubmit = await invokeExpress(app, {
-    method: 'POST',
+    method: HttpRequestMethods.Post,
     url: '/host/cds-es/v1/test/registry/org.schema/Organization/_activate',
     headers: { 'content-type': 'application/json' },
     body: activationPayload,
@@ -253,7 +262,7 @@ async function onboardViaActivateAndOrder(app: express.Express, queueAdapter: Qu
   expect(activationPoll.status).toBe(200);
 
   const activationEntry = activationPoll.body.data[0];
-  const offerId = String(activationEntry.meta?.claims?.[ClaimsOfferSchemaorg.identifier] || '');
+  const offerId = String(activationEntry.resource?.meta?.claims?.[ClaimsOfferSchemaorg.identifier] || '');
   expect(offerId).toBeTruthy();
 
   const orderPayload = structuredClone(ORGANIZATION_ORDER_REQUEST) as any;
@@ -271,7 +280,7 @@ async function onboardViaActivateAndOrder(app: express.Express, queueAdapter: Qu
   };
 
   const orderSubmit = await invokeExpress(app, {
-    method: 'POST',
+    method: HttpRequestMethods.Post,
     url: '/host/cds-es/v1/test/registry/org.schema/Order/_batch',
     headers: { 'content-type': 'application/json' },
     body: orderPayload,
@@ -282,5 +291,5 @@ async function onboardViaActivateAndOrder(app: express.Express, queueAdapter: Qu
   const orderPoll = await pollJsonBody(app, orderSubmit.headers.location, orderPayload.thid);
   expect(orderPoll.status).toBe(200);
 
-  return String(activationEntry.meta?.claims?.['org.schema.Organization.alternateName'] || '');
+  return String(activationEntry.resource?.meta?.claims?.[ClaimsOrganizationSchemaorg.alternateName] || '');
 }

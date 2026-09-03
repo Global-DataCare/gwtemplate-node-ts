@@ -2,6 +2,25 @@
 
 ## [Unreleased]
 
+## [1.23.16] - 2026-09-03
+
+- Keep every Fabric MSP administrator under network-governance management, export
+  only its secret-free public MSP definition, and continue handing the host
+  only bounded peer/TLS and GW-client enrollment grants. Treat MSP identifiers
+  and channels as governance-assigned values rather than host-selected input;
+  reuse the same governed administrator for later peers of that MSP without
+  binding it to any one Host credential.
+
+- Emit licence search, purchase and issue, Order, clinical, lifecycle and
+  internal job-response claims only at `entry.resource.meta.claims`. Keep the
+  tolerant request/response normalization compatible with legacy
+  `entry.meta.claims`, prefer canonical claims when both exist, and avoid a
+  deprecation warning for payloads already in canonical form.
+- Add a source-level regression gate that rejects governed GW Bundle writers
+  which reintroduce entry-level claims.
+- Consume `gdc-common-utils-ts@2.7.5` so GW fixtures and shared licence writers
+  use the same canonical contract.
+
 - Clarify that local clinical authors remain operational role-bearing
   `did:web` actors. Stable `urn:multibase:z...` contact identifiers are private
   account aliases and imported URNs remain immutable source provenance. The

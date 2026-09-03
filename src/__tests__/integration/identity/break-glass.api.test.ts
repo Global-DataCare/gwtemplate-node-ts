@@ -1,4 +1,5 @@
 // TDD contract: write this test red first; make it green only with the complete real behavior.
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
 import express from 'express';
 import { CryptographyService } from 'gdc-common-utils-ts/CryptographyService';
 import type { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
@@ -53,7 +54,7 @@ describe('break-glass SMART route contract (integration)', () => {
         justification: 'Urgent veterinary access is required.',
       } as const;
       const response = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: '/clinic/cds-ES/v1/animal-care/identity/openid/smart/token',
         headers: { 'content-type': 'application/json' },
         body: {

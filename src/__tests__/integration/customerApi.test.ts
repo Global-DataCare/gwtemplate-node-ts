@@ -1,6 +1,7 @@
 // TDD contract: write this test red first; make it green only with the complete real behavior.
 // src/__tests__/integration/customerApi.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
 
 /**
  * @file Integration test for the Asynchronous Customer Onboarding API Endpoint.
@@ -123,7 +124,7 @@ describe('Person Onboarding API', () => {
 
     // --- Act ---
     const response = await invokeExpress(app, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       url: registrationUrl,
       headers: { 'content-type': 'application/x-www-form-urlencoded', authorization: 'Bearer test-id-token' },
       body: { request: testEncryptedJwe1 },

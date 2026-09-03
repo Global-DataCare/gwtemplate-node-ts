@@ -43,6 +43,8 @@
  * - `TEST_NETWORK_POLL_MS`
  *   Default: `1500`
  */
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 
 import {
   HealthcareConsentActions,
@@ -84,7 +86,7 @@ function buildIdentifierUuidForTesting(
 
 async function postJson(url: string, body: unknown, bearer: string): Promise<Response> {
   return fetch(url, {
-    method: 'POST',
+    method: HttpRequestMethods.Post,
     headers: {
       'content-type': 'application/json',
       authorization: `Bearer ${bearer}`,
@@ -121,7 +123,7 @@ describeIfConfigured('ConsentAccess smoke against deployed test-network host', (
       action: string,
       attachmentData: string,
     ) => ({
-      resourceType: 'Consent',
+      resourceType: ResourceTypesFhirR4.Consent,
       status: 'active',
       meta: {
         claims: {
@@ -184,13 +186,13 @@ describeIfConfigured('ConsentAccess smoke against deployed test-network host', (
       {
         thid: thidBatch,
         body: {
-          resourceType: 'Bundle',
+          resourceType: ResourceTypesFhirR4.Bundle,
           type: 'batch',
           entry: [
             {
-              request: { method: 'POST', url: 'individual/org.hl7.fhir.r4/Communication' },
+              request: { method: HttpRequestMethods.Post, url: 'individual/org.hl7.fhir.r4/Communication' },
               resource: {
-                resourceType: 'Communication',
+                resourceType: ResourceTypesFhirR4.Communication,
                 status: 'completed',
                 meta: {
                   claims: {

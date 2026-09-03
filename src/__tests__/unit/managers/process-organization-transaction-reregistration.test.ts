@@ -1,4 +1,5 @@
 // TDD contract: write this test red first; make it green only with the complete real behavior.
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 import { describe, expect, it, jest } from '@jest/globals';
 import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { processOrganizationVerificationTransaction } from '../../../managers/hosting/process-organization-verification';
@@ -40,7 +41,7 @@ describe('processOrganizationVerificationTransaction legacy re-registration', ()
       normalizeClaims: value => value,
       createPendingTenantRegistrationFromClaims,
       createOrganizationIssueClaimsFromClaims: jest.fn() as any,
-      forwardOrganizationVerificationTransactionToIca: jest.fn(async () => ({ resourceType: 'Bundle' })),
+      forwardOrganizationVerificationTransactionToIca: jest.fn(async () => ({ resourceType: ResourceTypesFhirR4.Bundle })),
       extractCredentialResourcesFromIcaPayload: jest.fn(() => [representativeCredential]),
       reregisterExistingLegacyRepresentativeController,
     });

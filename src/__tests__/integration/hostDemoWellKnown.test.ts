@@ -1,6 +1,7 @@
 // Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 // src/__tests__/integration/hostDemoWellKnown.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
 
 import { invokeExpress } from './helpers/invokeExpress';
 import { startServer, resetServerConfig } from '../../server';
@@ -39,32 +40,32 @@ describe('Host well-known endpoints (demo, mem)', () => {
       process.env.HOST_COVERAGE_SCOPE = 'EU';
       process.env.NETWORK_MODE = 'test';
 
-      const rootDid = await invokeExpress(app, { method: 'GET', url: '/.well-known/did.json' });
+      const rootDid = await invokeExpress(app, { method: HttpRequestMethods.Get, url: '/.well-known/did.json' });
       expect(rootDid.status).toBe(200);
       expect(JSON.parse(rootDid.text).id).toBe(HOST_DID);
 
-      const selfDesc = await invokeExpress(app, { method: 'GET', url: `${HOST_WELL_KNOWN_PREFIX}/self-description.json` });
+      const selfDesc = await invokeExpress(app, { method: HttpRequestMethods.Get, url: `${HOST_WELL_KNOWN_PREFIX}/self-description.json` });
       expect(selfDesc.status).toBe(200);
       const selfDescJson = JSON.parse(selfDesc.text);
       expect(selfDescJson.issuer).toBe(HOST_DID);
 
-      const legalParticipant = await invokeExpress(app, { method: 'GET', url: `${HOST_WELL_KNOWN_PREFIX}/legal-participant.vc.json` });
+      const legalParticipant = await invokeExpress(app, { method: HttpRequestMethods.Get, url: `${HOST_WELL_KNOWN_PREFIX}/legal-participant.vc.json` });
       expect(legalParticipant.status).toBe(200);
       const legalParticipantJson = JSON.parse(legalParticipant.text);
       expect(legalParticipantJson.issuer).toBe(HOST_DID);
 
-      const jwks = await invokeExpress(app, { method: 'GET', url: `${HOST_WELL_KNOWN_PREFIX}/jwks.json` });
+      const jwks = await invokeExpress(app, { method: HttpRequestMethods.Get, url: `${HOST_WELL_KNOWN_PREFIX}/jwks.json` });
       expect(jwks.status).toBe(200);
       const jwksJson = JSON.parse(jwks.text);
       expect(jwksJson.keys.find((key: any) => key.alg === 'ES384')).toBeDefined();
 
-      const openidIssuer = await invokeExpress(app, { method: 'GET', url: `${HOST_WELL_KNOWN_PREFIX}/openid-credential-issuer` });
+      const openidIssuer = await invokeExpress(app, { method: HttpRequestMethods.Get, url: `${HOST_WELL_KNOWN_PREFIX}/openid-credential-issuer` });
       expect(openidIssuer.status).toBe(200);
       const openidIssuerJson = JSON.parse(openidIssuer.text);
       expect(openidIssuerJson.credential_issuer).toContain('http://localhost:3000');
 
       const issuedVc = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: '/host/cds-ES/v1/health-care/identity/oidc/credential',
         headers: { authorization: 'Bearer demo', 'content-type': 'application/json' },
         body: { format: 'jwt_vc_json', type: 'gx:LegalParticipant' },

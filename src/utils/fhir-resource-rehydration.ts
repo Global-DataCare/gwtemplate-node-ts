@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 import { canonicalizeFhirClaims, getClaimValue } from './claims';
 import { normalizeReference, tokenToCoding } from './fhir-data-utils';
 import { determineResourceId } from './resource';
-import { GatewayLocalFhirResourceTypes, ResourceTypesFhirR4 } from '../shared/fhir-constants';
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 import { DIGITAL_TWIN_SEARCH_CLAIM_PREFIX } from './digital-twin-research-projection';
 import { convertClaimsToFhirResource } from 'gdc-common-utils-ts/utils/bundle-document-builder';
 
@@ -172,7 +172,7 @@ export function buildFhirResourceFromIndexedClaims(
     if (timingDateTime) resource.timingDateTime = timingDateTime;
   }
 
-  if (resourceType === GatewayLocalFhirResourceTypes.OperationOutcome) {
+  if (resourceType === ResourceTypesFhirR4.OperationOutcome) {
     resource.issue = Array.isArray(record?.issue) ? record.issue : [];
   }
 

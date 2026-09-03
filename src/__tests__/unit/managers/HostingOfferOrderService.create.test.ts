@@ -1,4 +1,5 @@
-// Flow contract: an active tenant controller requests only professional-seat quantity; GW authors policy-controlled Offer terms, persists the protected Offer under host custody, and returns a usable Offer for Order confirmation.
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
+// An active tenant controller requests only professional-seat quantity; GW authors policy-controlled Offer terms, persists the protected Offer under host custody, and returns a usable Offer for Order confirmation.
 import { ClaimsOfferSchemaorg, ClaimsOrganizationSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { HostingOfferOrderService } from '../../../managers/hosting/HostingOfferOrderService';
 
@@ -36,7 +37,7 @@ describe('HostingOfferOrderService professional-seat Offer creation', () => {
     );
 
     expect(response.response?.status).toBe('201');
-    expect(response.meta?.claims).toEqual(expect.objectContaining({
+    expect(response.resource?.meta?.claims).toEqual(expect.objectContaining({
       [ClaimsOrganizationSchemaorg.alternateName]: '7654321',
       [ClaimsOfferSchemaorg.eligibleQuantityValue]: 3,
       [ClaimsOfferSchemaorg.acceptedPaymentMethod]: 'TestNetworkVirtual',

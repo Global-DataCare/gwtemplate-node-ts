@@ -1,4 +1,5 @@
 // TDD contract: write this test red first; make it green only with the complete real behavior.
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { SendGridEmailNotificationAdapter } from '../../../../services/notifications/SendGridEmailNotificationAdapter.js';
 
@@ -52,7 +53,7 @@ describe('SendGridEmailNotificationAdapter', () => {
     expect(mockFetch).toHaveBeenCalledWith(
       'https://api.sendgrid.com/v3/mail/send',
       expect.objectContaining({
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         headers: {
           Authorization: 'Bearer sg-key',
           'Content-Type': 'application/json',

@@ -1,3 +1,4 @@
+import { HttpStatusCodes } from 'gdc-common-utils-ts/constants/http';
 import { randomUUID } from 'crypto';
 import { IJobProcessor } from './registry';
 import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
@@ -20,6 +21,7 @@ import {
 import { isDigitalTwinSecondaryUseEnabled } from '../utils/digital-twin-secondary-use';
 import { buildSearchResponseEntries } from '../utils/didcomm-response';
 import { GatewayResponseEntryTypes } from '../shared/gateway-response-types';
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 
 type FhirBundleEntryLike = {
   type?: string;
@@ -166,7 +168,7 @@ export class MedicationStatementManager implements IJobProcessor {
 
     if (normalizedAction === '_batch') {
       for (const entry of entries) {
-        const rawClaims = entry?.meta?.claims;
+        const rawClaims = entry?.resource?.meta?.claims ?? entry?.meta?.claims;
         try {
           if (!rawClaims || typeof rawClaims !== 'object') {
             throw new ManagerError('Missing meta.claims in MedicationStatement entry.', IssueType.Required);
@@ -210,7 +212,7 @@ export class MedicationStatementManager implements IJobProcessor {
             });
             const researchClaims = projectClaimsForDigitalTwin({
               claims,
-              resourceType: 'MedicationStatement',
+              resourceType: ResourceTypesFhirR4.MedicationStatement,
               twinSubjectId,
             });
             const researchId = String(
@@ -227,26 +229,26 @@ export class MedicationStatementManager implements IJobProcessor {
           }
 
           responseEntries.push({
-            type: 'MedicationStatement',
+            type: ResourceTypesFhirR4.MedicationStatement,
             response: {
-              status: '201',
+              status: String(HttpStatusCodes.Created),
               location: `/${job.tenantId}/cds-${jurisdiction}/v1/${job.sector}/${normalizedSection}/${job.format}/MedicationStatement/_batch-response`,
             },
-            meta: { claims },
+            resource: { resourceType: ResourceTypesFhirR4.MedicationStatement, meta: { claims } },
           });
         } catch (e: any) {
           const status = e instanceof ManagerError ? e.status : '400';
           const code = e instanceof ManagerError ? e.code : IssueType.Invalid;
           responseEntries.push({
-            type: 'MedicationStatement',
-            meta: { claims: rawClaims || {} },
+            type: ResourceTypesFhirR4.MedicationStatement,
+            resource: { resourceType: ResourceTypesFhirR4.OperationOutcome, meta: { claims: rawClaims || {} } },
             response: { status, outcome: createOperationOutcome(IssueLevel.Error, code, e?.message || 'Invalid entry') },
           });
         }
       }
     } else {
       const first = entries[0];
-      const rawClaims = first?.meta?.claims || {};
+      const rawClaims = first?.resource?.meta?.claims ?? first?.meta?.claims ?? {};
       const claims = normalizeContextualizedClaims(rawClaims as Record<string, any>);
       const subject =
         getClaimValue<string>(claims, 'MedicationStatement.subject') ||
@@ -280,7 +282,7 @@ export class MedicationStatementManager implements IJobProcessor {
       aud: job.content?.iss as string,
       exp: Math.floor(Date.now() / 1000) + 300,
       body: {
-        resourceType: 'Bundle',
+        resourceType: ResourceTypesFhirR4.Bundle,
         type: 'batch-response',
         data: responseEntries,
         total: responseEntries.length,

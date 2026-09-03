@@ -1,6 +1,10 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 // src/__tests__/integration/end-to-end-flow.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
+import { DidcommMessageTypes } from 'gdc-common-utils-ts/constants/didcomm';
+import { GatewayRequestEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
+import { HttpStatusCodes } from 'gdc-common-utils-ts/constants/http';
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
 
 // This MUST be the first line to ensure deterministic key generation for the test run.
 process.env.DEV_SEED = 'true';
@@ -170,7 +174,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
 
     // 1. ACT (Phase 1): Post the initial job
     const response = await invokeExpress(app, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       url: registrationUrl,
       // DemoTokenVerifier still requires a structurally valid JWT. The signature is
       // intentionally empty in demo mode, but an arbitrary bearer string is rejected.
@@ -201,7 +205,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
     
     const pollingPath = new URL(pollingUrl).pathname;
     const pollResponse = await invokeExpress(app, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       url: pollingPath,
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
       body: { thid },
@@ -219,7 +223,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
     // 5. ASSERT (Phase 3): Verify the content of the final, decrypted Offer
     expect(finalResponse.thid).toBe(thid);
     const responseEntry = finalResponse.body.data[0];
-    const claims = responseEntry.meta.claims;
+    const claims = responseEntry.resource.meta.claims;
 
     expect(responseEntry.type).toBe('Organization-registration-offer-v1.0');
     expect(claims[ClaimsOfferSchemaorg.eligibleQuantityValue]).toBe(2);
@@ -239,7 +243,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
       body: {
         data: [
           {
-            type: 'Organization-order-request-v1.0',
+            type: GatewayRequestEntryTypes.OrganizationOrder,
             meta: { claims: { [ClaimsOrderSchemaorg.acceptedOfferIdentifier]: offerId } },
           },
         ],
@@ -279,7 +283,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
 
     const orderUrl = `/host/cds-ES/v1/test/registry/org.schema/Order/_batch`;
     const orderPostResponse = await invokeExpress(app, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       url: orderUrl,
       headers: {
         'content-type': 'application/x-www-form-urlencoded',
@@ -299,7 +303,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
         await delay(50);
       }
       orderPollResponse = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: orderPollingPath,
         headers: { 'content-type': 'application/x-www-form-urlencoded' },
         body: { thid: orderThid },
@@ -315,7 +319,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
     const { decryptedBytes: orderDecryptedBytes } = await cryptoService.decryptJwe(encryptedOrderFinalResponse, externalEncrypter);
     const orderFinalResponse = JSON.parse(Content.bytesToStringUTF8(orderDecryptedBytes)) as IDecodedDidcommPayload;
     expect(orderFinalResponse.thid).toBe(orderThid);
-    expect(orderFinalResponse.body?.data?.[0]).toMatchObject({ response: { status: '201' } });
+    expect(orderFinalResponse.body?.data?.[0]).toMatchObject({ response: { status: String(HttpStatusCodes.Created) } });
 
     // Reload host + tenant caches after finalization to make subsequent tests deterministic.
     await tenantManager.loadHost();
@@ -342,7 +346,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
       body: {
         data: [
           {
-            type: 'Employee-form-v1.0',
+            type: GatewayRequestEntryTypes.EmployeeForm,
             verb: 'POST',
             meta: { claims: testClaimsTenant1Receptionist1 },
           },
@@ -376,7 +380,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
     const registrationUrl = `/${testTenant1AlternateName}/cds-ES/v1/health-care/entity/org.schema/Employee/_batch`;
 
     const response = await invokeExpress(app, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       url: registrationUrl,
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
       body: { request: compactJwe },
@@ -436,7 +440,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
     const registrationUrl = `/${tenantId}/cds-${jurisdiction}/v1/health-care/individual/org.schema/Person/_batch`;
     
     const postResponse = await invokeExpress(app, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       url: registrationUrl,
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
       body: { request: compactJwe },
@@ -458,7 +462,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
     
     const pollingPath = new URL(pollingUrl).pathname;
     const pollResponse = await invokeExpress(app, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       url: pollingPath, // Use POST for secure polling to keep thid out of logs
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
       body: { thid },
@@ -498,7 +502,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
       body: {
         data: [
           {
-            type: 'Composition-entry-add-v1.0',
+            type: GatewayRequestEntryTypes.CompositionEntryAdd,
             meta: {
               claims: {
                 'org.schema.Composition.subject': `urn:uuid:${createdPersonId}`,
@@ -529,7 +533,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
 
     const registrationUrl = `/${testTenant1AlternateName}/cds-es/v1/health-care/individual/org.schema/Composition/_batch`;
     const response = await invokeExpress(app, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       url: registrationUrl,
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
       body: { request: compactJwe },
@@ -553,7 +557,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
       body: {
         data: [
           {
-            type: 'Communication-send-v1.0',
+            type: GatewayRequestEntryTypes.CommunicationSend,
             meta: {
               claims: { // This structure should align with the FHIR-to-DIDComm mapping
                 'org.schema.Communication.recipient': `urn:uuid:${createdPersonId}`,
@@ -589,7 +593,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
 
     const registrationUrl = `/${testTenant1AlternateName}/cds-es/v1/health-care/individual/org.schema/Communication/_batch`;
     const response = await invokeExpress(app, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       url: registrationUrl,
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
       body: { request: compactJwe },
@@ -611,7 +615,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
       aud: await tenantManager.getTenantDid(testTenant1VaultId),
       body: {
         data: [{
-          type: 'Communication-response-v1.0',
+          type: DidcommMessageTypes.CommunicationResponse,
           meta: { claims: { 'org.schema.Text.text': 'Confirmed' } }
         }]
       }
@@ -632,7 +636,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
       aud: await tenantManager.getTenantDid(testTenant1VaultId),
       body: {
         data: [{
-          type: 'Subscription-create-v1.0',
+          type: GatewayRequestEntryTypes.SubscriptionCreate,
           meta: {
             claims: {
               'org.schema.Subscription.subject': `urn:uuid:${createdPersonId}`,
@@ -668,7 +672,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
         aud: await tenantManager.getTenantDid(testTenant1VaultId),
         body: {
             data: [{
-                type: 'Person-discover-v1.0',
+                type: GatewayRequestEntryTypes.PersonDiscover,
                 meta: {
                     claims: {
                         [ClaimsPersonSchemaorg.identifierType]: discoveryClaimType,
@@ -697,7 +701,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
     const discoveryUrl = `/${testTenant1AlternateName}/cds-es/v1/health-care/test-network/org.schema/Person/_discovery`;
     
     const postResponse = await invokeExpress(app, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       url: discoveryUrl,
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
       body: { request: compactJwe },
@@ -719,7 +723,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
         await delay(50);
       }
       pollResponse = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: pollingPath,
         headers: { 'content-type': 'application/x-www-form-urlencoded' },
         body: { thid },

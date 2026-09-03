@@ -1,4 +1,5 @@
 // TDD contract: write this test red first; make it green only with the complete real behavior.
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
 import express from 'express';
 import { createAuthorityRouter } from '../../routes/authority';
 import { AsyncResponseStoreMem } from '../../adapters/async-response-store.mem';
@@ -34,9 +35,9 @@ describe('Authority Well-Known API', () => {
   app.use('/', createAuthorityRouter(authorities, asyncStore));
 
   it('serves CA did and jwks', async () => {
-    const didResp = await invokeExpress(app, { method: 'GET', url: '/ca/.well-known/did.json' });
+    const didResp = await invokeExpress(app, { method: HttpRequestMethods.Get, url: '/ca/.well-known/did.json' });
     expect(didResp.status).toBe(200);
-    const jwksResp = await invokeExpress(app, { method: 'GET', url: '/ca/.well-known/jwks.json' });
+    const jwksResp = await invokeExpress(app, { method: HttpRequestMethods.Get, url: '/ca/.well-known/jwks.json' });
     expect(jwksResp.status).toBe(200);
   });
 });

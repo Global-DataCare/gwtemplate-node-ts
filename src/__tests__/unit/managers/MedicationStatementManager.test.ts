@@ -1,4 +1,6 @@
 // Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
+import { GatewayRequestEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 import { describe, expect, it, jest, beforeEach } from '@jest/globals';
 import { MedicationStatementManager } from '../../../managers/MedicationStatementManager';
 import { IVaultRepository } from '../../../database/repositories/vault/vault.repository';
@@ -45,7 +47,7 @@ describe('MedicationStatementManager', () => {
     sector: 'health-care',
     section: 'individual',
     format: 'org.hl7.fhir.api',
-    resourceType: 'MedicationStatement',
+    resourceType: ResourceTypesFhirR4.MedicationStatement,
     action: '_batch',
     content: {
       jti: 'jti-medication-1',
@@ -55,12 +57,11 @@ describe('MedicationStatementManager', () => {
       exp: Math.floor(Date.now() / 1000) + 300,
       type: 'org.hl7.fhir.api.Bundle',
       body: {
-        resourceType: 'Bundle',
+        resourceType: ResourceTypesFhirR4.Bundle,
         type: 'batch',
         entry: [{
-          type: 'MedicationStatement',
-          meta: {
-            claims: {
+          type: ResourceTypesFhirR4.MedicationStatement,
+          resource: { meta: { claims: {
               '@context': 'org.hl7.fhir.api',
               'MedicationStatement.subject': 'Organization/subject-001',
               'MedicationStatement.identifier': 'urn:uuid:med-001',
@@ -69,8 +70,7 @@ describe('MedicationStatementManager', () => {
               'MedicationStatement.medication': 'Medication/medication-161',
               'MedicationStatement.adherence': 'http://hl7.org/fhir/CodeSystem/medication-statement-adherence|taking-as-directed',
               'MedicationStatement.status': 'active',
-            },
-          },
+            } } },
         }],
       },
     } as any,
@@ -107,7 +107,7 @@ describe('MedicationStatementManager', () => {
   it('omits malformed FHIR claim keys, warns, and persists the valid claims in the same entry', async () => {
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
     const job = createBatchJob();
-    const entryClaims = (job.content as any).body.entry[0].meta.claims;
+    const entryClaims = (job.content as any).body.entry[0].resource.meta.claims;
     entryClaims['MedicationStatement.CodeDisplay'] = 'Paracetamol';
     entryClaims['MedicationStatement.code_display'] = 'Paracetamol';
 
@@ -167,13 +167,11 @@ describe('MedicationStatementManager', () => {
         body: {
           data: [
             {
-              type: 'MedicationStatement-search-request-v1.0',
-              meta: {
-                claims: {
+              type: GatewayRequestEntryTypes.MedicationStatementSearch,
+              resource: { meta: { claims: {
                   '@context': 'org.hl7.fhir.api',
                   'MedicationStatement.code-text': 'paracetamol',
-                },
-              },
+                } } },
             },
           ],
         },
@@ -210,7 +208,7 @@ describe('MedicationStatementManager', () => {
         body: {
           data: [
             {
-              type: 'MedicationStatement-search-request-v1.0',
+              type: GatewayRequestEntryTypes.MedicationStatementSearch,
               meta: {
                 claims: {
                   '@context': 'org.hl7.fhir.api',

@@ -57,10 +57,19 @@ export function validateOnboardingManifest(manifest) {
     },
     authority: {
       caUrl: requiredString(authority.caUrl, 'manifest.authority.caUrl'),
+      caName: requiredString(authority.caName, 'manifest.authority.caName'),
       caAdminHome: requiredPath(authority.caAdminHome, 'manifest.authority.caAdminHome'),
       caTlsCert: authority.caTlsCert
         ? requiredPath(authority.caTlsCert, 'manifest.authority.caTlsCert')
         : undefined,
+      mspAdminOutputDir: requiredPath(
+        authority.mspAdminOutputDir,
+        'manifest.authority.mspAdminOutputDir',
+      ),
+      publicMspOutputDir: requiredPath(
+        authority.publicMspOutputDir,
+        'manifest.authority.publicMspOutputDir',
+      ),
       authorizationOutput: requiredPath(
         authority.authorizationOutput,
         'manifest.authority.authorizationOutput',
@@ -124,9 +133,11 @@ export function buildRolePlan(manifest, role) {
   if (role === 'authority') {
     return [
       'Verify the controller decision, current operator token and mandatory HostingServiceCredential.',
+      'Create the MSP administrator identity under governance management.',
+      'Export a secret-free public MSP definition for governed channel admission.',
       'Register a bounded two-use Fabric CA enrollment identity.',
       'Register an independent one-use Fabric client identity for GW.',
-      'Write the enrollment grant with mode 0600; never print its secret.',
+      'Write both host enrollment grants with mode 0600; never transfer the MSP administrator.',
     ];
   }
   if (role === 'host') {

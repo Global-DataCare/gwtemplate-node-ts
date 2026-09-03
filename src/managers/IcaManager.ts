@@ -1,5 +1,9 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/managers/IcaManager.ts
+import { GatewayInternalResourceTypes } from 'gdc-common-utils-ts/constants/gateway-response';
+import { GatewayResponseEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 
 import { v4 as uuidv4 } from 'uuid';
 import fs from 'fs';
@@ -123,7 +127,7 @@ export class IcaManager {
         if (label) enrollBody.label = label;
 
         const res = await fetch(enrollUrl, {
-          method: 'POST',
+          method: HttpRequestMethods.Post,
           headers: {
             'content-type': 'application/json',
             ...(enrollAuth ? { authorization: enrollAuth } : {}),
@@ -150,17 +154,17 @@ export class IcaManager {
       }
 
       const entry: BundleEntry = {
-        type: 'IcaEnrollResponse-v1.0',
+        type: GatewayResponseEntryTypes.IcaEnroll,
         response: { status: responsePayload.status === 'approved' ? '201' : '202' },
         resource: {
-          resourceType: 'IcaEnrollmentResult',
+          resourceType: GatewayInternalResourceTypes.IcaEnrollmentResult,
           ...responsePayload,
         },
       };
 
       const responseBundle: BundleJsonApi = {
         data: [entry],
-        resourceType: 'Bundle',
+        resourceType: ResourceTypesFhirR4.Bundle,
         type: getBundleResponseTypeForAction(job.action),
         total: 1,
       };
@@ -176,7 +180,7 @@ export class IcaManager {
       };
     } catch (error: any) {
       const errorEntry: ErrorEntry = {
-        type: 'IcaEnrollResponse-v1.0',
+        type: GatewayResponseEntryTypes.IcaEnroll,
         response: {
           status: error?.status || '500',
           outcome: createOperationOutcome(
@@ -188,7 +192,7 @@ export class IcaManager {
       };
       const responseBundle: BundleJsonApi = {
         data: [errorEntry],
-        resourceType: 'Bundle',
+        resourceType: ResourceTypesFhirR4.Bundle,
         type: getBundleResponseTypeForAction(job.action),
         total: 1,
       };

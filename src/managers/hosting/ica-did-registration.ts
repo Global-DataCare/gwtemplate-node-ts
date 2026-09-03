@@ -1,3 +1,4 @@
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
 import { IssueType } from 'gdc-common-utils-ts/models/issue';
 import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
 import { DidDocument } from 'gdc-common-utils-ts/models/did';
@@ -202,7 +203,7 @@ export async function pollIcaJsonResult(params: {
       await new Promise((resolve) => setTimeout(resolve, waitMs));
     }
     const res = await fetchImpl(pollingUrl, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       headers: {
         'content-type': 'application/json',
       },
@@ -283,7 +284,7 @@ export async function registerDidDocumentWithIca(params: {
 
   const fetchImpl = params.fetchImpl || fetch;
   const res = await fetchImpl(url, {
-    method: 'POST',
+    method: HttpRequestMethods.Post,
     headers: {
       'content-type': DIDCOMM_PLAINTEXT_JSON_MEDIA_TYPE,
       accept: DIDCOMM_DEFAULT_ACCEPT_HEADER,

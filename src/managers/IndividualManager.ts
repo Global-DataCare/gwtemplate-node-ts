@@ -1,5 +1,7 @@
 // src/managers/IndividualManager.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
+import { SchemaOrgTypes } from 'gdc-common-utils-ts/constants/schemaorg';
+import { HttpStatusCodes } from 'gdc-common-utils-ts/constants/http';
 
 import { v4 as uuidv4} from 'uuid';
 import { BundleType, getBundleResponseTypeForAction } from '../utils/bundle';
@@ -132,7 +134,7 @@ export class IndividualManager {
           const resultEntries = await this.processSubjectSearch(job, tenantVaultId);
           responseEntries.push(...resultEntries);
         } catch (error: any) {
-          const errorEntry = this.handleError(error, 'Subject-search-response-v1.0', job.content?.body);
+          const errorEntry = this.handleError(error, GatewayResponseEntryTypes.SubjectSearch, job.content?.body);
           responseEntries.push(errorEntry);
         }
         break;
@@ -142,7 +144,7 @@ export class IndividualManager {
     }
 
     const responseBundle: BundleJsonApi = {
-      resourceType: 'Bundle',
+      resourceType: ResourceTypesFhirR4.Bundle,
       type: getBundleResponseTypeForAction(job.action),
       total: responseEntries.length,
       data: responseEntries,
@@ -226,15 +228,15 @@ export class IndividualManager {
     person.meta.claims[ClaimsPersonSchemaorg.identifier] = publicUuidUrn;
 
     return {
-      type: 'Customer',
+      type: SchemaOrgTypes.Customer,
       resource: {
         ...person,
-        resourceType: 'Person',
+        resourceType: ResourceTypesFhirR4.Person,
         contained: [
           { ...service, resourceType: 'Service' }
         ],
       },
-      response: { status: '201' },
+      response: { status: String(HttpStatusCodes.Created) },
     };
   }
 
@@ -249,7 +251,7 @@ export class IndividualManager {
 
     // 1. Prepare all discovery tasks and group them by target (channel + chaincode)
     for (const entry of entries) {
-      const claims = entry.meta?.claims;
+      const claims = entry.resource?.meta?.claims ?? entry.meta?.claims;
       const prepResult = this.prepareUrnAndJurisdiction(claims as any);
 
       if (!prepResult.urn) {
@@ -257,7 +259,7 @@ export class IndividualManager {
           type: entry.type,
           meta: entry.meta,
           response: {
-            status: '400',
+            status: String(HttpStatusCodes.BadRequest),
             outcome: createOperationOutcome(IssueLevel.Error, IssueType.Invalid, 'Unsupported discovery claim type'),
           },
         });
@@ -288,7 +290,7 @@ export class IndividualManager {
           type: originalTask.originalEntry.type,
           meta: originalTask.originalEntry.meta,
           response: did
-            ? { status: '200', location: did }
+            ? { status: String(HttpStatusCodes.Ok), location: did }
             : { status: '404', outcome: createOperationOutcome(IssueLevel.Information, IssueType.NotFound, 'Identifier not found on the network') },
         });
       });
@@ -419,7 +421,7 @@ export class IndividualManager {
     let anchorIdentifier: string | undefined;
 
     for (const entry of entries) {
-      const claims = entry.meta?.claims;
+      const claims = entry.resource?.meta?.claims ?? entry.meta?.claims;
       if (!claims) continue;
       const currentIdentifier = claims[ClaimsPersonSchemaorg.identifier] as string | undefined;
       if (currentIdentifier) {
@@ -535,9 +537,9 @@ export class IndividualManager {
       offerClaims[ClaimsOrganizationSchemaorg.alternateName] = params.tenantId;
       await this.persistCommercialIndividualOffer(params.tenantVaultId, offerClaims);
       return {
-        type: 'Individual-license-offer-v1.0',
-        meta: { claims: offerClaims },
-        response: { status: '200' },
+        type: GatewayResponseEntryTypes.IndividualLicenseOffer,
+        resource: { meta: { claims: offerClaims } },
+        response: { status: String(HttpStatusCodes.Ok) },
       };
     }
 
@@ -595,7 +597,7 @@ export class IndividualManager {
         type: entryType,
         meta: meta,
         response: {
-          status: '500',
+          status: String(HttpStatusCodes.InternalServerError),
           outcome: createOperationOutcome(
             IssueLevel.Error,
             IssueType.Exception,

@@ -13,7 +13,7 @@ Cada fase corresponde a uno de estos responsables:
 | Gobernanza del espacio de datos | Aprueba por escrito el proveedor, dominio, controller y entorno | No genera la clave privada del host ni administra su Kubernetes |
 | Operador de la ICA del espacio de datos | Configura la preautorización, crea la activación de un uso y mantiene el endpoint de emisión | No emite certificados MSP/TLS de Fabric |
 | DevOps del host | Genera y custodia la clave del host, solicita la Host VC y despliega Helm | No recibe la identidad administradora de Fabric CA |
-| Administrador de Fabric | Valida la Host VC, registra los grants MSP/TLS y gobierna MSP y canales | No recibe la clave privada del host |
+| Entidad gobernadora de la red / administrador de Fabric | Asigna el MSP, valida la Host VC, gestiona el administrador de cada MSP, registra los grants y gobierna canales | No recibe las claves privadas del peer, TLS ni cliente GW |
 
 La **ICA del espacio de datos** emite la `HostingServiceCredential`. La
 **ICA de Fabric** emite después los certificados X.509 MSP/TLS. Son servicios,
@@ -29,7 +29,9 @@ activación, la clave pública JWK y la firma de la solicitud. La ICA emite la
 `HostingServiceCredential` para el host aprobado.
 
 Después, el responsable del host entrega esa credencial al administrador de
-Fabric. Este administrador la verifica y registra en la ICA de Fabric dos
+Fabric. La gobernanza asigna y aprueba el identificador MSP; el proveedor no lo
+elige unilateralmente. El administrador verifica la credencial, genera y
+gestiona la identidad administradora de ese MSP y registra en la ICA de Fabric dos
 grants temporales: uno con dos usos para que el host genere localmente la
 identidad MSP y el certificado TLS del peer, y otro de un uso para la identidad
 cliente con la que GW CORE del host accede a Fabric. El responsable del host
@@ -37,10 +39,17 @@ recibe esos identificadores/secretos temporales y la cadena TLS pública de la
 ICA de Fabric. Al ejecutar el responsable del host el asistente, las claves
 privadas y certificados se generan y quedan bajo custodia del propio host.
 
+La identidad administradora del MSP queda gestionada por la entidad gobernadora
+de la red y nunca se entrega al host. La definición pública
+del MSP la produce la autoridad de Fabric a partir de la cadena emisora y del
+certificado público de administración. El host sólo comunica su endpoint y los
+certificados o huellas públicas de operación que produzca el asistente.
+
 Los certificados acreditan las identidades, pero la pertenencia a los canales
-se gobierna aparte. Si se reutiliza un MSP que ya está admitido y sus canales ya
-están configurados, no se crea otro MSP; se emiten identidades nuevas de ese MSP
-y se comprueba la incorporación del nuevo peer.
+se gobierna aparte. Si el mismo operador y ámbito administrativo reutilizan un
+MSP ya admitido, no se crea otro MSP: se emiten identidades nuevas para el peer
+y se comprueba su incorporación. Un tenant alojado no se convierte por ello en
+otro MSP.
 
 ## 2. Acordar y aprobar la hoja de entrada
 
@@ -60,8 +69,8 @@ País:
 Email del controller del host (aprobación ICA):
 Identificador estable del controller:
 Rol ISCO-08 del controller:
-MSP ID solicitado:
-Canales solicitados:
+MSP asignado y aprobado por la gobernanza de Fabric:
+Canales aprobados por la gobernanza de Fabric:
 IP fija de salida hacia la ICA de Fabric:
 Namespace y release Helm:
 StorageClass e IngressClass:
@@ -69,8 +78,8 @@ DNS/TLS del GW y del peer:
 ```
 
 Gobernanza confirma por escrito identidad legal, dominio, controller, contexto
-de emisión y entorno. El administrador de Fabric confirma por escrito MSP y
-canales. En `test-network` se usa una autorización de staging; para `network` se repite
+de emisión y entorno. El administrador de Fabric asigna el MSP y confirma los
+canales aprobados. En `test-network` se usa una autorización de staging; para `network` se repite
 todo con una autorización productiva nueva. Estas aprobaciones no configuran
 Kubernetes por sí solas: cada DevOps aplica después únicamente la parte que le
 corresponde.
@@ -350,18 +359,22 @@ coinciden con la aprobación.
 Hasta aquí solo se ha autorizado el servicio de alojamiento. Todavía no se han
 generado certificados MSP/TLS ni se ha incorporado ningún peer a Fabric.
 
-## 7. Administrador de Fabric: registrar los grants
+<a id="7-administrador-de-fabric-registrar-y-custodiar-el-administrador-del-msp"></a>
+
+## 7. Administrador de Fabric: registrar y gestionar el administrador del MSP
 
 El proveedor entrega por canal seguro:
 
 - Host VC-JWT;
-- dominio y MSP solicitados;
-- canales solicitados;
+- dominio y MSP asignado por la gobernanza;
+- canales aprobados;
 - IP fija de salida.
 
 El **administrador de Fabric**, no el proveedor ni el DevOps de la ICA del
-espacio de datos, usa la identidad registradora de la ICA de Fabric y ejecuta
-el asistente público:
+espacio de datos, incorpora ese MSP al inventario gobernado. El valor de
+`mspId` incluido en la solicitud debe coincidir exactamente con la decisión
+firmada: el host no puede inventar ni modificar el nombre. Después usa la
+identidad registradora de la ICA de Fabric y ejecuta el asistente público:
 
 ```bash
 node scripts/onboarding/host-onboarding-assistant.mjs \
@@ -372,9 +385,26 @@ node scripts/onboarding/host-onboarding-assistant.mjs \
   --apply --confirm-request '<request-id-firmado>'
 ```
 
+El asistente crea bajo las rutas `authority.mspAdminOutputDir` y
+`authority.publicMspOutputDir`:
+
+- la identidad y clave privada `<MSP>.admin`, gestionadas por la entidad
+  gobernadora de la red;
+- la definición pública saneada del MSP, sin secretos ni claves privadas.
+
+El mismo contrato puede auditarse por separado con
+`scripts/enrollment/provision-governed-msp-admin.sh`. Si ambas rutas ya existen
+y coinciden en MSP, red e ICA de Fabric, el asistente reutiliza la identidad
+sin volver a registrarla; si el material gestionado está incompleto o no coincide, se
+detiene sin sobrescribirla. Así varios peers aprobados del mismo operador
+pueden pertenecer al mismo MSP.
+`authority.caName` identifica la ICA de Fabric exacta y se conserva en ambos
+grants para que el host no pueda enrolarse accidentalmente contra otra CA.
+
 Salida hacia el DevOps del host: grant de dos usos para MSP/TLS, grant de un
 uso para el cliente GW y cadena TLS pública de la ICA de Fabric. Nunca se
-entrega la identidad administradora.
+entrega la identidad administradora del MSP ni la identidad registradora de la
+ICA de Fabric.
 
 El tiempo predeterminado del asistente es 15 minutos. Para una entrega acordada
 de viernes a lunes, el administrador puede generar ambos grants con una ventana
@@ -454,6 +484,12 @@ Los `values` referencian Secrets ya creados para MSP, TLS, autorización, GW,
 PostgreSQL y CouchDB. No contienen claves, grants, VC-JWT ni contraseñas.
 
 ## 10. Administrador de Fabric: incorporar el MSP y aceptar el host
+
+Cuando el peer esté accesible, el host comunica su endpoint y la información
+pública de verificación producida durante el enrolamiento. No entrega carpetas
+MSP privadas. El administrador utiliza la definición pública gobernada para
+incorporar el MSP a los canales y la identidad `<MSP>.admin` que gestiona para
+unir el peer y aprobar el lifecycle de esa organización.
 
 El administrador de Fabric aplica el reconciliador con su inventario privado:
 

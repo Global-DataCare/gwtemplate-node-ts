@@ -1,5 +1,6 @@
 // src/managers/ObservationManager.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
+import { HttpStatusCodes } from 'gdc-common-utils-ts/constants/http';
 
 import { randomUUID } from 'crypto';
 import { IJobProcessor } from './registry';
@@ -22,6 +23,7 @@ import { applyFhirCidVersioningToEntry, FhirCidVersionMapping, registerFhirCidMa
 import type { IBlockchainAdapter } from '../adapters/IBlockchainAdapter';
 import { SUBJECT_SECTION_DIGITAL_TWIN, SUBJECT_SECTION_INDIVIDUAL } from '../constants/domain';
 import type { ITenantsManager } from './ITenantsManager';
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 
 type FhirBundleEntryLike = {
   type?: string;
@@ -92,7 +94,7 @@ export class ObservationManager implements IJobProcessor {
     const cidMappings: FhirCidVersionMapping[] = [];
 
     for (const entry of entries) {
-      const rawClaims = entry?.meta?.claims;
+      const rawClaims = entry?.resource?.meta?.claims ?? entry?.meta?.claims;
       try {
         if (!rawClaims || typeof rawClaims !== 'object') {
           throw new ManagerError('Missing meta.claims in Observation entry.', IssueType.Required);
@@ -196,7 +198,7 @@ export class ObservationManager implements IJobProcessor {
         const versioning = applyFhirCidVersioningToEntry({
           entry,
           claims,
-          resourceType: 'Observation',
+          resourceType: ResourceTypesFhirR4.Observation,
           resourceId: fallbackId,
         });
         const id = String(entry?.resource?.id || fallbackId);
@@ -212,22 +214,22 @@ export class ObservationManager implements IJobProcessor {
 
         const responseAction = `${normalizedAction}-response`;
         responseEntries.push({
-          type: 'Observation',
+          type: ResourceTypesFhirR4.Observation,
           response: {
-            status: '201',
+            status: String(HttpStatusCodes.Created),
             location: `/${job.tenantId}/cds-${jurisdiction}/v1/${job.sector}/${normalizedSection}/${normalizedFormat}/Observation/${responseAction}`,
           },
-          meta: {
+          resource: { resourceType: ResourceTypesFhirR4.Observation, meta: {
             claims,
             ...(researchTags && researchTags.length > 0 ? { tag: researchTags } : {}),
-          },
+          } },
         });
       } catch (e: any) {
         const status = e instanceof ManagerError ? e.status : '400';
         const code = e instanceof ManagerError ? e.code : IssueType.Invalid;
         responseEntries.push({
-          type: 'Observation',
-          meta: { claims: rawClaims || {} },
+          type: ResourceTypesFhirR4.Observation,
+          resource: { resourceType: ResourceTypesFhirR4.OperationOutcome, meta: { claims: rawClaims || {} } },
           response: {
             status,
             outcome: createOperationOutcome(IssueLevel.Error, code, e?.message || String(e)),
@@ -251,7 +253,7 @@ export class ObservationManager implements IJobProcessor {
       aud: job.content?.iss as string,
       exp: Math.floor(Date.now() / 1000) + 300,
       body: {
-        resourceType: 'Bundle',
+        resourceType: ResourceTypesFhirR4.Bundle,
         type: `${normalizedAction}-response`,
         data: responseEntries,
       },

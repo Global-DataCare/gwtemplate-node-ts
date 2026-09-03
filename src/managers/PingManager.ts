@@ -1,4 +1,6 @@
 // File: src/managers/PingManager.ts
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
+import { HttpStatusCodes } from 'gdc-common-utils-ts/constants/http';
 
 import { v4 as uuidv4 } from 'uuid';
 import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
@@ -39,13 +41,13 @@ export class PingManager {
     const responseEntries: BundleEntry[] = jobEntries.map((entry: BundleEntry) => ({
       ...entry,
       response: {
-        status: '200',
+        status: String(HttpStatusCodes.Ok),
       },
     }));
 
     const responseBundle: BundleJsonApi = {
       data: responseEntries,
-      resourceType: 'Bundle',
+      resourceType: ResourceTypesFhirR4.Bundle,
       total: responseEntries.length,
       type: getBundleResponseTypeForAction(job.action),
     };

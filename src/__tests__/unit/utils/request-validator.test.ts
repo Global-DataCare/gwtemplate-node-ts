@@ -1,6 +1,7 @@
 // Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 // src/__tests__/unit/utils/request-validator.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 
 import { isRequestValid } from '../../../utils/request-validator';
 import { DidService } from 'gdc-common-utils-ts/models/did';
@@ -108,7 +109,7 @@ describe('isRequestValid', () => {
       sector: Sector.HEALTH_CARE,
       section: 'digitaltwin',
       format: 'org.hl7.fhir.r4',
-      resourceType: 'Composition',
+      resourceType: ResourceTypesFhirR4.Composition,
       action: '_batch',
     })).toBe(true);
   });
@@ -126,7 +127,7 @@ describe('isRequestValid', () => {
       sector: Sector.HEALTH_CARE,
       section: 'digitaltwin',
       format: 'org.hl7.fhir.r4',
-      resourceType: 'ResearchSubject',
+      resourceType: ResourceTypesFhirR4.ResearchSubject,
       action: '_search',
     })).toBe(true);
   });
@@ -147,7 +148,7 @@ describe('isRequestValid', () => {
       sector: 'test',
       section: 'registry',
       format: 'org.schema',
-      resourceType: 'Organization',
+      resourceType: ResourceTypesFhirR4.Organization,
       action: '_activate',
     };
     expect(isRequestValid(mockServices, params)).toBe(true);
@@ -158,7 +159,7 @@ describe('isRequestValid', () => {
       sector: 'test',
       section: 'registry',
       format: 'org.schema',
-      resourceType: 'Organization',
+      resourceType: ResourceTypesFhirR4.Organization,
       action: '_transaction',
     };
     expect(isRequestValid(mockServices, params)).toBe(true);
@@ -169,7 +170,7 @@ describe('isRequestValid', () => {
       sector: 'test',
       section: 'registry',
       format: 'org.schema',
-      resourceType: 'Organization',
+      resourceType: ResourceTypesFhirR4.Organization,
       action: '_disable',
     };
     expect(isRequestValid(mockServices, params)).toBe(true);
@@ -191,7 +192,7 @@ describe('isRequestValid', () => {
       sector: Sector.HEALTH_CARE,
       section: 'individual',
       format: 'org.schema',
-      resourceType: 'Organization',
+      resourceType: ResourceTypesFhirR4.Organization,
       action: '_transaction',
     };
     expect(isRequestValid(mockServices, params)).toBe(true);
@@ -202,7 +203,7 @@ describe('isRequestValid', () => {
       sector: Sector.HEALTH_CARE,
       section: 'individual',
       format: 'org.schema',
-      resourceType: 'Organization',
+      resourceType: ResourceTypesFhirR4.Organization,
       action: '_purge',
     };
     expect(isRequestValid(mockServices, params)).toBe(true);
@@ -213,7 +214,7 @@ describe('isRequestValid', () => {
       sector: Sector.HEALTH_CARE,
       section: 'individual',
       format: 'org.schema',
-      resourceType: 'Organization',
+      resourceType: ResourceTypesFhirR4.Organization,
       action: '_disable',
     };
     expect(isRequestValid(mockServices, params)).toBe(true);
@@ -335,7 +336,7 @@ describe('isRequestValid', () => {
       sector: Sector.HEALTH_CARE,
       section: 'individual',
       format: 'org.hl7.fhir.api',
-      resourceType: 'RelatedPerson',
+      resourceType: ResourceTypesFhirR4.RelatedPerson,
       action: '_purge',
     };
     expect(isRequestValid(mockServices, params)).toBe(true);

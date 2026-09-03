@@ -1,4 +1,6 @@
 // TDD contract: write this test red first; make it green only with the complete real behavior.
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 import { describe, expect, it } from '@jest/globals';
 import {
   extractCommunicationSearchFilters,
@@ -14,7 +16,7 @@ import {
 describe('search-request utils', () => {
   it('extracts composition search filters from Parameters and request.url wrappers', () => {
     const body = {
-      resourceType: 'Bundle',
+      resourceType: ResourceTypesFhirR4.Bundle,
       type: 'batch',
       parameter: [
         { name: 'subject', valueString: 'did:web:example:subject:1' },
@@ -25,7 +27,7 @@ describe('search-request utils', () => {
       entry: [
         {
           request: {
-            method: 'GET',
+            method: HttpRequestMethods.Get,
             url: 'Composition/_search?section=LOINC|10160-0&type=document&composition.type=LOINC|60591-5&exclude-section=LOINC|11348-0',
           },
         },
@@ -42,7 +44,7 @@ describe('search-request utils', () => {
 
   it('extracts document reference and communication filters from canonical aliases', () => {
     const body = {
-      resourceType: 'Parameters',
+      resourceType: ResourceTypesFhirR4.Parameters,
       parameter: [
         { name: 'documentreference.identifier', valueString: 'doc-1' },
         { name: 'attachment.hash', valueString: 'cid-123' },

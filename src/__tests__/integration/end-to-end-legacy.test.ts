@@ -1,6 +1,8 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 // src/__tests__/integration/end-to-end-legacy.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
+import { HttpStatusCodes } from 'gdc-common-utils-ts/constants/http';
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
 
 /**
  * @file This integration test validates the "legacy" plaintext API flow.
@@ -192,7 +194,7 @@ describe('End-to-End API Flow (Legacy / Unencrypted)', () => {
     const registrationUrl = `/host/cds-ES/v1/test/registry/org.schema/Organization/_batch`;
 
     const response = await invokeExpress(app, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       url: registrationUrl,
       headers: {
         'content-type': 'application/json',
@@ -210,7 +212,7 @@ describe('End-to-End API Flow (Legacy / Unencrypted)', () => {
   it('Part 2 (PDF Attachment): should process organization with Base64 PDF and store a URL', async () => {
     const pdfBase64 = Buffer.from('dummy-pdf-content').toString('base64');
     const orgCreationPayloadWithPdf = JSON.parse(JSON.stringify(testPayloadCreateTenant1));
-    const claims = orgCreationPayloadWithPdf.body.data[0].meta.claims;
+    const claims = orgCreationPayloadWithPdf.body.data[0].resource.meta.claims;
     claims[ClaimsServiceSchemaorg.termsOfService] = pdfBase64;
     // Ensure the Service resource can be materialized into a stored document.
     claims[ClaimsServiceSchemaorg.identifier] = 'urn:uuid:service-001';
@@ -221,7 +223,7 @@ describe('End-to-End API Flow (Legacy / Unencrypted)', () => {
     const registrationUrl = `/host/cds-ES/v1/test/registry/org.schema/Organization/_batch`;
 
     const response = await invokeExpress(app, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       url: registrationUrl,
       headers: {
         'content-type': 'application/json',
@@ -236,13 +238,13 @@ describe('End-to-End API Flow (Legacy / Unencrypted)', () => {
     await queueAdapter.waitForEmptyQueue();
 
     const pollingResponse = await invokeExpress(app, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       url: new URL(response.headers.location).pathname,
       headers: { 'content-type': 'application/json' },
       body: { thid: orgCreationPayloadWithPdf.thid },
     });
     expect(pollingResponse.status).toBe(200);
-    expect(JSON.parse(pollingResponse.text).data[0]).toMatchObject({ response: { status: '201' } });
+    expect(JSON.parse(pollingResponse.text).data[0]).toMatchObject({ response: { status: String(HttpStatusCodes.Created) } });
 
     // Registration step creates a provisional tenant record stored in the HOST vault.
     const vaultId = getTenantVaultId(
@@ -267,7 +269,7 @@ describe('End-to-End API Flow (Legacy / Unencrypted)', () => {
         const orgCreationPayload = { ...testPayloadCreateTenant1 };
         const registrationUrl = `/host/cds-ES/v1/test/registry/org.schema/Organization/_batch`;
         await invokeExpress(app, {
-          method: 'POST',
+          method: HttpRequestMethods.Post,
           url: registrationUrl,
           headers: {
             'content-type': 'application/json',
@@ -279,7 +281,7 @@ describe('End-to-End API Flow (Legacy / Unencrypted)', () => {
         
         // After the async job completes, explicitly load the new 'acme' tenant into the cache
         // so that subsequent API calls in other tests can find it.
-        const claims = testPayloadCreateTenant1.body.data[0].meta.claims;
+        const claims = testPayloadCreateTenant1.body.data[0].resource.meta.claims;
         const vaultId = getTenantVaultId(claims[ClaimsServiceSchemaorg.category], claims['org.schema.Organization.alternateName']);
         await tenantManager.getTenant(vaultId);
     });
@@ -295,7 +297,7 @@ describe('End-to-End API Flow (Legacy / Unencrypted)', () => {
       authManager.setConsent(consentId, false);
       
       const response = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: communicationUrl,
         headers: {
           'content-type': 'application/json',

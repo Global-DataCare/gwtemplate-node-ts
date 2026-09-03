@@ -1,5 +1,8 @@
 // src/managers/EmployeeManager.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
+import { GatewayResponseEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
+import { HttpStatusCodes } from 'gdc-common-utils-ts/constants/http';
 
 import { v4 as uuidv4 } from 'uuid';
 import { OrganizationEmployeeSearchResponseEntryTypes } from 'gdc-common-utils-ts';
@@ -139,7 +142,7 @@ export class EmployeeManager {
 
     const responseBundle: BundleJsonApi = {
       data: responseEntries,
-      resourceType: 'Bundle',
+      resourceType: ResourceTypesFhirR4.Bundle,
       total: responseEntries.length,
       type: getBundleResponseTypeForAction(job.action),
     };
@@ -187,7 +190,7 @@ export class EmployeeManager {
       type: 'search-response',
       body: {
         data: responseEntries,
-        resourceType: 'Bundle',
+        resourceType: ResourceTypesFhirR4.Bundle,
         total: responseEntries.length,
         type: getBundleResponseTypeForAction(job.action),
       },
@@ -279,8 +282,8 @@ export class EmployeeManager {
     jurisdiction?: string,
   ): Promise<BundleEntry> {
     const requestEntry = entry as BundleEntryRequest;
-    const { request, meta: entryMeta, type } = requestEntry;
-    const claims = entryMeta?.claims;
+    const { request, type } = requestEntry;
+    const claims = requestEntry.resource?.meta?.claims || requestEntry.meta?.claims;
 
     if (!request) {
       throw new ManagerError('Entry requires a request object.', IssueType.Required);
@@ -297,7 +300,7 @@ export class EmployeeManager {
           return this.purgeEmployee(employeeCollectionName, tenantVaultId, employeeId, claims || {}, type);
         }
         if (!claims) {
-          throw new ManagerError('Entry requires meta.claims.', IssueType.Required);
+          throw new ManagerError('Entry requires resource.meta.claims.', IssueType.Required);
         }
         return this.createEmployee(tenantVaultId, employeeCollectionName, tenantId, tenantUrn, employeeId, claims, type, meta, contentType);
       case 'DELETE':
@@ -311,7 +314,7 @@ export class EmployeeManager {
     const explicitResourceId = String((entry as any)?.resource?.id || '').trim();
     if (explicitResourceId) return explicitResourceId;
 
-    const identifierClaim = entry.meta?.claims?.[ClaimsPersonSchemaorg.identifier];
+    const identifierClaim = (entry.resource?.meta?.claims || entry.meta?.claims)?.[ClaimsPersonSchemaorg.identifier];
     if (typeof identifierClaim !== 'string' || !identifierClaim.trim()) {
       return undefined;
     }
@@ -507,11 +510,11 @@ export class EmployeeManager {
       type: entryType,
       resource: {
         id: employeeId,
-        type: 'Person',
+        type: ResourceTypesFhirR4.Person,
         meta: { claims: claims },
         contained: [occupationDoc],
       },
-      response: { status: '201' },
+      response: { status: String(HttpStatusCodes.Created) },
     };
   }
 
@@ -604,10 +607,10 @@ export class EmployeeManager {
       type: entryType,
       resource: {
         id: employee.id,
-        type: 'Person',
+        type: ResourceTypesFhirR4.Person,
         meta: { claims: isActive ? employee.claims : claims },
       },
-      response: { status: '200' },
+      response: { status: String(HttpStatusCodes.Ok) },
     };
   }
 
@@ -644,9 +647,9 @@ export class EmployeeManager {
       await this.persistHostCommercialOffer(offerClaims);
 
       return {
-        type: 'Employee-license-offer-v1.0',
-        meta: { claims: offerClaims },
-        response: { status: '200' },
+        type: GatewayResponseEntryTypes.EmployeeLicenseOffer,
+        resource: { meta: { claims: offerClaims } },
+        response: { status: String(HttpStatusCodes.Ok) },
       };
     }
 
@@ -698,7 +701,7 @@ export class EmployeeManager {
     return {
       type: entryType,
       resource: { id: employeeId },
-      response: { status: '200' },
+      response: { status: String(HttpStatusCodes.Ok) },
     };
   }
 
@@ -747,7 +750,7 @@ export class EmployeeManager {
     return {
       type: entryType,
       resource: { id: employeeId },
-      response: { status: '200' },
+      response: { status: String(HttpStatusCodes.Ok) },
     };
   }
 
@@ -835,7 +838,7 @@ export class EmployeeManager {
         type: entryType,
         meta: meta,
         response: {
-          status: '500',
+          status: String(HttpStatusCodes.InternalServerError),
           outcome: createOperationOutcome(
             IssueLevel.Error,
             IssueType.Exception,

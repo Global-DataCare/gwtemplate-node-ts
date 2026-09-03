@@ -1,4 +1,6 @@
 // TDD contract: write this test red first; make it green only with the complete real behavior.
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 import { createHash, randomUUID } from 'crypto';
 import { mock, MockProxy } from 'jest-mock-extended';
 import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-job';
@@ -71,13 +73,13 @@ describe('ConsentManager', () => {
 
   const mockMeta: BundleEntryMeta = { claims: mockClaims };
   const mockEntry: BundleEntryRequest = {
-    type: 'Consent',
+    type: ResourceTypesFhirR4.Consent,
     meta: mockMeta,
-    resource: { resourceType: 'Consent' },
-    request: { method: 'POST', url: `/${mockSector}/individual/org.hl7.fhir.api/Consent`},
+    resource: { resourceType: ResourceTypesFhirR4.Consent },
+    request: { method: HttpRequestMethods.Post, url: `/${mockSector}/individual/org.hl7.fhir.api/Consent`},
   };
   const mockBundleJsonApi: BundleJsonApi<BundleEntryRequest> = {
-    resourceType: 'Bundle',
+    resourceType: ResourceTypesFhirR4.Bundle,
     type: 'batch',
     data: [mockEntry],
   };
@@ -96,7 +98,7 @@ describe('ConsentManager', () => {
       sector: mockSector,
       section: 'individual',
       format: knownDomainsReversedEnum['org.hl7.fhir.api'],
-      resourceType: 'Consent',
+      resourceType: ResourceTypesFhirR4.Consent,
       action: '_batch',
       id: randomUUID(),
       status: JobStatus.DRAFT,

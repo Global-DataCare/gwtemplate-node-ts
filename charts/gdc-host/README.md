@@ -38,13 +38,16 @@ confirma chaincodes.
 El orden correcto es:
 
 1. la ICA del espacio de datos emite la `HostingServiceCredential`;
-2. la autoridad verifica esa VC-JWT y la decisión de gobernanza;
-3. la autoridad registra una identidad de dos enrolamientos para MSP/TLS y
+2. la autoridad asigna el MSP, verifica esa VC-JWT y la decisión de gobernanza;
+3. la entidad gobernadora genera y gestiona `<MSP>.admin`, y exporta solamente la
+   definición MSP pública;
+4. la autoridad registra una identidad de dos enrolamientos para MSP/TLS y
    otra de un uso para el cliente GW en la ICA de Fabric;
-4. el host ejecuta enrollment y genera localmente las tres claves privadas;
-5. el operador materializa Secrets y ejecuta Helm;
-6. el reconciliador añade el MSP, une canales y aplica lifecycle CCAAS;
-7. el E2E valida escritura, lectura, autorización y persistencia.
+5. el host ejecuta enrollment y genera localmente sus tres claves privadas;
+6. el operador materializa Secrets y ejecuta Helm;
+7. el reconciliador usa la identidad administrativa gestionada por la entidad
+   gobernadora para añadir el MSP, unir canales y aplicar lifecycle CCAAS;
+8. el E2E valida escritura, lectura, autorización y persistencia.
 
 El chart recibe únicamente `authorization.json` saneado. La VC-JWT, un posible
 PDF y los secretos de enrollment no entran en values, ConfigMaps ni manifiestos

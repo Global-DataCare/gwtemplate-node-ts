@@ -1,3 +1,5 @@
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 import { createHash, randomUUID } from 'node:crypto';
 import { HealthcareConsentPurposes } from 'gdc-common-utils-ts/constants/healthcare';
 import { ClaimConsent, ConsentDecisions } from 'gdc-common-utils-ts/models/consent-rule';
@@ -84,7 +86,7 @@ export interface BreakGlassControllerNotifier {
     expiresAt: string;
     consentLedgerAssetId: string;
     communication: Readonly<{
-      resourceType: 'Communication';
+      resourceType: typeof ResourceTypesFhirR4.Communication;
       status: 'in-progress';
       identifier: ReadonlyArray<Readonly<{ value: string }>>;
       subject: Readonly<{ reference: string }>;
@@ -239,7 +241,7 @@ export class BreakGlassService implements BreakGlassAuthorizer {
         expiresAt: consentExpiresAt,
         consentLedgerAssetId: `break-glass-consent:${emergencyConsentId}`,
         communication: {
-          resourceType: 'Communication',
+          resourceType: ResourceTypesFhirR4.Communication,
           status: 'in-progress',
           identifier: [{ value: `urn:uuid:${emergencyConsentId}` }],
           subject: { reference: input.subjectDid },
@@ -330,7 +332,7 @@ class BreakGlassControllerNotifierHttp implements BreakGlassControllerNotifier {
 
   async notify(input: Parameters<BreakGlassControllerNotifier['notify']>[0]): Promise<{ notificationId: string }> {
     const response = await fetch(this.endpoint, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       headers: { 'content-type': 'application/json', authorization: `Bearer ${this.bearerToken}` },
       body: JSON.stringify(input),
     });

@@ -1,5 +1,9 @@
 // Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 // Contract marker: imported clinical resources preserve their external author provenance.
+import { GatewayResponseEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
+import { GatewayRequestEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 import { invokeExpress } from './helpers/invokeExpress';
 import { extractBundleSearchResources } from 'gdc-common-utils-ts/utils/organization-employee-lifecycle';
 import { getTenantVaultId, generateTenantCollectionNameFromClaims } from '../../utils/tenant';
@@ -62,7 +66,7 @@ describe('MedicationStatement API (integration)', () => {
         [ClaimsServiceSchemaorg.category]: Sector.SYSTEM,
       };
       const hostCollectionName = generateTenantCollectionNameFromClaims(hostBootstrapClaims as any);
-      const tenantClaims = testPayloadCreateTenant1.body.data[0].meta.claims as any;
+      const tenantClaims = testPayloadCreateTenant1.body.data[0].resource.meta.claims as any;
       const tenantVaultId = getTenantVaultId(tenantClaims[ClaimsServiceSchemaorg.category], testTenant1TenantId);
 
       const tenantConfig = {
@@ -92,12 +96,12 @@ describe('MedicationStatement API (integration)', () => {
 
       const buildIpsDocumentReference = (suffix: string, sent: string) => {
         const documentBundle = {
-          resourceType: 'Bundle',
+          resourceType: ResourceTypesFhirR4.Bundle,
           type: 'document',
           entry: [
             {
               resource: {
-                resourceType: 'Composition',
+                resourceType: ResourceTypesFhirR4.Composition,
                 id: `ips-composition-${suffix}`,
                 status: 'final',
                 date: sent,
@@ -156,7 +160,7 @@ describe('MedicationStatement API (integration)', () => {
             },
             {
               resource: {
-                resourceType: 'MedicationStatement',
+                resourceType: ResourceTypesFhirR4.MedicationStatement,
                 id: `medication-${suffix}`,
                 status: 'active',
                 subject: { reference: subjectDid },
@@ -174,7 +178,7 @@ describe('MedicationStatement API (integration)', () => {
             },
             {
               resource: {
-                resourceType: 'Condition',
+                resourceType: ResourceTypesFhirR4.Condition,
                 id: `condition-${suffix}`,
                 clinicalStatus: {
                   coding: [{ system: 'http://terminology.hl7.org/CodeSystem/condition-clinical', code: 'active' }],
@@ -194,7 +198,7 @@ describe('MedicationStatement API (integration)', () => {
             },
             {
               resource: {
-                resourceType: 'AllergyIntolerance',
+                resourceType: ResourceTypesFhirR4.AllergyIntolerance,
                 id: `allergy-${suffix}`,
                 clinicalStatus: {
                   coding: [{ system: 'http://terminology.hl7.org/CodeSystem/allergyintolerance-clinical', code: 'active' }],
@@ -214,7 +218,7 @@ describe('MedicationStatement API (integration)', () => {
             },
             {
               resource: {
-                resourceType: 'Observation',
+                resourceType: ResourceTypesFhirR4.Observation,
                 id: `observation-${suffix}`,
                 status: 'final',
                 subject: { reference: subjectDid },
@@ -234,7 +238,7 @@ describe('MedicationStatement API (integration)', () => {
         };
 
         return {
-          resourceType: 'DocumentReference',
+          resourceType: ResourceTypesFhirR4.DocumentReference,
           id: `ips-document-reference-${suffix}`,
           subject: { reference: subjectDid },
           date: sent,
@@ -255,7 +259,7 @@ describe('MedicationStatement API (integration)', () => {
       const waitForBatch = async (thid: string) => {
         for (let i = 0; i < 50; i++) {
           const pollResp = await invokeExpress(app, {
-            method: 'POST',
+            method: HttpRequestMethods.Post,
             url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch-response`,
             headers: { 'content-type': 'application/json' },
             body: { thid },
@@ -269,17 +273,17 @@ describe('MedicationStatement API (integration)', () => {
       const submitReplay = async (suffix: string, sent: string) => {
         const embeddedDocumentReference = buildIpsDocumentReference(suffix, sent);
         const submitResp = await invokeExpress(app, {
-          method: 'POST',
+          method: HttpRequestMethods.Post,
           url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch`,
           headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
           body: {
             thid: `communication-replay-${suffix}`,
             body: {
-              resourceType: 'Bundle',
+              resourceType: ResourceTypesFhirR4.Bundle,
               type: 'batch',
               entry: [
                 {
-                  request: { method: 'POST', url: 'individual/org.hl7.fhir.r4/Communication' },
+                  request: { method: HttpRequestMethods.Post, url: 'individual/org.hl7.fhir.r4/Communication' },
                   meta: {
                     claims: {
                       '@context': 'org.hl7.fhir.r4',
@@ -290,7 +294,7 @@ describe('MedicationStatement API (integration)', () => {
                     },
                   },
                   resource: {
-                    resourceType: 'Communication',
+                    resourceType: ResourceTypesFhirR4.Communication,
                     status: 'completed',
                     subject: { reference: subjectDid },
                     sent,
@@ -383,7 +387,7 @@ describe('MedicationStatement API (integration)', () => {
         [ClaimsServiceSchemaorg.category]: Sector.SYSTEM,
       };
       const hostCollectionName = generateTenantCollectionNameFromClaims(hostBootstrapClaims as any);
-      const tenantClaims = testPayloadCreateTenant1.body.data[0].meta.claims as any;
+      const tenantClaims = testPayloadCreateTenant1.body.data[0].resource.meta.claims as any;
       const tenantVaultId = getTenantVaultId(tenantClaims[ClaimsServiceSchemaorg.category], testTenant1TenantId);
 
       const tenantConfig = {
@@ -403,12 +407,12 @@ describe('MedicationStatement API (integration)', () => {
       const subjectDid = 'did:web:api.acme.org:individual:subject-001';
       const ipsDocumentTypeToken = `${HealthcareBasicSections.PatientSummaryDocument.system}|${HealthcareBasicSections.PatientSummaryDocument.code}`;
       const documentBundle = {
-        resourceType: 'Bundle',
+        resourceType: ResourceTypesFhirR4.Bundle,
         type: 'document',
         entry: [
           {
             resource: {
-              resourceType: 'Composition',
+              resourceType: ResourceTypesFhirR4.Composition,
               id: 'ips-composition-001',
               status: 'final',
               type: {
@@ -436,7 +440,7 @@ describe('MedicationStatement API (integration)', () => {
           },
           {
             resource: {
-              resourceType: 'MedicationStatement',
+              resourceType: ResourceTypesFhirR4.MedicationStatement,
               id: 'medication-001',
               status: 'active',
               subject: { reference: subjectDid },
@@ -450,7 +454,7 @@ describe('MedicationStatement API (integration)', () => {
       };
       const documentBundleB64 = Buffer.from(JSON.stringify(documentBundle), 'utf8').toString('base64');
       const embeddedDocumentReference = {
-        resourceType: 'DocumentReference',
+        resourceType: ResourceTypesFhirR4.DocumentReference,
         id: 'ips-document-reference-001',
         subject: { reference: subjectDid },
         date: '2026-05-22T10:00:00Z',
@@ -470,17 +474,17 @@ describe('MedicationStatement API (integration)', () => {
 
       const thidBatch = 'communication-medication-batch-001';
       const submitResp = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch`,
         headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
         body: {
           thid: thidBatch,
           body: {
-            resourceType: 'Bundle',
+            resourceType: ResourceTypesFhirR4.Bundle,
             type: 'batch',
             entry: [
               {
-                request: { method: 'POST', url: 'individual/org.hl7.fhir.r4/Communication' },
+                request: { method: HttpRequestMethods.Post, url: 'individual/org.hl7.fhir.r4/Communication' },
                 meta: {
                   claims: {
                     '@context': 'org.hl7.fhir.r4',
@@ -490,7 +494,7 @@ describe('MedicationStatement API (integration)', () => {
                   },
                 },
                 resource: {
-                  resourceType: 'Communication',
+                  resourceType: ResourceTypesFhirR4.Communication,
                   status: 'completed',
                   subject: { reference: subjectDid },
                   sent: '2026-05-22T10:00:00Z',
@@ -514,7 +518,7 @@ describe('MedicationStatement API (integration)', () => {
       let batchPayload: any;
       for (let i = 0; i < 50; i++) {
         const pollResp = await invokeExpress(app, {
-          method: 'POST',
+          method: HttpRequestMethods.Post,
           url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch-response`,
           headers: { 'content-type': 'application/json' },
           body: { thid: thidBatch },
@@ -531,7 +535,7 @@ describe('MedicationStatement API (integration)', () => {
 
       const thidSearch = 'medication-search-001';
       const searchResp = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.api/MedicationStatement/_search`,
         headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
         body: {
@@ -539,7 +543,7 @@ describe('MedicationStatement API (integration)', () => {
           body: {
             data: [
               {
-                type: 'MedicationStatement-search-request-v1.0',
+                type: GatewayRequestEntryTypes.MedicationStatementSearch,
                 meta: {
                   claims: {
                     '@context': 'org.hl7.fhir.api',
@@ -556,7 +560,7 @@ describe('MedicationStatement API (integration)', () => {
       let searchPayload: any;
       for (let i = 0; i < 50; i++) {
         const pollResp = await invokeExpress(app, {
-          method: 'POST',
+          method: HttpRequestMethods.Post,
           url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.api/MedicationStatement/_batch-response`,
           headers: { 'content-type': 'application/json' },
           body: { thid: thidSearch },
@@ -575,18 +579,18 @@ describe('MedicationStatement API (integration)', () => {
       const thidIpsSearch = 'ips-bundle-search-001';
       const ipsSearchReference = `individual/org.hl7.fhir.r4/Bundle/_search?type=document&composition.subject=${encodeURIComponent(subjectDid)}&composition.type=${encodeURIComponent(ipsDocumentTypeToken)}`;
       const ipsSearchResp = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Bundle/_search`,
         headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
         body: {
           thid: thidIpsSearch,
           body: {
-            resourceType: 'Bundle',
+            resourceType: ResourceTypesFhirR4.Bundle,
             type: 'batch',
             entry: [
               {
                 request: {
-                  method: 'GET',
+                  method: HttpRequestMethods.Get,
                   url: `Bundle?type=document&composition.subject=${encodeURIComponent(subjectDid)}&composition.type=${encodeURIComponent(ipsDocumentTypeToken)}`,
                 },
               },
@@ -599,7 +603,7 @@ describe('MedicationStatement API (integration)', () => {
       let ipsSearchPayload: any;
       for (let i = 0; i < 50; i++) {
         const pollResp = await invokeExpress(app, {
-          method: 'POST',
+          method: HttpRequestMethods.Post,
           url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Bundle/_search-response`,
           headers: { 'content-type': 'application/json' },
           body: { thid: thidIpsSearch },
@@ -626,17 +630,17 @@ describe('MedicationStatement API (integration)', () => {
 
       const thidCommunicationSearch = 'communication-ips-search-001';
       const communicationSearchResp = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch`,
         headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
         body: {
           thid: thidCommunicationSearch,
           body: {
-            resourceType: 'Bundle',
+            resourceType: ResourceTypesFhirR4.Bundle,
             type: 'batch',
             entry: [
               {
-                request: { method: 'POST', url: 'individual/org.hl7.fhir.r4/Communication' },
+                request: { method: HttpRequestMethods.Post, url: 'individual/org.hl7.fhir.r4/Communication' },
                 meta: {
                   claims: {
                     '@context': 'org.hl7.fhir.r4',
@@ -646,7 +650,7 @@ describe('MedicationStatement API (integration)', () => {
                   },
                 },
                 resource: {
-                  resourceType: 'Communication',
+                  resourceType: ResourceTypesFhirR4.Communication,
                   status: 'completed',
                   subject: { reference: subjectDid },
                   sent: '2026-05-22T12:00:00Z',
@@ -668,7 +672,7 @@ describe('MedicationStatement API (integration)', () => {
       let communicationSearchPayload: any;
       for (let i = 0; i < 50; i++) {
         const pollResp = await invokeExpress(app, {
-          method: 'POST',
+          method: HttpRequestMethods.Post,
           url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch-response`,
           headers: { 'content-type': 'application/json' },
           body: { thid: thidCommunicationSearch },
@@ -681,7 +685,7 @@ describe('MedicationStatement API (integration)', () => {
       }
 
       expect(communicationSearchPayload?.resourceType).toBe('Bundle');
-      expect(communicationSearchPayload?.data?.[0]?.type).toBe('Bundle-search-response-v1.0');
+      expect(communicationSearchPayload?.data?.[0]?.type).toBe(GatewayResponseEntryTypes.BundleSearch);
       expect(communicationSearchPayload?.data?.[0]?.response?.status).toBe('200');
       expect(communicationSearchPayload?.data?.[0]?.resource?.resourceType).toBe('Bundle');
       expect(communicationSearchPayload?.data?.[0]?.resource?.type).toBe('document');
@@ -725,7 +729,7 @@ describe('MedicationStatement API (integration)', () => {
       };
       const hostCollectionName = generateTenantCollectionNameFromClaims(hostBootstrapClaims as any);
       const tenantClaims = {
-        ...(testPayloadCreateTenant1.body.data[0].meta.claims as any),
+        ...(testPayloadCreateTenant1.body.data[0].resource.meta.claims as any),
         [ClaimsServiceSchemaorg.category]: 'health-care',
       };
       const tenantVaultId = getTenantVaultId('health-care', testTenant1TenantId);
@@ -759,12 +763,12 @@ describe('MedicationStatement API (integration)', () => {
       const communicationThid = 'communication-digitaltwin-medication-001';
       const medicationCode = 'http://www.nlm.nih.gov/research/umls/rxnorm|161';
       const embeddedMedicationBundle = {
-        resourceType: 'Bundle',
+        resourceType: ResourceTypesFhirR4.Bundle,
         type: 'document',
         entry: [
           {
             resource: {
-              resourceType: 'Composition',
+              resourceType: ResourceTypesFhirR4.Composition,
               id: 'digitaltwin-composition-001',
               status: 'final',
               subject: { reference: subjectDid },
@@ -789,7 +793,7 @@ describe('MedicationStatement API (integration)', () => {
           },
           {
             resource: {
-              resourceType: 'MedicationStatement',
+              resourceType: ResourceTypesFhirR4.MedicationStatement,
               id: 'medication-digitaltwin-001',
               status: 'active',
               language: 'es',
@@ -811,7 +815,7 @@ describe('MedicationStatement API (integration)', () => {
         ],
       };
       const documentReference = {
-        resourceType: 'DocumentReference',
+        resourceType: ResourceTypesFhirR4.DocumentReference,
         id: 'digitaltwin-document-reference-001',
         subject: { reference: subjectDid },
         date: '2026-05-22T10:00:00Z',
@@ -829,19 +833,19 @@ describe('MedicationStatement API (integration)', () => {
       };
 
       const submitResp = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch`,
         headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
         body: {
           thid: communicationThid,
           body: {
-            resourceType: 'Bundle',
+            resourceType: ResourceTypesFhirR4.Bundle,
             type: 'batch',
             entry: [
               {
-                request: { method: 'POST', url: 'individual/org.hl7.fhir.r4/Communication' },
+                request: { method: HttpRequestMethods.Post, url: 'individual/org.hl7.fhir.r4/Communication' },
                 resource: {
-                  resourceType: 'Communication',
+                  resourceType: ResourceTypesFhirR4.Communication,
                   status: 'completed',
                   subject: { reference: subjectDid },
                   sent: '2026-05-22T10:00:00Z',
@@ -865,7 +869,7 @@ describe('MedicationStatement API (integration)', () => {
       let communicationPayload: any;
       for (let i = 0; i < 50; i++) {
         const pollResp = await invokeExpress(app, {
-          method: 'POST',
+          method: HttpRequestMethods.Post,
           url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch-response`,
           headers: { 'content-type': 'application/json' },
           body: { thid: communicationThid },
@@ -906,13 +910,13 @@ describe('MedicationStatement API (integration)', () => {
 
       const searchByCodeThid = 'digitaltwin-medication-code-search-001';
       const codeSearchResp = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.api/ResearchSubject/_search`,
         headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
         body: {
           thid: searchByCodeThid,
           body: {
-            resourceType: 'Parameters',
+            resourceType: ResourceTypesFhirR4.Parameters,
             parameter: [
               { name: 'section', valueString: HealthcareBasicSections.HistoryOfMedicationUse.attributeValue },
               { name: 'MedicationStatement.code', valueString: medicationCode },
@@ -925,7 +929,7 @@ describe('MedicationStatement API (integration)', () => {
       let codeSearchPayload: any;
       for (let i = 0; i < 50; i++) {
         const pollResp = await invokeExpress(app, {
-          method: 'POST',
+          method: HttpRequestMethods.Post,
           url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.api/ResearchSubject/_batch-response`,
           headers: { 'content-type': 'application/json' },
           body: { thid: searchByCodeThid },
@@ -976,7 +980,7 @@ describe('MedicationStatement API (integration)', () => {
         [ClaimsServiceSchemaorg.category]: Sector.SYSTEM,
       };
       const hostCollectionName = generateTenantCollectionNameFromClaims(hostBootstrapClaims as any);
-      const tenantClaims = testPayloadCreateTenant1.body.data[0].meta.claims as any;
+      const tenantClaims = testPayloadCreateTenant1.body.data[0].resource.meta.claims as any;
       const tenantVaultId = getTenantVaultId(tenantClaims[ClaimsServiceSchemaorg.category], testTenant1TenantId);
 
       const tenantConfig = {
@@ -996,12 +1000,12 @@ describe('MedicationStatement API (integration)', () => {
       const subjectDid = 'did:web:api.acme.org:individual:subject-ips-plus-two-medications-001';
       const ipsDocumentTypeToken = `${HealthcareBasicSections.PatientSummaryDocument.system}|${HealthcareBasicSections.PatientSummaryDocument.code}`;
       const baseDocumentBundle = {
-        resourceType: 'Bundle',
+        resourceType: ResourceTypesFhirR4.Bundle,
         type: 'document',
         entry: [
           {
             resource: {
-              resourceType: 'Composition',
+              resourceType: ResourceTypesFhirR4.Composition,
               id: 'ips-composition-base-001',
               status: 'final',
               type: {
@@ -1031,7 +1035,7 @@ describe('MedicationStatement API (integration)', () => {
           },
           {
             resource: {
-              resourceType: 'MedicationStatement',
+              resourceType: ResourceTypesFhirR4.MedicationStatement,
               id: 'medication-base-001',
               status: 'active',
               subject: { reference: subjectDid },
@@ -1057,7 +1061,7 @@ describe('MedicationStatement API (integration)', () => {
       };
 
       const baseDocumentReference = {
-        resourceType: 'DocumentReference',
+        resourceType: ResourceTypesFhirR4.DocumentReference,
         id: 'ips-document-reference-base-001',
         subject: { reference: subjectDid },
         date: '2026-05-22T09:00:00Z',
@@ -1075,17 +1079,17 @@ describe('MedicationStatement API (integration)', () => {
       };
 
       const baseSubmitResp = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch`,
         headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
         body: {
           thid: 'communication-ips-base-001',
           body: {
-            resourceType: 'Bundle',
+            resourceType: ResourceTypesFhirR4.Bundle,
             type: 'batch',
             entry: [
               {
-                request: { method: 'POST', url: 'individual/org.hl7.fhir.r4/Communication' },
+                request: { method: HttpRequestMethods.Post, url: 'individual/org.hl7.fhir.r4/Communication' },
                 meta: {
                   claims: {
                     '@context': 'org.hl7.fhir.r4',
@@ -1095,7 +1099,7 @@ describe('MedicationStatement API (integration)', () => {
                   },
                 },
                 resource: {
-                  resourceType: 'Communication',
+                  resourceType: ResourceTypesFhirR4.Communication,
                   status: 'completed',
                   subject: { reference: subjectDid },
                   sent: '2026-05-22T09:00:00Z',
@@ -1119,7 +1123,7 @@ describe('MedicationStatement API (integration)', () => {
       let baseBatchPayload: any;
       for (let i = 0; i < 50; i++) {
         const pollResp = await invokeExpress(app, {
-          method: 'POST',
+          method: HttpRequestMethods.Post,
           url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch-response`,
           headers: { 'content-type': 'application/json' },
           body: { thid: 'communication-ips-base-001' },
@@ -1145,7 +1149,7 @@ describe('MedicationStatement API (integration)', () => {
         demoCompositionTitle: 'IPS Medication Summary',
       } as any);
       const firstMedicationResp = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch`,
         headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
         body: firstMedicationRequest,
@@ -1155,7 +1159,7 @@ describe('MedicationStatement API (integration)', () => {
       let firstMedicationBatchPayload: any;
       for (let i = 0; i < 50; i++) {
         const pollResp = await invokeExpress(app, {
-          method: 'POST',
+          method: HttpRequestMethods.Post,
           url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch-response`,
           headers: { 'content-type': 'application/json' },
           body: { thid: 'communication-extra-medication-001' },
@@ -1181,7 +1185,7 @@ describe('MedicationStatement API (integration)', () => {
         demoCompositionTitle: 'IPS Medication Summary',
       } as any);
       const secondMedicationResp = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch`,
         headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
         body: secondMedicationRequest,
@@ -1191,7 +1195,7 @@ describe('MedicationStatement API (integration)', () => {
       let secondMedicationBatchPayload: any;
       for (let i = 0; i < 50; i++) {
         const pollResp = await invokeExpress(app, {
-          method: 'POST',
+          method: HttpRequestMethods.Post,
           url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch-response`,
           headers: { 'content-type': 'application/json' },
           body: { thid: 'communication-extra-medication-002' },
@@ -1210,17 +1214,17 @@ describe('MedicationStatement API (integration)', () => {
         + `&composition.type=${encodeURIComponent(ipsDocumentTypeToken)}`;
 
       const communicationSearchResp = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch`,
         headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
         body: {
           thid: 'communication-ips-search-plus-two-001',
           body: {
-            resourceType: 'Bundle',
+            resourceType: ResourceTypesFhirR4.Bundle,
             type: 'batch',
             entry: [
               {
-                request: { method: 'POST', url: 'individual/org.hl7.fhir.r4/Communication' },
+                request: { method: HttpRequestMethods.Post, url: 'individual/org.hl7.fhir.r4/Communication' },
                 meta: {
                   claims: {
                     '@context': 'org.hl7.fhir.r4',
@@ -1230,7 +1234,7 @@ describe('MedicationStatement API (integration)', () => {
                   },
                 },
                 resource: {
-                  resourceType: 'Communication',
+                  resourceType: ResourceTypesFhirR4.Communication,
                   status: 'completed',
                   subject: { reference: subjectDid },
                   sent: '2026-05-22T12:00:00Z',
@@ -1252,7 +1256,7 @@ describe('MedicationStatement API (integration)', () => {
       let communicationSearchPayload: any;
       for (let i = 0; i < 50; i++) {
         const pollResp = await invokeExpress(app, {
-          method: 'POST',
+          method: HttpRequestMethods.Post,
           url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch-response`,
           headers: { 'content-type': 'application/json' },
           body: { thid: 'communication-ips-search-plus-two-001' },
@@ -1265,7 +1269,7 @@ describe('MedicationStatement API (integration)', () => {
       }
 
       expect(communicationSearchPayload?.resourceType).toBe('Bundle');
-      expect(communicationSearchPayload?.data?.[0]?.type).toBe('Bundle-search-response-v1.0');
+      expect(communicationSearchPayload?.data?.[0]?.type).toBe(GatewayResponseEntryTypes.BundleSearch);
       expect(communicationSearchPayload?.data?.[0]?.response?.status).toBe('200');
       expect(communicationSearchPayload?.data?.[0]?.resource?.resourceType).toBe('Bundle');
       expect(communicationSearchPayload?.data?.[0]?.resource?.type).toBe('document');

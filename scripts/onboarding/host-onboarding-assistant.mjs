@@ -47,7 +47,7 @@ async function writePrivateJson(path, jsonText) {
 }
 
 async function applyAuthority(manifest) {
-  log('1/3 Verifying governance and host VC evidence.');
+  log('1/4 Verifying governance and host VC evidence.');
   const authorization = await run(process.execPath, [
     'scripts/enrollment/authorize-host-enrollment.mjs',
     '--request', manifest.inputs.request,
@@ -58,29 +58,45 @@ async function applyAuthority(manifest) {
   ], { capture: true, label: 'host enrollment authorization' });
   await writePrivateJson(manifest.authority.authorizationOutput, authorization);
 
-  log('2/3 Registering a bounded Fabric CA peer enrollment identity.');
+  log('2/4 Provisioning the governed MSP administrator and public MSP definition.');
+  await run('bash', ['scripts/enrollment/provision-governed-msp-admin.sh'], {
+    label: 'governed MSP administrator provisioning',
+    env: {
+      AUTHORIZATION_JSON: manifest.authority.authorizationOutput,
+      CA_URL: manifest.authority.caUrl,
+      CA_NAME: manifest.authority.caName,
+      CA_ADMIN_HOME: manifest.authority.caAdminHome,
+      MSP_ADMIN_OUTPUT_DIR: manifest.authority.mspAdminOutputDir,
+      MSP_PUBLIC_OUTPUT_DIR: manifest.authority.publicMspOutputDir,
+      ...(manifest.authority.caTlsCert ? { CA_TLS_CERT: manifest.authority.caTlsCert } : {}),
+    },
+  });
+
+  log('3/4 Registering a bounded Fabric CA peer enrollment identity.');
   await run('bash', ['scripts/enrollment/register-host-enrollment.sh'], {
     label: 'Fabric CA registration',
     env: {
       AUTHORIZATION_JSON: manifest.authority.authorizationOutput,
       CA_URL: manifest.authority.caUrl,
+      CA_NAME: manifest.authority.caName,
       CA_ADMIN_HOME: manifest.authority.caAdminHome,
       ENROLLMENT_OUTPUT_FILE: manifest.authority.enrollmentGrantOutput,
       ...(manifest.authority.caTlsCert ? { CA_TLS_CERT: manifest.authority.caTlsCert } : {}),
     },
   });
-  log('3/3 Registering a one-use GW Fabric client identity.');
+  log('4/4 Registering a one-use GW Fabric client identity.');
   await run('bash', ['scripts/enrollment/register-host-client-enrollment.sh'], {
     label: 'Fabric CA GW client registration',
     env: {
       AUTHORIZATION_JSON: manifest.authority.authorizationOutput,
       CA_URL: manifest.authority.caUrl,
+      CA_NAME: manifest.authority.caName,
       CA_ADMIN_HOME: manifest.authority.caAdminHome,
       CLIENT_ENROLLMENT_OUTPUT_FILE: manifest.authority.clientEnrollmentGrantOutput,
       ...(manifest.authority.caTlsCert ? { CA_TLS_CERT: manifest.authority.caTlsCert } : {}),
     },
   });
-  log('Authority phase complete. Transfer both mode-0600 enrollment grants over an approved secure channel.');
+  log('Authority phase complete. Retain the MSP administrator; transfer only both mode-0600 host grants.');
 }
 
 async function applyHost(manifest) {
@@ -149,6 +165,8 @@ async function runPlatform(manifest, apply) {
 async function showStatus(manifest) {
   const entries = [
     ['authorization', manifest.authority.authorizationOutput],
+    ['governed MSP administrator', manifest.authority.mspAdminOutputDir],
+    ['public MSP definition', manifest.authority.publicMspOutputDir],
     ['enrollment grant', manifest.authority.enrollmentGrantOutput],
     ['GW client enrollment grant', manifest.authority.clientEnrollmentGrantOutput],
     ['host MSP/TLS', manifest.host.mspOutputDir],

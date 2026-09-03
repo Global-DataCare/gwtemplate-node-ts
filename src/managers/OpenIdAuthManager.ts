@@ -1,5 +1,6 @@
 // src/managers/OpenIdAuthManager.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 
 import { IJobProcessor } from './registry';
 import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
@@ -1088,7 +1089,7 @@ export class OpenIdAuthManager implements IJobProcessor {
       return {
         raw,
         capability: 'Composition.rs',
-        resourceType: 'Composition',
+        resourceType: ResourceTypesFhirR4.Composition,
         filters: {},
       };
     }
@@ -1101,7 +1102,7 @@ export class OpenIdAuthManager implements IJobProcessor {
       return {
         raw,
         capability: 'Composition.rs',
-        resourceType: 'Composition',
+        resourceType: ResourceTypesFhirR4.Composition,
         filters: sections.length > 0 ? { section: sections } : {},
       };
     }

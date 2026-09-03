@@ -1,4 +1,5 @@
 // src/managers/ConsentManager.ts
+import { HttpStatusCodes } from 'gdc-common-utils-ts/constants/http';
 
 import { randomUUID } from 'crypto';
 import { IVaultRepository } from '../database/repositories/vault/vault.repository';
@@ -11,6 +12,7 @@ import { IssueLevel, IssueType } from 'gdc-common-utils-ts/models/issue';
 import { RecordBase } from 'gdc-common-utils-ts/models/resource-document';
 import { buildConsentRuleKey, hashConsentRuleId } from '../utils/consent';
 import { getClaimValue, normalizeContextualizedClaims } from '../utils/claims';
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 import { getTenantVaultId } from '../utils/tenant';
 import {
   extractLedgerSafeResearchTags,
@@ -118,7 +120,7 @@ export class ConsentManager implements IJobProcessor {
             const versioning = applyFhirCidVersioningToEntry({
               entry,
               claims,
-              resourceType: 'Consent',
+              resourceType: ResourceTypesFhirR4.Consent,
               resourceId: fallbackId,
             });
 
@@ -135,11 +137,11 @@ export class ConsentManager implements IJobProcessor {
             const responseAction = `${normalizedAction}-response`;
             responseEntries.push({
                 response: {
-                    status: '201',
+                    status: String(HttpStatusCodes.Created),
                     location: `/${job.tenantId}/cds-${jurisdiction}/v1/${job.sector}/${normalizedSection}/${normalizedFormat}/Consent/${responseAction}`,
                 },
                 ...(researchTags && researchTags.length > 0 ? { meta: { tag: researchTags } } : {}),
-                type: 'Consent'
+                type: ResourceTypesFhirR4.Consent
             } as any);
 
         } catch (e: any) {
@@ -150,8 +152,8 @@ export class ConsentManager implements IJobProcessor {
                     status: status,
                     outcome: createOperationOutcome(IssueLevel.Error, issueType, e.message),
                 },
-                meta: { claims: rawClaims || {} },
-                type: 'Consent'
+                resource: { resourceType: ResourceTypesFhirR4.OperationOutcome, meta: { claims: rawClaims || {} } },
+                type: ResourceTypesFhirR4.Consent
             });
         }
     }
@@ -170,7 +172,7 @@ export class ConsentManager implements IJobProcessor {
     });
 
     const responseBundle: BundleJsonApi = {
-      resourceType: 'Bundle',
+      resourceType: ResourceTypesFhirR4.Bundle,
       type: `${normalizedAction}-response`,
       data: responseEntries,
     };

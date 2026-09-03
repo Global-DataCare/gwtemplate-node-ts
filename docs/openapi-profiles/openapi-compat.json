@@ -279,23 +279,25 @@
             "data": [
               {
                 "type": "Organization-registration-form-v1.0",
-                "meta": {
-                  "claims": {
-                    "@context": "org.schema",
-                    "@type": "template",
-                    "org.schema.Organization.address.addressCountry": "ES",
-                    "org.schema.Organization.identifier.additionalType": "TAX",
-                    "org.schema.Organization.identifier.value": "acme-id",
-                    "org.schema.Organization.legalName": "Acme Organization SL",
-                    "org.schema.Organization.name": "Acme Org",
-                    "org.schema.Organization.numberOfEmployees.value": 2,
-                    "org.schema.Organization.url": "api.acme.org",
-                    "org.schema.Person.email": "admin1@acme.org",
-                    "org.schema.Person.hasOccupation": "ISCO-08|1120",
-                    "org.schema.Service.category": "health-care",
-                    "org.schema.Service.identifier": "did:web:api-provider.example.com",
-                    "org.schema.Service.serviceType": "organization/Composition.cruds,organization/ResearchSubject.rs",
-                    "org.schema.Service.termsOfService": "data:application/pdf;base64,JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCAzMDAgMjAwXSAvQ29udGVudHMgNCAwIFIgL1Jlc291cmNlcyA8PCAvRm9udCA8PCAvRjEgNSAwIFIgPj4+PiA+PgplbmRvYmoKNCAwIG9iago8PCAvTGVuZ3RoIDQ0ID4+CnN0cmVhbQpCVAovRjEgMjQgVGYKMTAwIDEwMCBUZAooSGVsbG8gUERGKSBUagoKRVQKZW5kc3RyZWFtCmVuZGiago1IDAgb2JqCjw8IC9UeXBlIC9Gb250IC9TdWJ0eXBlIC9UeXBlMSAvQmFzZUZvbnQgL0hlbHZldGljYSA+PgplbmRvYmoKeHJlZgowIDYKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDEwIDAwMDAwIG4gCjAwMDAwMDAwNTMgMDAwMDAgbiAKMDAwMDAwMDEwNiAwMDAwMCBuIAowMDAwMDAwMjU1IDAwMDAwIG4gCjAwMDAwMDAzNDMgMDAwMDAgbiAKdHJhaWxlcgo8PCAvU2l6ZSA2IC9Sb290IDEgMCBSID4+CnN0YXJ0eHJlZgo0MDMKJSVFT0Y="
+                "resource": {
+                  "meta": {
+                    "claims": {
+                      "@context": "org.schema",
+                      "@type": "template",
+                      "org.schema.Organization.address.addressCountry": "ES",
+                      "org.schema.Organization.identifier.additionalType": "TAX",
+                      "org.schema.Organization.identifier.value": "acme-id",
+                      "org.schema.Organization.legalName": "Acme Organization SL",
+                      "org.schema.Organization.name": "Acme Org",
+                      "org.schema.Organization.numberOfEmployees.value": 2,
+                      "org.schema.Organization.url": "api.acme.org",
+                      "org.schema.Person.email": "admin1@acme.org",
+                      "org.schema.Person.hasOccupation": "ISCO-08|1120",
+                      "org.schema.Service.category": "health-care",
+                      "org.schema.Service.identifier": "did:web:api-provider.example.com",
+                      "org.schema.Service.serviceType": "organization/Composition.cruds,organization/ResearchSubject.rs",
+                      "org.schema.Service.termsOfService": "data:application/pdf;base64,JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCAzMDAgMjAwXSAvQ29udGVudHMgNCAwIFIgL1Jlc291cmNlcyA8PCAvRm9udCA8PCAvRjEgNSAwIFIgPj4+PiA+PgplbmRvYmoKNCAwIG9iago8PCAvTGVuZ3RoIDQ0ID4+CnN0cmVhbQpCVAovRjEgMjQgVGYKMTAwIDEwMCBUZAooSGVsbG8gUERGKSBUagoKRVQKZW5kc3RyZWFtCmVuZGiago1IDAgb2JqCjw8IC9UeXBlIC9Gb250IC9TdWJ0eXBlIC9UeXBlMSAvQmFzZUZvbnQgL0hlbHZldGljYSA+PgplbmRvYmoKeHJlZgowIDYKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDEwIDAwMDAwIG4gCjAwMDAwMDAwNTMgMDAwMDAgbiAKMDAwMDAwMDEwNiAwMDAwMCBuIAowMDAwMDAwMjU1IDAwMDAwIG4gCjAwMDAwMDAzNDMgMDAwMDAgbiAKdHJhaWxlcgo8PCAvU2l6ZSA2IC9Sb290IDEgMCBSID4+CnN0YXJ0eHJlZgo0MDMKJSVFT0Y="
+                    }
                   }
                 }
               }
@@ -1088,10 +1090,12 @@
             "data": [
               {
                 "type": "Organization-order-request-v1.0",
-                "meta": {
-                  "claims": {
-                    "@context": "org.schema",
-                    "org.schema.Order.acceptedOffer.identifier": "{{offerId}}"
+                "resource": {
+                  "meta": {
+                    "claims": {
+                      "@context": "org.schema",
+                      "org.schema.Order.acceptedOffer.identifier": "{{offerId}}"
+                    }
                   }
                 }
               }
@@ -1422,19 +1426,12 @@
             "data": [
               {
                 "type": "Employee-form-v1.0",
-                "meta": {
-                  "claims": {
-                    "org.schema.Person.identifier": "urn:uuid:11b2c3d4-e5f6-7890-1234-567890abcdef",
-                    "org.schema.Person.hasOccupation.identifier.value": "ISCO-08|4226",
-                    "org.schema.Person.email": "receptionist1@acme.org"
-                  }
-                },
                 "resource": {
                   "meta": {
                     "claims": {
                       "org.schema.Person.identifier": "urn:uuid:11b2c3d4-e5f6-7890-1234-567890abcdef",
-                      "org.schema.Person.hasOccupation.identifier.value": "ISCO-08|4226",
-                      "org.schema.Person.email": "receptionist1@acme.org"
+                      "org.schema.Person.email": "receptionist1@acme.org",
+                      "org.schema.Person.hasOccupation.identifier.value": "ISCO-08|4226"
                     }
                   }
                 }
@@ -1487,24 +1484,6 @@
             "data": [
               {
                 "type": "Family-registration-form-v1.0",
-                "meta": {
-                  "claims": {
-                    "@context": "org.schema",
-                    "@type": "template",
-                    "Organization.address.addressCountry": "ES",
-                    "Organization.identifier.additionalType": "UUID",
-                    "Organization.identifier.value": "<UUID>",
-                    "Organization.owner.email": "adult1@example.com",
-                    "Organization.owner.identifier.value": "<cert-serialnumber>",
-                    "Person.email": "child1@example.com",
-                    "Person.identifier.additionalType": "UUID",
-                    "Person.identifier.value": "<child1-ID>",
-                    "Service.category": "health-care",
-                    "Service.identifier": "did:web:api-provider.example.com",
-                    "Service.serviceType": "organization/Composition.cruds,organization/ResearchSubject.rs",
-                    "Service.termsOfService": "https://provider.example.com/terms.pdf"
-                  }
-                },
                 "resource": {
                   "meta": {
                     "claims": {
@@ -1521,7 +1500,7 @@
                       "Service.category": "health-care",
                       "Service.identifier": "did:web:api-provider.example.com",
                       "Service.serviceType": "organization/Composition.cruds,organization/ResearchSubject.rs",
-                      "Service.termsOfService": "https://provider.example.com/terms.pdf"
+                      "Service.termsOfService": "https://portal.example.org/files/legal-organization-signed-terms.pdf"
                     }
                   }
                 }
@@ -1578,10 +1557,12 @@
             "data": [
               {
                 "type": "Family-order-request-v1.0",
-                "meta": {
-                  "claims": {
-                    "@context": "org.schema",
-                    "org.schema.Order.acceptedOffer.identifier": "{{offerId}}"
+                "resource": {
+                  "meta": {
+                    "claims": {
+                      "@context": "org.schema",
+                      "org.schema.Order.acceptedOffer.identifier": "{{offerId}}"
+                    }
                   }
                 }
               }
@@ -2470,23 +2451,25 @@
             "data": [
               {
                 "type": "Organization-registration-form-v1.0",
-                "meta": {
-                  "claims": {
-                    "@context": "org.schema",
-                    "@type": "template",
-                    "org.schema.Organization.address.addressCountry": "ES",
-                    "org.schema.Organization.identifier.additionalType": "TAX",
-                    "org.schema.Organization.identifier.value": "acme-id",
-                    "org.schema.Organization.legalName": "Acme Organization SL",
-                    "org.schema.Organization.name": "Acme Org",
-                    "org.schema.Organization.numberOfEmployees.value": 2,
-                    "org.schema.Organization.url": "api.acme.org",
-                    "org.schema.Person.email": "admin1@acme.org",
-                    "org.schema.Person.hasOccupation": "ISCO-08|1120",
-                    "org.schema.Service.category": "health-care",
-                    "org.schema.Service.identifier": "did:web:api-provider.example.com",
-                    "org.schema.Service.serviceType": "organization/Composition.cruds,organization/ResearchSubject.rs",
-                    "org.schema.Service.termsOfService": "data:application/pdf;base64,JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCAzMDAgMjAwXSAvQ29udGVudHMgNCAwIFIgL1Jlc291cmNlcyA8PCAvRm9udCA8PCAvRjEgNSAwIFIgPj4+PiA+PgplbmRvYmoKNCAwIG9iago8PCAvTGVuZ3RoIDQ0ID4+CnN0cmVhbQpCVAovRjEgMjQgVGYKMTAwIDEwMCBUZAooSGVsbG8gUERGKSBUagoKRVQKZW5kc3RyZWFtCmVuZGiago1IDAgb2JqCjw8IC9UeXBlIC9Gb250IC9TdWJ0eXBlIC9UeXBlMSAvQmFzZUZvbnQgL0hlbHZldGljYSA+PgplbmRvYmoKeHJlZgowIDYKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDEwIDAwMDAwIG4gCjAwMDAwMDAwNTMgMDAwMDAgbiAKMDAwMDAwMDEwNiAwMDAwMCBuIAowMDAwMDAwMjU1IDAwMDAwIG4gCjAwMDAwMDAzNDMgMDAwMDAgbiAKdHJhaWxlcgo8PCAvU2l6ZSA2IC9Sb290IDEgMCBSID4+CnN0YXJ0eHJlZgo0MDMKJSVFT0Y="
+                "resource": {
+                  "meta": {
+                    "claims": {
+                      "@context": "org.schema",
+                      "@type": "template",
+                      "org.schema.Organization.address.addressCountry": "ES",
+                      "org.schema.Organization.identifier.additionalType": "TAX",
+                      "org.schema.Organization.identifier.value": "acme-id",
+                      "org.schema.Organization.legalName": "Acme Organization SL",
+                      "org.schema.Organization.name": "Acme Org",
+                      "org.schema.Organization.numberOfEmployees.value": 2,
+                      "org.schema.Organization.url": "api.acme.org",
+                      "org.schema.Person.email": "admin1@acme.org",
+                      "org.schema.Person.hasOccupation": "ISCO-08|1120",
+                      "org.schema.Service.category": "health-care",
+                      "org.schema.Service.identifier": "did:web:api-provider.example.com",
+                      "org.schema.Service.serviceType": "organization/Composition.cruds,organization/ResearchSubject.rs",
+                      "org.schema.Service.termsOfService": "data:application/pdf;base64,JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCAzMDAgMjAwXSAvQ29udGVudHMgNCAwIFIgL1Jlc291cmNlcyA8PCAvRm9udCA8PCAvRjEgNSAwIFIgPj4+PiA+PgplbmRvYmoKNCAwIG9iago8PCAvTGVuZ3RoIDQ0ID4+CnN0cmVhbQpCVAovRjEgMjQgVGYKMTAwIDEwMCBUZAooSGVsbG8gUERGKSBUagoKRVQKZW5kc3RyZWFtCmVuZGiago1IDAgb2JqCjw8IC9UeXBlIC9Gb250IC9TdWJ0eXBlIC9UeXBlMSAvQmFzZUZvbnQgL0hlbHZldGljYSA+PgplbmRvYmoKeHJlZgowIDYKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDEwIDAwMDAwIG4gCjAwMDAwMDAwNTMgMDAwMDAgbiAKMDAwMDAwMDEwNiAwMDAwMCBuIAowMDAwMDAwMjU1IDAwMDAwIG4gCjAwMDAwMDAzNDMgMDAwMDAgbiAKdHJhaWxlcgo8PCAvU2l6ZSA2IC9Sb290IDEgMCBSID4+CnN0YXJ0eHJlZgo0MDMKJSVFT0Y="
+                    }
                   }
                 }
               }
@@ -2553,19 +2536,12 @@
             "data": [
               {
                 "type": "Employee-form-v1.0",
-                "meta": {
-                  "claims": {
-                    "org.schema.Person.identifier": "urn:uuid:11b2c3d4-e5f6-7890-1234-567890abcdef",
-                    "org.schema.Person.hasOccupation.identifier.value": "ISCO-08|4226",
-                    "org.schema.Person.email": "receptionist1@acme.org"
-                  }
-                },
                 "resource": {
                   "meta": {
                     "claims": {
                       "org.schema.Person.identifier": "urn:uuid:11b2c3d4-e5f6-7890-1234-567890abcdef",
-                      "org.schema.Person.hasOccupation.identifier.value": "ISCO-08|4226",
-                      "org.schema.Person.email": "receptionist1@acme.org"
+                      "org.schema.Person.email": "receptionist1@acme.org",
+                      "org.schema.Person.hasOccupation.identifier.value": "ISCO-08|4226"
                     }
                   }
                 }
@@ -2997,6 +2973,851 @@
     }
   },
   "paths": {
+    "/host/ping": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Ping (host root)",
+        "description": "Root-level liveness check for the host runtime.",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "503": {
+            "description": "Service Unavailable"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/host/cds-{hostCoverageScope}/{version}/{hostNetwork}/.well-known/ping": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Ping (host)",
+        "description": "Canonical health check for the host runtime scoped by coverage scope, version, and host network.",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "503": {
+            "description": "Service Unavailable"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/ping": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Ping (tenant)",
+        "description": "Health check for a tenant resolved by its CDS path.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Version"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/host/cds-{hostCoverageScope}/{version}/{hostNetwork}/.well-known/did.json": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "DID document (host)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/HostCoverageScope"
+          },
+          {
+            "$ref": "#/components/parameters/Version"
+          },
+          {
+            "$ref": "#/components/parameters/HostRegistrySector"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/did.json": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "DID document (tenant)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Version"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/host/cds-{hostCoverageScope}/{version}/{hostNetwork}/.well-known/jwks.json": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "JWKS (host)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/HostCoverageScope"
+          },
+          {
+            "$ref": "#/components/parameters/Version"
+          },
+          {
+            "$ref": "#/components/parameters/HostRegistrySector"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/jwks.json": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "JWKS (tenant)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Version"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/host/cds-{hostCoverageScope}/{version}/{hostNetwork}/.well-known/openid-configuration": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "OpenID configuration (host)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/HostCoverageScope"
+          },
+          {
+            "$ref": "#/components/parameters/Version"
+          },
+          {
+            "$ref": "#/components/parameters/HostRegistrySector"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/openid-configuration": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "OpenID configuration (tenant)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Version"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/host/cds-{hostCoverageScope}/{version}/{hostNetwork}/.well-known/smart-configuration": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "SMART configuration (host)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/HostCoverageScope"
+          },
+          {
+            "$ref": "#/components/parameters/Version"
+          },
+          {
+            "$ref": "#/components/parameters/HostRegistrySector"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/smart-configuration": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "SMART configuration (tenant)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Version"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/host/cds-{hostCoverageScope}/{version}/{hostNetwork}/.well-known/legal-participant.vc.json": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Gaia-X Legal Participant VC (host)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/HostCoverageScope"
+          },
+          {
+            "$ref": "#/components/parameters/Version"
+          },
+          {
+            "$ref": "#/components/parameters/HostRegistrySector"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/legal-participant.vc.json": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Gaia-X Legal Participant VC (tenant)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Version"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/service-offering-index.json": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "DSP index service offering (tenant)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Version"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/service-offering-research.json": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "DSP research service offering (tenant)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Version"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/fhir/metadata": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "FHIR CapabilityStatement (tenant)",
+        "description": "Returns the tenant's FHIR capability statement for supported sectors.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Version"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/.well-known/did.json": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Resolve the operational DID document of the host",
+        "responses": {
+          "200": {
+            "description": "Host DID document generated from its runtime KMS keys"
+          },
+          "503": {
+            "description": "Host bootstrap has not completed"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/tenant-status.json": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Read the safe tenant and controller lifecycle status",
+        "responses": {
+          "200": {
+            "description": "Tenant lifecycle, controller DIDs, public kids and DCR state"
+          },
+          "404": {
+            "description": "Tenant is not registered"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/employee/{memberId}/{role}/did.json": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Resolve the governed organization controller DID document",
+        "responses": {
+          "200": {
+            "description": "Public controller DID document"
+          },
+          "404": {
+            "description": "Controller DID is not registered for this tenant"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/host/cds-{hostCoverageScope}/{version}/{hostNetwork}/.well-known/dspace-version": {
+      "get": {
+        "tags": [
+          "Data Catalog Discovery"
+        ],
+        "summary": "Host DSP version-discovery entrypoint",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/HostCoverageScope"
+          },
+          {
+            "$ref": "#/components/parameters/Version"
+          },
+          {
+            "$ref": "#/components/parameters/HostRegistrySector"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "DSP version metadata returned"
+          },
+          "503": {
+            "description": "Host not available"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/dspace-version": {
+      "get": {
+        "tags": [
+          "Data Catalog Discovery"
+        ],
+        "summary": "Hosted tenant DSP version-discovery entrypoint",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Version"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "DSP version metadata returned"
+          },
+          "404": {
+            "description": "Tenant not found"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/host/cds-{hostCoverageScope}/{version}/{hostNetwork}/dsp/catalog/request": {
+      "post": {
+        "tags": [
+          "Data Catalog Discovery"
+        ],
+        "summary": "Operator DSP catalog request",
+        "description": "Returns a `dcat:Catalog` with provider datasets discoverable by client apps.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/HostCoverageScope"
+          },
+          {
+            "$ref": "#/components/parameters/Version"
+          },
+          {
+            "$ref": "#/components/parameters/HostRegistrySector"
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "filters": {
+                    "type": "object",
+                    "properties": {
+                      "sector": {
+                        "type": "string"
+                      },
+                      "jurisdiction": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "DSP catalog response"
+          },
+          "503": {
+            "description": "Host not available"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/host/cds-{hostCoverageScope}/{version}/{hostNetwork}/dsp/catalog/dcat.json": {
+      "get": {
+        "tags": [
+          "Data Catalog Discovery"
+        ],
+        "summary": "Operator DSP catalog artifact",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/HostCoverageScope"
+          },
+          {
+            "$ref": "#/components/parameters/Version"
+          },
+          {
+            "$ref": "#/components/parameters/HostRegistrySector"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "DCAT catalog artifact"
+          },
+          "503": {
+            "description": "Host not available"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/host/cds-{hostCoverageScope}/{version}/{hostNetwork}/dsp/catalog/datasets/{id}": {
+      "get": {
+        "tags": [
+          "Data Catalog Discovery"
+        ],
+        "summary": "Read one provider dataset from operator catalog",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/HostCoverageScope"
+          },
+          {
+            "$ref": "#/components/parameters/Version"
+          },
+          {
+            "$ref": "#/components/parameters/HostRegistrySector"
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Dataset found"
+          },
+          "404": {
+            "description": "Dataset not found"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/dsp/catalog/request": {
+      "post": {
+        "tags": [
+          "Data Catalog Discovery"
+        ],
+        "summary": "Hosted provider catalog request (tenant scoped)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Version"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "DSP catalog response"
+          },
+          "404": {
+            "description": "Tenant not found"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/dsp/catalog/dcat.json": {
+      "get": {
+        "tags": [
+          "Data Catalog Discovery"
+        ],
+        "summary": "Hosted provider DSP catalog artifact",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Version"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "DCAT catalog artifact"
+          },
+          "404": {
+            "description": "Tenant not found"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/dsp/catalog/datasets/{id}": {
+      "get": {
+        "tags": [
+          "Data Catalog Discovery"
+        ],
+        "summary": "Read one provider dataset from hosted tenant catalog",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Version"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Dataset found"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/api/dataspace-discovery/providers": {
+      "post": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Resolve published service providers for backend/BFF consumption",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Normalized autodiscovery DTOs returned"
+          },
+          "503": {
+            "description": "Host DID document is unavailable"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/auth/token": {
+      "post": {
+        "tags": [
+          "99. Legacy / Internal"
+        ],
+        "summary": "Exchange an Activation Code for an Initial Access Token",
+        "description": "This endpoint performs a token exchange. The user authenticates by presenting a valid `id_token` (from an OIDC provider) as a Bearer token.\nIn the request body, they provide an `activation_code` (`subject_token`).\nIf both are valid, the server returns a short-lived `initial_access_token` with the scope `dcr:register`, which grants permission to call the DCR endpoint.\n",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TokenExchangeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success. Returns the initial access token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenExchangeResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request. The request body is malformed or the activation code is invalid."
+          },
+          "401": {
+            "description": "Unauthorized. The `id_token` is missing, invalid, or expired."
+          },
+          "404": {
+            "description": "The activation code was not found."
+          },
+          "409": {
+            "description": "Conflict. The activation code has already been used."
+          }
+        },
+        "x-profile": "compat"
+      }
+    },
     "/{tenantId}/cds-{jurisdiction}/v1/{sector}/{section}/org.hl7.fhir.r5/SubscriptionTopic/_batch": {
       "post": {
         "summary": "Register FHIR R5 subscription topics",
@@ -7191,851 +8012,6 @@
           },
           "500": {
             "description": "Job failed or response decode failed."
-          }
-        },
-        "x-profile": "core"
-      }
-    },
-    "/auth/token": {
-      "post": {
-        "tags": [
-          "99. Legacy / Internal"
-        ],
-        "summary": "Exchange an Activation Code for an Initial Access Token",
-        "description": "This endpoint performs a token exchange. The user authenticates by presenting a valid `id_token` (from an OIDC provider) as a Bearer token.\nIn the request body, they provide an `activation_code` (`subject_token`).\nIf both are valid, the server returns a short-lived `initial_access_token` with the scope `dcr:register`, which grants permission to call the DCR endpoint.\n",
-        "security": [
-          {
-            "BearerAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TokenExchangeRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Success. Returns the initial access token.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TokenExchangeResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request. The request body is malformed or the activation code is invalid."
-          },
-          "401": {
-            "description": "Unauthorized. The `id_token` is missing, invalid, or expired."
-          },
-          "404": {
-            "description": "The activation code was not found."
-          },
-          "409": {
-            "description": "Conflict. The activation code has already been used."
-          }
-        },
-        "x-profile": "compat"
-      }
-    },
-    "/host/ping": {
-      "get": {
-        "tags": [
-          "Discovery"
-        ],
-        "summary": "Ping (host root)",
-        "description": "Root-level liveness check for the host runtime.",
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "503": {
-            "description": "Service Unavailable"
-          }
-        },
-        "x-profile": "core"
-      }
-    },
-    "/host/cds-{hostCoverageScope}/{version}/{hostNetwork}/.well-known/ping": {
-      "get": {
-        "tags": [
-          "Discovery"
-        ],
-        "summary": "Ping (host)",
-        "description": "Canonical health check for the host runtime scoped by coverage scope, version, and host network.",
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "503": {
-            "description": "Service Unavailable"
-          }
-        },
-        "x-profile": "core"
-      }
-    },
-    "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/ping": {
-      "get": {
-        "tags": [
-          "Discovery"
-        ],
-        "summary": "Ping (tenant)",
-        "description": "Health check for a tenant resolved by its CDS path.",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/TenantId"
-          },
-          {
-            "$ref": "#/components/parameters/Jurisdiction"
-          },
-          {
-            "$ref": "#/components/parameters/Version"
-          },
-          {
-            "$ref": "#/components/parameters/Sector"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        },
-        "x-profile": "core"
-      }
-    },
-    "/host/cds-{hostCoverageScope}/{version}/{hostNetwork}/.well-known/did.json": {
-      "get": {
-        "tags": [
-          "Discovery"
-        ],
-        "summary": "DID document (host)",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/HostCoverageScope"
-          },
-          {
-            "$ref": "#/components/parameters/Version"
-          },
-          {
-            "$ref": "#/components/parameters/HostRegistrySector"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        },
-        "x-profile": "core"
-      }
-    },
-    "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/did.json": {
-      "get": {
-        "tags": [
-          "Discovery"
-        ],
-        "summary": "DID document (tenant)",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/TenantId"
-          },
-          {
-            "$ref": "#/components/parameters/Jurisdiction"
-          },
-          {
-            "$ref": "#/components/parameters/Version"
-          },
-          {
-            "$ref": "#/components/parameters/Sector"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        },
-        "x-profile": "core"
-      }
-    },
-    "/host/cds-{hostCoverageScope}/{version}/{hostNetwork}/.well-known/jwks.json": {
-      "get": {
-        "tags": [
-          "Discovery"
-        ],
-        "summary": "JWKS (host)",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/HostCoverageScope"
-          },
-          {
-            "$ref": "#/components/parameters/Version"
-          },
-          {
-            "$ref": "#/components/parameters/HostRegistrySector"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        },
-        "x-profile": "core"
-      }
-    },
-    "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/jwks.json": {
-      "get": {
-        "tags": [
-          "Discovery"
-        ],
-        "summary": "JWKS (tenant)",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/TenantId"
-          },
-          {
-            "$ref": "#/components/parameters/Jurisdiction"
-          },
-          {
-            "$ref": "#/components/parameters/Version"
-          },
-          {
-            "$ref": "#/components/parameters/Sector"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        },
-        "x-profile": "core"
-      }
-    },
-    "/host/cds-{hostCoverageScope}/{version}/{hostNetwork}/.well-known/openid-configuration": {
-      "get": {
-        "tags": [
-          "Discovery"
-        ],
-        "summary": "OpenID configuration (host)",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/HostCoverageScope"
-          },
-          {
-            "$ref": "#/components/parameters/Version"
-          },
-          {
-            "$ref": "#/components/parameters/HostRegistrySector"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        },
-        "x-profile": "core"
-      }
-    },
-    "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/openid-configuration": {
-      "get": {
-        "tags": [
-          "Discovery"
-        ],
-        "summary": "OpenID configuration (tenant)",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/TenantId"
-          },
-          {
-            "$ref": "#/components/parameters/Jurisdiction"
-          },
-          {
-            "$ref": "#/components/parameters/Version"
-          },
-          {
-            "$ref": "#/components/parameters/Sector"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        },
-        "x-profile": "core"
-      }
-    },
-    "/host/cds-{hostCoverageScope}/{version}/{hostNetwork}/.well-known/smart-configuration": {
-      "get": {
-        "tags": [
-          "Discovery"
-        ],
-        "summary": "SMART configuration (host)",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/HostCoverageScope"
-          },
-          {
-            "$ref": "#/components/parameters/Version"
-          },
-          {
-            "$ref": "#/components/parameters/HostRegistrySector"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        },
-        "x-profile": "core"
-      }
-    },
-    "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/smart-configuration": {
-      "get": {
-        "tags": [
-          "Discovery"
-        ],
-        "summary": "SMART configuration (tenant)",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/TenantId"
-          },
-          {
-            "$ref": "#/components/parameters/Jurisdiction"
-          },
-          {
-            "$ref": "#/components/parameters/Version"
-          },
-          {
-            "$ref": "#/components/parameters/Sector"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        },
-        "x-profile": "core"
-      }
-    },
-    "/host/cds-{hostCoverageScope}/{version}/{hostNetwork}/.well-known/legal-participant.vc.json": {
-      "get": {
-        "tags": [
-          "Discovery"
-        ],
-        "summary": "Gaia-X Legal Participant VC (host)",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/HostCoverageScope"
-          },
-          {
-            "$ref": "#/components/parameters/Version"
-          },
-          {
-            "$ref": "#/components/parameters/HostRegistrySector"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        },
-        "x-profile": "core"
-      }
-    },
-    "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/legal-participant.vc.json": {
-      "get": {
-        "tags": [
-          "Discovery"
-        ],
-        "summary": "Gaia-X Legal Participant VC (tenant)",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/TenantId"
-          },
-          {
-            "$ref": "#/components/parameters/Jurisdiction"
-          },
-          {
-            "$ref": "#/components/parameters/Version"
-          },
-          {
-            "$ref": "#/components/parameters/Sector"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        },
-        "x-profile": "core"
-      }
-    },
-    "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/service-offering-index.json": {
-      "get": {
-        "tags": [
-          "Discovery"
-        ],
-        "summary": "DSP index service offering (tenant)",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/TenantId"
-          },
-          {
-            "$ref": "#/components/parameters/Jurisdiction"
-          },
-          {
-            "$ref": "#/components/parameters/Version"
-          },
-          {
-            "$ref": "#/components/parameters/Sector"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        },
-        "x-profile": "core"
-      }
-    },
-    "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/service-offering-research.json": {
-      "get": {
-        "tags": [
-          "Discovery"
-        ],
-        "summary": "DSP research service offering (tenant)",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/TenantId"
-          },
-          {
-            "$ref": "#/components/parameters/Jurisdiction"
-          },
-          {
-            "$ref": "#/components/parameters/Version"
-          },
-          {
-            "$ref": "#/components/parameters/Sector"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        },
-        "x-profile": "core"
-      }
-    },
-    "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/fhir/metadata": {
-      "get": {
-        "tags": [
-          "Discovery"
-        ],
-        "summary": "FHIR CapabilityStatement (tenant)",
-        "description": "Returns the tenant's FHIR capability statement for supported sectors.",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/TenantId"
-          },
-          {
-            "$ref": "#/components/parameters/Jurisdiction"
-          },
-          {
-            "$ref": "#/components/parameters/Version"
-          },
-          {
-            "$ref": "#/components/parameters/Sector"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        },
-        "x-profile": "core"
-      }
-    },
-    "/.well-known/did.json": {
-      "get": {
-        "tags": [
-          "Discovery"
-        ],
-        "summary": "Resolve the operational DID document of the host",
-        "responses": {
-          "200": {
-            "description": "Host DID document generated from its runtime KMS keys"
-          },
-          "503": {
-            "description": "Host bootstrap has not completed"
-          }
-        },
-        "x-profile": "core"
-      }
-    },
-    "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/tenant-status.json": {
-      "get": {
-        "tags": [
-          "Discovery"
-        ],
-        "summary": "Read the safe tenant and controller lifecycle status",
-        "responses": {
-          "200": {
-            "description": "Tenant lifecycle, controller DIDs, public kids and DCR state"
-          },
-          "404": {
-            "description": "Tenant is not registered"
-          }
-        },
-        "x-profile": "core"
-      }
-    },
-    "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/employee/{memberId}/{role}/did.json": {
-      "get": {
-        "tags": [
-          "Discovery"
-        ],
-        "summary": "Resolve the governed organization controller DID document",
-        "responses": {
-          "200": {
-            "description": "Public controller DID document"
-          },
-          "404": {
-            "description": "Controller DID is not registered for this tenant"
-          }
-        },
-        "x-profile": "core"
-      }
-    },
-    "/host/cds-{hostCoverageScope}/{version}/{hostNetwork}/.well-known/dspace-version": {
-      "get": {
-        "tags": [
-          "Data Catalog Discovery"
-        ],
-        "summary": "Host DSP version-discovery entrypoint",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/HostCoverageScope"
-          },
-          {
-            "$ref": "#/components/parameters/Version"
-          },
-          {
-            "$ref": "#/components/parameters/HostRegistrySector"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "DSP version metadata returned"
-          },
-          "503": {
-            "description": "Host not available"
-          }
-        },
-        "x-profile": "core"
-      }
-    },
-    "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/dspace-version": {
-      "get": {
-        "tags": [
-          "Data Catalog Discovery"
-        ],
-        "summary": "Hosted tenant DSP version-discovery entrypoint",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/TenantId"
-          },
-          {
-            "$ref": "#/components/parameters/Jurisdiction"
-          },
-          {
-            "$ref": "#/components/parameters/Version"
-          },
-          {
-            "$ref": "#/components/parameters/Sector"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "DSP version metadata returned"
-          },
-          "404": {
-            "description": "Tenant not found"
-          }
-        },
-        "x-profile": "core"
-      }
-    },
-    "/host/cds-{hostCoverageScope}/{version}/{hostNetwork}/dsp/catalog/request": {
-      "post": {
-        "tags": [
-          "Data Catalog Discovery"
-        ],
-        "summary": "Operator DSP catalog request",
-        "description": "Returns a `dcat:Catalog` with provider datasets discoverable by client apps.",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/HostCoverageScope"
-          },
-          {
-            "$ref": "#/components/parameters/Version"
-          },
-          {
-            "$ref": "#/components/parameters/HostRegistrySector"
-          }
-        ],
-        "requestBody": {
-          "required": false,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "filters": {
-                    "type": "object",
-                    "properties": {
-                      "sector": {
-                        "type": "string"
-                      },
-                      "jurisdiction": {
-                        "type": "string"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "DSP catalog response"
-          },
-          "503": {
-            "description": "Host not available"
-          }
-        },
-        "x-profile": "core"
-      }
-    },
-    "/host/cds-{hostCoverageScope}/{version}/{hostNetwork}/dsp/catalog/dcat.json": {
-      "get": {
-        "tags": [
-          "Data Catalog Discovery"
-        ],
-        "summary": "Operator DSP catalog artifact",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/HostCoverageScope"
-          },
-          {
-            "$ref": "#/components/parameters/Version"
-          },
-          {
-            "$ref": "#/components/parameters/HostRegistrySector"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "DCAT catalog artifact"
-          },
-          "503": {
-            "description": "Host not available"
-          }
-        },
-        "x-profile": "core"
-      }
-    },
-    "/host/cds-{hostCoverageScope}/{version}/{hostNetwork}/dsp/catalog/datasets/{id}": {
-      "get": {
-        "tags": [
-          "Data Catalog Discovery"
-        ],
-        "summary": "Read one provider dataset from operator catalog",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/HostCoverageScope"
-          },
-          {
-            "$ref": "#/components/parameters/Version"
-          },
-          {
-            "$ref": "#/components/parameters/HostRegistrySector"
-          },
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Dataset found"
-          },
-          "404": {
-            "description": "Dataset not found"
-          }
-        },
-        "x-profile": "core"
-      }
-    },
-    "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/dsp/catalog/request": {
-      "post": {
-        "tags": [
-          "Data Catalog Discovery"
-        ],
-        "summary": "Hosted provider catalog request (tenant scoped)",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/TenantId"
-          },
-          {
-            "$ref": "#/components/parameters/Jurisdiction"
-          },
-          {
-            "$ref": "#/components/parameters/Version"
-          },
-          {
-            "$ref": "#/components/parameters/Sector"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "DSP catalog response"
-          },
-          "404": {
-            "description": "Tenant not found"
-          }
-        },
-        "x-profile": "core"
-      }
-    },
-    "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/dsp/catalog/dcat.json": {
-      "get": {
-        "tags": [
-          "Data Catalog Discovery"
-        ],
-        "summary": "Hosted provider DSP catalog artifact",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/TenantId"
-          },
-          {
-            "$ref": "#/components/parameters/Jurisdiction"
-          },
-          {
-            "$ref": "#/components/parameters/Version"
-          },
-          {
-            "$ref": "#/components/parameters/Sector"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "DCAT catalog artifact"
-          },
-          "404": {
-            "description": "Tenant not found"
-          }
-        },
-        "x-profile": "core"
-      }
-    },
-    "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/dsp/catalog/datasets/{id}": {
-      "get": {
-        "tags": [
-          "Data Catalog Discovery"
-        ],
-        "summary": "Read one provider dataset from hosted tenant catalog",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/TenantId"
-          },
-          {
-            "$ref": "#/components/parameters/Jurisdiction"
-          },
-          {
-            "$ref": "#/components/parameters/Version"
-          },
-          {
-            "$ref": "#/components/parameters/Sector"
-          },
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Dataset found"
-          },
-          "404": {
-            "description": "Not found"
-          }
-        },
-        "x-profile": "core"
-      }
-    },
-    "/api/dataspace-discovery/providers": {
-      "post": {
-        "tags": [
-          "Discovery"
-        ],
-        "summary": "Resolve published service providers for backend/BFF consumption",
-        "requestBody": {
-          "required": false,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Normalized autodiscovery DTOs returned"
-          },
-          "503": {
-            "description": "Host DID document is unavailable"
           }
         },
         "x-profile": "core"

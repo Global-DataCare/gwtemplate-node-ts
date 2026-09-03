@@ -1,5 +1,6 @@
 // src/database/storage/ipfs.storage.adapter.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
 
 import { sha3_384 } from '@noble/hashes/sha3.js';
 import { encodeMultibase58btc } from 'gdc-common-utils-ts/utils/multibase58';
@@ -105,7 +106,7 @@ export class IpfsStorageAdapter implements IStorageAdapter {
 
   private async statMfsPath(mfsPath: string): Promise<{ Hash: string; Size?: number }> {
     const response = await this.fetchImpl(this.buildApiUrl('/api/v0/files/stat', { arg: mfsPath }), {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
     });
     if (!response.ok) {
       throw new Error(`IPFS stat failed: ${await readKuboErrorMessage(response)}`);
@@ -127,7 +128,7 @@ export class IpfsStorageAdapter implements IStorageAdapter {
           truncate: 'true',
         }),
         {
-          method: 'POST',
+          method: HttpRequestMethods.Post,
           body: buildKuboWriteFormData(dataBytes, contentType, encodedMultiHash),
         },
       );
@@ -164,7 +165,7 @@ export class IpfsStorageAdapter implements IStorageAdapter {
     try {
       const readResponse = await this.fetchImpl(
         this.buildApiUrl('/api/v0/files/read', { arg: mfsPath }),
-        { method: 'POST' },
+        { method: HttpRequestMethods.Post },
       );
       if (!readResponse.ok) {
         throw new Error(await readKuboErrorMessage(readResponse));
@@ -201,7 +202,7 @@ export class IpfsStorageAdapter implements IStorageAdapter {
           arg: mfsPath,
           force: 'true',
         }),
-        { method: 'POST' },
+        { method: HttpRequestMethods.Post },
       );
       if (!response.ok) {
         throw new Error(await readKuboErrorMessage(response));

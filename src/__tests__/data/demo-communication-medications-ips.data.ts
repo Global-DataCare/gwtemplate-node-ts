@@ -1,5 +1,7 @@
 // Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 // TDD contract: write this test red first; make it green only with the complete real behavior.
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 export const demoCommunicationMedicationIpsDefaults = {
   subjectId: 'did:web:api.acme.org:individual:subject-001',
   fhirContextR4: 'org.hl7.fhir.r4',
@@ -78,7 +80,7 @@ function encodeBase64(value: string): string {
 export function buildDemoDocumentBundle(config: DemoConfig) {
   const medicationCase = getDemoMedicationCase(config);
   return {
-    resourceType: 'Bundle',
+    resourceType: ResourceTypesFhirR4.Bundle,
     type: config.fhirBundleDocument,
     entry: [
       {
@@ -196,11 +198,11 @@ export function buildDemoCommunicationBatchSubmitRequest(config: DemoConfig) {
   return {
     thid: config.thidComm,
     body: {
-      resourceType: 'Bundle',
+      resourceType: ResourceTypesFhirR4.Bundle,
       type: config.fhirBundleBatch,
       entry: [
         {
-          request: { method: 'POST', url: `individual/${config.fhirContextR4}/${config.communicationResource}` },
+          request: { method: HttpRequestMethods.Post, url: `individual/${config.fhirContextR4}/${config.communicationResource}` },
           meta: {
             claims: {
               '@context': config.fhirContextR4,
@@ -273,12 +275,12 @@ export function buildDemoIpsSearchRequest(config: DemoConfig) {
   return {
     thid: config.thidIpsSearch,
     body: {
-      resourceType: 'Bundle',
+      resourceType: ResourceTypesFhirR4.Bundle,
       type: config.fhirBundleBatch,
       entry: [
         {
           request: {
-            method: 'GET',
+            method: HttpRequestMethods.Get,
             url: `Bundle?type=${encodeURIComponent(config.fhirBundleDocument)}&composition.subject=${encodeURIComponent(config.subjectId)}&composition.type=${encodeURIComponent(config.loincPatientSummaryDocument)}`,
           },
         },

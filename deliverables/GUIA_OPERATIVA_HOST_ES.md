@@ -13,7 +13,8 @@ documento conserva el detalle técnico de referencia y no sustituye ese orden.
 ## 1. Resultado y roles
 
 Una ejecución correcta deja una `HostingServiceCredential` VC-JWT, una
-autorización vinculada a URL/MSP/red/canales, certificados MSP y TLS con claves
+autorización vinculada a URL/MSP/red/canales, un administrador del MSP
+gestionado por la entidad gobernadora de la red, certificados MSP y TLS con claves
 privadas generadas por el host, el MSP admitido en los canales, el runtime
 instalado mediante Helm y evidencias de escritura, lectura, denegación y
 persistencia.
@@ -21,7 +22,7 @@ persistencia.
 | Rol | Responsabilidad | Entrega |
 | --- | --- | --- |
 | ICA del espacio de datos | Verifica evidencia o preautorización y emite la Host VC | `host-credential.jwt` y DID público de la ICA |
-| Autoridad de red/Fabric ICA | Verifica VC, decisión y operador; registra el enrolamiento | `authorization.json`, `enrollment-grant.json`, cadena TLS de Fabric CA |
+| Entidad gobernadora de la red/Fabric ICA | Asigna el MSP, verifica VC/decisión, gestiona `<MSP>.admin` y registra el enrolamiento | definición pública MSP, `authorization.json`, grants y cadena TLS |
 | Proveedor del host | Genera claves y solicita certificados MSP/TLS | identidad privada y paquete Helm saneado |
 | Operador de red | Admite el MSP y gobierna canales/lifecycle | estado y auditoría del reconciliador |
 | Operador Kubernetes | Crea Secrets, instala Helm y verifica | release, rollouts y evidencias operativas |
@@ -96,7 +97,18 @@ copie MSP, TLS, VC, grant, Secret o KEK entre entornos.
 
 El inventario fija URL, `mspId`, orderer, bootstrap peers, canales, namespace,
 release, StorageClass, IngressClass, DNS/TLS, digests OCI, package IDs CCAAS,
-adaptador KMS, backups, observabilidad, NetworkPolicies y puertos.
+adaptador KMS, backups, observabilidad, NetworkPolicies y puertos. `mspId` es
+asignado y aprobado por la gobernanza de Fabric. El proveedor lo copia
+exactamente; no lo elige unilateralmente. Varios peers del mismo operador y
+ámbito administrativo pueden reutilizar un MSP, mientras que los tenants
+alojados no se convierten en MSP.
+
+`authority.caName` fija el nombre exacto de la ICA de Fabric emisora. El
+asistente lo incorpora a los grants y `fabric-ca-client` lo aplica tanto al
+registro como a los enrolamientos MSP, TLS y cliente GW.
+
+El MSP asignado y aprobado por la gobernanza de Fabric es el único valor que
+puede aparecer en la solicitud, los certificados y Helm.
 
 Los values también fijan `host.adminEmail`, `host.adminUid` y
 `host.adminRole`: son el controller inicial del registro técnico reservado
@@ -193,7 +205,23 @@ node scripts/onboarding/host-onboarding-assistant.mjs \
   --apply --confirm-request "${request_id}"
 ```
 
-`authorization.json` no contiene la VC-JWT. El asistente crea dos grants
+`authorization.json` no contiene la VC-JWT. Antes de crear los grants, el
+asistente registra y enrola una identidad administrativa del MSP bajo las
+rutas privadas de la autoridad:
+
+```text
+authority.mspAdminOutputDir   clave y certificado <MSP>.admin; nunca se entrega
+authority.publicMspOutputDir  definición pública saneada para admitir el MSP
+```
+
+La definición pública del MSP la produce la autoridad de Fabric; el host no la
+define ni entrega una clave administrativa. El script auditable que implementa
+este límite es `scripts/enrollment/provision-governed-msp-admin.sh`.
+Una incorporación posterior del mismo MSP reutiliza esa identidad administrada si MSP, red e
+ICA coinciden; nunca rota ni sobrescribe el administrador como efecto colateral
+del alta de otro peer.
+
+Después, el asistente crea dos grants
 privados en modo `0600`: uno admite exactamente dos enrolamientos —MSP y TLS
 del peer— y otro admite un único enrolamiento para la identidad cliente del GW.
 Ambos contienen `issuedAt`/`expiresAt`. La fecha es una ventana aplicada por
@@ -210,6 +238,9 @@ ventana cualquier identificador no consumido.
 ## 7. Fase B: proveedor del host
 
 Se transfieren únicamente los dos grants `0600` y la cadena TLS pública de Fabric CA.
+La identidad `<MSP>.admin` y su clave privada permanecen en la infraestructura
+de la gobernanza. El proveedor genera solamente las identidades de peer/TLS y
+cliente GW que necesita su runtime.
 El proveedor ejecuta plan y aplicación:
 
 ```bash

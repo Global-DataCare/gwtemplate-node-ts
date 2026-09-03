@@ -1,4 +1,5 @@
 // TDD contract: write this test red first; make it green only with the complete real behavior.
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
 import { jest } from '@jest/globals';
 import { sha3_384 } from '@noble/hashes/sha3.js';
 import { encodeMultibase58btc } from 'gdc-common-utils-ts/utils/multibase58';
@@ -42,7 +43,7 @@ describe('SupabaseStorageAdapter', () => {
     expect(fetchMock).toHaveBeenCalledWith(
       `${baseUrl}/storage/v1/object/${bucketName}/${expectedHash}`,
       expect.objectContaining({
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         headers: expect.objectContaining({
           authorization: `Bearer ${serviceRoleKey}`,
           apikey: serviceRoleKey,
@@ -101,7 +102,7 @@ describe('SupabaseStorageAdapter', () => {
     expect(fetchMock).toHaveBeenCalledWith(
       `${baseUrl}/storage/v1/object/${bucketName}/zQmBlobRef`,
       expect.objectContaining({
-        method: 'GET',
+        method: HttpRequestMethods.Get,
         headers: expect.objectContaining({
           authorization: `Bearer ${serviceRoleKey}`,
           apikey: serviceRoleKey,

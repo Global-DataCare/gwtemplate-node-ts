@@ -34,6 +34,7 @@ register_args=(-u "${CA_URL}" --id.name "${enrollment_id}" --id.secret "${enroll
   --id.type peer --id.maxenrollments 2
   --id.attrs "gdc.mspId=${msp_id}:ecert,gdc.hostCredentialSha256=${credential_digest}:ecert")
 [[ -z "${CA_TLS_CERT:-}" ]] || register_args+=(--tls.certfiles "${CA_TLS_CERT}")
+[[ -z "${CA_NAME:-}" ]] || register_args+=(--caname "${CA_NAME}")
 fabric-ca-client register "${register_args[@]}"
 
 umask 077
@@ -42,6 +43,7 @@ jq -n \
   --arg enrollmentId "${enrollment_id}" \
   --arg enrollmentSecret "${enrollment_secret}" \
   --arg caUrl "${CA_URL}" \
+  --arg caName "${CA_NAME:-}" \
   --arg mspId "${msp_id}" \
   --arg hostUrl "${host_url}" \
   --arg hostCredentialId "${credential_id}" \
@@ -53,6 +55,7 @@ jq -n \
     enrollmentId: $enrollmentId,
     enrollmentSecret: $enrollmentSecret,
     caUrl: $caUrl,
+    caName: $caName,
     mspId: $mspId,
     hostUrl: $hostUrl,
     hostCredentialId: $hostCredentialId,

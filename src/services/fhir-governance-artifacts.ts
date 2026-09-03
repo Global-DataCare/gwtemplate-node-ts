@@ -1,4 +1,5 @@
 // Copyright 2026 Antifraud Services Inc. under the Apache License, Version 2.0.
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 
 export type GovernedFhirArtifactType =
   | 'CapabilityStatement'
@@ -142,7 +143,7 @@ export function buildGovernedCapabilityStatement(
     throw new Error('FHIR implementation description is required.');
   }
   const resources: object[] = [{
-    type: 'Communication',
+    type: ResourceTypesFhirR4.Communication,
     searchParam: declareSearchParameters(canonicalBaseUrl, COMMUNICATION_SEARCH_PARAMETERS),
   }];
   if (options.enableContractSearchParameters) {

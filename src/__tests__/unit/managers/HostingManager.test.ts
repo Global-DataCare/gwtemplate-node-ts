@@ -1,6 +1,9 @@
 // Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/__tests__/unit/managers/HostingManager.test.ts
+import { GatewayRequestEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 
 import { jest } from '@jest/globals';
 import {
@@ -106,7 +109,7 @@ const testBaseJobForClaims = (claims: ClaimsRecord): JobRequest => ({
   createdAtTimestamp: Date.now(),
   tenantId: (claims as any)[ClaimsOrganizationSchemaorg.alternateName] || 'host',
   jurisdiction: (claims as any)[ClaimsOrganizationSchemaorg.addressCountry],
-  resourceType: 'Organization',
+  resourceType: ResourceTypesFhirR4.Organization,
   section: 'registry',
   format: 'org.schema',
   action: '_batch',
@@ -120,8 +123,8 @@ const testBaseJobForClaims = (claims: ClaimsRecord): JobRequest => ({
       data: [
         {
           meta: { claims },
-          request: { method: 'POST' },
-          type: 'Organization-registration-form-v1.0',
+          request: { method: HttpRequestMethods.Post },
+          type: GatewayRequestEntryTypes.OrganizationRegistrationForm,
         },
       ],
     },
@@ -528,7 +531,7 @@ describe('HostingManager', () => {
       orgId: 'ignored-legacy-org-id',
       organization: {
         id: 'urn:test:org:acme-id',
-        type: 'Organization',
+        type: ResourceTypesFhirR4.Organization,
         meta: {
           claims: {
             [ClaimsOrganizationSchemaorg.identifierType]: 'TAX',
@@ -658,7 +661,7 @@ describe('HostingManager', () => {
       orgId: 'legacy-fallback-id',
       organization: {
         id: 'urn:test:org:fallback',
-        type: 'Organization',
+        type: ResourceTypesFhirR4.Organization,
         meta: {
           claims: {
             [ClaimsOrganizationSchemaorg.identifierType]: 'TAX',
@@ -758,7 +761,7 @@ describe('HostingManager', () => {
       orgId: ledgerOrgId,
       organization: {
         id: ledgerOrgId,
-        type: 'Organization',
+        type: ResourceTypesFhirR4.Organization,
         meta: {
           claims: {
             [ClaimsOrganizationSchemaorg.identifierType]: 'TAX',
@@ -836,7 +839,7 @@ describe('HostingManager', () => {
       orgId: 'urn:org:tax:VATES-B42215152',
       organization: {
         id: 'urn:org:tax:VATES-B42215152',
-        type: 'Organization',
+        type: ResourceTypesFhirR4.Organization,
         meta: {
           claims: {
             [ClaimsOrganizationSchemaorg.identifierType]: 'TAX',
@@ -868,7 +871,7 @@ describe('HostingManager', () => {
     expect(entry.response.status).toBe('201');
 
     const expectedAlternateName = String(claimsWithoutAlternateName[ClaimsOrganizationSchemaorg.identifierValue]);
-    expect(entry.meta?.claims?.[ClaimsOrganizationSchemaorg.alternateName]).toBe(expectedAlternateName);
+    expect(entry.resource?.meta?.claims?.[ClaimsOrganizationSchemaorg.alternateName]).toBe(expectedAlternateName);
 
     const tenantVaultId = tenantUtils.getTenantVaultId(
       claimsWithoutAlternateName[ClaimsServiceSchemaorg.category] as Sector,

@@ -1,5 +1,6 @@
 // src/managers/RelatedPersonManager.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
+import { HttpStatusCodes } from 'gdc-common-utils-ts/constants/http';
 
 import { randomUUID } from 'crypto';
 import { IJobProcessor } from './registry';
@@ -183,7 +184,7 @@ export class RelatedPersonManager implements IJobProcessor {
         const versioning = applyFhirCidVersioningToEntry({
           entry,
           claims,
-          resourceType: 'RelatedPerson',
+          resourceType: ResourceTypesFhirR4.RelatedPerson,
           resourceId: fallbackId,
         });
         const id = String(entry?.resource?.id || fallbackId);
@@ -211,15 +212,15 @@ export class RelatedPersonManager implements IJobProcessor {
 
           const responseAction = `${normalizedAction}-response`;
           responseEntries.push({
-            type: 'RelatedPerson',
+            type: ResourceTypesFhirR4.RelatedPerson,
             response: {
-              status: '200',
+              status: String(HttpStatusCodes.Ok),
               location: `/${job.tenantId}/cds-${jurisdiction}/v1/${job.sector}/${normalizedSection}/${normalizedFormat}/RelatedPerson/${responseAction}`,
             },
-            meta: {
+            resource: { resourceType: ResourceTypesFhirR4.RelatedPerson, meta: {
               claims,
               ...(researchTags && researchTags.length > 0 ? { tag: researchTags } : {}),
-            },
+            } },
           });
           continue;
         }
@@ -239,22 +240,22 @@ export class RelatedPersonManager implements IJobProcessor {
 
         const responseAction = `${normalizedAction}-response`;
         responseEntries.push({
-          type: 'RelatedPerson',
+          type: ResourceTypesFhirR4.RelatedPerson,
           response: {
-            status: '201',
+            status: String(HttpStatusCodes.Created),
             location: `/${job.tenantId}/cds-${jurisdiction}/v1/${job.sector}/${normalizedSection}/${normalizedFormat}/RelatedPerson/${responseAction}`,
           },
-          meta: {
+          resource: { resourceType: ResourceTypesFhirR4.RelatedPerson, meta: {
             claims,
             ...(researchTags && researchTags.length > 0 ? { tag: researchTags } : {}),
-          },
+          } },
         });
       } catch (e: any) {
         const status = e instanceof ManagerError ? e.status : '400';
         const code = e instanceof ManagerError ? e.code : IssueType.Invalid;
         responseEntries.push({
-          type: 'RelatedPerson',
-          meta: { claims: rawClaims || {} },
+          type: ResourceTypesFhirR4.RelatedPerson,
+          resource: { resourceType: ResourceTypesFhirR4.OperationOutcome, meta: { claims: rawClaims || {} } },
           response: {
             status,
             outcome: createOperationOutcome(IssueLevel.Error, code, e?.message || String(e)),
@@ -279,7 +280,7 @@ export class RelatedPersonManager implements IJobProcessor {
       aud: job.content?.iss as string,
       exp: Math.floor(Date.now() / 1000) + 300,
       body: {
-        resourceType: 'Bundle',
+        resourceType: ResourceTypesFhirR4.Bundle,
         type: `${normalizedAction}-response`,
         total: responseEntries.length,
         data: responseEntries,
@@ -324,10 +325,10 @@ export class RelatedPersonManager implements IJobProcessor {
     }
     if (!claims['@context']) claims['@context'] = 'org.hl7.fhir.api';
     return {
-      type: 'RelatedPerson',
+      type: ResourceTypesFhirR4.RelatedPerson,
       meta: { ...(record.status ? { status: record.status } : {}) },
       resource: {
-        resourceType: 'RelatedPerson',
+        resourceType: ResourceTypesFhirR4.RelatedPerson,
         id: record.id,
         meta: {
           ...(record.status ? { status: record.status } : {}),

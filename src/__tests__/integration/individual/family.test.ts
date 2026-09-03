@@ -1,6 +1,10 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 // src/__tests__/integration/individual/family.test.ts
 // Always create JSDoc, do not use strings inline in keys nor values, use types instead, and reuse the data test examples.
+import { GatewayRequestEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
+import { HttpStatusCodes } from 'gdc-common-utils-ts/constants/http';
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 
 import express from 'express';
 import { createApiRouter } from '../../../routes/api';
@@ -194,29 +198,32 @@ describe('[/individual/org.schema/Organization/_batch] Integration Tests (sandbo
         ...regJob.content!.body,
         data: regJob.content!.body!.data.map((entry: any) => ({
           ...entry,
-          meta: {
-            ...entry.meta,
+          resource: {
+            ...entry.resource,
+            meta: {
+            ...entry.resource.meta,
             claims: {
-              ...entry.meta.claims,
+              ...entry.resource.meta.claims,
               [ClaimsServiceSchemaorg.category]: Sector.HEALTH_CARE,
             },
+          },
           },
         })),
       },
     } as any;
     const offerPayload = await hostingManager.process(regJob);
-    expect(offerPayload.body.data[0]).toMatchObject({ response: { status: '201' } });
+    expect(offerPayload.body.data[0]).toMatchObject({ response: { status: String(HttpStatusCodes.Created) } });
     const offerId = getClaimValue<string>(
-      offerPayload.body.data[0].meta?.claims || {},
+      offerPayload.body.data[0].resource?.meta?.claims || {},
       ClaimsOfferSchemaorg.identifier,
     );
     expect(offerId).toBeDefined();
     const orderJob = structuredClone(ORGANIZATION_ORDER_JOB);
     orderJob.sector = Sector.HEALTH_CARE;
     orderJob.jurisdiction = 'es';
-    orderJob.content!.body!.data[0]!.meta!.claims[ClaimsOrderSchemaorg.acceptedOfferIdentifier] = offerId;
+    orderJob.content!.body!.data[0]!.resource!.meta!.claims![ClaimsOrderSchemaorg.acceptedOfferIdentifier] = offerId;
     const orderPayload = await hostingManager.process(orderJob);
-    expect(orderPayload.body.data[0]).toMatchObject({ response: { status: '201' } });
+    expect(orderPayload.body.data[0]).toMatchObject({ response: { status: String(HttpStatusCodes.Created) } });
     await tenantsCacheManager.refreshTenant(getTenantVaultId(Sector.HEALTH_CARE, testTenant1TenantId));
 
     const asyncResponseStore = new AsyncResponseStoreMem();
@@ -255,13 +262,13 @@ describe('[/individual/org.schema/Organization/_batch] Integration Tests (sandbo
 	      section: 'individual',
 	      format: 'org.schema',
 	      action: '_batch',
-	      resourceType: 'Organization',
+	      resourceType: ResourceTypesFhirR4.Organization,
 	      content: withoutIncompleteJwsProof(FAMILY_REGISTRATION_REQUEST) as any,
 	    };
     mockKmsService.decodeRequest.mockResolvedValueOnce(decodedJob as any);
 
     const response = await invokeExpress(app, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       url,
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -297,13 +304,13 @@ describe('[/individual/org.schema/Organization/_batch] Integration Tests (sandbo
       section: 'individual',
       format: 'org.schema',
       action: '_transaction',
-      resourceType: 'Organization',
+      resourceType: ResourceTypesFhirR4.Organization,
       content: withoutIncompleteJwsProof(FAMILY_REGISTRATION_REQUEST) as any,
     };
     mockKmsService.decodeRequest.mockResolvedValueOnce(decodedJob as any);
 
     const response = await invokeExpress(app, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       url,
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -339,12 +346,12 @@ describe('[/individual/org.schema/Organization/_batch] Integration Tests (sandbo
       section: 'individual',
       format: 'org.schema',
       action: '_purge',
-      resourceType: 'Organization',
+      resourceType: ResourceTypesFhirR4.Organization,
       content: {
         ...withoutIncompleteJwsProof(FAMILY_REGISTRATION_REQUEST),
         body: {
           data: [{
-            type: 'Family-purge-request-v1.0',
+            type: GatewayRequestEntryTypes.FamilyPurge,
             meta: {
               claims: {
                 [ClaimsOrganizationSchemaorg.ownerTelephone]: '+34600000001',
@@ -360,7 +367,7 @@ describe('[/individual/org.schema/Organization/_batch] Integration Tests (sandbo
     mockKmsService.decodeRequest.mockResolvedValueOnce(decodedJob as any);
 
     const response = await invokeExpress(app, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       url,
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',

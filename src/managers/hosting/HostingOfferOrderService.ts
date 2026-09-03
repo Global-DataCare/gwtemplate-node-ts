@@ -1,3 +1,4 @@
+import { HttpStatusCodes } from 'gdc-common-utils-ts/constants/http';
 import { v4 as uuidv4 } from 'uuid';
 import { BundleEntry } from 'gdc-common-utils-ts/models/bundle';
 import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
@@ -60,7 +61,7 @@ export class HostingOfferOrderService {
       throw new ManagerError(`Tenant vault not found: ${tenantVaultId}`, IssueType.NotFound);
     }
 
-    const requestedClaims = normalizeContextualizedClaims(entry.meta?.claims || {});
+    const requestedClaims = normalizeContextualizedClaims(entry.resource?.meta?.claims || entry.meta?.claims || {});
     const category = String(getClaimValue<string>(
       requestedClaims,
       'org.schema.IndividualProduct.category',
@@ -107,10 +108,9 @@ export class HostingOfferOrderService {
     );
 
     return {
-      type: 'Organization-license-offer-response-v1.0',
-      meta: { claims },
+      type: GatewayResponseEntryTypes.OrganizationLicenseOffer,
       resource: { id: offerId, meta: { claims } } as any,
-      response: { status: '201' },
+      response: { status: String(HttpStatusCodes.Created) },
     };
   }
 
@@ -289,10 +289,9 @@ export class HostingOfferOrderService {
     await this.vaultRepository.put(hostCollectionName, [secureCommunicationDoc], getEnvSectionId('communications'));
 
     return {
-      type: 'Organization-order-response-v1.0',
-      meta: { claims: paymentCommunication.claims },
-      resource: invoiceBundle as any,
-      response: { status: '201' },
+      type: GatewayResponseEntryTypes.OrganizationOrder,
+      resource: { ...(invoiceBundle as any), meta: { ...((invoiceBundle as any).meta || {}), claims: paymentCommunication.claims } },
+      response: { status: String(HttpStatusCodes.Created) },
     };
   }
 }

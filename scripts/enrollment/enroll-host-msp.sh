@@ -9,6 +9,7 @@ fi
 enrollment_id="$(jq -r '.enrollmentId // empty' "${ENROLLMENT_GRANT_FILE}")"
 enrollment_secret="$(jq -r '.enrollmentSecret // empty' "${ENROLLMENT_GRANT_FILE}")"
 ca_url="$(jq -r '.caUrl // empty' "${ENROLLMENT_GRANT_FILE}")"
+ca_name="$(jq -r '.caName // empty' "${ENROLLMENT_GRANT_FILE}")"
 spec_version="$(jq -r '.specVersion // empty' "${ENROLLMENT_GRANT_FILE}")"
 expires_at="$(jq -r '.expiresAt // empty' "${ENROLLMENT_GRANT_FILE}")"
 max_enrollments="$(jq -r '.maxEnrollments // 0' "${ENROLLMENT_GRANT_FILE}")"
@@ -47,11 +48,13 @@ chmod 700 "${HOST_MSP_OUTPUT_DIR}"
 export FABRIC_CA_CLIENT_HOME="${HOST_MSP_OUTPUT_DIR}"
 enroll_args=(-u "${enroll_url}" --csr.hosts "${HOST_PEER_DNS}")
 [[ -z "${CA_TLS_CERT:-}" ]] || enroll_args+=(--tls.certfiles "${CA_TLS_CERT}")
+[[ -z "${ca_name}" ]] || enroll_args+=(--caname "${ca_name}")
 fabric-ca-client enroll "${enroll_args[@]}"
 
 export FABRIC_CA_CLIENT_MSPDIR=tls
 tls_enroll_args=(-u "${enroll_url}" --enrollment.profile tls --csr.hosts "${HOST_PEER_DNS}")
 [[ -z "${CA_TLS_CERT:-}" ]] || tls_enroll_args+=(--tls.certfiles "${CA_TLS_CERT}")
+[[ -z "${ca_name}" ]] || tls_enroll_args+=(--caname "${ca_name}")
 fabric-ca-client enroll "${tls_enroll_args[@]}"
 
 unset FABRIC_CA_CLIENT_MSPDIR

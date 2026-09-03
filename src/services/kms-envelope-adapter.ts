@@ -1,3 +1,4 @@
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'crypto';
 import { GoogleAuth } from 'google-auth-library';
 
@@ -149,7 +150,7 @@ export class CloudKmsEnvelopeAdapter implements KmsEnvelopeAdapter {
   async wrapKeyMaterial(plaintext: Uint8Array, context: { entityVaultId: string; purpose: string }): Promise<string> {
     const accessToken = await this.tokenProvider();
     const response = await this.fetchImpl(`https://cloudkms.googleapis.com/v1/${this.keyName}:encrypt`, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       headers: {
         Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
@@ -170,7 +171,7 @@ export class CloudKmsEnvelopeAdapter implements KmsEnvelopeAdapter {
   async unwrapKeyMaterial(wrapped: string, context: { entityVaultId: string; purpose: string }): Promise<Uint8Array> {
     const accessToken = await this.tokenProvider();
     const response = await this.fetchImpl(`https://cloudkms.googleapis.com/v1/${this.keyName}:decrypt`, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       headers: {
         Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
@@ -234,7 +235,7 @@ export class HashicorpTransitEnvelopeAdapter implements KmsEnvelopeAdapter {
 
   async wrapKeyMaterial(plaintext: Uint8Array, context: { entityVaultId: string; purpose: string }): Promise<string> {
     const response = await this.fetchImpl(this.buildUrl(`encrypt/${this.keyName}`), {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       headers: this.buildHeaders(),
       body: JSON.stringify({
         plaintext: Buffer.from(plaintext).toString('base64'),
@@ -251,7 +252,7 @@ export class HashicorpTransitEnvelopeAdapter implements KmsEnvelopeAdapter {
 
   async unwrapKeyMaterial(wrapped: string, context: { entityVaultId: string; purpose: string }): Promise<Uint8Array> {
     const response = await this.fetchImpl(this.buildUrl(`decrypt/${this.keyName}`), {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       headers: this.buildHeaders(),
       body: JSON.stringify({
         ciphertext: wrapped,

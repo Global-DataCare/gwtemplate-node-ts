@@ -1,3 +1,4 @@
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
 import type { LLMGenerateJsonParams, LLMProvider } from './LLMProvider.js';
 
 type OllamaGenerateRequest = {
@@ -34,7 +35,7 @@ export class OllamaProvider implements LLMProvider {
       };
 
       const response = await fetch(`${this.baseUrl.replace(/\/$/, '')}/api/generate`, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestBody),
         signal: controller.signal,

@@ -1,5 +1,8 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/managers/DeviceRegistrationManager.ts
+import { GatewayResponseEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
+import { HttpStatusCodes } from 'gdc-common-utils-ts/constants/http';
 
 import { v4 as uuidv4 } from 'uuid';
 import { IJobProcessor } from './registry';
@@ -230,11 +233,11 @@ export class DeviceRegistrationManager implements IJobProcessor {
       // --- Response Formatting Step ---
       responseEntry = {
         type: entryType,
-        meta: { claims: softwareClaims },
-        response: { status: '201' }, // HTTP 201 Created
+        response: { status: String(HttpStatusCodes.Created) }, // HTTP 201 Created
         resource: {
-          resourceType: 'Device', // DCR result wrapped in a device-like resource
+          resourceType: ResourceTypesFhirR4.Device, // DCR result wrapped in a device-like resource
           id: clientId,
+          meta: { claims: softwareClaims },
           // The standard DCR response is embedded directly here.
           ...registrationResponse
         }
@@ -246,7 +249,7 @@ export class DeviceRegistrationManager implements IJobProcessor {
 
     const responseBundle: BundleJsonApi = {
       data: [responseEntry],
-      resourceType: 'Bundle',
+      resourceType: ResourceTypesFhirR4.Bundle,
       total: 1,
       type: 'transaction-response',
     };
@@ -313,7 +316,7 @@ export class DeviceRegistrationManager implements IJobProcessor {
     return {
       type: entryType, meta,
       response: {
-        status: '500',
+        status: String(HttpStatusCodes.InternalServerError),
         outcome: createOperationOutcome(IssueLevel.Error, IssueType.Exception, 'An unexpected internal server error occurred.'),
       },
     };
@@ -685,12 +688,12 @@ export class DeviceRegistrationManager implements IJobProcessor {
 
       const clientId = content.clientId || doc.id;
       entries.push({
-        type: 'Device:Registered',
-        meta: { claims: content.softwareClaims || undefined },
-        response: { status: '200' },
+        type: GatewayResponseEntryTypes.DeviceRegistered,
+        response: { status: String(HttpStatusCodes.Ok) },
         resource: {
-          resourceType: 'Device',
+          resourceType: ResourceTypesFhirR4.Device,
           id: clientId,
+          meta: { claims: content.softwareClaims || undefined },
           client_id: clientId,
           client_id_issued_at: content.clientIdIssuedAt,
           registration_client_uri: content.registrationClientUri,
@@ -700,7 +703,7 @@ export class DeviceRegistrationManager implements IJobProcessor {
     }
 
     const responseBundle: BundleJsonApi = {
-      resourceType: 'Bundle',
+      resourceType: ResourceTypesFhirR4.Bundle,
       type: 'batch-response',
       data: entries,
     };
@@ -800,8 +803,8 @@ export class DeviceRegistrationManager implements IJobProcessor {
       iss: composeHostDidWebId(this.apiBaseUrl), aud: job.content?.iss as string,
       exp: Math.floor(Date.now() / 1000) + 300,
       body: {
-        resourceType: 'Bundle', type: 'transaction-response', total: 1,
-        data: [{ type: IdentityAuthResponseEntryTypes.DeviceRevoked, response: { status: '200' }, resource: { resourceType: 'Device', id: clientId, status: DeviceBindingStatuses.Revoked } }],
+        resourceType: ResourceTypesFhirR4.Bundle, type: 'transaction-response', total: 1,
+        data: [{ type: IdentityAuthResponseEntryTypes.DeviceRevoked, response: { status: String(HttpStatusCodes.Ok) }, resource: { resourceType: ResourceTypesFhirR4.Device, id: clientId, status: DeviceBindingStatuses.Revoked } }],
       },
     };
   }

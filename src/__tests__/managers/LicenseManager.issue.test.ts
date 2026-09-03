@@ -1,4 +1,6 @@
 // TDD contract: write this test red first; make it green only with the complete real behavior.
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 import { mock, MockProxy } from 'jest-mock-extended';
 import type { IVaultRepository } from '../../database/repositories/vault/vault.repository';
 import { LicenseManager } from '../../managers/LicenseManager';
@@ -56,7 +58,7 @@ describe('LicenseManager (_issue)', () => {
         aud: 'did:web:api.acme.org',
         type: 'application/json',
         body: {
-          resourceType: 'Bundle',
+          resourceType: ResourceTypesFhirR4.Bundle,
           type: 'batch',
           data: [
             {
@@ -70,7 +72,7 @@ describe('LicenseManager (_issue)', () => {
                   'org.schema.IndividualProduct.additionalType': 'mobile',
                 },
               },
-              request: { method: 'POST', url: '/acme/cds-ES/v1/health-care/identity/openid/License/_issue' },
+              request: { method: HttpRequestMethods.Post, url: '/acme/cds-ES/v1/health-care/identity/openid/License/_issue' },
             },
           ],
         },

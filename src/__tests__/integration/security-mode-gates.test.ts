@@ -1,4 +1,5 @@
 // Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 import express from 'express';
 import request from 'supertest';
 import { createApiRouter } from '../../routes/api';
@@ -198,7 +199,7 @@ describe('SECURITY_MODE content-type gates', () => {
       .set('Content-Type', 'application/fhir+json')
       .set('Authorization', `Bearer ${bearer}`)
       .send({
-        resourceType: 'Bundle',
+        resourceType: ResourceTypesFhirR4.Bundle,
         type: 'batch',
         id: 'demo-fhir-communication',
         thid: 'demo-fhir-communication',

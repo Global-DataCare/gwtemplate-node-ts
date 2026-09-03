@@ -1,5 +1,6 @@
 // Flow contract: License search returns 0..n actual resources as Bundle
 // entries; a FHIR resource is never replaced by a nested `{ total, data }` list.
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 import type { IVaultRepository } from '../../database/repositories/vault/vault.repository';
@@ -261,7 +262,7 @@ describe('LicenseManager (_search)', () => {
     // Same business search, but through the canonical FHIR `_search` wrapper.
     const response = await manager.process(newJobSearchLicense({
       request: {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: buildGwCoreTenantResourceActionPath(TEST_LICENSE_SEARCH_SELECTOR),
       },
       resource: buildFhirParametersResourceFromSearchParams({

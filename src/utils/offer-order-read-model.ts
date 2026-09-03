@@ -7,12 +7,11 @@ import { normalizeContextualizedClaims } from './claims';
 /**
  * Normalizes one offer/order search entry into flat comparable claims.
  *
- * Current shared SDK helpers may send claims either in `entry.meta.claims` or
- * in `entry.resource.meta.claims`. GW search readers should not force frontend
- * code to care about that transport detail.
+ * Current shared SDK helpers send claims in `entry.resource.meta.claims`.
+ * GW search readers retain a temporary legacy fallback during rollout.
  */
 export function extractOfferOrderSearchClaims(entry: BundleEntry): Record<string, unknown> {
-  const rawClaims = entry?.meta?.claims || entry?.resource?.meta?.claims;
+  const rawClaims = entry?.resource?.meta?.claims || entry?.meta?.claims;
   return rawClaims ? normalizeContextualizedClaims(rawClaims) : {};
 }
 
