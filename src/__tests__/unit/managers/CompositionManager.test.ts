@@ -4,6 +4,7 @@
 import { GatewayResponseEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
 import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
 import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
+import { FhirIpsCreatorKinds } from 'gdc-common-utils-ts/utils/fhir-ips-creator-identity';
 
 import { describe, expect, it, jest, beforeEach } from '@jest/globals';
 import {
@@ -31,7 +32,11 @@ import {
   EXAMPLE_TENANT_SERVICE_DID,
   EXAMPLE_LICENSE_SEAT_UUID_ACTIVE,
   EXAMPLE_PROFESSIONAL_DID,
+  EXAMPLE_HEALTHCARE_ACTOR_ROLE_PHYSICIAN,
+  EXAMPLE_KYC_CONTROLLER_USER_UUID,
+  EXAMPLE_KYC_CONTROLLER_UUID,
 } from 'gdc-common-utils-ts/examples/shared';
+import { getClinicalCreatorBindingsSectionId } from '../../../utils/ips-bundle';
 import {
   ExampleEmployeeEmails,
   ExampleEmployeeRoles,
@@ -522,6 +527,70 @@ describe('CompositionManager', () => {
       occurrenceDateTime: '2026-01-01T10:00:00Z',
       lotNumber: 'CURRENT-LOT',
     });
+  });
+
+  it('exports a role-bound operational author as FHIR Practitioner and PractitionerRole', async () => {
+    const subjectDid = EXAMPLE_SUBJECT_DID;
+    const practitionerIdentifier = `urn:uuid:${EXAMPLE_KYC_CONTROLLER_USER_UUID}`;
+    const practitionerRoleIdentifier = `urn:uuid:${EXAMPLE_KYC_CONTROLLER_UUID}`;
+    mockVaultRepository.listContainersInSection.mockImplementation(async (_vaultId: string, sectionId: string) => {
+      if (sectionId === getSubjectScopedSectionId(subjectDid, 'individual', DataCollectionIds.composition)) {
+        return [{
+          id: 'composition-role-author-summary-001',
+          [CompositionClaim.Identifier]: 'urn:uuid:composition-role-author-summary-001',
+          [CompositionClaim.Subject]: subjectDid,
+          [CompositionClaim.Section]: HealthcareBasicSections.HistoryOfMedicationUse.attributeValue,
+          [CompositionClaim.Type]: HealthcareBasicSections.PatientSummaryDocument.attributeValue,
+          [CompositionClaim.Author]: EXAMPLE_PROFESSIONAL_DID,
+        }] as any;
+      }
+      if (sectionId === getClinicalCreatorBindingsSectionId()) {
+        return [{
+          id: practitionerRoleIdentifier,
+          kind: FhirIpsCreatorKinds.Professional,
+          actorIdentifier: practitionerIdentifier,
+          authorIdentifier: practitionerRoleIdentifier,
+          ownerIdentifier: EXAMPLE_TENANT_SERVICE_DID,
+          role: EXAMPLE_HEALTHCARE_ACTOR_ROLE_PHYSICIAN,
+          actorDids: [EXAMPLE_PROFESSIONAL_DID],
+        }] as any;
+      }
+      return [] as any;
+    });
+
+    const response = await manager.process(createJob({
+      sector: 'health-care',
+      section: 'individual',
+      format: 'org.hl7.fhir.r4',
+      resourceType: 'Subject',
+      action: '$summary',
+      content: {
+        ...(createJob().content as any),
+        body: {
+          resourceType: ResourceTypesFhirR4.Parameters,
+          parameter: [{ name: 'subject', valueString: subjectDid }],
+        },
+      } as any,
+    }));
+
+    const bundle = (response.body as any).data[0].resource;
+    expect(bundle.entry[0].resource.author).toEqual([{ reference: practitionerRoleIdentifier }]);
+    expect(bundle.entry).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        fullUrl: practitionerIdentifier,
+        resource: expect.objectContaining({ resourceType: ResourceTypesFhirR4.Practitioner }),
+      }),
+      expect.objectContaining({
+        fullUrl: practitionerRoleIdentifier,
+        resource: expect.objectContaining({
+          resourceType: ResourceTypesFhirR4.PractitionerRole,
+          practitioner: { reference: practitionerIdentifier },
+          organization: { reference: EXAMPLE_TENANT_SERVICE_DID },
+        }),
+      }),
+    ]));
+    expect(JSON.stringify(bundle)).not.toContain('mailto:');
+    expect(JSON.stringify(bundle)).not.toContain('tel:');
   });
 
   it('supports digitaltwin ResearchSubject/$summary with org.hl7.fhir.api claims-first materialization', async () => {

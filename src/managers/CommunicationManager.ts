@@ -53,6 +53,12 @@ import { isDigitalTwinSecondaryUseEnabled } from '../utils/digital-twin-secondar
 import { getAuthenticatedJobActorIdentifiers } from '../utils/authenticated-job-actor';
 import { ClaimConsent, ConsentStatuses } from 'gdc-common-utils-ts/models/consent-rule';
 import { canonicalizeBundleEntryMetadata } from '../utils/canonical-entry-metadata';
+import {
+  resolveClinicalCreatorBinding,
+  type AuthenticatedClinicalCreatorEvidence,
+  type ClinicalCreatorBinding,
+} from 'gdc-common-utils-ts/utils/fhir-ips-creator-identity';
+import { getClinicalCreatorBindingsSectionId } from '../utils/clinical-creator-binding';
 
 type SupportedProjectedResourceType =
   | 'MedicationStatement'
@@ -160,8 +166,6 @@ const PROJECTED_RESOURCE_CONFIG: Record<SupportedProjectedResourceType, Projecti
     identifierClaimKeys: ['Consent.identifier', 'Consent.identifier.value'],
   },
 };
-
-const CLINICAL_AUTHOR_IDENTITY_BINDINGS_SECTION = 'clinical_author_identity_bindings';
 
 interface CommunicationManagerOptions {
   tenantsCacheManager: ITenantsManager;
@@ -1457,8 +1461,32 @@ export class CommunicationManager implements IJobProcessor {
     if (!authorDid || authorDid !== authenticatedDid) return;
     const verifiedContacts = getAuthenticatedJobActorIdentifiers(job)
       .filter((identifier) => !identifier.startsWith('did:web:'));
+    const sectionId = getClinicalCreatorBindingsSectionId();
+    const bindingRecords = await this.vaultRepository.listContainersInSection(tenantVaultId, sectionId);
+    const bindings = (bindingRecords as unknown[]).filter(isClinicalCreatorBinding);
+    const evidence = clinicalCreatorEvidence(job);
+    const stableBinding = resolveClinicalCreatorBinding(bindings, evidence);
+    if (stableBinding) {
+      await this.vaultRepository.put(tenantVaultId, [{
+        ...stableBinding,
+        id: stableBinding.authorIdentifier,
+        actorDids: Array.from(new Set([...(stableBinding.actorDids || []), authorDid])),
+        verifiedContactIdentifiers: Array.from(new Set([
+          ...(stableBinding.verifiedContactIdentifiers || []),
+          ...verifiedContacts,
+        ])),
+        dcrClientIds: Array.from(new Set([
+          ...(stableBinding.dcrClientIds || []),
+          ...(evidence.dcrClientId ? [evidence.dcrClientId] : []),
+        ])),
+        keyIds: Array.from(new Set([
+          ...(stableBinding.keyIds || []),
+          ...(evidence.keyId ? [evidence.keyId] : []),
+        ])),
+      } as any], sectionId);
+      return;
+    }
     if (verifiedContacts.length === 0) return;
-    const sectionId = getEnvSectionId(CLINICAL_AUTHOR_IDENTITY_BINDINGS_SECTION);
     const id = createHash('sha256').update(authorDid, 'utf8').digest('hex');
     const existing = await this.vaultRepository.get<{ id: string; verifiedContacts?: string[] }>(
       tenantVaultId,
@@ -1481,9 +1509,13 @@ export class CommunicationManager implements IJobProcessor {
   ): Promise<boolean> {
     const authenticatedIdentifiers = getAuthenticatedJobActorIdentifiers(job);
     if (authorDids.some((authorDid) => authenticatedIdentifiers.includes(authorDid))) return true;
+    const sectionId = getClinicalCreatorBindingsSectionId();
+    const bindingRecords = await this.vaultRepository.listContainersInSection(tenantVaultId, sectionId);
+    const bindings = (bindingRecords as unknown[]).filter(isClinicalCreatorBinding);
+    const stableBinding = resolveClinicalCreatorBinding(bindings, clinicalCreatorEvidence(job));
+    if (stableBinding?.actorDids?.some((actorDid) => authorDids.includes(actorDid))) return true;
     const verifiedContacts = authenticatedIdentifiers.filter((identifier) => !identifier.startsWith('did:web:'));
     if (verifiedContacts.length === 0) return false;
-    const sectionId = getEnvSectionId(CLINICAL_AUTHOR_IDENTITY_BINDINGS_SECTION);
     for (const authorDid of authorDids) {
       const id = createHash('sha256').update(authorDid, 'utf8').digest('hex');
       const binding = await this.vaultRepository.get<{ id: string; verifiedContacts?: string[] }>(
@@ -2263,4 +2295,27 @@ export class CommunicationManager implements IJobProcessor {
     const parsed = JSON.parse(jsonText);
     return this.asDocumentBundle(parsed);
   }
+}
+
+function isClinicalCreatorBinding(value: unknown): value is ClinicalCreatorBinding {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  return typeof record.kind === 'string'
+    && typeof record.actorIdentifier === 'string'
+    && typeof record.authorIdentifier === 'string'
+    && typeof record.ownerIdentifier === 'string'
+    && typeof record.role === 'string';
+}
+
+function clinicalCreatorEvidence(job: JobRequest): AuthenticatedClinicalCreatorEvidence {
+  const identifiers = getAuthenticatedJobActorIdentifiers(job);
+  const actorDid = identifiers.find((identifier) => identifier.startsWith('did:web:'));
+  const bearer = (job.content as any)?.meta?.bearer?.jwt?.payload || {};
+  const protectedHeader = (job.content as any)?.meta?.jws?.protected || {};
+  return {
+    actorDid,
+    verifiedContactIdentifiers: identifiers.filter((identifier) => !identifier.startsWith('did:web:')),
+    dcrClientId: String((job.content as any)?.client_id || bearer.client_id || bearer.azp || '').trim() || undefined,
+    keyId: String(protectedHeader.kid || '').trim() || undefined,
+  };
 }

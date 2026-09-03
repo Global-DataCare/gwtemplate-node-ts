@@ -5,8 +5,13 @@ import type {
   IpsOrFhirImportInput,
   RouteContext,
   SubmitAndPollResult,
+  ServerProfileRecord,
+  ClinicalCreatorIpsExport,
 } from 'gdc-sdk-node-ts';
-import { cloneImportedClinicalDocumentForDemo } from 'gdc-sdk-node-ts';
+import {
+  cloneImportedClinicalDocumentForDemo,
+  exportServerProfileClinicalCreatorIps,
+} from 'gdc-sdk-node-ts';
 
 /** Implemented by the individual-controller, individual-member and professional facades. */
 type ClinicalSummaryWriter = Pick<IndividualControllerSdk, 'updateClinicalSummary'>;
@@ -56,4 +61,11 @@ export function updateEditableImportedIpsForDemo(
     recipient: input.providerDid,
     bundle: editableCopy,
   });
+}
+
+/** Export the stable FHIR author without exposing login or device aliases. */
+export function exportClinicalCreator(
+  profile: ServerProfileRecord,
+): ClinicalCreatorIpsExport {
+  return exportServerProfileClinicalCreatorIps(profile);
 }

@@ -1,4 +1,4 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 // src/__tests__/managers/DeviceRegistrationManager.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
@@ -31,6 +31,8 @@ import {
   EXAMPLE_EMPLOYEE_DEVICE_CLIENT_ID_PRIMARY,
   EXAMPLE_EMPLOYEE_DEVICE_INSTANCE_ID_TERTIARY,
   EXAMPLE_LEGAL_ORGANIZATION_TAX_ID,
+  EXAMPLE_KYC_CONTROLLER_USER_UUID,
+  EXAMPLE_KYC_CONTROLLER_UUID,
   EXAMPLE_TENANT_ROUTE_CONTEXT,
   ExampleHttpStatusText,
 } from 'gdc-common-utils-ts/examples/shared';
@@ -45,6 +47,8 @@ import { testIndividualControllerDcrIdentity } from '../data/identity.data';
 import { DeviceAppTypes, DeviceUserClasses } from 'gdc-common-utils-ts/constants/device';
 import { LicenseStatuses } from 'gdc-common-utils-ts/utils/license';
 import { HttpStatusCodes } from 'gdc-common-utils-ts/constants/http';
+import { FhirIpsCreatorKinds } from 'gdc-common-utils-ts/utils/fhir-ips-creator-identity';
+import { getClinicalCreatorBindingsSectionId } from '../../utils/clinical-creator-binding';
 
 const TEST_API_BASE_URL = 'http://localhost:3001';
 const FABRIC_LEDGER_TEST_ENV = {
@@ -156,6 +160,73 @@ describe('DeviceRegistrationManager', () => {
       expect((updatedContent as any).deviceBindings).toHaveLength(1);
       expect(updatedContent.status).toBe('active');
       expect(updatedLicense?.status).toBe('active');
+    });
+
+    it('links DCR client and key aliases only to an existing stable clinical creator assignment', async () => {
+      const job = cloneDeep(DCR_REGISTRATION_JOB);
+      const body = job.content?.body as any;
+      const activationCode = String(body?.code);
+      const vaultId = getTenantVaultId(job.sector as any, job.tenantId as string);
+      const actorDid = 'did:web:clinic.example:employees:stable-practitioner';
+      const binding = {
+        id: `urn:uuid:${EXAMPLE_KYC_CONTROLLER_UUID}`,
+        kind: FhirIpsCreatorKinds.Professional,
+        actorIdentifier: `urn:uuid:${EXAMPLE_KYC_CONTROLLER_USER_UUID}`,
+        authorIdentifier: `urn:uuid:${EXAMPLE_KYC_CONTROLLER_UUID}`,
+        ownerIdentifier: 'did:web:clinic.example',
+        role: HealthcareActorRoles.Veterinarian,
+      };
+      Object.assign(body, {
+        [IdentityDcrMetadataFields.ActorDid]: actorDid,
+        [IdentityDcrMetadataFields.ProfileDid]: actorDid,
+        [IdentityDcrMetadataFields.ClinicalCreatorBinding]: {
+          kind: binding.kind,
+          actorIdentifier: binding.actorIdentifier,
+          authorIdentifier: binding.authorIdentifier,
+          ownerIdentifier: binding.ownerIdentifier,
+          role: binding.role,
+        },
+      });
+      await vaultRepository.put(vaultId, [{
+        id: 'license-clinical-creator',
+        status: 'issued',
+        sequence: 0,
+        content: {
+          id: 'license-clinical-creator',
+          tenantId: job.tenantId,
+          orderId: 'order-clinical-creator',
+          activationCode,
+          userClass: 'employee',
+          type: 'web',
+          status: 'issued',
+          plan: 'default',
+          renewalCycle: '12m',
+          reactivationEnabled: false,
+          exp: Math.floor(Date.now() / 1000) + 3600,
+        },
+      }], getEnvSectionId('device-licenses'));
+
+      const rejected = await manager.process(job);
+      expect(((rejected.body as BundleJsonApi).data[0] as ErrorEntry).response.status)
+        .toBe(String(HttpStatusCodes.Forbidden));
+
+      await vaultRepository.put(vaultId, [binding], getClinicalCreatorBindingsSectionId());
+      const result = await manager.process(job);
+
+      const entry = (result.body as BundleJsonApi).data[0] as BundleEntryResponse;
+      expect(entry.response.status).toBe(String(HttpStatusCodes.Created));
+      const clientId = String((entry.resource as any).client_id);
+      const stored = await vaultRepository.get<any>(
+        vaultId,
+        binding.authorIdentifier,
+        getClinicalCreatorBindingsSectionId(),
+      );
+      expect(stored).toEqual(expect.objectContaining({
+        ...binding,
+        actorDids: [actorDid],
+        dcrClientIds: expect.arrayContaining([clientId, body.ext_device_info.device_id]),
+        keyIds: expect.arrayContaining(body.jwks.keys.map((key: any) => key.kid)),
+      }));
     });
 
     it('binds an individual-controller DCR to the verified account and licensed subject', async () => {

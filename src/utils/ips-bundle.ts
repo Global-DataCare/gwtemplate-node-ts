@@ -17,6 +17,14 @@ import { canonicalizeFhirClaims } from './claims';
 import { SupportedFhirIngestionFormat } from './fhir-ingestion';
 import { randomUUID } from 'crypto';
 import { Format } from 'gdc-common-utils-ts/constants/Schemas';
+import {
+  FhirIpsCreatorKinds,
+  buildFhirIpsCreatorAuthor,
+  resolveClinicalCreatorBinding,
+  type ClinicalCreatorBinding,
+} from 'gdc-common-utils-ts/utils/fhir-ips-creator-identity';
+import { getClinicalCreatorBindingsSectionId } from './clinical-creator-binding';
+export { getClinicalCreatorBindingsSectionId } from './clinical-creator-binding';
 
 type BuildConsolidatedIpsBundleDocumentParams = {
   vaultRepository: IVaultRepository;
@@ -141,6 +149,47 @@ export async function buildConsolidatedIpsBundleDocument(
   const compositionId = `ips-composition-${determineResourceId(params.subject, process.env.NODE_ENV)}`;
   const compositionIdentifier = `urn:uuid:${compositionId}`;
   const compositionSectionTokens = Array.from(sectionRefs.keys());
+  const exportedAuthorRefs = new Set<string>();
+  if (authorRefs.size > 0) {
+    const storedBindings = await params.vaultRepository.listContainersInSection(
+      params.tenantVaultId,
+      getClinicalCreatorBindingsSectionId(),
+    );
+    const bindings = (storedBindings as unknown[]).filter(isClinicalCreatorBinding);
+    for (const operationalAuthor of authorRefs) {
+      const binding = resolveClinicalCreatorBinding(bindings, { actorDid: operationalAuthor });
+      if (!binding) {
+        exportedAuthorRefs.add(operationalAuthor);
+        continue;
+      }
+      const creator = binding.kind === FhirIpsCreatorKinds.Professional
+        ? buildFhirIpsCreatorAuthor({
+            kind: binding.kind,
+            actorIdentifier: binding.actorIdentifier,
+            authorIdentifier: binding.authorIdentifier,
+            organizationReference: binding.ownerIdentifier,
+            role: binding.role,
+          })
+        : binding.kind === FhirIpsCreatorKinds.IndividualMember
+          ? buildFhirIpsCreatorAuthor({
+              kind: binding.kind,
+              actorIdentifier: binding.actorIdentifier,
+              authorIdentifier: binding.authorIdentifier,
+              subjectReference: binding.ownerIdentifier,
+              role: binding.role,
+            })
+          : buildFhirIpsCreatorAuthor({
+              kind: binding.kind,
+              actorIdentifier: binding.actorIdentifier,
+              authorIdentifier: binding.authorIdentifier,
+              subjectReference: binding.ownerIdentifier,
+            });
+      exportedAuthorRefs.add(creator.authorReference);
+      for (const entry of creator.entries) {
+        bundleEntries.set(entry.fullUrl, { fullUrl: entry.fullUrl, resource: { ...entry.resource } });
+      }
+    }
+  }
   const compositionClaims: Record<string, any> = {
     '@context': Format.FHIR_API,
     'Composition.identifier': compositionIdentifier,
@@ -149,8 +198,8 @@ export async function buildConsolidatedIpsBundleDocument(
     'Composition.date': pickLatestIsoDate(compositionDates),
     'Composition.section': compositionSectionTokens.join(','),
   };
-  if (authorRefs.size > 0) {
-    compositionClaims['Composition.author'] = Array.from(authorRefs).join(',');
+  if (exportedAuthorRefs.size > 0) {
+    compositionClaims['Composition.author'] = Array.from(exportedAuthorRefs).join(',');
   }
   const compositionResource: Record<string, any> = {
     resourceType: ResourceTypesFhirR4.Composition,
@@ -176,8 +225,8 @@ export async function buildConsolidatedIpsBundleDocument(
       },
       entry: Array.from(sectionRefs.get(sectionToken) || []).map((reference) => ({ reference })),
     })),
-    ...(authorRefs.size > 0 ? {
-      author: Array.from(authorRefs).map((reference) => ({ reference })),
+    ...(exportedAuthorRefs.size > 0 ? {
+      author: Array.from(exportedAuthorRefs).map((reference) => ({ reference })),
     } : {}),
   };
 
@@ -195,6 +244,16 @@ export async function buildConsolidatedIpsBundleDocument(
       })),
     ],
   };
+}
+
+function isClinicalCreatorBinding(value: unknown): value is ClinicalCreatorBinding {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  return typeof record.kind === 'string'
+    && typeof record.actorIdentifier === 'string'
+    && typeof record.authorIdentifier === 'string'
+    && typeof record.ownerIdentifier === 'string'
+    && typeof record.role === 'string';
 }
 
 export function projectSummaryBundleByFormat(

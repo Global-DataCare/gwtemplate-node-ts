@@ -54,6 +54,8 @@ import {
 } from '../utils/urn';
 import { buildOrganizationRoleLicenseId } from 'gdc-common-utils-ts/utils/organization-role-license';
 import { hasRoleCode } from 'gdc-common-utils-ts/utils/activation-policy';
+import type { ClinicalCreatorBinding } from 'gdc-common-utils-ts/utils/fhir-ips-creator-identity';
+import { getClinicalCreatorBindingsSectionId } from '../utils/clinical-creator-binding';
 
 /**
  * Manages the business logic for a single device registration (DCR) request,
@@ -195,6 +197,12 @@ export class DeviceRegistrationManager implements IJobProcessor {
           IssueType.Conflict,
         );
       }
+      const clinicalCreatorBinding = await this.prepareClinicalCreatorBinding({
+        vaultId,
+        registrationRequest: registrationRequest as DcrRegistrationRequest & Record<string, any>,
+        clientId,
+        clientInstanceId: fingerprint.clientInstanceId,
+      });
       const deviceProfile = {
         type: 'DeviceProfile',
         clientId,
@@ -229,6 +237,13 @@ export class DeviceRegistrationManager implements IJobProcessor {
         : deviceProfileDoc;
 
       await this.vaultRepository.put(vaultId, [protectedDeviceProfile], getEnvSectionId('device-profiles'));
+      if (clinicalCreatorBinding) {
+        await this.vaultRepository.put(
+          vaultId,
+          [clinicalCreatorBinding as any],
+          getClinicalCreatorBindingsSectionId(),
+        );
+      }
 
       // Bind the activated license seat to this client_id and capture a minimal device fingerprint.
       if (licenseDoc && license) {
@@ -384,6 +399,52 @@ export class DeviceRegistrationManager implements IJobProcessor {
   private getDeviceAllowance(license: DeviceLicense & Record<string, any>): number {
     const value = Number(license.maxDevices);
     return Number.isInteger(value) && value > 0 ? value : DEFAULT_LICENSE_DEVICE_ALLOWANCE;
+  }
+
+  /** Links one registered device only to an exact pre-authorized creator assignment. */
+  private async prepareClinicalCreatorBinding(params: {
+    vaultId: string;
+    registrationRequest: DcrRegistrationRequest & Record<string, any>;
+    clientId: string;
+    clientInstanceId: string;
+  }): Promise<(ClinicalCreatorBinding & { id: string }) | undefined> {
+    const requested = params.registrationRequest[IdentityDcrMetadataFields.ClinicalCreatorBinding];
+    if (requested === undefined) return undefined;
+    if (!isClinicalCreatorBinding(requested)) {
+      throw new ManagerError('DCR clinical creator binding is malformed.', IssueType.Value);
+    }
+    const existing = await this.vaultRepository.get<any>(
+      params.vaultId,
+      requested.authorIdentifier,
+      getClinicalCreatorBindingsSectionId(),
+    );
+    if (!isClinicalCreatorBinding(existing)
+      || !sameStableClinicalCreatorBinding(existing, requested)) {
+      throw new ManagerError(
+        'DCR clinical creator binding was not pre-authorized for this tenant.',
+        IssueType.Forbidden,
+      );
+    }
+    const actorDid = String(params.registrationRequest[IdentityDcrMetadataFields.ActorDid] || '').trim();
+    if (!actorDid) {
+      throw new ManagerError('DCR clinical creator binding requires actor_did.', IssueType.Required);
+    }
+    const keyIds = Array.isArray(params.registrationRequest.jwks?.keys)
+      ? params.registrationRequest.jwks.keys
+        .map((key: any) => String(key?.kid || '').trim())
+        .filter(Boolean)
+      : [];
+    return {
+      ...existing,
+      id: existing.authorIdentifier,
+      actorDids: uniqueText([...(existing.actorDids || []), actorDid]),
+      dcrClientIds: uniqueText([
+        ...(existing.dcrClientIds || []),
+        params.clientId,
+        params.clientInstanceId,
+      ]),
+      keyIds: uniqueText([...(existing.keyIds || []), ...keyIds]),
+    };
   }
 
   /** Converts a verified individual activation into one exact DCR authorization tuple. */
@@ -986,4 +1047,29 @@ export class DeviceRegistrationManager implements IJobProcessor {
       },
     };
   }
+}
+
+function isClinicalCreatorBinding(value: unknown): value is ClinicalCreatorBinding {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const binding = value as Record<string, unknown>;
+  return typeof binding.kind === 'string'
+    && typeof binding.actorIdentifier === 'string'
+    && typeof binding.authorIdentifier === 'string'
+    && typeof binding.ownerIdentifier === 'string'
+    && typeof binding.role === 'string';
+}
+
+function sameStableClinicalCreatorBinding(
+  left: ClinicalCreatorBinding,
+  right: ClinicalCreatorBinding,
+): boolean {
+  return left.kind === right.kind
+    && left.actorIdentifier === right.actorIdentifier
+    && left.authorIdentifier === right.authorIdentifier
+    && left.ownerIdentifier === right.ownerIdentifier
+    && left.role === right.role;
+}
+
+function uniqueText(values: readonly string[]): string[] {
+  return Array.from(new Set(values.map((value) => String(value || '').trim()).filter(Boolean)));
 }

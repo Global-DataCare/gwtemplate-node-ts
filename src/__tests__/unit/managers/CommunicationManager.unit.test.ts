@@ -57,8 +57,14 @@ import {
   EXAMPLE_PROFESSIONAL_DID,
   EXAMPLE_PROVIDER_ORGANIZATION_DID,
   EXAMPLE_SUBJECT_DID,
+  EXAMPLE_KYC_CONTROLLER_USER_UUID,
+  EXAMPLE_KYC_CONTROLLER_UUID,
+  EXAMPLE_RELATED_PERSON_ROLE,
+  EXAMPLE_CLIENT_INSTANCE_UUID,
 } from 'gdc-common-utils-ts/examples/shared';
 import { EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_PROVIDER_ORGANIZATION_URN } from 'gdc-common-utils-ts/examples/inter-tenant-access-contract';
+import { FhirIpsCreatorKinds } from 'gdc-common-utils-ts/utils/fhir-ips-creator-identity';
+import { getClinicalCreatorBindingsSectionId } from '../../../utils/ips-bundle';
 
 describe('CommunicationManager Unit Tests', () => {
   let communicationManager: CommunicationManager;
@@ -230,11 +236,14 @@ describe('CommunicationManager Unit Tests', () => {
         if (String(sectionId).includes('digitaltwin_subject_aliases')) return { twinSubjectId: twinSubjectDid } as any;
         return undefined;
       });
-      mockVaultRepository.listContainersInSection.mockResolvedValueOnce([{
-        id: 'research-immunization-mistake',
-        audit: { creatorDid, sourceRecordId: 'immunization-mistake' },
-        'Immunization.subject': twinSubjectDid,
-      }] as any);
+      mockVaultRepository.listContainersInSection.mockImplementation(async (_vaultId: string, sectionId: string) =>
+        String(sectionId).includes('immunizations')
+          ? [{
+              id: 'research-immunization-mistake',
+              audit: { creatorDid, sourceRecordId: 'immunization-mistake' },
+              'Immunization.subject': twinSubjectDid,
+            }] as any
+          : []);
 
       // Step 2. One creator-authorized delete removes both the operational error and only its correlated projection.
       const response = await communicationManager.process(buildClinicalBatchJob([{
@@ -299,7 +308,7 @@ describe('CommunicationManager Unit Tests', () => {
 
   describe('convertFhirToCommMsg', () => {
     it('should correctly convert a FHIR Communication resource to a CommMsgExtended object', () => {
-      const fhirResource = { ...testCommunicationAppointmentFhirR4, resourceType: ResourceTypesFhirR4.Communication as const };
+      const fhirResource = { ...testCommunicationAppointmentFhirR4, resourceType: ResourceTypesFhirR4.Communication };
       const expectedCommMsg = testCommMsgExtAppointmentRequest;
       const testThid = expectedCommMsg.thid;
       
@@ -345,7 +354,7 @@ describe('CommunicationManager Unit Tests', () => {
 
     it('distributes note texts across payload entries when counts match', () => {
       const fhirResource = {
-        resourceType: ResourceTypesFhirR4.Communication as const,
+        resourceType: ResourceTypesFhirR4.Communication,
         status: 'completed',
         payload: [
           { contentReference: { reference: 'https://example.org/ref-1' } },
@@ -723,10 +732,11 @@ describe('CommunicationManager Unit Tests', () => {
 
     it('deletes only a version-matched clinical resource authored by the same linked controller identity', async () => {
       // Flow contract:
-      // 1. A phone-authenticated controller creates one allergy; the resource
-      //    persists only that session's creator DID.
-      // 2. After phone and email are linked, an email-DID session whose verified
-      //    token proves the same phone deletes that exact resource version.
+      // 1. A DCR-authenticated controller creates one allergy; the resource
+      //    persists only that session's creator DID while its client alias is
+      //    attached to the pre-imported stable assignment.
+      // 2. An email-DID session already linked to that assignment deletes the
+      //    exact resource version through a different authentication channel.
       // 3. The same batch creates a different allergy and returns per-entry 204.
       // 4. A stale version fails 412 and an unrelated professional fails 403.
       // Authorization invariant: subject and linked verified creator must match.
@@ -739,8 +749,22 @@ describe('CommunicationManager Unit Tests', () => {
       const mixedCreateId = 'allergy-controller-mixed-create-001';
       const partialSuccessCreateId = 'allergy-partial-success-create-001';
       const section = 'LOINC|48765-2';
+      const tenantVaultId = 'health-care_acme';
       mockTenantsCacheManager.getTenantDid.mockResolvedValue(testServerDid as any);
       mockVaultRepository.vaultExists.mockResolvedValue(true as any);
+      await mockVaultRepository.put(tenantVaultId, [{
+        id: `urn:uuid:${EXAMPLE_KYC_CONTROLLER_UUID}`,
+        kind: FhirIpsCreatorKinds.IndividualMember,
+        actorIdentifier: `urn:uuid:${EXAMPLE_KYC_CONTROLLER_USER_UUID}`,
+        authorIdentifier: `urn:uuid:${EXAMPLE_KYC_CONTROLLER_UUID}`,
+        ownerIdentifier: subjectDid,
+        role: EXAMPLE_RELATED_PERSON_ROLE,
+        actorDids: [controllerDid, linkedEmailDid],
+      } as any], getClinicalCreatorBindingsSectionId());
+      mockVaultRepository.listContainersInSection.mockImplementation(async (vaultId: string, sectionId: string) =>
+        [...storedRecords.entries()]
+          .filter(([key]) => key.startsWith(`${vaultId}|${sectionId}|`))
+          .map(([, value]) => value));
 
       const buildJob = (
         attachedBundle: Record<string, any>,
@@ -803,17 +827,22 @@ describe('CommunicationManager Unit Tests', () => {
           },
         }],
       }, controllerDid, 'clinical-create-before-delete-001', {
-        sub: 'phone-login-account-001',
-        phone_number: controllerPhone,
+        sub: 'device-login-account-001',
+        azp: EXAMPLE_CLIENT_INSTANCE_UUID,
       }));
 
-      const tenantVaultId = 'health-care_acme';
       const allergySectionId = getSubjectScopedSectionId(subjectDid, 'individual', 'allergies');
       const stored = await mockVaultRepository.get(tenantVaultId, allergyId, allergySectionId) as any;
       expect(stored?.['Composition.author']).toBe(controllerDid);
       expect(Object.keys(stored || {}).some((key) => /email|phone|contact/i.test(key))).toBe(false);
       expect(JSON.stringify(stored)).not.toContain(controllerPhone);
       expect(JSON.stringify(stored)).not.toContain(controllerEmail);
+      const creatorBinding = await mockVaultRepository.get(
+        tenantVaultId,
+        `urn:uuid:${EXAMPLE_KYC_CONTROLLER_UUID}`,
+        getClinicalCreatorBindingsSectionId(),
+      ) as any;
+      expect(creatorBinding.dcrClientIds).toContain(EXAMPLE_CLIENT_INSTANCE_UUID);
       const versionId = stored?.['AllergyIntolerance.meta.versionId'];
       expect(versionId).toBeTruthy();
 
@@ -843,7 +872,6 @@ describe('CommunicationManager Unit Tests', () => {
         sub: 'email-login-account-002',
         email: controllerEmail,
         email_verified: true,
-        phone_number: controllerPhone,
       }));
 
       // Step 3. The fact is absent and the per-entry batch result is 204.
@@ -2641,7 +2669,7 @@ describe('CommunicationManager Unit Tests', () => {
       mockTenantsCacheManager.getTenantDid.mockResolvedValue(testServerDid as any);
 
       const fhirResource = {
-        resourceType: ResourceTypesFhirR4.Communication as const,
+        resourceType: ResourceTypesFhirR4.Communication,
         status: 'completed',
         subject: { reference: 'did:web:subject.example' },
         sender: { reference: 'mailto:Sender@Example.org' },
