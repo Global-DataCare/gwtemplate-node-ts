@@ -1,3 +1,4 @@
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
 import { IssueType } from 'gdc-common-utils-ts/models/issue';
 
@@ -98,7 +99,7 @@ export function collectSearchFiltersFromBody(body: any): SearchFilters {
   };
 
   if (Array.isArray(body?.parameter)) {
-    merge(extractSearchFiltersFromParametersResource({ resourceType: 'Parameters', parameter: body.parameter }));
+    merge(extractSearchFiltersFromParametersResource({ resourceType: ResourceTypesFhirR4.Parameters, parameter: body.parameter }));
   }
 
   const wrappers = [

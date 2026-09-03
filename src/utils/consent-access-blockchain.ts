@@ -1,3 +1,4 @@
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 import { createHash } from 'crypto';
 import type { BundleEntry, BundleJsonApi } from 'gdc-common-utils-ts/models/bundle';
 import { HealthcareAllRolesByClaim } from 'gdc-common-utils-ts/constants/healthcare';
@@ -9,7 +10,7 @@ export type ConsentRuleBlockchainEntry = Readonly<{
   id: string;
   type: string;
   resource: Readonly<{
-    resourceType: 'Consent';
+    resourceType: typeof ResourceTypesFhirR4.Consent;
     meta: Readonly<{
       claims: Record<string, unknown>;
     }>;

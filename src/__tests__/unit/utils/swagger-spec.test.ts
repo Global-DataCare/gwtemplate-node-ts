@@ -1,7 +1,10 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 // Always create JSDoc, do not use strings inline in keys nor values, use types instead, and reuse the data test examples.
 import { generateSwaggerSpec } from '../../../utils/swagger-spec';
-import { testClaimsRegisterTenantExpanded } from '../../data/organization.data';
+import { testClaimsRegisterTenantExpanded, testTenant1IdValue } from '../../data/organization.data';
+import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { Format } from 'gdc-common-utils-ts/constants/Schemas';
+import { EXAMPLE_SIGNED_TERMS_PDF_URL } from 'gdc-common-utils-ts/examples/shared';
 
 describe('Swagger Spec Generation', () => {
   it('includes onboarding endpoints in the same journey order as API_INTEGRATORS_GUIDE', async () => {
@@ -207,25 +210,25 @@ describe('Swagger Spec Generation', () => {
     ).toBe('#/components/examples/DeviceRegistrationResponse');
 
     const familyClaims =
-      spec.components.examples.FamilyRegistrationPlaintextMessage?.value?.body?.data?.[0]?.meta?.claims;
+      spec.components.examples.FamilyRegistrationPlaintextMessage?.value?.body?.data?.[0]?.resource?.meta?.claims;
     const familyAttachmentData =
       spec.components.examples.FamilyRegistrationPlaintextMessage?.value?.attachments?.[0]?.data;
     const familyInlineAttachmentData =
       spec.components.examples.FamilyRegistrationPlaintextMessageInlineBase64?.value?.attachments?.[0]?.data;
     const organizationClaims =
-      spec.components.examples.OrganizationRegistrationPlaintextMessage?.value?.body?.data?.[0]?.meta?.claims;
+      spec.components.examples.OrganizationRegistrationPlaintextMessage?.value?.body?.data?.[0]?.resource?.meta?.claims;
     const verificationTransactionClaims =
       spec.components.examples.OrganizationVerificationTransactionPlaintextMessage?.value?.body?.data?.[0]?.resource?.meta?.claims;
     expect(organizationClaims).toBeDefined();
-    expect(organizationClaims['org.schema.Organization.identifier.value']).toBe('acme-id');
-    expect(organizationClaims['org.schema.Organization.alternateName']).toBeUndefined();
+    expect(organizationClaims[ClaimsOrganizationSchemaorg.identifierValue]).toBe(testTenant1IdValue);
+    expect(organizationClaims[ClaimsOrganizationSchemaorg.alternateName]).toBeUndefined();
     expect(verificationTransactionClaims).toBeDefined();
-    expect(verificationTransactionClaims['org.schema.Service.serviceType']).toBe(
-      testClaimsRegisterTenantExpanded['org.schema.Service.serviceType'],
+    expect(verificationTransactionClaims[ClaimsServiceSchemaorg.serviceType]).toBe(
+      testClaimsRegisterTenantExpanded[ClaimsServiceSchemaorg.serviceType],
     );
 
     expect(familyClaims).toBeDefined();
-    expect(familyClaims['Service.termsOfService']).toBe('https://provider.example.com/terms.pdf');
+    expect(familyClaims[ClaimsServiceSchemaorg.termsOfService.replace(`${Format.SCHEMA}.`, '')]).toBe(EXAMPLE_SIGNED_TERMS_PDF_URL);
     expect(familyAttachmentData).toEqual({ links: ['{{signedIndividualFormPdfUrl}}'] });
     expect(familyInlineAttachmentData).toEqual({ base64: '{{signedIndividualFormPdfBase64}}' });
     expect(familyClaims['org.schema.Service.termsOfService']).toBeUndefined();

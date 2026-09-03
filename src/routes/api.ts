@@ -1,5 +1,7 @@
 // src/routes/api.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
+import { GatewayInternalResourceTypes } from 'gdc-common-utils-ts/constants/gateway-response';
+import { GatewayResponseEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
 
 import * as express from 'express';
 import { IKmsService } from '../gdc-backend-utils-node/models/IKmsService';
@@ -794,7 +796,7 @@ export function createApiRouter(
       ...req.params,
       section: 'did',
       format: 'document',
-      resourceType: 'Document',
+      resourceType: GatewayInternalResourceTypes.Document,
     };
     return pollingHandler(req, res);
   };
@@ -3311,7 +3313,7 @@ export function createApiRouter(
       ...req.params,
       section: 'did',
       format: 'document',
-      resourceType: 'Document',
+      resourceType: GatewayInternalResourceTypes.Document,
     } as any;
 
     const routeParams = req.params as unknown as RouteParams;

@@ -1,3 +1,7 @@
+import { ResourceTypesFhirR5 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
+import { HttpStatusCodes } from 'gdc-common-utils-ts/constants/http';
 import { randomUUID } from 'crypto';
 import type { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 import type { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
@@ -88,7 +92,7 @@ export class SubscriptionManager implements ISubscriptionProcessor {
         responseEntries.push({
           type: resource.resourceType,
           response: {
-            status: '201',
+            status: String(HttpStatusCodes.Created),
             location: `/${job.tenantId}/cds-${job.jurisdiction}/v1/${job.sector}/${job.section}/org.hl7.fhir.r5/${resource.resourceType}/${resource.id}`,
           },
           resource: { resourceType: resource.resourceType, id: resource.id, status: resource.status },
@@ -107,7 +111,7 @@ export class SubscriptionManager implements ISubscriptionProcessor {
     return {
       jti: randomUUID(), type: 'transaction-response', thid: job.content?.thid as string,
       iss: job.content?.aud as string, aud: job.content?.iss as string,
-      body: { resourceType: 'Bundle', type: '_batch-response', data: responseEntries },
+      body: { resourceType: ResourceTypesFhirR4.Bundle, type: '_batch-response', data: responseEntries },
     };
   }
 
@@ -238,8 +242,8 @@ export class SubscriptionManager implements ISubscriptionProcessor {
 
   private buildStatusBundle(subscription: any, topic: any, type: string, eventNumber?: number, focus?: string): any {
     const timestamp = new Date().toISOString();
-    return { resourceType: 'Bundle', type: 'subscription-notification', timestamp, entry: [{ resource: {
-      resourceType: 'SubscriptionStatus', status: subscription.status === 'requested' ? 'requested' : 'active', type,
+    return { resourceType: ResourceTypesFhirR4.Bundle, type: 'subscription-notification', timestamp, entry: [{ resource: {
+      resourceType: ResourceTypesFhirR5.SubscriptionStatus, status: subscription.status === 'requested' ? 'requested' : 'active', type,
       subscription: { reference: `Subscription/${subscription.id}` }, topic: topic.url,
       ...(eventNumber ? { eventsSinceSubscriptionStart: String(eventNumber), notificationEvent: [{ eventNumber: String(eventNumber), timestamp, focus: { reference: focus } }] } : {}),
     } }] };
@@ -248,7 +252,7 @@ export class SubscriptionManager implements ISubscriptionProcessor {
   private async post(endpoint: string, parameters: any[], body: any): Promise<Pick<Response, 'ok' | 'status'>> {
     const headers: Record<string, string> = { 'content-type': 'application/fhir+json' };
     for (const parameter of parameters) headers[String(parameter.name).toLowerCase()] = String(parameter.value);
-    return this.fetchFn(endpoint, { method: 'POST', headers, body: JSON.stringify(body), signal: AbortSignal.timeout(5000) });
+    return this.fetchFn(endpoint, { method: HttpRequestMethods.Post, headers, body: JSON.stringify(body), signal: AbortSignal.timeout(5000) });
   }
 
   private async deliver(vaultId: string, outbox: any): Promise<void> {

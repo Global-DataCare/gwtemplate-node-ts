@@ -1,4 +1,5 @@
 // TDD contract: write this test red first; make it green only with the complete real behavior.
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 import { SubscriptionManager } from '../../managers/SubscriptionManager';
 import { VaultMemRepository } from '../../database/repositories/vault/vault.mem.repository';
 import { mockKmsService } from '../mocks/kms.mock';
@@ -24,17 +25,17 @@ describe('SubscriptionManager', () => {
         resourceType: 'SubscriptionTopic', id: 'new-data-topic', status: 'active',
         url: 'https://profiles.example/SubscriptionTopic/new-data',
         resourceTrigger: [{ resource: 'Observation' }],
-        canFilterBy: [{ resourceType: 'Observation', filterParameter: 'patient', comparator: ['eq'] }],
+        canFilterBy: [{ resourceType: ResourceTypesFhirR4.Observation, filterParameter: 'patient', comparator: ['eq'] }],
       } }] } },
     } as any);
     const result = await manager.process({
       tenantId: 'tenant.example', jurisdiction: 'ES', sector: 'health-care',
       section: 'entity', format: 'org.hl7.fhir.r5', resourceType: 'Subscription', action: '_batch',
-      content: { body: { resourceType: 'Bundle', type: 'batch', entry: [{ resource: {
+      content: { body: { resourceType: ResourceTypesFhirR4.Bundle, type: 'batch', entry: [{ resource: {
         resourceType: 'Subscription', id: 'new-data', status: 'requested',
         topic: 'https://profiles.example/SubscriptionTopic/new-data',
         channelType: { code: 'rest-hook' }, endpoint: 'https://bff.example/fhir/subscriptions',
-        filterBy: [{ resourceType: 'Observation', filterParameter: 'patient', value: 'Patient/123' }],
+        filterBy: [{ resourceType: ResourceTypesFhirR4.Observation, filterParameter: 'patient', value: 'Patient/123' }],
       } }] } },
     } as any);
 
@@ -45,9 +46,9 @@ describe('SubscriptionManager', () => {
 
     await manager.captureEvents({
       tenantId: 'tenant.example', jurisdiction: 'ES', sector: 'health-care',
-      section: 'individual', format: 'org.hl7.fhir.r5', resourceType: 'Observation', action: '_batch',
+      section: 'individual', format: 'org.hl7.fhir.r5', resourceType: ResourceTypesFhirR4.Observation, action: '_batch',
       content: { body: { entry: [{ resource: {
-        resourceType: 'Observation', id: 'obs-1', subject: { reference: 'Patient/123' }, status: 'final',
+        resourceType: ResourceTypesFhirR4.Observation, id: 'obs-1', subject: { reference: 'Patient/123' }, status: 'final',
       } }] } },
     } as any);
     expect(fetchFn).toHaveBeenCalledTimes(2);

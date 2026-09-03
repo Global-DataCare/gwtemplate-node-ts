@@ -1,6 +1,7 @@
 // TDD contract: write this test red first; make it green only with the complete real behavior.
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/__tests__/unit/utils/fhir-ingestion.test.ts
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
 import {
@@ -34,7 +35,7 @@ describe('fhir-ingestion utils', () => {
 
     expect(() =>
       validateFhirPayloadByVersion('org.hl7.fhir.r4', 'Observation', {
-        resource: { resourceType: 'DocumentReference' },
+        resource: { resourceType: ResourceTypesFhirR4.DocumentReference },
       }),
     ).toThrow("FHIR validation failed: expected resourceType 'Observation' but got 'DocumentReference'.");
   });
@@ -42,7 +43,7 @@ describe('fhir-ingestion utils', () => {
   it('invokes registered r4 validator when format is org.hl7.fhir.r4', () => {
     const validator = jest.fn();
     registerFhirVersionValidator('r4', validator);
-    const resource = { resourceType: 'Observation', status: 'final' };
+    const resource = { resourceType: ResourceTypesFhirR4.Observation, status: 'final' };
 
     validateFhirPayloadByVersion('org.hl7.fhir.r4', 'Observation', { resource });
 

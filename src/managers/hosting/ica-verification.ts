@@ -1,3 +1,5 @@
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 import { v4 as uuidv4 } from 'uuid';
 import { ClaimsRecord } from 'gdc-common-utils-ts/models/resource-document';
 import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
@@ -66,7 +68,7 @@ export async function forwardOrganizationVerificationTransactionToIca(
       ? (deps.job.content?.body as any).attachments
       : [];
   const translatedBody = {
-    resourceType: 'Bundle',
+    resourceType: ResourceTypesFhirR4.Bundle,
     type: 'collection',
     total: 1,
     data: [{
@@ -120,7 +122,7 @@ export async function forwardOrganizationVerificationTransactionToIca(
     deps.resourceType,
   );
   const response = await fetchImpl(verifyUrl, {
-    method: 'POST',
+    method: HttpRequestMethods.Post,
     headers: {
       accept: DIDCOMM_DEFAULT_ACCEPT_HEADER,
       'content-type': deps.icaDidcommPlainJsonMediaType,

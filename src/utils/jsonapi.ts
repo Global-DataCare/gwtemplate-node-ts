@@ -1,5 +1,6 @@
 // src/utils/jsonapi.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 
 import { safelyJoinUrl } from "gdc-common-utils-ts/utils/url";
 
@@ -61,7 +62,7 @@ export const convertPrimaryDocToFhirBundle = (primaryDocument: any, bundleType: 
     if (primaryDocument.errors) {
         entries.push(...primaryDocument.errors.map((errorObject: any) => ({
             resource: {
-                resourceType: 'OperationOutcome',
+                resourceType: ResourceTypesFhirR4.OperationOutcome,
                 id: errorObject.id,
                 issue: [{
                     code: errorObject.status,
@@ -73,7 +74,7 @@ export const convertPrimaryDocToFhirBundle = (primaryDocument: any, bundleType: 
     }
     
     const bundle: any = {
-        resourceType: 'Bundle',
+        resourceType: ResourceTypesFhirR4.Bundle,
         type: bundleType,
         total: entries.length,
         entry: entries,

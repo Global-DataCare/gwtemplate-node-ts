@@ -1,4 +1,4 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 /**
  * TEST SECTOR USAGE: This integration test covers both network (infra) and business (functional) sectors.
  *
@@ -9,6 +9,10 @@
  */
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/__tests__/integration/organizationApi.test.ts
+import { GatewayResponseEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
+import { GatewayRequestEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 
 import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
@@ -353,7 +357,7 @@ describe('Organization Registration API', () => {
       section: 'registry',
       format: 'org.schema',
       action: '_activate',
-      resourceType: 'Organization',
+      resourceType: ResourceTypesFhirR4.Organization,
       content: {
         iss: 'did:web:controller.example.com',
         aud: 'did:web:host.example.com',
@@ -386,9 +390,9 @@ describe('Organization Registration API', () => {
           },
           data: [
             {
-              type: 'Organization-activation-request-v1.0',
+              type: GatewayRequestEntryTypes.OrganizationActivation,
               meta: { claims: activationClaims },
-              request: { method: 'POST' },
+              request: { method: HttpRequestMethods.Post },
               resource: {},
             },
           ],
@@ -404,7 +408,7 @@ describe('Organization Registration API', () => {
 
     const response = await hostingManager.process(job);
     expect(response.body.data[0].response.status).toBe('201');
-    const responseClaims = response.body.data[0].meta?.claims as Record<string, unknown>;
+    const responseClaims = response.body.data[0].resource?.meta?.claims as Record<string, unknown>;
     return {
       tenantId: String(responseClaims[ClaimsOrganizationSchemaorg.alternateName]),
       sector: String(responseClaims[ClaimsServiceSchemaorg.category]),
@@ -474,7 +478,7 @@ describe('Organization Registration API', () => {
         section: 'registry',
         format: 'org.schema',
         action: '_activate',
-        resourceType: 'Organization',
+        resourceType: ResourceTypesFhirR4.Organization,
         content: {
           iss: 'did:web:controller.example.com',
           aud: 'did:web:host.example.com',
@@ -506,9 +510,9 @@ describe('Organization Registration API', () => {
             },
             data: [
               {
-                type: 'Organization-activation-request-v1.0',
+                type: GatewayRequestEntryTypes.OrganizationActivation,
                 meta: { claims: { ...testClaimsTenant1Registration } },
-                request: { method: 'POST' },
+                request: { method: HttpRequestMethods.Post },
                 resource: {},
               },
             ],
@@ -599,7 +603,7 @@ describe('Organization Registration API', () => {
 
     it('should route signed organization lifecycle preflight through the host registry queue', async () => {
       const response = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: '/host/cds-es/v1/test/registry/org.schema/Organization/_status',
         headers: {
           'Content-Type': 'application/json',
@@ -608,7 +612,7 @@ describe('Organization Registration API', () => {
         },
         body: {
           thid: 'lifecycle-status-thid',
-          body: { data: [{ type: 'Organization-lifecycle-status-request-v1.0', meta: { claims: {
+          body: { data: [{ type: GatewayRequestEntryTypes.OrganizationLifecycleStatus, meta: { claims: {
             [ClaimsOrganizationSchemaorg.identifierValue]: testClaimsTenant1Registration[ClaimsOrganizationSchemaorg.identifierValue],
           } } }] },
         },
@@ -625,7 +629,7 @@ describe('Organization Registration API', () => {
         body: {
           data: [
             {
-              type: 'Organization-disable-request-v1.0',
+              type: GatewayRequestEntryTypes.OrganizationDisable,
               meta: {
                 claims: {
                   [ClaimsOrganizationSchemaorg.identifierValue]: testClaimsTenant1Registration[ClaimsOrganizationSchemaorg.identifierValue],
@@ -637,7 +641,7 @@ describe('Organization Registration API', () => {
       };
 
       const disableResponse = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: '/host/cds-es/v1/test/registry/org.schema/Organization/_disable',
         headers: {
           'Content-Type': 'application/json',
@@ -656,14 +660,14 @@ describe('Organization Registration API', () => {
         body: {
           data: [
             {
-              type: 'Employee-registration-request-v1.0',
+              type: GatewayRequestEntryTypes.EmployeeRegistration,
               meta: {
                 claims: {
                   'Organization.owner.email': 'doctor@example.com',
                   'Organization.owner.hasOccupation.identifier.value': 'RESPRSN',
                 },
               },
-              request: { method: 'POST' },
+              request: { method: HttpRequestMethods.Post },
               resource: {},
             },
           ],
@@ -671,7 +675,7 @@ describe('Organization Registration API', () => {
       };
 
       const blockedResponse = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: employeeUrl,
         headers: {
           'Content-Type': 'application/json',
@@ -685,7 +689,7 @@ describe('Organization Registration API', () => {
       expect(mockQueueAdapter.addJob).toHaveBeenCalledTimes(1);
 
       const enableResponse = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: '/host/cds-es/v1/test/registry/org.schema/Organization/_enable',
         headers: {
           'Content-Type': 'application/json',
@@ -697,7 +701,7 @@ describe('Organization Registration API', () => {
           body: {
             data: [
               {
-                type: 'Organization-enable-request-v1.0',
+                type: GatewayRequestEntryTypes.OrganizationEnable,
                 meta: {
                   claims: {
                     [ClaimsOrganizationSchemaorg.identifierValue]: testClaimsTenant1Registration[ClaimsOrganizationSchemaorg.identifierValue],
@@ -713,7 +717,7 @@ describe('Organization Registration API', () => {
       await hostingManager.process(enableJob);
 
       const allowedResponse = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: employeeUrl,
         headers: {
           'Content-Type': 'application/json',
@@ -755,7 +759,7 @@ describe('Organization Registration API', () => {
       });
 
       const response = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: '/host/cds-es/v1/test/registry/org.schema/Organization/_issue-response',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -779,7 +783,7 @@ describe('Organization Registration API', () => {
       } as any);
 
       const response = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: registrationUrl,
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -826,7 +830,7 @@ describe('Organization Registration API', () => {
       
       // --- ACT (Phase 1) ---
       const postResponse = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: registrationUrl,
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -853,7 +857,7 @@ describe('Organization Registration API', () => {
       const pollingUrl = postResponse.headers.location;
       const pollingPath = new URL(pollingUrl).pathname;
       const pollResponse = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: pollingPath,
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -871,7 +875,7 @@ describe('Organization Registration API', () => {
       const finalResponse = JSON.parse(Content.bytesToStringUTF8(decryptedBytes)) as IDecodedDidcommPayload;
 
       const responseEntry = finalResponse.body.data[0];
-      const responseClaims = responseEntry.meta.claims;
+      const responseClaims = responseEntry.resource.meta.claims;
 
       expect(responseEntry.type).toBe('Organization-registration-offer-v1.0');
       expect(responseClaims[ClaimsOfferSchemaorg.eligibleQuantityValue]).toBe(2);
@@ -881,7 +885,7 @@ describe('Organization Registration API', () => {
 
     it('should accept a legal registration request without alternateName and derive it from identifier.value', async () => {
       const orgCreationPayload = structuredClone(withoutIncompleteJwsProof(ORGANIZATION_REGISTRATION_REQUEST));
-      delete (orgCreationPayload.body.data[0].meta.claims as Record<string, unknown>)['org.schema.Organization.alternateName'];
+      delete (orgCreationPayload.body.data[0].resource.meta.claims as Record<string, unknown>)[ClaimsOrganizationSchemaorg.alternateName];
       const { thid } = orgCreationPayload;
 
       const decodedJobForManager: JobRequest = {
@@ -901,7 +905,7 @@ describe('Organization Registration API', () => {
 
       const registrationUrl = `/host/cds-es/v1/test/registry/org.schema/Organization/_batch`;
       const postResponse = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: registrationUrl,
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -921,7 +925,7 @@ describe('Organization Registration API', () => {
 
       const pollingPath = new URL(postResponse.headers.location).pathname;
       const pollResponse = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: pollingPath,
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -936,10 +940,10 @@ describe('Organization Registration API', () => {
       const encryptedFinalResponse = pollResponse.text.replace('response=', '');
       const { decryptedBytes } = await cryptoService.decryptJwe(encryptedFinalResponse, externalEncrypter);
       const finalResponse = JSON.parse(Content.bytesToStringUTF8(decryptedBytes)) as IDecodedDidcommPayload;
-      const responseClaims = finalResponse.body.data[0].meta.claims;
+      const responseClaims = finalResponse.body.data[0].resource.meta.claims;
 
       expect(responseClaims['org.schema.Organization.identifier.value']).toBe('acme-id');
-      expect(responseClaims['org.schema.Organization.alternateName']).toBe('acme-id');
+      expect(responseClaims[ClaimsOrganizationSchemaorg.alternateName]).toBe('acme-id');
     });
 
     it('should process an Order and return a payment Communication', async () => {
@@ -964,7 +968,7 @@ describe('Organization Registration API', () => {
       });
 
       const regPostResponse = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: registrationUrl,
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -982,7 +986,7 @@ describe('Organization Registration API', () => {
       const pollingUrl = regPostResponse.headers.location;
       const pollingPath = new URL(pollingUrl).pathname;
       const pollResponse = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: pollingPath,
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -996,13 +1000,13 @@ describe('Organization Registration API', () => {
       const encryptedOfferResponse = pollResponse.text.replace('response=', '');
       const { decryptedBytes: decryptedOfferBytes } = await cryptoService.decryptJwe(encryptedOfferResponse, externalEncrypter);
       const offerResponse = JSON.parse(Content.bytesToStringUTF8(decryptedOfferBytes)) as IDecodedDidcommPayload;
-      const offerClaims = offerResponse.body.data[0].meta.claims;
+      const offerClaims = offerResponse.body.data[0].resource.meta.claims;
       const offerId = offerClaims[ClaimsOfferSchemaorg.identifier] as string;
       expect(offerId).toBeDefined();
 
       // --- ACT (Phase 2: Submit Order) ---
       const orderPayload = structuredClone(withoutIncompleteJwsProof(ORGANIZATION_ORDER_REQUEST));
-      orderPayload.body.data[0].meta.claims[ClaimsOrderSchemaorg.acceptedOfferIdentifier] = offerId;
+      orderPayload.body.data[0].resource.meta.claims[ClaimsOrderSchemaorg.acceptedOfferIdentifier] = offerId;
       const { thid: orderThid } = orderPayload;
       
       const decodedOrderJob: JobRequest = {
@@ -1029,7 +1033,7 @@ describe('Organization Registration API', () => {
       
       const orderUrl = `/host/cds-es/v1/test/registry/org.schema/Order/_batch`;
       const orderPostResponse = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: orderUrl,
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -1053,7 +1057,7 @@ describe('Organization Registration API', () => {
       const orderPollingUrl = orderPostResponse.headers.location;
       const orderPollingPath = new URL(orderPollingUrl).pathname;
       const finalPollResponse = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: orderPollingPath,
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -1071,10 +1075,10 @@ describe('Organization Registration API', () => {
       const finalVcResponse = JSON.parse(Content.bytesToStringUTF8(decryptedVcBytes)) as IDecodedDidcommPayload;
 
       const responseEntry = finalVcResponse.body.data[0];
-      expect(responseEntry.type).toBe('Organization-order-response-v1.0');
+      expect(responseEntry.type).toBe(GatewayResponseEntryTypes.OrganizationOrder);
       expect(['201', '404']).toContain(responseEntry.response.status);
       if (responseEntry.meta?.claims) {
-        expect(responseEntry.meta.claims['org.schema.Order.acceptedOffer.identifier'] || offerId).toBeDefined();
+        expect(responseEntry.resource.meta.claims[ClaimsOrderSchemaorg.acceptedOfferIdentifier] || offerId).toBeDefined();
       }
     });
   });

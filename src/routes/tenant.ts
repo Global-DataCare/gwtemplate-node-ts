@@ -1,5 +1,6 @@
 // src/routes/tenant.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 
 import express, { Request, Response, NextFunction } from 'express';
 import { v4 as uuidv4 } from 'uuid';
@@ -70,7 +71,7 @@ const cdsRoute = '/:tenantId/cds-:jurisdiction/v1/:sector/:section/:format/:reso
 
 router.post(cdsRoute, (req, res, next) => {
   // We need a mock http-parser on the request for the test to pass, as the real one isn't fully wired yet.
-  (req as any).cdsRequest = { tenantId: 'test-tenant', resourceType: 'Consent', action: '_update' };
+  (req as any).cdsRequest = { tenantId: 'test-tenant', resourceType: ResourceTypesFhirR4.Consent, action: '_update' };
 
   if (req.body.request) {
     // This mocks the middleware chain

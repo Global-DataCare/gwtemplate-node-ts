@@ -1,6 +1,7 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 // src/__tests__/unit/worker.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
 
 import { jest } from '@jest/globals';
 import { mock, MockProxy } from 'jest-mock-extended';
@@ -11,6 +12,11 @@ import { testCreateCustomerJobRequestProfessionalOnboarding } from '../data/cust
 import { createJobName } from '../../utils/naming';
 import { IKmsService } from '../../gdc-backend-utils-node/models/IKmsService';
 import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
+import { EXAMPLE_SUBJECT_DID } from 'gdc-common-utils-ts/examples/shared';
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
+import { GatewayEnvelopeTypes } from '../../shared/gateway-response-types';
+import { HttpStatusCodes } from 'gdc-common-utils-ts/constants/http';
+import { IssueType, IssueTypeToHttpStatus } from 'gdc-common-utils-ts/models/issue';
 
 describe('Worker', () => {
   let worker: Worker;
@@ -41,7 +47,7 @@ describe('Worker', () => {
 
   it('should route a "Person" resourceType job to the IndividualManager and encode the response', async () => {
     // ARRANGE
-    const resourceType = 'Person';
+    const resourceType = ResourceTypesFhirR4.Person;
     const vaultId = 'health-care_acme';
     const jobName = createJobName(
       vaultId,
@@ -84,28 +90,28 @@ describe('Worker', () => {
   it('logs failed bundle-entry OperationOutcomes before encrypting the response', async () => {
     // Step 1. A manager returns a mixed batch response; only the failed entry
     // has an OperationOutcome that must become observable in service logs.
-    const jobName = createJobName('health-care_acme', 'Person', '_batch');
+    const jobName = createJobName('health-care_acme', ResourceTypesFhirR4.Person, '_batch');
     const job: JobRequest = {
       ...testCreateCustomerJobRequestProfessionalOnboarding,
       tenantId: 'acme',
       sector: 'health-care',
-      resourceType: 'Person',
+      resourceType: ResourceTypesFhirR4.Person,
       contentType: 'application/json',
     };
     const outcome = {
-      resourceType: 'OperationOutcome',
+      resourceType: ResourceTypesFhirR4.OperationOutcome,
       issue: [{ severity: 'error', code: 'invalid', diagnostics: 'Malformed claim' }],
     };
     mockIndividualManager.process.mockResolvedValue({
       jti: 'response-with-outcome',
-      type: 'batch-response',
+      type: GatewayEnvelopeTypes.BatchResponse,
       thid: job.content?.thid as string,
       iss: API_BASE_URL,
-      aud: 'did:web:client.example.com',
+      aud: EXAMPLE_SUBJECT_DID,
       body: {
         data: [
-          { type: 'Person', response: { status: '201' } },
-          { type: 'Person', response: { status: '422', outcome } },
+          { type: ResourceTypesFhirR4.Person, response: { status: String(HttpStatusCodes.Created) } },
+          { type: ResourceTypesFhirR4.Person, response: { status: IssueTypeToHttpStatus[IssueType.Processing], outcome } },
         ],
       },
     } as IDecodedDidcommPayload);
@@ -167,8 +173,8 @@ describe('Worker', () => {
       contentType: 'application/fhir+json',
     };
     subscriptionManager.process.mockResolvedValue({
-      jti: 'subscription-response', type: 'batch-response', thid: job.content?.thid as string,
-      iss: API_BASE_URL, aud: 'did:web:client.example.com', body: { data: [] },
+      jti: 'subscription-response', type: GatewayEnvelopeTypes.BatchResponse, thid: job.content?.thid as string,
+      iss: API_BASE_URL, aud: EXAMPLE_SUBJECT_DID, body: { data: [] },
     });
     mockKmsService.getPublicEncryptionKey.mockResolvedValue({ kid: 'key-1' } as any);
     mockKmsService.encodeResponse.mockResolvedValue('encrypted-subscription-response');
@@ -179,19 +185,19 @@ describe('Worker', () => {
     expect(subscriptionManager.captureEvents).not.toHaveBeenCalled();
   });
 
-  it('should normalize resource.meta.claims into entry.meta.claims before manager routing', async () => {
+  it('keeps canonical resource.meta.claims unchanged and emits no deprecation warning', async () => {
     const mockPersonManager = mock<IJobProcessor>();
     const registryWithPerson = mock<ManagerRegistry>({
       individualManager: mockPersonManager,
     });
     const localWorker = new Worker(registryWithPerson, API_BASE_URL, mockKmsService);
 
-    const jobName = createJobName('test_host', 'Person', '_batch');
+    const jobName = createJobName('test_host', ResourceTypesFhirR4.Person, '_batch');
     const job: JobRequest = {
       ...testCreateCustomerJobRequestProfessionalOnboarding,
       tenantId: 'host',
       sector: 'test',
-      resourceType: 'Person',
+      resourceType: ResourceTypesFhirR4.Person,
       contentType: 'application/json',
       content: {
         ...(testCreateCustomerJobRequestProfessionalOnboarding.content || {}),
@@ -199,10 +205,10 @@ describe('Worker', () => {
         body: {
           data: [
             {
-              type: 'Person',
-              request: { method: 'POST' },
+              type: ResourceTypesFhirR4.Person,
+              request: { method: HttpRequestMethods.Post },
               resource: {
-                resourceType: 'Person',
+                resourceType: ResourceTypesFhirR4.Person,
                 meta: {
                   claims: {
                     '@context': 'org.hl7.fhir.api',
@@ -220,9 +226,9 @@ describe('Worker', () => {
 
     const managerResponse: IDecodedDidcommPayload = {
       jti: 'mock-jti-person',
-      type: 'batch-response',
+      type: GatewayEnvelopeTypes.BatchResponse,
       iss: API_BASE_URL,
-      aud: 'did:web:client.example.com',
+      aud: EXAMPLE_SUBJECT_DID,
       exp: Math.floor(Date.now() / 1000) + 300,
       thid: 'thid-person-normalize-001',
       body: { data: [] },
@@ -232,15 +238,58 @@ describe('Worker', () => {
     mockKmsService.getPublicEncryptionKey.mockResolvedValue({ kid: 'host-key' } as any);
     mockKmsService.encodeResponse.mockResolvedValue('encrypted-task-response');
 
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
     await localWorker.process(jobName, job);
 
     expect(mockPersonManager.process).toHaveBeenCalledTimes(1);
-    expect((job.content as any).body.data[0].meta.claims).toMatchObject({
+    expect((job.content as any).body.data[0].resource.meta.claims).toMatchObject({
       '@context': 'org.hl7.fhir.api',
       id: 'task-normalize-001',
       subject: 'Person/elder-001',
       status: 'active',
     });
+    expect((job.content as any).body.data[0].meta?.claims).toBeUndefined();
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it('accepts legacy entry.meta.claims once, canonicalizes it, and warns', async () => {
+    const jobName = createJobName('test_host', ResourceTypesFhirR4.Person, '_batch');
+    const job: JobRequest = {
+      ...testCreateCustomerJobRequestProfessionalOnboarding,
+      tenantId: 'host',
+      sector: 'test',
+      resourceType: ResourceTypesFhirR4.Person,
+      contentType: 'application/json',
+      content: {
+        ...(testCreateCustomerJobRequestProfessionalOnboarding.content || {}),
+        body: {
+          data: [{
+            type: ResourceTypesFhirR4.Person,
+            meta: { claims: { id: 'legacy-person-001' } },
+            resource: { resourceType: ResourceTypesFhirR4.Person },
+          }],
+        },
+      } as any,
+    };
+    mockIndividualManager.process.mockResolvedValue({
+      jti: 'legacy-response',
+      type: GatewayEnvelopeTypes.BatchResponse,
+      iss: API_BASE_URL,
+      aud: EXAMPLE_SUBJECT_DID,
+      thid: 'legacy-thid',
+      body: { data: [] },
+    } as IDecodedDidcommPayload);
+    mockKmsService.getPublicEncryptionKey.mockResolvedValue({ kid: 'host-key' } as any);
+    mockKmsService.encodeResponse.mockResolvedValue('encrypted-legacy-response');
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    await worker.process(jobName, job);
+
+    expect((job.content as any).body.data[0].resource.meta.claims).toEqual({ id: 'legacy-person-001' });
+    expect((job.content as any).body.data[0].meta.claims).toBeUndefined();
+    expect(warn).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
   });
 
   it('should route individual pdf DocumentReference create jobs to the FamilyManager', async () => {
@@ -252,15 +301,15 @@ describe('Worker', () => {
       section: 'individual',
       format: 'pdf',
       action: '_create',
-      resourceType: 'DocumentReference',
+      resourceType: ResourceTypesFhirR4.DocumentReference,
       contentType: 'application/json',
     };
 
     const managerResponse: IDecodedDidcommPayload = {
       jti: 'mock-jti-document-reference',
-      type: 'batch-response',
+      type: GatewayEnvelopeTypes.BatchResponse,
       iss: API_BASE_URL,
-      aud: 'did:web:client.example.com',
+      aud: EXAMPLE_SUBJECT_DID,
       exp: Math.floor(Date.now() / 1000) + 300,
       thid: job.content?.thid as string,
       body: { data: [] },
@@ -286,12 +335,12 @@ describe('Worker', () => {
       section: 'digitaltwin',
       format: 'org.hl7.fhir.api',
       action: '_search',
-      resourceType: 'Composition',
+      resourceType: ResourceTypesFhirR4.Composition,
       contentType: 'application/json',
       content: {
         ...(testCreateCustomerJobRequestProfessionalOnboarding.content || {}),
         thid: 'thid-twin-composition-001',
-        body: { resourceType: 'Parameters', parameter: [] },
+        body: { resourceType: ResourceTypesFhirR4.Parameters, parameter: [] },
       } as any,
     };
 
@@ -299,7 +348,7 @@ describe('Worker', () => {
       jti: 'mock-jti-twin-composition',
       type: 'transaction-response',
       iss: API_BASE_URL,
-      aud: 'did:web:client.example.com',
+      aud: EXAMPLE_SUBJECT_DID,
       exp: Math.floor(Date.now() / 1000) + 300,
       thid: job.content?.thid as string,
       body: { data: [] },
@@ -325,13 +374,13 @@ describe('Worker', () => {
       section: 'digitaltwin',
       format: 'org.hl7.fhir.r4',
       action: '_search',
-      resourceType: 'ResearchSubject',
+      resourceType: ResourceTypesFhirR4.ResearchSubject,
       contentType: 'application/json',
       content: {
         ...(testCreateCustomerJobRequestProfessionalOnboarding.content || {}),
         thid: 'thid-twin-research-subject-search-001',
         body: {
-          resourceType: 'Parameters',
+          resourceType: ResourceTypesFhirR4.Parameters,
           parameter: [{ name: 'section', valueString: 'LOINC|10160-0' }],
         },
       } as any,
@@ -340,7 +389,7 @@ describe('Worker', () => {
       jti: 'research-subject-search-response',
       type: 'transaction-response',
       iss: API_BASE_URL,
-      aud: 'did:web:client.example.com',
+      aud: EXAMPLE_SUBJECT_DID,
       thid: job.content?.thid as string,
       body: { data: [] },
     } as IDecodedDidcommPayload);
@@ -355,7 +404,7 @@ describe('Worker', () => {
   describe('Architecture Keeper Tests', () => {
     it('should ALWAYS use encodeResponse for legacy (JSON) requests, NEVER protectConfidentialData', async () => {
       // ARRANGE
-      const resourceType = 'Person';
+      const resourceType = ResourceTypesFhirR4.Person;
       const jobName = createJobName('health-care_acme', resourceType, '_batch');
       const job: JobRequest = {
         ...testCreateCustomerJobRequestProfessionalOnboarding,
@@ -372,7 +421,7 @@ describe('Worker', () => {
         aud: 'urn:did:example:123',
         exp: Math.floor(Date.now() / 1000) + 300,
         thid: job.content!.thid,
-        body: { data: [{ type: 'Bundle', id: 'some-bundle-id' }] },
+        body: { data: [{ type: ResourceTypesFhirR4.Bundle, id: 'some-bundle-id' }] },
       };
       mockIndividualManager.process.mockResolvedValue(mockManagerResponse);
       

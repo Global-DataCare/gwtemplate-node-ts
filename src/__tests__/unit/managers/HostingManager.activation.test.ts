@@ -1,4 +1,8 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
+import { GatewayResponseEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
+import { GatewayRequestEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { toJwkThumbprintSha256Urn } from 'gdc-common-utils-ts/utils/jwk-thumbprint';
 import { buildOrganizationDidWeb, buildProfessionalDidWeb } from 'gdc-common-utils-ts/utils/did';
@@ -29,6 +33,14 @@ import { getEnvSectionId } from '../../../utils/section-env';
 import { getTenantAuthorizationLifecycle } from '../../../utils/tenant-lifecycle';
 import { EntityLifecycleStatus } from '../../../gdc-backend-utils-node/models/enums';
 import type { IHostRuntime } from '../../../managers/IHostRuntime';
+import { GatewayClaim } from '../../../shared/gateway-claim-contract';
+import { GatewayVerificationStatus } from '../../../shared/gateway-response-types';
+import {
+  EXAMPLE_API_ORGANIZATION_DID,
+  EXAMPLE_LICENSE_INVOICE_ID,
+  EXAMPLE_LICENSE_PAYMENT_METHOD_STRIPE,
+} from 'gdc-common-utils-ts/examples/shared';
+import { URN_NETWORK } from '../../data/urn.data';
 
 const uuidMock = {
   v4: jest.fn(),
@@ -83,7 +95,7 @@ describe('HostingManager activation flow', () => {
           '@context': ['https://www.w3.org/2018/credentials/v1'],
           type: ['VerifiableCredential', 'OrganizationCredential'],
           credentialSubject: {
-            id: 'did:web:api.acme.org',
+            id: EXAMPLE_API_ORGANIZATION_DID,
             taxID: 'VATES-B00112233',
             category: testClaimsTenant1Registration[ClaimsServiceSchemaorg.category],
             serviceType: testClaimsTenant1Registration[ClaimsServiceSchemaorg.serviceType],
@@ -142,7 +154,7 @@ describe('HostingManager activation flow', () => {
 
     mockConfig = {
       securityMode: 'compat',
-      networkMode: 'test-network',
+      networkMode: URN_NETWORK,
       fhirLegacy: false,
       jsonLegacy: false,
       didcommPlainEnabled: true,
@@ -209,11 +221,11 @@ describe('HostingManager activation flow', () => {
       createdAtTimestamp: Date.now(),
       tenantId: 'host',
       jurisdiction: 'es',
-      sector: 'test-network' as Sector,
+      sector: URN_NETWORK as Sector,
       section: 'registry',
       format: 'org.schema',
       action: '_activate',
-      resourceType: 'Organization',
+      resourceType: ResourceTypesFhirR4.Organization,
       content: {
         iss: 'did:web:controller.example.com',
         aud: 'did:web:testhost.com',
@@ -226,7 +238,7 @@ describe('HostingManager activation flow', () => {
             '@context': ['https://www.w3.org/2018/credentials/v1'],
             type: ['VerifiableCredential'],
             credentialSubject: {
-              id: 'did:web:api.acme.org',
+              id: EXAMPLE_API_ORGANIZATION_DID,
               taxID: 'VATES-B00112233',
               category: testClaimsTenant1Registration[ClaimsServiceSchemaorg.category],
               serviceType: testClaimsTenant1Registration[ClaimsServiceSchemaorg.serviceType],
@@ -249,11 +261,11 @@ describe('HostingManager activation flow', () => {
           },
           data: [
             {
-              type: 'Organization-activation-request-v1.0',
+              type: GatewayRequestEntryTypes.OrganizationActivation,
               meta: {
                 claims: { ...testClaimsTenant1Registration },
               },
-              request: { method: 'POST' },
+              request: { method: HttpRequestMethods.Post },
               resource: {},
             },
           ],
@@ -289,11 +301,11 @@ describe('HostingManager activation flow', () => {
       createdAtTimestamp: Date.now(),
       tenantId: 'host',
       jurisdiction: 'es',
-      sector: 'test-network' as Sector,
+      sector: URN_NETWORK as Sector,
       section: 'registry',
       format: 'org.schema',
       action,
-      resourceType: 'Organization',
+      resourceType: ResourceTypesFhirR4.Organization,
       content: {
         iss: 'did:web:host.example.com',
         aud: 'did:web:testhost.com',
@@ -309,13 +321,13 @@ describe('HostingManager activation flow', () => {
                   ? LifecycleRequestType.TenantEnable
                   : action === '_purge'
                     ? LifecycleRequestType.TenantPurge
-                    : 'Organization-lifecycle-status-request-v1.0',
+                    : GatewayRequestEntryTypes.OrganizationLifecycleStatus,
               meta: {
                 claims: {
                   [ClaimsOrganizationSchemaorg.identifierValue]: testClaimsTenant1Registration[ClaimsOrganizationSchemaorg.identifierValue],
                 },
               },
-              request: { method: 'POST' },
+              request: { method: HttpRequestMethods.Post },
               resource: action.endsWith('-descendants')
                 ? { lifecycle: { descendantKind } }
                 : {},
@@ -371,11 +383,11 @@ describe('HostingManager activation flow', () => {
       createdAtTimestamp: Date.now(),
       tenantId: 'host',
       jurisdiction: 'es',
-      sector: 'test-network' as Sector,
+      sector: URN_NETWORK as Sector,
       section: 'registry',
       format: 'org.schema',
       action,
-      resourceType: 'Organization',
+      resourceType: ResourceTypesFhirR4.Organization,
       content: {
         iss: 'did:web:host.example.com',
         aud: 'did:web:testhost.com',
@@ -393,7 +405,7 @@ describe('HostingManager activation flow', () => {
                   [ClaimsOrganizationSchemaorg.identifierValue]: testClaimsHostInitialization[ClaimsOrganizationSchemaorg.identifierValue],
                 },
               },
-              request: { method: 'POST' },
+              request: { method: HttpRequestMethods.Post },
               resource: {},
             },
           ],
@@ -453,11 +465,11 @@ describe('HostingManager activation flow', () => {
     const entry = responsePayload.body.data[0];
 
     expect(entry.response.status).toBe('201');
-    expect(entry.type).toBe('Organization-activation-response-v1.0');
-    expect(entry.meta.claims['org.schema.Organization.did']).toBe('did:web:api.acme.org');
-    expect(entry.meta.claims['org.schema.Action.activation.networkMode']).toBe('test-network');
-    expect(entry.meta.claims['org.schema.Action.activation.revocationChecked']).toBe('true');
-    expect(entry.meta.claims['org.schema.Action.activation.onChainChecked']).toBe('false');
+    expect(entry.type).toBe(GatewayResponseEntryTypes.OrganizationActivation);
+    expect(entry.resource.meta.claims[GatewayClaim.OrganizationDid]).toBe(EXAMPLE_API_ORGANIZATION_DID);
+    expect(entry.resource.meta.claims[GatewayClaim.ActivationNetworkMode]).toBe(URN_NETWORK);
+    expect(entry.resource.meta.claims[GatewayClaim.ActivationRevocationChecked]).toBe('true');
+    expect(entry.resource.meta.claims[GatewayClaim.ActivationOnChainChecked]).toBe('false');
 
     const claims = job.content!.body!.data[0]!.meta!.claims;
     const tenantVaultId = tenantUtils.getTenantVaultId(
@@ -472,8 +484,8 @@ describe('HostingManager activation flow', () => {
     expect(finalDoc).toBeDefined();
     expect(finalDoc.content).toBeDefined();
     expect(finalDoc.content!.status).toBe('active');
-    expect(finalDoc.content!.didDocument.id).toBe('did:web:api.acme.org');
-    expect(finalDoc.content!.networkStatus[0].networkName).toBe('test-network');
+    expect(finalDoc.content!.didDocument.id).toBe(EXAMPLE_API_ORGANIZATION_DID);
+    expect(finalDoc.content!.networkStatus[0].networkName).toBe(URN_NETWORK);
     expect(getTenantAuthorizationLifecycle(finalDoc.content)?.status).toBe('active');
 
     const tenantCollectionName = tenantUtils.generateTenantCollectionNameFromClaims({
@@ -485,7 +497,7 @@ describe('HostingManager activation flow', () => {
       'legal-participant.vc.json',
       getEnvSectionId('.well-known'),
     );
-    expect((legalParticipantDoc as any)?.content?.credentialSubject?.id).toBe('did:web:api.acme.org');
+    expect((legalParticipantDoc as any)?.content?.credentialSubject?.id).toBe(EXAMPLE_API_ORGANIZATION_DID);
 
     const employeeDocs = await vaultRepository.getContainersInSection(
       tenantCollectionName,
@@ -505,7 +517,7 @@ describe('HostingManager activation flow', () => {
       getEnvSectionId('proofs'),
     );
     expect((proofDoc as any)?.content?.vp_token).toBe(vpTokenCompact);
-    expect((proofDoc as any)?.content?.trustPolicy?.networkMode).toBe('test-network');
+    expect((proofDoc as any)?.content?.trustPolicy?.networkMode).toBe(URN_NETWORK);
     expect(mockLogger.warn).toHaveBeenCalledWith(
       expect.stringContaining('_activate received deprecated legacy compatibility field(s): organizationCredential, representativeCredential'),
     );
@@ -521,11 +533,11 @@ describe('HostingManager activation flow', () => {
    */
   it('should expose the canonical org.schema.Offer.identifier in _activate and require that exact value for the follow-up Order', async () => {
     const activationResponse = await hostingManager.process(buildActivationJob());
-    const activationClaims = activationResponse.body.data[0].meta?.claims as Record<string, unknown>;
+    const activationClaims = activationResponse.body.data[0].resource?.meta?.claims as Record<string, unknown>;
     const canonicalOfferId = activationClaims[ClaimsOfferSchemaorg.identifier];
     const offerId = String(canonicalOfferId || '');
 
-    expect(activationResponse.body.data[0].type).toBe('Organization-activation-response-v1.0');
+    expect(activationResponse.body.data[0].type).toBe(GatewayResponseEntryTypes.OrganizationActivation);
     expect(canonicalOfferId).toBeDefined();
     expect(typeof canonicalOfferId).toBe('string');
     expect(offerId).toContain(':Offer:');
@@ -537,7 +549,7 @@ describe('HostingManager activation flow', () => {
       createdAtTimestamp: Date.now(),
       tenantId: 'host',
       jurisdiction: 'es',
-      sector: 'test-network' as Sector,
+      sector: URN_NETWORK as Sector,
       section: 'registry',
       format: 'org.schema',
       action: '_batch',
@@ -546,9 +558,9 @@ describe('HostingManager activation flow', () => {
       httpMethod: 'POST',
       requestUrl: '/host/cds-es/v1/test-network/registry/org.schema/Order/_batch',
     };
-    orderJob.content!.body.data[0].meta.claims[ClaimsOrderSchemaorg.acceptedOfferIdentifier] = offerId;
-    orderJob.content!.body.data[0].meta.claims[ClaimsOrderSchemaorg.paymentMethod] = 'Stripe';
-    orderJob.content!.body.data[0].meta.claims[ClaimsOrderSchemaorg.partOfInvoice] = 'in_activation_follow_up';
+    orderJob.content!.body.data[0].resource.meta.claims[ClaimsOrderSchemaorg.acceptedOfferIdentifier] = offerId;
+    orderJob.content!.body.data[0].resource.meta.claims[ClaimsOrderSchemaorg.paymentMethod] = EXAMPLE_LICENSE_PAYMENT_METHOD_STRIPE;
+    orderJob.content!.body.data[0].resource.meta.claims[ClaimsOrderSchemaorg.partOfInvoice] = EXAMPLE_LICENSE_INVOICE_ID;
 
     const orderResponse = await hostingManager.process(orderJob);
 
@@ -700,7 +712,7 @@ describe('HostingManager activation flow', () => {
     const entry = responsePayload.body.data[0];
 
     expect(entry.response.status).toBe('201');
-    expect(entry.meta.claims['org.schema.Organization.did']).toBe('did:web:api.acme.org');
+    expect(entry.resource.meta.claims[GatewayClaim.OrganizationDid]).toBe(EXAMPLE_API_ORGANIZATION_DID);
   });
 
   /**
@@ -863,7 +875,7 @@ describe('HostingManager activation flow', () => {
 
     expect(entry.response.status).toBe('201');
 
-    const claims = entry.meta.claims;
+    const claims = entry.resource.meta.claims;
     const tenantCollectionName = tenantUtils.generateTenantCollectionNameFromClaims({
       ...claims,
       [ClaimsOrganizationSchemaorg.url]: 'https://api.acme.org',
@@ -878,7 +890,7 @@ describe('HostingManager activation flow', () => {
     ) as ConfidentialStorageDoc;
     expect(tenantCollectionName).toBeDefined();
     expect(tenantDoc.content?.status).toBe('active');
-    expect(entry.meta.claims[ClaimsOrganizationSchemaorg.addressCountry]).toBe('ES');
+    expect(entry.resource.meta.claims[ClaimsOrganizationSchemaorg.addressCountry]).toBe('ES');
     expect(mockLogger.error).not.toHaveBeenCalledWith(
       'Unexpected error during registration processing:',
       expect.anything(),
@@ -898,10 +910,10 @@ describe('HostingManager activation flow', () => {
     const entry = responsePayload.body.data[0];
 
     expect(entry.response.status).toBe('201');
-    expect(entry.meta.claims[ClaimsOrganizationSchemaorg.alternateName]).toBe('VATES-B00112233');
-    expect(entry.meta.claims[ClaimsOrganizationSchemaorg.identifierType]).toBe('TAX');
-    expect(entry.meta.claims[ClaimsOrganizationSchemaorg.identifierValue]).toBe('VATES-B00112233');
-    expect(entry.meta.claims[ClaimsOrganizationSchemaorg.identifier]).toBe(
+    expect(entry.resource.meta.claims[ClaimsOrganizationSchemaorg.alternateName]).toBe('VATES-B00112233');
+    expect(entry.resource.meta.claims[ClaimsOrganizationSchemaorg.identifierType]).toBe('TAX');
+    expect(entry.resource.meta.claims[ClaimsOrganizationSchemaorg.identifierValue]).toBe('VATES-B00112233');
+    expect(entry.resource.meta.claims[ClaimsOrganizationSchemaorg.identifier]).toBe(
       'urn:test-namespace:test-network:es:v1:health-care:entity:tax:VATES-B00112233',
     );
   });
@@ -917,8 +929,8 @@ describe('HostingManager activation flow', () => {
     const entry = responsePayload.body.data[0];
 
     expect(entry.response.status).toBe('201');
-    expect(entry.meta.claims[ClaimsOrganizationSchemaorg.addressCountry]).toBe('ES');
-    expect(entry.meta.claims[ClaimsOrganizationSchemaorg.identifier]).toBe(
+    expect(entry.resource.meta.claims[ClaimsOrganizationSchemaorg.addressCountry]).toBe('ES');
+    expect(entry.resource.meta.claims[ClaimsOrganizationSchemaorg.identifier]).toBe(
       'urn:test-namespace:test-network:es:v1:health-care:entity:tax:acme-id',
     );
   });
@@ -956,10 +968,10 @@ describe('HostingManager activation flow', () => {
     const entry = responsePayload.body.data[0];
 
     expect(entry.response.status).toBe('201');
-    expect(entry.meta.claims[ClaimsOrganizationSchemaorg.alternateName]).toBe('123e4567-e89b-12d3-a456-426614174000');
-    expect(entry.meta.claims[ClaimsOrganizationSchemaorg.identifierType]).toBe('UUID');
-    expect(entry.meta.claims[ClaimsOrganizationSchemaorg.identifierValue]).toBe('123e4567-e89b-12d3-a456-426614174000');
-    expect(entry.meta.claims[ClaimsOrganizationSchemaorg.identifier]).toBe(
+    expect(entry.resource.meta.claims[ClaimsOrganizationSchemaorg.alternateName]).toBe('123e4567-e89b-12d3-a456-426614174000');
+    expect(entry.resource.meta.claims[ClaimsOrganizationSchemaorg.identifierType]).toBe('UUID');
+    expect(entry.resource.meta.claims[ClaimsOrganizationSchemaorg.identifierValue]).toBe('123e4567-e89b-12d3-a456-426614174000');
+    expect(entry.resource.meta.claims[ClaimsOrganizationSchemaorg.identifier]).toBe(
       'urn:test-namespace:test-network:es:v1:health-care:entity:uuid:123e4567-e89b-12d3-a456-426614174000',
     );
   });
@@ -978,10 +990,10 @@ describe('HostingManager activation flow', () => {
     const entry = responsePayload.body.data[0];
 
     expect(entry.response.status).toBe('201');
-    expect(entry.meta.claims[ClaimsOrganizationSchemaorg.alternateName]).toBe('BC1234567');
-    expect(entry.meta.claims[ClaimsOrganizationSchemaorg.identifierType]).toBe('TAX');
-    expect(entry.meta.claims[ClaimsOrganizationSchemaorg.identifierValue]).toBe('BC1234567');
-    expect(entry.meta.claims[ClaimsOrganizationSchemaorg.identifier]).toBe(
+    expect(entry.resource.meta.claims[ClaimsOrganizationSchemaorg.alternateName]).toBe('BC1234567');
+    expect(entry.resource.meta.claims[ClaimsOrganizationSchemaorg.identifierType]).toBe('TAX');
+    expect(entry.resource.meta.claims[ClaimsOrganizationSchemaorg.identifierValue]).toBe('BC1234567');
+    expect(entry.resource.meta.claims[ClaimsOrganizationSchemaorg.identifier]).toBe(
       'urn:test-namespace:test-network:es:v1:health-care:entity:tax:BC1234567',
     );
   });
@@ -1216,7 +1228,7 @@ describe('HostingManager activation flow', () => {
       headers: {
         get: (name: string) => (name.toLowerCase() === 'content-type' ? 'application/json' : null),
       },
-      json: async () => ({ status: 'approved', didDocumentId: 'did:web:api.acme.org' }),
+      json: async () => ({ status: GatewayVerificationStatus.Approved, didDocumentId: EXAMPLE_API_ORGANIZATION_DID }),
     }));
     global.fetch = fetchMock;
 
@@ -1245,7 +1257,7 @@ describe('HostingManager activation flow', () => {
 
     const disableResponse = await hostingManager.process(buildLifecycleJob('_disable'));
     expect(disableResponse.body.data[0].response.status).toBe('200');
-    expect(disableResponse.body.data[0].meta.claims['org.schema.Action.tenantAuthorization.status']).toBe('suspended');
+    expect(disableResponse.body.data[0].resource.meta.claims[GatewayClaim.TenantAuthorizationStatus]).toBe('suspended');
 
     const claims = activationJob.content!.body!.data[0]!.meta!.claims;
     const tenantVaultId = tenantUtils.getTenantVaultId(
@@ -1261,7 +1273,7 @@ describe('HostingManager activation flow', () => {
 
     const enableResponse = await hostingManager.process(buildLifecycleJob('_enable'));
     expect(enableResponse.body.data[0].response.status).toBe('200');
-    expect(enableResponse.body.data[0].meta.claims['org.schema.Action.tenantAuthorization.status']).toBe('active');
+    expect(enableResponse.body.data[0].resource.meta.claims[GatewayClaim.TenantAuthorizationStatus]).toBe('active');
 
     const enabledDoc = await vaultRepository.get(
       hostCollectionName,
@@ -1287,7 +1299,7 @@ describe('HostingManager activation flow', () => {
 
     const disableResponse = await hostingManager.process(disableJob);
     expect(disableResponse.body.data[0].response.status).toBe('200');
-    expect(disableResponse.body.data[0].meta.claims['org.schema.Action.tenantAuthorization.changedBy'])
+    expect(disableResponse.body.data[0].resource.meta.claims[GatewayClaim.TenantAuthorizationChangedBy])
       .toBe('did:web:controller.example.com');
   });
 
@@ -1369,7 +1381,7 @@ describe('HostingManager activation flow', () => {
     const sectionId = getEnvSectionId(`${SUBJECT_SECTION_INDIVIDUAL}_subject`);
     await vaultRepository.put(tenantVaultId, [{
       id: 'retained-communication', status: EntityLifecycleStatus.Active, sequence: 0,
-      type: 'Communication', content: { resourceType: 'Communication' },
+      type: ResourceTypesFhirR4.Communication, content: { resourceType: ResourceTypesFhirR4.Communication },
     } as ConfidentialStorageDoc], sectionId);
 
     const status = await hostingManager.process(buildLifecycleJob('_status'));

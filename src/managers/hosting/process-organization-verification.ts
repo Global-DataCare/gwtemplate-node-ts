@@ -1,3 +1,5 @@
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
+import { HttpStatusCodes } from 'gdc-common-utils-ts/constants/http';
 import { v4 as uuidv4 } from 'uuid';
 import type { BundleEntry } from 'gdc-common-utils-ts/models/bundle';
 import type { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
@@ -207,7 +209,7 @@ export async function processOrganizationVerificationTransaction(
     iss: deps.issuerDid,
     aud: deps.job.content?.iss as string,
     body: {
-      resourceType: 'Bundle',
+      resourceType: ResourceTypesFhirR4.Bundle,
       type: getBundleResponseTypeForAction(deps.job.action),
       total: 1,
       data: [{
@@ -219,7 +221,7 @@ export async function processOrganizationVerificationTransaction(
           testNetworkAdmissionCredential ? 'host' : 'ica',
           !reRegisteredClaims,
         ),
-        response: { status: '200' },
+        response: { status: String(HttpStatusCodes.Ok) },
       }],
     },
   };
@@ -281,14 +283,14 @@ export async function processOrganizationIssue(
     iss: deps.issuerDid,
     aud: deps.job.content?.iss as string,
     body: {
-      resourceType: 'Bundle',
+      resourceType: ResourceTypesFhirR4.Bundle,
       type: getBundleResponseTypeForAction(deps.job.action),
       total: 1,
       data: [{
         type: ORGANIZATION_ISSUE_RESPONSE_TYPE,
         ...(vc.length > 0 ? { vc } : {}),
         resource: buildOrganizationIssueResponseResource(icaResponse, processedClaims),
-        response: { status: '200' },
+        response: { status: String(HttpStatusCodes.Ok) },
       }],
     },
   };

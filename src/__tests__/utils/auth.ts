@@ -1,6 +1,7 @@
 // TDD contract: write this test red first; make it green only with the complete real behavior.
 // src/__tests__/utils/auth.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
 
 /**
  * Authenticates a test user against the Firebase Auth REST API to get a valid ID token.
@@ -25,7 +26,7 @@ export async function getGoogleAuthTokenForTesting(email: string, password: stri
 
   try {
     const response = await fetch(url, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       headers: {
         'Content-Type': 'application/json',
       },

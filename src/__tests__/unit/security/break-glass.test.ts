@@ -1,4 +1,5 @@
 // Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 import { BreakGlassService, evaluateBreakGlassPolicy } from '../../../security/break-glass';
 
 const humanRequest = {
@@ -101,7 +102,7 @@ describe('break-glass audit and controller notice', () => {
       professionalActorHash: expect.stringMatching(/^[a-f0-9]{64}$/),
       consentLedgerAssetId: `break-glass-consent:${result.emergencyConsentId}`,
       communication: expect.objectContaining({
-        resourceType: 'Communication',
+        resourceType: ResourceTypesFhirR4.Communication,
         subject: { reference: input.subjectDid },
         sender: { reference: input.actorOrganizationDid },
       }),

@@ -1,4 +1,5 @@
 // TDD contract: write this test red first; make it green only with the complete real behavior.
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from '@jest/globals';
 import type { StoryHarness } from './helpers/story-flow';
 import { installIcaVerifyFetchMock, pollJsonBody, startStoryServer, stopStoryServer } from './helpers/story-flow';
@@ -53,7 +54,7 @@ describe('Host transaction Offer/Order route story', () => {
     delete transactionPayload.body.data[0].meta;
 
     const transactionSubmit = await invokeExpress(harness.app, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       url: '/host/cds-es/v1/test/registry/org.schema/Organization/_transaction',
       headers: { 'content-type': 'application/json' },
       body: transactionPayload,
@@ -98,7 +99,7 @@ describe('Host transaction Offer/Order route story', () => {
     };
 
     const orderSubmit = await invokeExpress(harness.app, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       url: '/host/cds-es/v1/test/registry/org.schema/Order/_batch',
       headers: { 'content-type': 'application/json' },
       body: orderPayload,
@@ -127,7 +128,7 @@ describe('Host transaction Offer/Order route story', () => {
     replayPayload.thid = 'host-transaction-order-replay-thid';
     replayPayload.jti = 'host-transaction-order-replay-jti';
     const replaySubmit = await invokeExpress(harness.app, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       url: '/host/cds-es/v1/test/registry/org.schema/Order/_batch',
       headers: { 'content-type': 'application/json' },
       body: replayPayload,
@@ -165,7 +166,7 @@ describe('Host transaction Offer/Order route story', () => {
     delete transactionPayload.body.data[0].meta;
 
     const transactionSubmit = await invokeExpress(harness.app, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       url: '/host/cds-es/v1/test/registry/org.schema/Organization/_transaction',
       headers: { 'content-type': 'application/json' },
       body: transactionPayload,
@@ -196,7 +197,7 @@ describe('Host transaction Offer/Order route story', () => {
     };
 
     const orderSubmit = await invokeExpress(harness.app, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       url: '/host/cds-es/v1/test/registry/org.schema/Order/_batch',
       headers: { 'content-type': 'application/json' },
       body: orderPayload,
@@ -234,7 +235,7 @@ describe('Host transaction Offer/Order route story', () => {
     delete transactionPayload.body.data[0].meta;
 
     const transactionSubmit = await invokeExpress(harness.app, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       url: '/host/cds-es/v1/test/registry/org.schema/Organization/_transaction',
       headers: { 'content-type': 'application/json' },
       body: transactionPayload,

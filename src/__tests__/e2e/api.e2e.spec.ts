@@ -1,6 +1,7 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: 1. authenticate a live test actor; 2. submit canonical organization claims; 3. process the queued job; 4. verify persisted tenant state. Authorization invariant: only the configured test actor may submit. Persistence invariant: accepted claims survive asynchronous processing under resource.meta.claims.
 // src/__tests__/e2e/api.e2e.spec.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 
 // This E2E test runs against a LIVE Firestore instance, configured via a local env profile.
 // It validates the entire LEGACY API flow (unencrypted JSON) from HTTP request to database interaction.
@@ -56,7 +57,7 @@ describeIfConfigured('End-to-End API Flow (Legacy with Live Firestore)', () => {
             createdAtTimestamp: Date.now(),
             section: 'registry',
             format: 'org.schema',
-            resourceType: 'Organization',
+            resourceType: ResourceTypesFhirR4.Organization,
             action: '_batch',
             content: jobContent,
           };
@@ -99,7 +100,7 @@ describeIfConfigured('End-to-End API Flow (Legacy with Live Firestore)', () => {
     
     const tenantId = `e2e-legacy-tenant-${Date.now()}`;
     const modifiedClaims: ClaimsRecord = {
-      ...testPayloadCreateTenant1.body.data[0].meta.claims,
+      ...testPayloadCreateTenant1.body.data[0].resource.meta.claims,
       'org.schema.Person.email': process.env.TEST_USER_EMAIL,
       'org.schema.Organization.identifier': `urn:uuid:${tenantId}`,
     };

@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+## [1.23.16] - 2026-09-02
+
+- Emit licence search, purchase and issue, Order, clinical, lifecycle and
+  internal job-response claims only at `entry.resource.meta.claims`. Keep the
+  tolerant request/response normalization compatible with legacy
+  `entry.meta.claims`, prefer canonical claims when both exist, and avoid a
+  deprecation warning for payloads already in canonical form.
+- Add a source-level regression gate that rejects governed GW Bundle writers
+  which reintroduce entry-level claims.
+- Consume `gdc-common-utils-ts@2.7.5` so GW fixtures and shared licence writers
+  use the same canonical contract.
+
 - Clarify that local clinical authors remain operational role-bearing
   `did:web` actors. Stable `urn:multibase:z...` contact identifiers are private
   account aliases and imported URNs remain immutable source provenance. The

@@ -2,6 +2,8 @@
 // src/__tests__/managers/FamilyManager.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // Always create JSDoc, do not use strings inline in keys nor values, use types instead, and reuse the data test examples.
+import { GatewayRequestEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 
 import { randomUUID } from 'crypto';
 import { execFileSync } from 'child_process';
@@ -129,7 +131,7 @@ function makeBatchJob(overrideClaims: Record<string, unknown> = {}): JobRequest 
     section: 'individual',
     format: 'org.schema',
     action: '_batch',
-    resourceType: 'Organization',
+    resourceType: ResourceTypesFhirR4.Organization,
     content: {
       jti: randomUUID(),
       thid: randomUUID(),
@@ -138,7 +140,7 @@ function makeBatchJob(overrideClaims: Record<string, unknown> = {}): JobRequest 
       type: 'application/api+json',
       body: {
         data: [{
-          type: 'Family-registration-form-v1.0',
+          type: GatewayRequestEntryTypes.FamilyRegistrationForm,
           meta: { claims: { ...BASE_CLAIMS, ...overrideClaims } },
         }],
       },
@@ -160,7 +162,7 @@ function makeTransactionJob(
     section: 'individual',
     format: 'org.schema',
     action: '_transaction',
-    resourceType: 'Organization',
+    resourceType: ResourceTypesFhirR4.Organization,
     content: {
       jti: randomUUID(),
       thid: randomUUID(),
@@ -169,7 +171,7 @@ function makeTransactionJob(
       type: 'application/api+json',
       body: {
         data: [{
-          type: 'Family-registration-form-v1.0',
+          type: GatewayRequestEntryTypes.FamilyRegistrationForm,
           meta: { claims: { ...BASE_CLAIMS, ...overrideClaims } },
         }],
       },
@@ -189,7 +191,7 @@ function makeSearchJob(overrideClaims: Record<string, unknown> = {}): JobRequest
     section: 'individual',
     format: 'org.schema',
     action: '_search',
-    resourceType: 'Organization',
+    resourceType: ResourceTypesFhirR4.Organization,
     content: {
       jti: randomUUID(),
       thid: randomUUID(),
@@ -249,7 +251,7 @@ function makePdfDraftJob(input: {
     section: 'individual',
     format: 'pdf',
     action: '_create',
-    resourceType: 'DocumentReference',
+    resourceType: ResourceTypesFhirR4.DocumentReference,
     content: {
       jti: randomUUID(),
       thid: randomUUID(),
@@ -258,9 +260,9 @@ function makePdfDraftJob(input: {
       type: 'application/api+json',
       body: {
         data: [{
-          type: 'DocumentReference',
+          type: ResourceTypesFhirR4.DocumentReference,
           resource: {
-            resourceType: 'DocumentReference',
+            resourceType: ResourceTypesFhirR4.DocumentReference,
             meta: {
               claims: {
                 [ClaimsOrganizationSchemaorg.identifier]: EXAMPLE_SUBJECT_DID,
@@ -303,7 +305,7 @@ function makePurgeJob(overrideClaims: Record<string, unknown> = {}): JobRequest 
     section: 'individual',
     format: 'org.schema',
     action: '_purge',
-    resourceType: 'Organization',
+    resourceType: ResourceTypesFhirR4.Organization,
     content: {
       jti: randomUUID(),
       thid: randomUUID(),
@@ -312,7 +314,7 @@ function makePurgeJob(overrideClaims: Record<string, unknown> = {}): JobRequest 
       type: 'application/api+json',
       body: {
         data: [{
-          type: 'Family-purge-request-v1.0',
+          type: GatewayRequestEntryTypes.FamilyPurge,
           meta: {
             claims: {
               [ClaimsOrganizationSchemaorg.ownerTelephone]: EXAMPLE_FAMILY_REGISTRATION_OWNER_TELEPHONE,
@@ -339,7 +341,7 @@ function makeDisableJob(overrideClaims: Record<string, unknown> = {}): JobReques
     section: 'individual',
     format: 'org.schema',
     action: '_disable',
-    resourceType: 'Organization',
+    resourceType: ResourceTypesFhirR4.Organization,
     content: {
       jti: randomUUID(),
       thid: randomUUID(),
@@ -910,7 +912,7 @@ describe('FamilyManager', () => {
         sectionId: getEnvSectionId(SUBJECT_SECTION_INDIVIDUAL),
         where: [{ name: ClaimsOrganizationSchemaorg.ownerEmail, value: ownerEmail }],
       });
-      expect(result).toMatchObject({ resourceType: 'Bundle', type: 'searchset' });
+      expect(result).toMatchObject({ resourceType: ResourceTypesFhirR4.Bundle, type: 'searchset' });
       expect(result.entry.map((item: any) => item.resource.id)).toEqual(['own-org', 'represented-org']);
       expect(result.entry[0].resource.meta.claims).toMatchObject({
         [ClaimsOrganizationSchemaorg.sameAs]: 'did:web:unid.online:card:uhc:personal:own',

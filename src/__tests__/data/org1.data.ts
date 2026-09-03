@@ -47,4 +47,3 @@ export const getOrg1EmployeeBatch = (org1Urn: string) => {
     })
   };
 };
-

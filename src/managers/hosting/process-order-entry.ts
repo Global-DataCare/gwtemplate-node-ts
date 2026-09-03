@@ -1,3 +1,6 @@
+import { GatewayResponseEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
+import { HttpStatusCodes } from 'gdc-common-utils-ts/constants/http';
 import { v4 as uuidv4 } from 'uuid';
 import type { BundleEntry } from 'gdc-common-utils-ts/models/bundle';
 import type { ClaimsRecord } from 'gdc-common-utils-ts/models/resource-document';
@@ -69,7 +72,7 @@ type ProcessHostOrderEntryDeps = Readonly<{
 }>;
 
 export async function processHostOrderEntry(deps: ProcessHostOrderEntryDeps): Promise<BundleEntry> {
-  const rawClaims = deps.entry?.meta?.claims;
+  const rawClaims = deps.entry?.resource?.meta?.claims ?? deps.entry?.meta?.claims;
   const claims = rawClaims ? normalizeContextualizedClaims(rawClaims) : rawClaims;
   if (!claims) {
     throw new ManagerError('Malformed order entry: missing meta.claims', IssueType.Required);
@@ -152,13 +155,13 @@ export async function processHostOrderEntry(deps: ProcessHostOrderEntryDeps): Pr
         }
       }
       return {
-        type: 'Organization-order-response-v1.0',
+        type: GatewayResponseEntryTypes.OrganizationOrder,
         resource: {
-          resourceType: 'Organization',
+          resourceType: ResourceTypesFhirR4.Organization,
           id: String(decryptedContent.id || ''),
           meta: { claims: replayClaims },
         },
-        response: { status: '200' },
+        response: { status: String(HttpStatusCodes.Ok) },
       };
     }
     throw new ManagerError(`Found registration for offerId '${offerId}', but it is not in 'pending' state.`, IssueType.Conflict);
@@ -403,12 +406,12 @@ export async function processHostOrderEntry(deps: ProcessHostOrderEntryDeps): Pr
   await deps.vaultRepository.put(hostCollectionName, [secureCommunicationDoc], getEnvSectionId('communications'));
 
   return {
-    type: 'Organization-order-response-v1.0',
+    type: GatewayResponseEntryTypes.OrganizationOrder,
     resource: {
       ...(invoiceBundle as any),
       meta: { ...((invoiceBundle as any).meta || {}), claims: paymentCommunication.claims },
     },
-    response: { status: '201' },
+    response: { status: String(HttpStatusCodes.Created) },
   };
 }
 
@@ -554,11 +557,11 @@ export async function processActivatedTenantOrderEntry(
   await deps.vaultRepository.put(deps.hostRuntime.hostCollectionName, [secureCommunicationDoc], getEnvSectionId('communications'));
 
   return {
-    type: 'Organization-order-response-v1.0',
+    type: GatewayResponseEntryTypes.OrganizationOrder,
     resource: {
       ...(invoiceBundle as any),
       meta: { ...((invoiceBundle as any).meta || {}), claims: paymentCommunication.claims },
     },
-    response: { status: '201' },
+    response: { status: String(HttpStatusCodes.Created) },
   };
 }

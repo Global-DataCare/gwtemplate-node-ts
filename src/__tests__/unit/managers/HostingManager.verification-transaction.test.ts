@@ -1,4 +1,6 @@
 // TDD contract: write this test red first; make it green only with the complete real behavior.
+import { GatewayResponseEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { ClaimsOfferSchemaorg, ClaimsOrderSchemaorg, ClaimsOrganizationSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { getEnvSectionId } from '../../../utils/section-env';
@@ -115,7 +117,7 @@ function buildTransactionJob(): JobRequest {
     sector: 'test-network',
     section: 'registry',
     format: 'org.schema',
-    resourceType: 'Organization',
+    resourceType: ResourceTypesFhirR4.Organization,
     action: '_transaction',
     requestUrl: EXAMPLE_REQUEST_URL,
     content: {
@@ -150,7 +152,7 @@ function buildIssueJob(): JobRequest {
 
 function buildIcaVerifyResponse() {
   return {
-    resourceType: 'Bundle',
+    resourceType: ResourceTypesFhirR4.Bundle,
     type: EXAMPLE_ICA_RESPONSE_BUNDLE_TYPE,
     data: [{
       type: EXAMPLE_ICA_VERIFY_RESPONSE_TYPE,
@@ -163,7 +165,7 @@ function buildIcaVerifyResponse() {
 
 function buildIcaVerifyCredentialResponse() {
   return {
-    resourceType: 'Bundle',
+    resourceType: ResourceTypesFhirR4.Bundle,
     type: EXAMPLE_ICA_RESPONSE_BUNDLE_TYPE,
     data: [
       {
@@ -769,7 +771,7 @@ describe('HostingManager legal organization verification transaction', () => {
       }),
     ]));
     expect((responseEntry as any)?.vc).not.toEqual(expect.arrayContaining([
-      expect.objectContaining({ type: 'License:Issued' }),
+      expect.objectContaining({ type: GatewayResponseEntryTypes.LicenseIssued }),
     ]));
     // Step 2: existing-tenant `_issue` is a controller/key/email reissue path,
     // not a new commercial onboarding. It must therefore not create a new

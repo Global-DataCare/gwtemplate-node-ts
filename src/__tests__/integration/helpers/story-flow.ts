@@ -1,4 +1,7 @@
 // TDD contract: write this test red first; make it green only with the complete real behavior.
+import { GatewayRequestEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 process.env.DEV_SEED = 'true';
 process.env.NODE_ENV = 'test';
 process.env.SECURITY_MODE = 'demo';
@@ -34,6 +37,7 @@ import { invokeExpress } from './invokeExpress';
 import {
   ClaimsOfferSchemaorg,
   ClaimsOrderSchemaorg,
+  ClaimsOrganizationSchemaorg,
   ClaimsServiceSchemaorg,
 } from 'gdc-common-utils-ts/constants/schemaorg';
 import { testClaimsTenant1Registration } from '../../data/end-to-end.data';
@@ -77,7 +81,7 @@ export async function pollJsonBody(
 ): Promise<{ status: number; body: any }> {
   const pollPath = new URL(pollingUrl, 'http://localhost').pathname;
   const response = await invokeExpress(app, {
-    method: 'POST',
+    method: HttpRequestMethods.Post,
     url: pollPath,
     headers: { 'content-type': 'application/json' },
     body: { thid },
@@ -161,14 +165,14 @@ export function buildActivationPayload(): Record<string, unknown> {
       },
       data: [
         {
-          type: 'Organization-activation-request-v1.0',
+          type: GatewayRequestEntryTypes.OrganizationActivation,
           meta: {},
           resource: {
             meta: {
               claims: { ...testClaimsTenant1Registration },
             },
           },
-          request: { method: 'POST' },
+          request: { method: HttpRequestMethods.Post },
         },
       ],
     },
@@ -194,7 +198,7 @@ export function buildActivationPayload(): Record<string, unknown> {
 export async function onboardTenantViaActivateAndOrder(app: express.Express, queueAdapter: QueueAdapterMem): Promise<string> {
   const activationPayload = buildActivationPayload() as any;
   const activationSubmit = await invokeExpress(app, {
-    method: 'POST',
+    method: HttpRequestMethods.Post,
     url: '/host/cds-es/v1/test/registry/org.schema/Organization/_activate',
     headers: { 'content-type': 'application/json' },
     body: activationPayload,
@@ -210,7 +214,7 @@ export async function onboardTenantViaActivateAndOrder(app: express.Express, que
   }
 
   const activationEntry = activationPoll.body.data[0];
-  const offerId = String(activationEntry.meta?.claims?.[ClaimsOfferSchemaorg.identifier] || '');
+  const offerId = String(activationEntry.resource?.meta?.claims?.[ClaimsOfferSchemaorg.identifier] || '');
   if (!offerId) {
     throw new Error('Activation flow did not return an Offer identifier.');
   }
@@ -232,7 +236,7 @@ export async function onboardTenantViaActivateAndOrder(app: express.Express, que
   };
 
   const orderSubmit = await invokeExpress(app, {
-    method: 'POST',
+    method: HttpRequestMethods.Post,
     url: '/host/cds-es/v1/test/registry/org.schema/Order/_batch',
     headers: { 'content-type': 'application/json' },
     body: orderPayload,
@@ -247,7 +251,7 @@ export async function onboardTenantViaActivateAndOrder(app: express.Express, que
     throw new Error(`Activation order poll failed with status ${orderPoll.status}`);
   }
 
-  return String(activationEntry.meta?.claims?.['org.schema.Organization.alternateName'] || '');
+  return String(activationEntry.resource?.meta?.claims?.[ClaimsOrganizationSchemaorg.alternateName] || '');
 }
 
 export function installIcaVerifyFetchMock(): typeof global.fetch {
@@ -280,13 +284,13 @@ export function installIcaVerifyFetchMock(): typeof global.fetch {
           get: (name: string) => name.toLowerCase() === 'content-type' ? 'application/json' : null,
         },
         json: async () => ({
-          resourceType: 'Bundle',
+          resourceType: ResourceTypesFhirR4.Bundle,
           type: 'batch-response',
           total: 1,
           data: [{
             type: 'VerifyResponse-v1.0',
             resource: {
-              resourceType: 'Bundle',
+              resourceType: ResourceTypesFhirR4.Bundle,
             },
           }],
         }),

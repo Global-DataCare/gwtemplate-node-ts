@@ -1,4 +1,5 @@
 // TDD contract: write this test red first; make it green only with the complete real behavior.
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 import { describe, expect, it } from '@jest/globals';
 import { extractHttpRequestDataAsJson } from '../../../utils/http-parser';
 
@@ -14,7 +15,7 @@ describe('http-parser', () => {
         body: {
           data: [
             {
-              type: 'Organization',
+              type: ResourceTypesFhirR4.Organization,
               meta: { claims: { '@context': 'org.schema' } },
             },
           ],
@@ -36,11 +37,11 @@ describe('http-parser', () => {
         iss: 'did:web:sender.example',
         aud: 'did:web:receiver.example',
         body: {
-          resourceType: 'Bundle',
+          resourceType: ResourceTypesFhirR4.Bundle,
           type: 'batch',
           entry: [
             {
-              resource: { resourceType: 'Observation' },
+              resource: { resourceType: ResourceTypesFhirR4.Observation },
               meta: { claims: { '@context': 'org.hl7.fhir.r4' } },
             },
           ],
@@ -63,7 +64,7 @@ describe('http-parser', () => {
         aud: 'did:web:receiver.example',
         type: 'application/custom+json',
         body: {
-          resourceType: 'Bundle',
+          resourceType: ResourceTypesFhirR4.Bundle,
           entry: [],
         },
       },

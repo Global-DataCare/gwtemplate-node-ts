@@ -1,7 +1,7 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 import { describe, expect, it } from '@jest/globals';
 import { buildFhirResourceFromIndexedClaims } from '../../../utils/fhir-resource-rehydration';
-import { ResourceTypesFhirR4 } from '../../../shared/fhir-constants';
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 
 describe('fhir-resource-rehydration utils', () => {
   it('rehydrates MedicationStatement using shared resource-type constants and medication text/display claims', () => {

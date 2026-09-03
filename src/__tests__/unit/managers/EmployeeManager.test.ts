@@ -1,6 +1,10 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/__tests__/unit/managers/EmployeeManager.test.ts
+import { GatewayResponseEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
+import { GatewayRequestEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 
 /**
  * Flow contract: interactive employee onboarding requires an available seat
@@ -116,17 +120,20 @@ describe('EmployeeManager', () => {
   describe('Employee Creation (POST)', () => {
     it('should return a commercial Offer without creating an employee when no licensed seat exists', async () => {
       const job = testBaseJobForEmployeeClaims(testClaimsTenant1Receptionist1, TENANT_ALTERNATE_NAME, TENANT_SECTOR);
+      const requestEntry = job.content!.body!.data[0] as any;
+      requestEntry.resource = { ...(requestEntry.resource || {}), meta: { claims: requestEntry.meta.claims } };
+      delete requestEntry.meta.claims;
       mockTenantsCacheManager.getTenantIdentifierUrn.mockResolvedValue(TENANT_URN);
       mockVaultRepository.getContainersInSection.mockResolvedValue([]);
 
       const response = await employeeManager.process(job);
 
       const entry = response.body.data[0] as any;
-      expect(entry.type).toBe('Employee-license-offer-v1.0');
-      expect(entry.meta.claims[ClaimsOfferSchemaorg.identifier]).toBeDefined();
-      expect(entry.meta.claims[ClaimsOfferSchemaorg.eligibleQuantityValue]).toBe(1);
-      expect(entry.meta.claims[ClaimsOfferSchemaorg.category]).toBe(TENANT_SECTOR);
-      expect(entry.meta.claims[ClaimsOfferSchemaorg.identifier]).toContain(`:${EXAMPLE_JURISDICTION}:v1:${EXAMPLE_SECTOR}:`);
+      expect(entry.type).toBe(GatewayResponseEntryTypes.EmployeeLicenseOffer);
+      expect(entry.resource.meta.claims[ClaimsOfferSchemaorg.identifier]).toBeDefined();
+      expect(entry.resource.meta.claims[ClaimsOfferSchemaorg.eligibleQuantityValue]).toBe(1);
+      expect(entry.resource.meta.claims[ClaimsOfferSchemaorg.category]).toBe(TENANT_SECTOR);
+      expect(entry.resource.meta.claims[ClaimsOfferSchemaorg.identifier]).toContain(`:${EXAMPLE_JURISDICTION}:v1:${EXAMPLE_SECTOR}:`);
       expect(mockVaultRepository.put).toHaveBeenCalledTimes(1);
       expect(mockVaultRepository.put).toHaveBeenCalledWith(
         HOST_COLLECTION_NAME,
@@ -136,7 +143,7 @@ describe('EmployeeManager', () => {
       const persistedOffer = (mockVaultRepository.put as any).mock.calls[0][1][0] as ConfidentialStorageDoc;
       expect(persistedOffer.indexed?.attributes?.find(
         (attribute) => attribute.name === ClaimsOfferSchemaorg.identifier,
-      )?.value).toBe(entry.meta.claims[ClaimsOfferSchemaorg.identifier]);
+      )?.value).toBe(entry.resource.meta.claims[ClaimsOfferSchemaorg.identifier]);
       expect(mockKmsService.provisionKeys).not.toHaveBeenCalled();
     });
 
@@ -414,12 +421,12 @@ describe('EmployeeManager', () => {
       const job = testBaseJobForEmployeeClaims(testClaimsTenant1Receptionist1, TENANT_ALTERNATE_NAME, TENANT_SECTOR);
       job.action = '_search';
       job.content!.body = {
-        resourceType: 'Bundle',
+        resourceType: ResourceTypesFhirR4.Bundle,
         type: 'batch',
         entry: [
           {
             request: {
-              method: 'GET',
+              method: HttpRequestMethods.Get,
               url: `Employee?${ClaimsPersonSchemaorg.email}=${encodeURIComponent(String(testClaimsTenant1Receptionist1[ClaimsPersonSchemaorg.email]))}`,
             },
           },
@@ -477,16 +484,16 @@ describe('EmployeeManager', () => {
       const job = testBaseJobForEmployeeClaims(testClaimsTenant1Receptionist1, TENANT_ALTERNATE_NAME, TENANT_SECTOR);
       job.action = '_search';
       job.content!.body = {
-        resourceType: 'Bundle',
+        resourceType: ResourceTypesFhirR4.Bundle,
         type: 'batch',
         entry: [
           {
             request: {
-              method: 'POST',
+              method: HttpRequestMethods.Post,
               url: 'Employee/_search',
             },
             resource: {
-              resourceType: 'Parameters',
+              resourceType: ResourceTypesFhirR4.Parameters,
               parameter: [
                 {
                   name: ClaimsPersonSchemaorg.email,
@@ -658,13 +665,13 @@ describe('EmployeeManager', () => {
       purgeJob.content!.body!.data = [
         {
           meta: { claims: testClaimsTenant1Receptionist1 },
-          request: { method: 'POST' },
-          type: 'Employee-purge-request-v1.0',
+          request: { method: HttpRequestMethods.Post },
+          type: GatewayRequestEntryTypes.EmployeePurge,
         },
         {
           meta: { claims: testClaimsTenant1Nurse1 },
-          request: { method: 'POST' },
-          type: 'Employee-purge-request-v1.0',
+          request: { method: HttpRequestMethods.Post },
+          type: GatewayRequestEntryTypes.EmployeePurge,
         },
       ] as any;
 

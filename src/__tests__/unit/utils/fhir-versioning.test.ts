@@ -1,4 +1,5 @@
 // TDD contract: write this test red first; make it green only with the complete real behavior.
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 import { describe, expect, it, jest } from '@jest/globals';
 import {
   applyFhirCidVersioningToEntry,
@@ -34,7 +35,7 @@ describe('fhir-versioning utils', () => {
     const entry: any = {
       fullUrl: 'urn:uuid:8e4db04c-3536-4b03-a33a-69bb1f3729e7',
       resource: {
-        resourceType: 'DocumentReference',
+        resourceType: ResourceTypesFhirR4.DocumentReference,
       },
     };
     const claims: Record<string, any> = {
@@ -44,7 +45,7 @@ describe('fhir-versioning utils', () => {
     const out = applyFhirCidVersioningToEntry({
       entry,
       claims,
-      resourceType: 'DocumentReference',
+      resourceType: ResourceTypesFhirR4.DocumentReference,
       resourceId: '8e4db04c-3536-4b03-a33a-69bb1f3729e7',
     });
 

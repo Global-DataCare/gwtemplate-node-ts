@@ -1,4 +1,5 @@
 // TDD contract: write this test red first; make it green only with the complete real behavior.
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 import admin from 'firebase-admin';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -71,7 +72,7 @@ function buildBloodPressureDayBatchDoc(dayLabel: string, dayDate: string): Confi
       created: `${dayDate}T09:00:00Z`,
     },
     content: {
-      resourceType: 'Bundle',
+      resourceType: ResourceTypesFhirR4.Bundle,
       type: 'collection',
       data: entries,
     },
@@ -140,7 +141,7 @@ describeIfConfigured('FirestoreVaultRepository blood-pressure day batches (E2E)'
 
       const hydratedDay1 = await repository.get<ConfidentialStorageDoc>(vaultId, day1Id, sectionId);
       expect(hydratedDay1?.content).toEqual(expect.objectContaining({
-        resourceType: 'Bundle',
+        resourceType: ResourceTypesFhirR4.Bundle,
         type: 'collection',
       }));
       expect(Array.isArray((hydratedDay1?.content as { data?: unknown[] } | undefined)?.data)).toBe(true);

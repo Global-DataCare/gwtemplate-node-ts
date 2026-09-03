@@ -1,3 +1,4 @@
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 import { createHash } from 'crypto';
 import { FhirResourceTypeDataCollections, HealthcareConsentPurposes } from 'gdc-common-utils-ts/constants/index';
 import { ClaimConsent } from 'gdc-common-utils-ts/models/consent-rule';
@@ -122,7 +123,7 @@ async function rebuildProjection(
   }
   const targetCompositionSection = getSubjectScopedSectionId(twinSubjectId, SUBJECT_SECTION_DIGITAL_TWIN, 'composition');
   for (const claims of grouped.values()) {
-    const projectedClaims = projectClaimsForDigitalTwin({ claims, resourceType: 'Composition', twinSubjectId });
+    const projectedClaims = projectClaimsForDigitalTwin({ claims, resourceType: ResourceTypesFhirR4.Composition, twinSubjectId });
     await vaultRepository.put(tenantVaultId, [{
       id: projectedRecordId('Composition', projectedClaims),
       ...projectedClaims,

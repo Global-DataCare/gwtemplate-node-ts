@@ -1,4 +1,8 @@
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 // TDD contract: write this test red first; make it green only with the complete real behavior.
+import { GatewayResponseEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
+import { GatewayRequestEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
 import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
 import type { StoryHarness } from './helpers/story-flow';
 import {
@@ -44,15 +48,15 @@ describe('Employee create/disable/re-enable route story', () => {
     payload.body.data[0].resource = {
       meta: {
         claims: {
-          ...(payload.body.data[0].meta?.claims || {}),
+          ...(payload.body.data[0].resource?.meta?.claims || {}),
         },
       },
     };
     payload.body.data[0].meta = {};
-    payload.body.data[0].request = { method: 'POST' };
+    payload.body.data[0].request = { method: HttpRequestMethods.Post };
 
     const submit = await invokeExpress(harness.app, {
-      method: 'POST', url: employeeUrl,
+      method: HttpRequestMethods.Post, url: employeeUrl,
       headers: { 'content-type': 'application/json' }, body: payload,
     });
     expect(submit.status).toBe(202);
@@ -60,13 +64,13 @@ describe('Employee create/disable/re-enable route story', () => {
 
     const poll = await pollJsonBody(harness.app, submit.headers.location, payload.thid);
     expect(poll.status).toBe(200);
-    expect(poll.body.data[0].type).toBe('Employee-license-offer-v1.0');
-    expect(poll.body.data[0].meta?.claims?.[ClaimsOfferSchemaorg.identifier]).toBeTruthy();
+    expect(poll.body.data[0].type).toBe(GatewayResponseEntryTypes.EmployeeLicenseOffer);
+    expect(poll.body.data[0].resource?.meta?.claims?.[ClaimsOfferSchemaorg.identifier]).toBeTruthy();
     expect(poll.body.data[0].resource?.id).toBeUndefined();
 
     // Confirm the exact Offer through the same auditable zero-price Order path
     // used by staging; the following lifecycle tests then consume that seat.
-    const offerId = poll.body.data[0].meta.claims[ClaimsOfferSchemaorg.identifier];
+    const offerId = poll.body.data[0].resource.meta.claims[ClaimsOfferSchemaorg.identifier];
     const orderPayload = structuredClone(ORGANIZATION_ORDER_REQUEST) as any;
     orderPayload.body.data[0].meta = {};
     orderPayload.body.data[0].resource = { meta: { claims: {
@@ -75,7 +79,7 @@ describe('Employee create/disable/re-enable route story', () => {
       [ClaimsOrderSchemaorg.partOfInvoice]: EXAMPLE_LICENSE_INVOICE_ID,
     } } };
     const orderSubmit = await invokeExpress(harness.app, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       url: '/host/cds-es/v1/test/registry/org.schema/Order/_batch',
       headers: { 'content-type': 'application/json' },
       body: orderPayload,
@@ -96,15 +100,15 @@ describe('Employee create/disable/re-enable route story', () => {
     createPayload.body.data[0].resource = {
       meta: {
         claims: {
-          ...(createPayload.body.data[0].meta?.claims || {}),
+          ...(createPayload.body.data[0].resource?.meta?.claims || {}),
         },
       },
     };
     createPayload.body.data[0].meta = {};
-    createPayload.body.data[0].request = { method: 'POST' };
+    createPayload.body.data[0].request = { method: HttpRequestMethods.Post };
 
     const createSubmit = await invokeExpress(harness.app, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       url: employeeUrl,
       headers: { 'content-type': 'application/json' },
       body: createPayload,
@@ -128,15 +132,15 @@ describe('Employee create/disable/re-enable route story', () => {
       id: employeeId,
       meta: {
         claims: {
-          ...(disablePayload.body.data[0].meta?.claims || {}),
+          ...(disablePayload.body.data[0].resource?.meta?.claims || {}),
         },
       },
     };
     disablePayload.body.data[0].meta = {};
-    disablePayload.body.data[0].request = { method: 'DELETE' };
+    disablePayload.body.data[0].request = { method: HttpRequestMethods.Delete };
 
     const disableSubmit = await invokeExpress(harness.app, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       url: employeeUrl,
       headers: { 'content-type': 'application/json' },
       body: disablePayload,
@@ -159,15 +163,15 @@ describe('Employee create/disable/re-enable route story', () => {
       id: employeeId,
       meta: {
         claims: {
-          ...(reenablePayload.body.data[0].meta?.claims || {}),
+          ...(reenablePayload.body.data[0].resource?.meta?.claims || {}),
         },
       },
     };
     reenablePayload.body.data[0].meta = {};
-    reenablePayload.body.data[0].request = { method: 'POST' };
+    reenablePayload.body.data[0].request = { method: HttpRequestMethods.Post };
 
     const reenableSubmit = await invokeExpress(harness.app, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       url: employeeUrl,
       headers: { 'content-type': 'application/json' },
       body: reenablePayload,
@@ -193,15 +197,15 @@ describe('Employee create/disable/re-enable route story', () => {
     createPayload.body.data[0].resource = {
       meta: {
         claims: {
-          ...(createPayload.body.data[0].meta?.claims || {}),
+          ...(createPayload.body.data[0].resource?.meta?.claims || {}),
         },
       },
     };
     createPayload.body.data[0].meta = {};
-    createPayload.body.data[0].request = { method: 'POST' };
+    createPayload.body.data[0].request = { method: HttpRequestMethods.Post };
 
     const createSubmit = await invokeExpress(harness.app, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       url: employeeUrl,
       headers: { 'content-type': 'application/json' },
       body: createPayload,
@@ -223,15 +227,15 @@ describe('Employee create/disable/re-enable route story', () => {
       id: employeeId,
       meta: {
         claims: {
-          ...(disablePayload.body.data[0].meta?.claims || {}),
+          ...(disablePayload.body.data[0].resource?.meta?.claims || {}),
         },
       },
     };
     disablePayload.body.data[0].meta = {};
-    disablePayload.body.data[0].request = { method: 'DELETE' };
+    disablePayload.body.data[0].request = { method: HttpRequestMethods.Delete };
 
     const disableSubmit = await invokeExpress(harness.app, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       url: employeeUrl,
       headers: { 'content-type': 'application/json' },
       body: disablePayload,
@@ -247,20 +251,20 @@ describe('Employee create/disable/re-enable route story', () => {
     const purgePayload = structuredClone(EMPLOYEE_REGISTRATION_REQUEST) as any;
     purgePayload.thid = 'employee-purge-story-thid';
     purgePayload.jti = 'employee-purge-story-jti';
-    purgePayload.body.data[0].type = 'Employee-purge-request-v1.0';
+    purgePayload.body.data[0].type = GatewayRequestEntryTypes.EmployeePurge;
     purgePayload.body.data[0].resource = {
       id: employeeId,
       meta: {
         claims: {
-          ...(purgePayload.body.data[0].meta?.claims || {}),
+          ...(purgePayload.body.data[0].resource?.meta?.claims || {}),
         },
       },
     };
     purgePayload.body.data[0].meta = {};
-    purgePayload.body.data[0].request = { method: 'POST' };
+    purgePayload.body.data[0].request = { method: HttpRequestMethods.Post };
 
     const purgeSubmit = await invokeExpress(harness.app, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       url: employeeUrl.replace('/_batch', '/_purge'),
       headers: { 'content-type': 'application/json' },
       body: purgePayload,

@@ -1,6 +1,7 @@
 // TDD contract: write this test red first; make it green only with the complete real behavior.
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/__tests__/unit/managers/DocumentReferenceManager.test.ts
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 
 import { describe, expect, it, jest, beforeEach } from '@jest/globals';
 import { DocumentReferenceManager } from '../../../managers/DocumentReferenceManager';
@@ -37,7 +38,7 @@ describe('DocumentReferenceManager', () => {
     sector: 'health-care',
     section: 'individual',
     format: 'org.hl7.fhir.r4',
-    resourceType: 'DocumentReference',
+    resourceType: ResourceTypesFhirR4.DocumentReference,
     action: '_batch',
     content: {
       jti: 'jti-1',
@@ -47,9 +48,9 @@ describe('DocumentReferenceManager', () => {
       exp: Math.floor(Date.now() / 1000) + 300,
       type: 'org.hl7.fhir.r4.Bundle',
       body: {
-        resourceType: 'Bundle',
+        resourceType: ResourceTypesFhirR4.Bundle,
         type: 'batch',
-        entry: [{ type: 'DocumentReference', meta: { claims }, resource: { resourceType: 'DocumentReference' } }],
+        entry: [{ type: ResourceTypesFhirR4.DocumentReference, meta: { claims }, resource: { resourceType: ResourceTypesFhirR4.DocumentReference } }],
       } as any,
     } as any,
   });

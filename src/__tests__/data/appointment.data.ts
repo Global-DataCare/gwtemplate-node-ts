@@ -2,6 +2,7 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/__tests__/data/appointment.data.ts
 // Description: Contains test data fixtures related to FHIR Appointments and Communications.
+import { FhirDataTypes } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 
 import { AppointmentClaimsFhirApi, AppointmentStatus } from '../../gdc-backend-utils-node/models/fhir/Appointment.claims';
 import { testExamplesDidWeb } from './identity.data';
@@ -84,7 +85,7 @@ export const testCommMsgExtAppointmentRequest = {
   // "note": [{ "text": "This is your new appointment. Best regards." }],
   "body": {
     "data": [
-      { type: "Annotation", id: "<text-uuid-v4>", text: testAppointmentRequestText},
+      { type: FhirDataTypes.Annotation, id: "<text-uuid-v4>", text: testAppointmentRequestText},
       {
         "type": "Reference",
         "id": "<uuid-v4>",
@@ -116,7 +117,7 @@ export const testCommMsgExtAppointmentAcceptedResponse = {
   // "note": [{ "text": testAppointmentAcceptedText }],
   "body": {
     "data": [
-      { type: "Annotation", id: "<text-uuid-v4>", text: testAppointmentAcceptedText},
+      { type: FhirDataTypes.Annotation, id: "<text-uuid-v4>", text: testAppointmentAcceptedText},
       {
         "type": "org.hl7.fhir.api.AppointmentResponse",
         "id": "<appointment-accepted-response-uuid>",
@@ -137,7 +138,7 @@ export const testCommMsgExtAppointmentCancelledResponse = {
   // "note": [{ "text": testAppointmentCancelledText }],
   "body": {
     "data": [
-      { type: "Annotation", id: "<text-uuid-v4>", text: testAppointmentAcceptedText},
+      { type: FhirDataTypes.Annotation, id: "<text-uuid-v4>", text: testAppointmentAcceptedText},
       {
         "type": "org.hl7.fhir.api.AppointmentResponse",
         "id": "<appointment-cancelled-response-uuid>",

@@ -1,4 +1,6 @@
 // TDD contract: write this test red first; make it green only with the complete real behavior.
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 import {
   HealthcareActorRoles,
   HealthcareBasicSections,
@@ -42,12 +44,12 @@ describe('demo smart access local-network builders', () => {
     expect(buildDemoIndividualIpsSearchRequest({ subjectDid })).toEqual({
       thid: DEMO_SMART_ACCESS_LOCAL_IDS.individualBundleSearchThreadId,
       body: {
-        resourceType: 'Bundle',
+        resourceType: ResourceTypesFhirR4.Bundle,
         type: 'batch',
         entry: [
           {
             request: {
-              method: 'GET',
+              method: HttpRequestMethods.Get,
               url:
                 `Bundle?type=document&composition.subject=${encodeURIComponent(subjectDid)}`
                 + `&composition.type=${encodeURIComponent(HealthcareBasicSections.PatientSummaryDocument.claim)}`,
@@ -133,7 +135,7 @@ describe('demo smart access local-network builders', () => {
     expect(buildDemoDigitalTwinResearchSubjectSearchRequest()).toEqual({
       thid: DEMO_SMART_ACCESS_LOCAL_IDS.digitalTwinSearchThreadId,
       body: {
-        resourceType: 'Parameters',
+        resourceType: ResourceTypesFhirR4.Parameters,
         parameter: [
           { name: 'section', valueString: HealthcareBasicSections.HistoryOfMedicationUse.attributeValue },
           { name: 'MedicationStatement.code', valueString: 'http://snomed.info/sct|387207008' },

@@ -1,6 +1,7 @@
 // TDD contract: write this test red first; make it green only with the complete real behavior.
 // src/__tests__/integration/pingApi.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
 
 import express from 'express';
 import { CryptographyService } from 'gdc-common-utils-ts/CryptographyService';
@@ -105,7 +106,7 @@ describe('Ping API Endpoint', () => {
       const expectedPollingUrl = `http://testhost.com${pingUrl.replace('/_batch', '/_batch-response')}`;
       // --- Act ---
       const response = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: pingUrl,
         headers: { 'content-type': 'application/x-www-form-urlencoded' },
         body: { request: testEncryptedJwePing },
@@ -165,7 +166,7 @@ describe('Ping API Endpoint', () => {
 
       // --- Act ---
       const response = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: pingUrl,
         headers: { 'content-type': 'application/x-www-form-urlencoded' },
         body: { request: testEncryptedJwePing },
@@ -193,7 +194,7 @@ describe('Ping API Endpoint', () => {
         const pingUrl = '/nonexistent-tenant/cds-xx/v1/test/ping/standard/resource/_batch';
 
         const response = await invokeExpress(app, {
-          method: 'POST',
+          method: HttpRequestMethods.Post,
           url: pingUrl,
           headers: { 'content-type': 'application/x-www-form-urlencoded' },
           body: { request: testEncryptedJwePing },
@@ -214,7 +215,7 @@ describe('Ping API Endpoint', () => {
         const pingUrl = '/tenant1/cds-xx/v1/test/ping/standard/resource/_batch';
 
         const response = await invokeExpress(app, {
-          method: 'POST',
+          method: HttpRequestMethods.Post,
           url: pingUrl,
           headers: { 'content-type': 'application/x-www-form-urlencoded' },
           body: { request: testEncryptedJwePing },
@@ -244,7 +245,7 @@ describe('Ping API Endpoint', () => {
       // --- Act ---
       try {
         const response = await invokeExpress(app, {
-          method: 'POST',
+          method: HttpRequestMethods.Post,
           url: pingUrl,
           headers: { 'content-type': 'application/json' },
           body: decodedPingMessage,
@@ -272,7 +273,7 @@ describe('Ping API Endpoint', () => {
       const fhirPollingUrl = '/host/cds-xx/v1/test/individual/org.hl7.fhir.r4/Consent/_batch-response';
 
       const response = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: fhirPollingUrl,
         headers: { 'content-type': 'application/x-www-form-urlencoded' },
         body: {},
@@ -292,7 +293,7 @@ describe('Ping API Endpoint', () => {
       const fhirPollingUrl = '/host/cds-xx/v1/test/individual/org.hl7.fhir.r4/Consent/_batch-response';
 
       const response = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: fhirPollingUrl,
         headers: { 'content-type': 'application/fhir+json' },
         body: {},
@@ -313,7 +314,7 @@ describe('Ping API Endpoint', () => {
       const { app } = setupApp(asyncResponseStore);
 
       const response = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: pollingUrl,
         headers: { 'content-type': 'application/x-www-form-urlencoded' },
         body: { thid },
@@ -330,7 +331,7 @@ describe('Ping API Endpoint', () => {
       const { app } = setupApp(asyncResponseStore);
 
       const response = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: pollingUrl,
         headers: { 'content-type': 'application/x-www-form-urlencoded' },
         body: { thid },
@@ -369,7 +370,7 @@ describe('Ping API Endpoint', () => {
       
       // --- Act ---
       const response = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: pollingUrl,
         headers: { 'content-type': 'application/x-www-form-urlencoded' },
         body: { thid },

@@ -1,6 +1,10 @@
 // TDD contract: write this test red first; make it green only with the complete real behavior.
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/__test__/data/end-to-end.data.ts
+import { GatewayRequestEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
+import { HttpMediaTypes } from 'gdc-common-utils-ts/constants/http';
+import { UrnPrefixes } from 'gdc-common-utils-ts/constants/urn';
+import { EXAMPLE_HOST_PUBLIC_DID } from 'gdc-common-utils-ts/examples/shared';
 
 import { ClaimsRecord } from 'gdc-common-utils-ts/models/resource-document';
 import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
@@ -98,17 +102,18 @@ export const testClaimsTenant1Registration: ClaimsRecord = {
  */
 export const testPayloadCreateTenant1 = {
   thid: `thid-${testConfigTenant1.id}`,
-  iss: `urn:email:${testTenant1Admin1Email}`,
-  aud: 'did:web:host.example.com',
-  type: 'api+json',
+  iss: `${UrnPrefixes.Email}${testTenant1Admin1Email}`,
+  aud: EXAMPLE_HOST_PUBLIC_DID,
+  type: HttpMediaTypes.ApiJsonShort,
   body: {
     data: [
       {
-        type: 'Organization-registration-form-v1.0',
-        meta: {
-          claims: testClaimsTenant1Registration,
+        type: GatewayRequestEntryTypes.OrganizationRegistrationForm,
+        resource: {
+          meta: {
+            claims: testClaimsTenant1Registration,
+          },
         },
-        resource: {},
       },
     ],
   },

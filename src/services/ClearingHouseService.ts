@@ -1,3 +1,4 @@
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
 import { createHash } from 'crypto';
 
 export type ClearingHouseVerificationRequest = {
@@ -26,7 +27,7 @@ export class ClearingHouseService implements IClearingHouseService {
         throw new Error('CLEARING_HOUSE_URL is required when CLEARING_HOUSE_MODE=remote');
       }
       const response = await fetch(baseUrl, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           vp_token: request.vpToken,

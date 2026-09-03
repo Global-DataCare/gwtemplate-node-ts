@@ -1,13 +1,14 @@
 // TDD contract: write this test red first; make it green only with the complete real behavior.
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 import type { BundleEntry } from 'gdc-common-utils-ts/models/bundle';
 import { ClaimConsent, ConsentDecisions } from 'gdc-common-utils-ts/models/consent-rule';
 import { buildConsentRulePrimaryDocument } from '../../../utils/consent-access-blockchain';
 
 function buildConsentEntry(actorRole: string): BundleEntry {
   return {
-    type: 'Consent',
+    type: ResourceTypesFhirR4.Consent,
     resource: {
-      resourceType: 'Consent',
+      resourceType: ResourceTypesFhirR4.Consent,
       meta: {
         claims: {
           '@context': 'org.hl7.fhir.api',

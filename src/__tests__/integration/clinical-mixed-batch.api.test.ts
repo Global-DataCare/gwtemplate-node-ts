@@ -1,3 +1,4 @@
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 /**
  * Flow contract journey: 1) bootstrap one tenant and authenticated clinical
  * Communication route; 2) create one subject-scoped Immunization through an
@@ -9,6 +10,10 @@
  * inner batch entry has an independent terminal response and DELETE never
  * treats a business identifier as the technical FHIR id.
  */
+import { GatewayRequestEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
+import { HttpStatusCodes } from 'gdc-common-utils-ts/constants/http';
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 import { invokeExpress } from './helpers/invokeExpress';
 import { getTenantVaultId, generateTenantCollectionNameFromClaims } from '../../utils/tenant';
 import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
@@ -52,7 +57,7 @@ describe('clinical mixed batch API (integration)', () => {
         [ClaimsOrganizationSchemaorg.identifierValue]: process.env.ORG_HOST_ID_VALUE,
         [ClaimsServiceSchemaorg.category]: Sector.SYSTEM,
       } as any);
-      const tenantClaims = testPayloadCreateTenant1.body.data[0].meta.claims as any;
+      const tenantClaims = testPayloadCreateTenant1.body.data[0].resource.meta.claims as any;
       const tenantVaultId = getTenantVaultId(tenantClaims[ClaimsServiceSchemaorg.category], testTenant1TenantId);
       await kmsService.provisionKeys(tenantVaultId);
       const secureTenantRecord = await kmsService.protectConfidentialData({
@@ -73,7 +78,7 @@ describe('clinical mixed batch API (integration)', () => {
 
       const submit = async (thid: string, innerEntry: Record<string, unknown>) => {
         const attachment = Buffer.from(JSON.stringify({
-          resourceType: 'Bundle',
+          resourceType: ResourceTypesFhirR4.Bundle,
           type: 'batch',
           entry: [innerEntry],
         }), 'utf8').toString('base64');
@@ -87,7 +92,7 @@ describe('clinical mixed batch API (integration)', () => {
           [CommunicationClaim.ContentAttachmentData]: attachment,
         };
         const response = await invokeExpress(app, {
-          method: 'POST',
+          method: HttpRequestMethods.Post,
           url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch`,
           headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
           body: {
@@ -97,12 +102,12 @@ describe('clinical mixed batch API (integration)', () => {
             type: 'application/didcomm-plain+json',
             thid,
             body: {
-              resourceType: 'Bundle',
+              resourceType: ResourceTypesFhirR4.Bundle,
               type: 'batch',
               entry: [{
-                request: { method: 'POST', url: 'Communication' },
+                request: { method: HttpRequestMethods.Post, url: 'Communication' },
                 meta: { claims },
-                resource: { resourceType: 'Communication', status: 'completed', meta: { claims } },
+                resource: { resourceType: ResourceTypesFhirR4.Communication, status: 'completed', meta: { claims } },
               }],
             },
           },
@@ -110,7 +115,7 @@ describe('clinical mixed batch API (integration)', () => {
         expect(response.status).toBe(202);
         for (let attempt = 0; attempt < 80; attempt += 1) {
           const poll = await invokeExpress(app, {
-            method: 'POST',
+            method: HttpRequestMethods.Post,
             url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch-response`,
             headers: { 'content-type': 'application/json' },
             body: { thid },
@@ -122,24 +127,24 @@ describe('clinical mixed batch API (integration)', () => {
       };
 
       const created = await submit('mixed-batch-create', {
-        type: 'Immunization-create-request-v1.0',
-        request: { method: 'POST', url: 'Immunization' },
+        type: GatewayRequestEntryTypes.ImmunizationCreate,
+        request: { method: HttpRequestMethods.Post, url: 'Immunization' },
         resource: {
-          resourceType: 'Immunization',
+          resourceType: ResourceTypesFhirR4.Immunization,
           id: resourceId,
           meta: { claims: { 'Immunization.subject': subjectDid, 'Immunization.status': 'completed' } },
         },
       });
       expect(created.data).toEqual(expect.arrayContaining([
-        expect.objectContaining({ id: resourceId, response: expect.objectContaining({ status: '201' }) }),
+        expect.objectContaining({ id: resourceId, response: expect.objectContaining({ status: String(HttpStatusCodes.Created) }) }),
       ]));
       const stored = await vaultRepository.get<any>(tenantVaultId, resourceId, sectionId);
       expect(stored?.audit?.creatorDid).toBeTruthy();
 
       const stale = await submit('mixed-batch-stale-delete', {
-        type: 'Immunization-delete-request-v1.0',
-        request: { method: 'DELETE', url: `Immunization/${resourceId}`, ifMatch: 'W/"stale"' },
-        resource: { resourceType: 'Immunization', id: resourceId, meta: { claims: {} } },
+        type: GatewayRequestEntryTypes.ImmunizationDelete,
+        request: { method: HttpRequestMethods.Delete, url: `Immunization/${resourceId}`, ifMatch: 'W/"stale"' },
+        resource: { resourceType: ResourceTypesFhirR4.Immunization, id: resourceId, meta: { claims: {} } },
       });
       expect(stale.data).toEqual(expect.arrayContaining([
         expect.objectContaining({ id: resourceId, response: expect.objectContaining({ status: '412' }) }),
@@ -147,12 +152,12 @@ describe('clinical mixed batch API (integration)', () => {
       expect(await vaultRepository.get(tenantVaultId, resourceId, sectionId)).toBeTruthy();
 
       const deleted = await submit('mixed-batch-delete', {
-        type: 'Immunization-delete-request-v1.0',
-        request: { method: 'DELETE', url: `Immunization/${resourceId}` },
-        resource: { resourceType: 'Immunization', id: resourceId, meta: { claims: {} } },
+        type: GatewayRequestEntryTypes.ImmunizationDelete,
+        request: { method: HttpRequestMethods.Delete, url: `Immunization/${resourceId}` },
+        resource: { resourceType: ResourceTypesFhirR4.Immunization, id: resourceId, meta: { claims: {} } },
       });
       expect(deleted.data).toEqual(expect.arrayContaining([
-        expect.objectContaining({ id: resourceId, response: expect.objectContaining({ status: '204' }) }),
+        expect.objectContaining({ id: resourceId, response: expect.objectContaining({ status: String(HttpStatusCodes.NoContent) }) }),
       ]));
       expect(await vaultRepository.get(tenantVaultId, resourceId, sectionId)).toBeUndefined();
     } finally {

@@ -1,4 +1,7 @@
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 // TDD contract: write this test red first; make it green only with the complete real behavior.
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 import { invokeExpress } from '../helpers/invokeExpress';
 import { getTenantVaultId } from '../../../utils/tenant';
 import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
@@ -49,7 +52,7 @@ describe('SMART scope route gates (integration)', () => {
     };
     const hostCollectionName = generateTenantCollectionNameFromClaims(hostBootstrapClaims);
 
-    const tenantClaims = testPayloadCreateTenant1.body.data[0].meta.claims as any;
+    const tenantClaims = testPayloadCreateTenant1.body.data[0].resource.meta.claims as any;
     const tenantVaultId = getTenantVaultId(
       tenantClaims[ClaimsServiceSchemaorg.category],
       tenantClaims['org.schema.Organization.alternateName'],
@@ -94,12 +97,12 @@ describe('SMART scope route gates (integration)', () => {
       });
 
       const response = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: `/${testTenant1AlternateName}/cds-ES/v1/health-care/individual/org.hl7.fhir.api/Communication/_batch`,
         headers: { 'content-type': 'application/json', authorization: `Bearer ${bearer}` },
         body: {
           thid: 'individual-scope-gate-001',
-          body: { resourceType: 'Bundle', type: 'batch', data: [] },
+          body: { resourceType: ResourceTypesFhirR4.Bundle, type: 'batch', data: [] },
         },
       });
 
@@ -119,12 +122,12 @@ describe('SMART scope route gates (integration)', () => {
       });
 
       const response = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: `/${testTenant1AlternateName}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.api/ResearchSubject/_search`,
         headers: { 'content-type': 'application/json', authorization: `Bearer ${bearer}` },
         body: {
           thid: 'digitaltwin-scope-gate-001',
-          body: { resourceType: 'Bundle', type: 'batch', data: [] },
+          body: { resourceType: ResourceTypesFhirR4.Bundle, type: 'batch', data: [] },
         },
       });
 
@@ -143,13 +146,13 @@ describe('SMART scope route gates (integration)', () => {
         scope: 'organization/ResearchSubject.rs?subject=*',
       });
       const response = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: `/${testTenant1AlternateName}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.r4/ResearchSubject/_search`,
         headers: { 'content-type': 'application/json', authorization: `Bearer ${bearer}` },
         body: {
           thid: 'legacy-tenant-researchsubject-search-001',
           body: {
-            resourceType: 'Parameters',
+            resourceType: ResourceTypesFhirR4.Parameters,
             parameter: [
               { name: 'section', valueString: 'http://loinc.org|10160-0' },
               { name: 'date-from', valueDate: '2024-01-01' },

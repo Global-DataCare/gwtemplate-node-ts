@@ -1,6 +1,9 @@
 // Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/__tests__/unit/managers/RelatedPersonManager.test.ts
+import { GatewayResponseEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
+import { HttpStatusCodes } from 'gdc-common-utils-ts/constants/http';
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 
 import { describe, expect, it, jest, beforeEach, afterEach } from '@jest/globals';
 import { RelatedPersonManager } from '../../../managers/RelatedPersonManager';
@@ -47,7 +50,7 @@ describe('RelatedPersonManager', () => {
     sector: 'health-care',
     section: 'individual',
     format: 'org.hl7.fhir.api',
-    resourceType: 'RelatedPerson',
+    resourceType: ResourceTypesFhirR4.RelatedPerson,
     action: '_batch',
     content: {
       jti: 'jti-relatedperson-1',
@@ -57,10 +60,10 @@ describe('RelatedPersonManager', () => {
       exp: Math.floor(Date.now() / 1000) + 300,
       type: 'org.hl7.fhir.api.Bundle',
       body: {
-        resourceType: 'Bundle',
+        resourceType: ResourceTypesFhirR4.Bundle,
         type: 'batch',
         entry: [{
-          type: 'RelatedPerson',
+          type: ResourceTypesFhirR4.RelatedPerson,
           meta: {
             claims: {
               '@context': 'org.hl7.fhir.api',
@@ -111,10 +114,10 @@ describe('RelatedPersonManager', () => {
         exp: Math.floor(Date.now() / 1000) + 300,
         type: 'org.hl7.fhir.api.Bundle',
         body: {
-          resourceType: 'Bundle',
+          resourceType: ResourceTypesFhirR4.Bundle,
           type: 'batch',
           entry: [{
-            type: 'RelatedPerson',
+            type: ResourceTypesFhirR4.RelatedPerson,
             resource: {
               meta: {
                 status: EntityLifecycleStatus.Inactive,
@@ -149,10 +152,10 @@ describe('RelatedPersonManager', () => {
         exp: Math.floor(Date.now() / 1000) + 300,
         type: 'org.hl7.fhir.api.Bundle',
         body: {
-          resourceType: 'Bundle',
+          resourceType: ResourceTypesFhirR4.Bundle,
           type: 'batch',
           entry: [{
-            type: 'RelatedPerson',
+            type: ResourceTypesFhirR4.RelatedPerson,
             resource: {
               id: 'urn:uuid:rel-001',
               meta: {
@@ -200,7 +203,7 @@ describe('RelatedPersonManager', () => {
       content: {
         ...(sourceJob.content as any),
         body: {
-          resourceType: 'Parameters',
+          resourceType: ResourceTypesFhirR4.Parameters,
           parameter: [{ name: 'patient', valueString: subject }],
         },
       } as any,
@@ -213,12 +216,12 @@ describe('RelatedPersonManager', () => {
     expect((response.body as any).total).toBe(1);
     expect((response.body as any).data).toHaveLength(1);
     expect((response.body as any).data[0]).toMatchObject({
-      type: 'RelatedPerson-search-response-v1.0',
-      response: { status: '200' },
+      type: GatewayResponseEntryTypes.RelatedPersonSearch,
+      response: { status: String(HttpStatusCodes.Ok) },
       resource: {
-        type: 'RelatedPerson',
+        type: ResourceTypesFhirR4.RelatedPerson,
         resource: {
-          resourceType: 'RelatedPerson',
+          resourceType: ResourceTypesFhirR4.RelatedPerson,
           id: 'urn:uuid:rel-001',
         },
       },
@@ -232,7 +235,7 @@ describe('RelatedPersonManager', () => {
       action: '_search',
       content: {
         ...(sourceJob.content as any),
-        body: { resourceType: 'Parameters', parameter: [] },
+        body: { resourceType: ResourceTypesFhirR4.Parameters, parameter: [] },
       } as any,
     }))).rejects.toThrow('RelatedPerson search requires an explicit subject or patient.');
     expect(mockVaultRepository.listContainersInSection).not.toHaveBeenCalled();

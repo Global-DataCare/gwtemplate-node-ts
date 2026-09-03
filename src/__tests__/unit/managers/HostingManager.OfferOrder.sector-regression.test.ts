@@ -1,4 +1,4 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 import { beforeEach } from '@jest/globals';
 import { VaultMemRepository } from '../../../database/repositories/vault/vault.mem.repository';
 import { TenantsCacheManager } from '../../../managers/TenantsCacheManager';
@@ -97,11 +97,11 @@ beforeEach(async () => {
 
 test('should FAIL if tenant vaultId is constructed with network sector instead of business sector', async () => {
   const job = { ...ORGANIZATION_REGISTRATION_JOB };
-  if (!job.content || !job.content.body || !job.content.body.data || !job.content.body.data[0] || !job.content.body.data[0].meta || !job.content.body.data[0].meta.claims) {
+  if (!job.content || !job.content.body || !job.content.body.data || !job.content.body.data[0]?.resource?.meta?.claims) {
     throw new Error('Malformed ORGANIZATION_REGISTRATION_JOB fixture');
   }
   // Forzamos el sector a uno de red (incorrecto para tenant)
-  job.content.body.data[0].meta.claims[ClaimsServiceSchemaorg.category] = Sector.TEST;
+  job.content.body.data[0].resource.meta.claims[ClaimsServiceSchemaorg.category] = Sector.TEST;
   // El manager encapsula errores en el bundle de respuesta (no lanza excepción aquí).
   const response = await hostingManager.process(job as any);
   const issue = (response as any)?.body?.data?.[0]?.response?.outcome?.issue?.[0];

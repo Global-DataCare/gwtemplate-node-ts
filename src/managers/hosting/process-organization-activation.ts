@@ -1,3 +1,5 @@
+import { GatewayResponseEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
+import { HttpStatusCodes } from 'gdc-common-utils-ts/constants/http';
 import { v4 as uuidv4 } from 'uuid';
 import type { BundleEntry, BundleJsonApi, ErrorEntry } from 'gdc-common-utils-ts/models/bundle';
 import type { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
@@ -32,6 +34,8 @@ import {
   HOST_ACTIVATE_REQUIRED_OUTPUT_CLAIMS,
 } from './hosting-claim-contracts';
 import { allowsLegacyRepresentativeBootstrap } from './legacy-representative-bootstrap-policy';
+import { GatewayClaim } from '../../shared/gateway-claim-contract';
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 
 type ActivationParticipantMaterial = {
   did?: string;
@@ -151,7 +155,7 @@ export async function processOrganizationActivation(
 
   const responseBundle: BundleJsonApi = {
     data: responseEntries,
-    resourceType: 'Bundle',
+    resourceType: ResourceTypesFhirR4.Bundle,
     type: getBundleResponseTypeForAction(deps.job.action),
     total: responseEntries.length,
   };
@@ -184,7 +188,7 @@ async function processActivationEntry(
   if (!activation.vpToken || typeof activation.vpToken !== 'string') {
     throw new ManagerError("Missing required activation proof 'vp_token'.", IssueType.Required);
   }
-  const rawClaims = deps.entry?.meta?.claims;
+  const rawClaims = deps.entry?.resource?.meta?.claims ?? deps.entry?.meta?.claims;
   const claims = rawClaims ? normalizeContextualizedClaims(rawClaims) : rawClaims;
   if (!claims) {
     throw new ManagerError('Malformed activation entry: missing meta.claims', IssueType.Required);
@@ -372,24 +376,21 @@ async function processActivationEntry(
     await deps.refreshTenant(vaultId);
 
     return {
-      type: 'Organization-activation-response-v1.0',
-      meta: {
-        claims: {
+      type: GatewayResponseEntryTypes.OrganizationActivation,
+      resource: { resourceType: ResourceTypesFhirR4.Organization, id: organization.id, meta: { claims: {
           ...processedClaims,
-          'org.schema.Organization.did': storedDid.id,
+          [GatewayClaim.OrganizationDid]: storedDid.id,
           ...(representativeActivationCode ? {
             'org.schema.IndividualProduct.serialNumber': representativeActivationCode,
             'org.schema.IndividualProduct.category': 'professional',
           } : {}),
-          'org.schema.Action.clearingHouse.acr': clearingResult.acr,
-          'org.schema.Action.clearingHouse.ledgerVerified': String(clearingResult.ledgerVerified),
-          'org.schema.Action.activation.networkMode': trustResult.trustPolicy.networkMode,
-          'org.schema.Action.activation.revocationChecked': String(trustResult.trustPolicy.revocationChecked),
-          'org.schema.Action.activation.onChainChecked': String(trustResult.trustPolicy.onChainChecked),
-        },
-      },
-      resource: { resourceType: 'Organization', id: organization.id },
-      response: { status: '200' },
+          [GatewayClaim.ClearingHouseAcr]: clearingResult.acr,
+          [GatewayClaim.ClearingHouseLedgerVerified]: String(clearingResult.ledgerVerified),
+          [GatewayClaim.ActivationNetworkMode]: trustResult.trustPolicy.networkMode,
+          [GatewayClaim.ActivationRevocationChecked]: String(trustResult.trustPolicy.revocationChecked),
+          [GatewayClaim.ActivationOnChainChecked]: String(trustResult.trustPolicy.onChainChecked),
+        } } },
+      response: { status: String(HttpStatusCodes.Ok) },
     };
   }
 
@@ -508,22 +509,20 @@ async function processActivationEntry(
   }
 
   return {
-    type: 'Organization-activation-response-v1.0',
-    meta: {
-      claims: {
-        ...processedClaims,
-        'org.schema.Organization.did': finalTenantConfig.didDocument?.id,
-        'org.schema.Action.clearingHouse.acr': clearingResult.acr,
-        'org.schema.Action.clearingHouse.ledgerVerified': String(clearingResult.ledgerVerified),
-        'org.schema.Action.activation.networkMode': trustResult.trustPolicy.networkMode,
-        'org.schema.Action.activation.revocationChecked': String(trustResult.trustPolicy.revocationChecked),
-        'org.schema.Action.activation.onChainChecked': String(trustResult.trustPolicy.onChainChecked),
-      },
-    },
+    type: GatewayResponseEntryTypes.OrganizationActivation,
     resource: {
-      resourceType: 'Organization',
+      resourceType: ResourceTypesFhirR4.Organization,
       id: organization.id,
+      meta: { claims: {
+        ...processedClaims,
+        [GatewayClaim.OrganizationDid]: finalTenantConfig.didDocument?.id,
+        [GatewayClaim.ClearingHouseAcr]: clearingResult.acr,
+        [GatewayClaim.ClearingHouseLedgerVerified]: String(clearingResult.ledgerVerified),
+        [GatewayClaim.ActivationNetworkMode]: trustResult.trustPolicy.networkMode,
+        [GatewayClaim.ActivationRevocationChecked]: String(trustResult.trustPolicy.revocationChecked),
+        [GatewayClaim.ActivationOnChainChecked]: String(trustResult.trustPolicy.onChainChecked),
+      } },
     },
-    response: { status: '201' },
+    response: { status: String(HttpStatusCodes.Created) },
   };
 }

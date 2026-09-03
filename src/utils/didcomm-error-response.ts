@@ -1,12 +1,13 @@
 // src/utils/didcomm-error-response.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 
 import type { Request, Response } from 'express';
 import { IssueLevel, IssueTypeCode } from 'gdc-common-utils-ts/models/issue';
 import { createOperationOutcome } from './outcome';
 
 export type LegacyFhirErrorBody = {
-  resourceType: 'Bundle';
+  resourceType: typeof ResourceTypesFhirR4.Bundle;
   entry: [];
   total: 0;
   issues: {
@@ -17,7 +18,7 @@ export type LegacyFhirErrorBody = {
 export type DidcommErrorEnvelope = {
   type: 'application/bundle-api+json' | 'application/fhir+json';
   body: {
-    resourceType: 'Bundle';
+    resourceType: typeof ResourceTypesFhirR4.Bundle;
     total: 0;
     issues: {
       issue: ReturnType<typeof createOperationOutcome>['issue'];
@@ -59,7 +60,7 @@ export function createDidcommEarlyErrorEnvelope(params: {
     ? {
         type: 'application/fhir+json',
         body: {
-          resourceType: 'Bundle',
+          resourceType: ResourceTypesFhirR4.Bundle,
           entry: [],
           total: 0,
           issues: { issue: outcome.issue },
@@ -68,7 +69,7 @@ export function createDidcommEarlyErrorEnvelope(params: {
     : {
         type: 'application/bundle-api+json',
         body: {
-          resourceType: 'Bundle',
+          resourceType: ResourceTypesFhirR4.Bundle,
           data: [],
           total: 0,
           issues: { issue: outcome.issue },
@@ -89,7 +90,7 @@ export function sendDidcommEarlyError(
   // LEGACY_FHIR mode: no DIDComm envelope, return raw FHIR JSON body.
   if (isLegacyFhirDirectRequest(req)) {
     const body: LegacyFhirErrorBody = {
-      resourceType: 'Bundle',
+      resourceType: ResourceTypesFhirR4.Bundle,
       entry: [],
       total: 0,
       issues: { issue: outcome.issue },

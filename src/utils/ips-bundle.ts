@@ -153,7 +153,7 @@ export async function buildConsolidatedIpsBundleDocument(
     compositionClaims['Composition.author'] = Array.from(authorRefs).join(',');
   }
   const compositionResource: Record<string, any> = {
-    resourceType: 'Composition',
+    resourceType: ResourceTypesFhirR4.Composition,
     id: compositionId,
     identifier: [{ value: compositionIdentifier }],
     status: 'final',
@@ -182,7 +182,7 @@ export async function buildConsolidatedIpsBundleDocument(
   };
 
   return {
-    resourceType: 'Bundle',
+    resourceType: ResourceTypesFhirR4.Bundle,
     type: 'document',
     entry: [
       {

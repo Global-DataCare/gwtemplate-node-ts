@@ -2,21 +2,29 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // Always create JSDoc, do not use strings inline in keys nor values, use types instead, and reuse the data test examples.
 // File: src/__tests__/data/example-payloads.ts
+import { GatewayResponseEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
+import { GatewayRequestEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
+import { HttpStatusCodes } from 'gdc-common-utils-ts/constants/http';
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 
 import { testClaimsOfferEntityExpanded, testClaimsOfferFamilyExpanded } from './offer.data';
 import { testClaimsRegisterTenantExpanded } from './organization.data';
 import { testFamilyRegisterExpanded } from './family.data';
+import { EXAMPLE_ORGANIZATION_EMPLOYEE_INPUT } from 'gdc-common-utils-ts/examples/api-flow-examples';
 import {
   HealthcareActorRoles,
   HealthcareConsentActions,
   HealthcareConsentPurposes,
 } from 'gdc-common-utils-ts/constants/index';
+import { Format } from 'gdc-common-utils-ts/constants/Schemas';
 import {
   ClaimsOrderSchemaorg,
   ClaimsOrganizationSchemaorg,
   ClaimsPersonSchemaorg,
   ClaimsServiceSchemaorg,
 } from 'gdc-common-utils-ts/constants/schemaorg';
+import { EXAMPLE_SIGNED_TERMS_PDF_URL } from 'gdc-common-utils-ts/examples/shared';
 
 
 /**
@@ -141,7 +149,7 @@ const metaRequestBodyOnlyKidHeader = {
 };
 
 const organizationVerificationTransactionBody = {
-  resourceType: 'Bundle',
+  resourceType: ResourceTypesFhirR4.Bundle,
   type: 'collection',
   total: 1,
   data: [{
@@ -226,12 +234,14 @@ export const ORGANIZATION_REGISTRATION_REQUEST = {
   "body": {
     "data": [{
       "type": "Organization-registration-form-v1.0",
-      "meta": {
+      "resource": {
+        "meta": {
         "claims": {
-          "@context": "org.schema",
+          "@context": Format.SCHEMA,
           "@type": "template",
-          ...((({ "org.schema.Organization.alternateName": _alternateName, ...legalClaims }) => legalClaims)(testClaimsRegisterTenantExpanded)),
-          "org.schema.Service.termsOfService": pdfEmbeddedData,
+          ...((({ [ClaimsOrganizationSchemaorg.alternateName]: _alternateName, ...legalClaims }) => legalClaims)(testClaimsRegisterTenantExpanded)),
+          [ClaimsServiceSchemaorg.termsOfService]: pdfEmbeddedData,
+        },
         },
       },
     }],
@@ -255,12 +265,14 @@ export const ORGANIZATION_REGISTRATION_RESPONSE = {
   "body": {
     "data": [{
       "type": "Organization-registration-offer-v1.0",
-      "meta": {
+      "resource": {
+        "meta": {
         "claims": {
-          "@context": "org.schema",
+          "@context": Format.SCHEMA,
           "@type": "receipt",
-          "org.schema.Service.termsOfService": "<url-stored-pdf>",
+          [ClaimsServiceSchemaorg.termsOfService]: "<url-stored-pdf>",
           ...testClaimsOfferEntityExpanded,
+        }
         }
       }
     }]
@@ -284,10 +296,12 @@ export const ORGANIZATION_ORDER_REQUEST = {
   "body": {
     "data": [{
       "type": "Organization-order-request-v1.0",
-      "meta": {
+      "resource": {
+        "meta": {
         "claims": {
-          "@context": "org.schema",
+          "@context": Format.SCHEMA,
           [ClaimsOrderSchemaorg.acceptedOfferIdentifier]: "{{offerId}}",
+        }
         }
       }
     }]
@@ -767,7 +781,7 @@ export const LICENSE_ISSUE_REQUEST = {
   aud: 'did:web:api.acme.org#identity_openid_license_issue',
   type: 'application/api+json',
   body: {
-    resourceType: 'Bundle',
+    resourceType: ResourceTypesFhirR4.Bundle,
     type: 'batch',
     data: [
       {
@@ -782,7 +796,7 @@ export const LICENSE_ISSUE_REQUEST = {
             'org.schema.IndividualProduct.additionalType': 'mobile',
           },
         },
-        request: { method: 'POST', url: '/acme/cds-ES/v1/health-care/identity/openid/License/_issue' },
+        request: { method: HttpRequestMethods.Post, url: '/acme/cds-ES/v1/health-care/identity/openid/License/_issue' },
       },
     ],
   },
@@ -854,21 +868,10 @@ export const EMPLOYEE_REGISTRATION_REQUEST = {
   "body": {
     "data": [{
       "type": "Employee-form-v1.0",
-      "meta": {
-        "claims": {
-          "org.schema.Person.identifier": "urn:uuid:11b2c3d4-e5f6-7890-1234-567890abcdef",
-          "org.schema.Person.hasOccupation.identifier.value": "ISCO-08|4226",
-          "org.schema.Person.email": "receptionist1@acme.org"
-        }
-      },
-      // Mirror canonical claims in `resource.meta.claims` because shared bundle
-      // readers no longer inspect legacy `entry.meta.claims` directly.
       "resource": {
         "meta": {
           "claims": {
-            "org.schema.Person.identifier": "urn:uuid:11b2c3d4-e5f6-7890-1234-567890abcdef",
-            "org.schema.Person.hasOccupation.identifier.value": "ISCO-08|4226",
-            "org.schema.Person.email": "receptionist1@acme.org"
+            ...EXAMPLE_ORGANIZATION_EMPLOYEE_INPUT.employeeClaims,
           }
         }
       }
@@ -897,25 +900,13 @@ export const FAMILY_REGISTRATION_REQUEST = {
   "body": {
     "data": [{
       "type": "Family-registration-form-v1.0",
-      "meta": {
-        "claims": {
-          "@context": "org.schema",
-          "@type": "template",
-          ...testFamilyRegisterExpanded,
-          "Organization.owner.email": "adult1@example.com",
-          "Service.termsOfService": "https://provider.example.com/terms.pdf",
-        }
-      },
-      // Mirror canonical claims in `resource.meta.claims` because shared bundle
-      // readers and example conformance tests read the canonical bundle view.
       "resource": {
         "meta": {
           "claims": {
-            "@context": "org.schema",
+            "@context": Format.SCHEMA,
             "@type": "template",
             ...testFamilyRegisterExpanded,
-            "Organization.owner.email": "adult1@example.com",
-            "Service.termsOfService": "https://provider.example.com/terms.pdf",
+            [ClaimsServiceSchemaorg.termsOfService.replace(`${Format.SCHEMA}.`, '')]: EXAMPLE_SIGNED_TERMS_PDF_URL,
           }
         }
       }
@@ -961,10 +952,12 @@ export const FAMILY_ORDER_REQUEST = {
   "body": {
     "data": [{
       "type": "Family-order-request-v1.0",
-      "meta": {
+      "resource": {
+        "meta": {
         "claims": {
-          "@context": "org.schema",
+          "@context": Format.SCHEMA,
           [ClaimsOrderSchemaorg.acceptedOfferIdentifier]: "{{offerId}}"
+        }
         }
       }
     }]
@@ -1021,7 +1014,7 @@ export const ORGANIZATION_VERIFICATION_TRANSACTION_RESPONSE = {
   aud: 'did:web:portal.example.org',
   type: 'hosting-response',
   body: {
-    resourceType: 'Bundle',
+    resourceType: ResourceTypesFhirR4.Bundle,
     type: 'transaction-response',
     total: 1,
     data: [{
@@ -1037,13 +1030,13 @@ export const ORGANIZATION_VERIFICATION_TRANSACTION_RESPONSE = {
           },
         },
         icaResponse: {
-          resourceType: 'Bundle',
+          resourceType: ResourceTypesFhirR4.Bundle,
           type: 'batch-response',
           total: ORGANIZATION_ISSUE_ICA_CREDENTIALS.length,
           data: ORGANIZATION_ISSUE_ICA_CREDENTIALS.map((credential) => ({
             type: 'VerifyResponse-v1.0',
             resource: credential,
-            response: { status: '200' },
+            response: { status: String(HttpStatusCodes.Ok) },
           })),
         },
         next: {
@@ -1054,7 +1047,7 @@ export const ORGANIZATION_VERIFICATION_TRANSACTION_RESPONSE = {
           },
         },
       },
-      response: { status: '200' },
+      response: { status: String(HttpStatusCodes.Ok) },
     }],
   },
 };
@@ -1082,7 +1075,7 @@ export const CUSTOMER_ONBOARDING_MESSAGE = {
         },
       },
       request: {
-        method: "POST",
+        method: HttpRequestMethods.Post,
         url: "individual/org.schema/Person/"
       },
     },
@@ -1096,7 +1089,7 @@ export const CUSTOMER_ONBOARDING_MESSAGE = {
         },
       },
       request: {
-        method: "POST",
+        method: HttpRequestMethods.Post,
         url: "individual/org.schema/Person/"
       },
     }],
@@ -1110,11 +1103,11 @@ export const CONSENT_CREATION_MESSAGE = {
   aud: "did:web:gateway.example.com",
   type: "org.hl7.fhir.r4.Bundle",
   body: {
-    resourceType: "Bundle",
+    resourceType: ResourceTypesFhirR4.Bundle,
     type: "batch",
     entry: [{
       url: "https://ehr-system.example.com/fhir/r4/Consent/patient-consent-uuid",
-      type: "Consent",
+      type: ResourceTypesFhirR4.Consent,
       meta: {
         claims: {
           "@context": "org.hl7.fhir.api",
@@ -1132,12 +1125,12 @@ export const CONSENT_CREATION_MESSAGE = {
         }
       },
       request: {
-        method: "POST",
+        method: HttpRequestMethods.Post,
         url: "/health-care/individual/org.hl7.fhir.api/Consent"
       },
       resource: {
         identifier: "urn:uuid:patient-consent-uuid",
-        resourceType: "Consent",
+        resourceType: ResourceTypesFhirR4.Consent,
         status: "active",
         scope: {
           coding: [{
@@ -1170,10 +1163,10 @@ export const COMMUNICATION_CREATION_MESSAGE = {
   aud: "did:web:gateway.acme.org",
   type: "org.hl7.fhir.r4.Bundle",
   body: {
-    resourceType: "Bundle",
+    resourceType: ResourceTypesFhirR4.Bundle,
     type: "batch",
     entry: [{
-      type: "Communication",
+      type: ResourceTypesFhirR4.Communication,
       meta: {
         claims: {
           "@context": "org.hl7.fhir.api",
@@ -1192,11 +1185,11 @@ export const COMMUNICATION_CREATION_MESSAGE = {
         }
       },
       request: {
-        method: "POST",
+        method: HttpRequestMethods.Post,
         url: "individual/org.hl7.fhir.r4/Communication"
       },
       resource: {
-        resourceType: "Communication",
+        resourceType: ResourceTypesFhirR4.Communication,
         status: "completed",
         partOf: [{ reference: "urn:uuid:communication-channel-id" }],
         category: [{
@@ -1302,13 +1295,13 @@ export const RESEARCH_COMPOSITION_INGESTION_MESSAGE = {
   aud: 'did:web:api.acme.org',
   type: 'application/api+json', // instead of 'org.hl7.fhir.api.Bundle' as "data" property is used (JSON:API Primary Document) but not "entry"
   body: {
-    resourceType: 'Bundle',
+    resourceType: ResourceTypesFhirR4.Bundle,
     type: 'batch',
     data: [
       {
-        type: 'Composition',
+        type: ResourceTypesFhirR4.Composition,
         resource: {
-          resourceType: 'Composition',
+          resourceType: ResourceTypesFhirR4.Composition,
           id: 'urn:uuid:0dbe2f39-3f6a-48a3-9807-2f9a102f1a11',
           meta: {
             claims: {
@@ -1324,7 +1317,7 @@ export const RESEARCH_COMPOSITION_INGESTION_MESSAGE = {
           },
           contained: [
             {
-              resourceType: 'DocumentReference',
+              resourceType: ResourceTypesFhirR4.DocumentReference,
               id: 'urn:uuid:c2b1f9ee-90d4-4f1d-8dc6-4c3f0b29621b',
               meta: {
                 claims: {
@@ -1341,7 +1334,7 @@ export const RESEARCH_COMPOSITION_INGESTION_MESSAGE = {
               },
             },
             {
-              resourceType: 'DocumentReference',
+              resourceType: ResourceTypesFhirR4.DocumentReference,
               id: 'urn:uuid:aad1f0bc-5781-42dc-9d8f-30252fbce6a9',
               meta: {
                 claims: {
@@ -1360,7 +1353,7 @@ export const RESEARCH_COMPOSITION_INGESTION_MESSAGE = {
           ],
         },
         request: {
-          method: 'POST',
+          method: HttpRequestMethods.Post,
           url: 'digitaltwin/org.hl7.fhir.api/Composition',
         },
       },
@@ -1377,10 +1370,10 @@ export const PERSONAL_OBSERVATION_MESSAGE = {
   aud: "did:web:api.acme.org",
   type: "org.hl7.fhir.r4.Bundle",
   body: {
-    resourceType: "Bundle",
+    resourceType: ResourceTypesFhirR4.Bundle,
     type: "batch",
     entry: [{
-      type: "Observation",
+      type: ResourceTypesFhirR4.Observation,
       meta: {
         claims: {
           "@context": "org.hl7.fhir.api",
@@ -1406,8 +1399,8 @@ export const PERSONAL_OBSERVATION_MESSAGE = {
           "Observation.meta-tag": "Anxiety,Night",
         }
       },
-      request: { method: "POST", url: "individual/org.hl7.fhir.api/Observation" },
-      resource: { resourceType: "Observation", status: "final" }
+      request: { method: HttpRequestMethods.Post, url: "individual/org.hl7.fhir.api/Observation" },
+      resource: { resourceType: ResourceTypesFhirR4.Observation, status: "final" }
     }]
   }
 };
@@ -1419,11 +1412,11 @@ export const PERSONAL_PREFERENCES_MDS_MESSAGE = {
   aud: "did:web:api.acme.org",
   type: "org.hl7.fhir.r4.Bundle",
   body: {
-    resourceType: "Bundle",
+    resourceType: ResourceTypesFhirR4.Bundle,
     type: "batch",
     entry: [
       {
-        type: "Observation",
+        type: ResourceTypesFhirR4.Observation,
         meta: {
           claims: {
             "@context": "org.hl7.fhir.api",
@@ -1436,11 +1429,11 @@ export const PERSONAL_PREFERENCES_MDS_MESSAGE = {
             "Observation.value-concept": "http://terminology.hl7.org/CodeSystem/v2-0136|Y",
           }
         },
-        request: { method: "POST", url: "individual/org.hl7.fhir.api/Observation" },
-        resource: { resourceType: "Observation", status: "final" }
+        request: { method: HttpRequestMethods.Post, url: "individual/org.hl7.fhir.api/Observation" },
+        resource: { resourceType: ResourceTypesFhirR4.Observation, status: "final" }
       },
       {
-        type: "Observation",
+        type: ResourceTypesFhirR4.Observation,
         meta: {
           claims: {
             "@context": "org.hl7.fhir.api",
@@ -1453,8 +1446,8 @@ export const PERSONAL_PREFERENCES_MDS_MESSAGE = {
             "Observation.value-concept": "http://terminology.hl7.org/CodeSystem/v2-0136|Y",
           }
         },
-        request: { method: "POST", url: "individual/org.hl7.fhir.api/Observation" },
-        resource: { resourceType: "Observation", status: "final" }
+        request: { method: HttpRequestMethods.Post, url: "individual/org.hl7.fhir.api/Observation" },
+        resource: { resourceType: ResourceTypesFhirR4.Observation, status: "final" }
       }
     ]
   }
@@ -1467,10 +1460,10 @@ export const FAMILY_MEMBER_RELATIONSHIP_MESSAGE = {
   aud: "did:web:api.acme.org",
   type: "org.hl7.fhir.r4.Bundle",
   body: {
-    resourceType: "Bundle",
+    resourceType: ResourceTypesFhirR4.Bundle,
     type: "batch",
     entry: [{
-      type: "RelatedPerson",
+      type: ResourceTypesFhirR4.RelatedPerson,
       meta: {
         claims: {
           "@context": "org.hl7.fhir.api",
@@ -1482,8 +1475,8 @@ export const FAMILY_MEMBER_RELATIONSHIP_MESSAGE = {
           "RelatedPerson.name": "Jane Doe",
         }
       },
-      request: { method: "POST", url: "individual/org.hl7.fhir.api/RelatedPerson" },
-      resource: { resourceType: "RelatedPerson" }
+      request: { method: HttpRequestMethods.Post, url: "individual/org.hl7.fhir.api/RelatedPerson" },
+      resource: { resourceType: ResourceTypesFhirR4.RelatedPerson }
     }]
   }
 };

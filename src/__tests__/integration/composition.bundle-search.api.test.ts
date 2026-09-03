@@ -6,6 +6,8 @@
 // Persistence invariant: delete changes current views while audit/history and
 // the separate consent/offboarding lifecycle contracts remain intact.
 // TDD contract: write this test red first; make it green only with complete behavior.
+import { DidcommPayloadTypes } from 'gdc-common-utils-ts/constants/didcomm';
+import { GatewayRequestEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
 import { invokeExpress } from './helpers/invokeExpress';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'fs';
@@ -18,20 +20,49 @@ import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { startServer, resetServerConfig } from '../../server';
 import { getEnvSectionId } from '../../utils/section-env';
 import { getSubjectScopedSectionId } from '../../utils/individual-sections';
-import { HealthcareBasicSections, HealthcareConsentPurposes } from 'gdc-common-utils-ts/constants/index';
+import {
+  GatewayResponseEntryTypes,
+  CompositionSearchParameterNames,
+  HealthcareBasicSections,
+  HealthcareConsentPurposes,
+  ResourceTypesFhirR4,
+} from 'gdc-common-utils-ts/constants/index';
+import { ResearchSubjectClaim } from 'gdc-common-utils-ts/models/interoperable-claims/research-subject-claims';
+import { Format, JobAction } from 'gdc-common-utils-ts/constants/Schemas';
+import {
+  HttpHeaderNames,
+  HttpMediaTypes,
+  HttpRequestMethods,
+  HttpStatusCodes,
+} from 'gdc-common-utils-ts/constants/http';
 import { testTenant1TenantId } from '../data/organization.data';
 import {
   getDigitalTwinSubjectAliasSectionId,
   getOrCreateDigitalTwinSubjectId,
 } from '../../utils/digital-twin-research-projection';
 import { buildOrganizationDidWeb, buildProfessionalDidWeb } from 'gdc-common-utils-ts/utils/did';
-import { EXAMPLE_HOST_PUBLIC_HOSTNAME, EXAMPLE_ROUTE_VERSION } from 'gdc-common-utils-ts/examples/shared';
+import {
+  EXAMPLE_HOST_PUBLIC_HOSTNAME,
+  EXAMPLE_JURISDICTION,
+  EXAMPLE_ROUTE_VERSION,
+  EXAMPLE_SUBJECT_DID,
+} from 'gdc-common-utils-ts/examples/shared';
 import { ExampleEmployeeEmails, ExampleEmployeeRoles } from 'gdc-common-utils-ts/examples/employee';
 import { ClaimConsent } from 'gdc-common-utils-ts/models/consent-rule';
 import { ServiceCapability } from 'gdc-common-utils-ts/constants/service-capabilities';
 import { applyDigitalTwinSecondaryUseDecision } from '../../utils/digital-twin-secondary-use';
 import { EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_PROVIDER_ORGANIZATION_URN } from 'gdc-common-utils-ts/examples/inter-tenant-access-contract';
 import { extractBundleSearchResources } from 'gdc-common-utils-ts/utils/organization-employee-lifecycle';
+import { buildGwCoreTenantResourceActionPath } from 'gdc-common-utils-ts/utils/gw-core-path';
+import {
+  EXAMPLE_RESEARCHER_WORKING_SELECTION_AUTHORIZATION,
+  EXAMPLE_RESEARCHER_WORKING_SELECTION_COMPOSITION_ID,
+  EXAMPLE_RESEARCHER_WORKING_SELECTION_SEARCH_THREAD_ID,
+  EXAMPLE_RESEARCHER_WORKING_SELECTION_TAG,
+  EXAMPLE_RESEARCHER_WORKING_SELECTION_THREAD_ID,
+  buildResearcherWorkingSelectionBundle,
+} from 'gdc-common-utils-ts/examples/researcher-working-selection';
+import { SUBJECT_SECTION_DIGITAL_TWIN } from '../../constants/domain';
 
 describe('Composition Bundle _search API (integration)', () => {
   function loadIpsAllSectionsFixture(subjectDid: string): any {
@@ -108,7 +139,7 @@ describe('Composition Bundle _search API (integration)', () => {
         [ClaimsServiceSchemaorg.category]: Sector.SYSTEM,
       };
       const hostCollectionName = generateTenantCollectionNameFromClaims(hostBootstrapClaims as any);
-      const tenantClaims = testPayloadCreateTenant1.body.data[0].meta.claims as any;
+      const tenantClaims = testPayloadCreateTenant1.body.data[0].resource.meta.claims as any;
       const tenantVaultId = getTenantVaultId(tenantClaims[ClaimsServiceSchemaorg.category], testTenant1TenantId);
 
       const tenantConfig = {
@@ -130,7 +161,7 @@ describe('Composition Bundle _search API (integration)', () => {
 
       const thidBatch = 'composition-batch-001';
       const submitResp = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Composition/_batch`,
         headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
         body: {
@@ -138,10 +169,10 @@ describe('Composition Bundle _search API (integration)', () => {
           body: {
             data: [
               {
-                type: 'Composition',
-                request: { method: 'POST' },
+                type: ResourceTypesFhirR4.Composition,
+                request: { method: HttpRequestMethods.Post },
                 resource: {
-                  resourceType: 'Composition',
+                  resourceType: ResourceTypesFhirR4.Composition,
                   id: 'composition-001',
                   meta: {
                     claims: {
@@ -165,7 +196,7 @@ describe('Composition Bundle _search API (integration)', () => {
       let batchPayload: any;
       for (let i = 0; i < 50; i++) {
         const pollResp = await invokeExpress(app, {
-          method: 'POST',
+          method: HttpRequestMethods.Post,
           url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Composition/_batch-response`,
           headers: { 'content-type': 'application/json' },
           body: { thid: thidBatch },
@@ -181,18 +212,18 @@ describe('Composition Bundle _search API (integration)', () => {
 
       const thidSearch = 'bundle-search-001';
       const searchResp = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Bundle/_search`,
         headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
         body: {
           thid: thidSearch,
           body: {
-            resourceType: 'Bundle',
+            resourceType: ResourceTypesFhirR4.Bundle,
             type: 'batch',
             entry: [
               {
                 request: {
-                  method: 'GET',
+                  method: HttpRequestMethods.Get,
                   url: `Bundle?type=document&composition.subject=${encodeURIComponent(subjectDid)}&composition.section=${encodeURIComponent(sectionCode)}`,
                 },
               },
@@ -205,7 +236,7 @@ describe('Composition Bundle _search API (integration)', () => {
       let searchPayload: any;
       for (let i = 0; i < 50; i++) {
         const pollResp = await invokeExpress(app, {
-          method: 'POST',
+          method: HttpRequestMethods.Post,
           url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Bundle/_search-response`,
           headers: { 'content-type': 'application/json' },
           body: { thid: thidSearch },
@@ -253,7 +284,7 @@ describe('Composition Bundle _search API (integration)', () => {
         [ClaimsServiceSchemaorg.category]: Sector.SYSTEM,
       };
       const hostCollectionName = generateTenantCollectionNameFromClaims(hostBootstrapClaims as any);
-      const tenantClaims = testPayloadCreateTenant1.body.data[0].meta.claims as any;
+      const tenantClaims = testPayloadCreateTenant1.body.data[0].resource.meta.claims as any;
       const tenantVaultId = getTenantVaultId(tenantClaims[ClaimsServiceSchemaorg.category], testTenant1TenantId);
 
       const tenantConfig = {
@@ -303,18 +334,18 @@ describe('Composition Bundle _search API (integration)', () => {
 
       const thidSearch = 'bundle-search-ips-exclude-001';
       const searchResp = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Bundle/_search`,
         headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
         body: {
           thid: thidSearch,
           body: {
-            resourceType: 'Bundle',
+            resourceType: ResourceTypesFhirR4.Bundle,
             type: 'batch',
             entry: [
               {
                 request: {
-                  method: 'GET',
+                  method: HttpRequestMethods.Get,
                   url:
                     `Bundle?type=document&composition.subject=${encodeURIComponent(subjectDid)}`
                     + `&composition.type=${encodeURIComponent(ipsType)}`
@@ -330,7 +361,7 @@ describe('Composition Bundle _search API (integration)', () => {
       let searchPayload: any;
       for (let i = 0; i < 50; i++) {
         const pollResp = await invokeExpress(app, {
-          method: 'POST',
+          method: HttpRequestMethods.Post,
           url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Bundle/_search-response`,
           headers: { 'content-type': 'application/json' },
           body: { thid: thidSearch },
@@ -384,7 +415,7 @@ describe('Composition Bundle _search API (integration)', () => {
         [ClaimsServiceSchemaorg.category]: Sector.SYSTEM,
       };
       const hostCollectionName = generateTenantCollectionNameFromClaims(hostBootstrapClaims as any);
-      const tenantClaims = testPayloadCreateTenant1.body.data[0].meta.claims as any;
+      const tenantClaims = testPayloadCreateTenant1.body.data[0].resource.meta.claims as any;
       const tenantVaultId = getTenantVaultId(tenantClaims[ClaimsServiceSchemaorg.category], testTenant1TenantId);
 
       const tenantConfig = {
@@ -419,18 +450,18 @@ describe('Composition Bundle _search API (integration)', () => {
 
       const thidSearch = 'bundle-search-docref-hash-001';
       const searchResp = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Bundle/_search`,
         headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
         body: {
           thid: thidSearch,
           body: {
-            resourceType: 'Bundle',
+            resourceType: ResourceTypesFhirR4.Bundle,
             type: 'batch',
             entry: [
               {
                 request: {
-                  method: 'GET',
+                  method: HttpRequestMethods.Get,
                   url: `DocumentReference?subject=${encodeURIComponent(subjectDid)}&contenthash=${encodeURIComponent(cid)}`,
                 },
               },
@@ -443,7 +474,7 @@ describe('Composition Bundle _search API (integration)', () => {
       let searchPayload: any;
       for (let i = 0; i < 50; i++) {
         const pollResp = await invokeExpress(app, {
-          method: 'POST',
+          method: HttpRequestMethods.Post,
           url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Bundle/_search-response`,
           headers: { 'content-type': 'application/json' },
           body: { thid: thidSearch },
@@ -457,7 +488,7 @@ describe('Composition Bundle _search API (integration)', () => {
 
       expect(searchPayload?.resourceType).toBe('Bundle');
       expect(searchPayload?.data?.[0]?.response?.status).toBe('200');
-      expect(searchPayload?.data?.[0]?.type).toBe('DocumentReference-search-response-v1.0');
+      expect(searchPayload?.data?.[0]?.type).toBe(GatewayResponseEntryTypes.DocumentReferenceSearch);
       const matches = extractBundleSearchResources(searchPayload);
       expect(matches).toHaveLength(1);
       expect(matches[0]?.['DocumentReference.contenthash']).toBe(cid);
@@ -494,7 +525,7 @@ describe('Composition Bundle _search API (integration)', () => {
         [ClaimsServiceSchemaorg.category]: Sector.SYSTEM,
       };
       const hostCollectionName = generateTenantCollectionNameFromClaims(hostBootstrapClaims as any);
-      const tenantClaims = testPayloadCreateTenant1.body.data[0].meta.claims as any;
+      const tenantClaims = testPayloadCreateTenant1.body.data[0].resource.meta.claims as any;
       const tenantVaultId = getTenantVaultId(tenantClaims[ClaimsServiceSchemaorg.category], testTenant1TenantId);
 
       const tenantConfig = {
@@ -520,7 +551,7 @@ describe('Composition Bundle _search API (integration)', () => {
         tenantVaultId,
         [{
           id: 'communication-001',
-          type: 'CommMsgExtended',
+          type: DidcommPayloadTypes.ExtendedCommunicationMessage,
           thid: 'permission-thread-001',
           'Communication.identifier': 'comm-permission-001',
           'Communication.subject': subjectDid,
@@ -557,18 +588,18 @@ describe('Composition Bundle _search API (integration)', () => {
 
       for (const searchCase of searchCases) {
         const searchResp = await invokeExpress(app, {
-          method: 'POST',
+          method: HttpRequestMethods.Post,
           url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Bundle/_search`,
           headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
           body: {
             thid: searchCase.thid,
             body: {
-              resourceType: 'Bundle',
+              resourceType: ResourceTypesFhirR4.Bundle,
               type: 'batch',
               entry: [
                 {
                   request: {
-                    method: 'GET',
+                    method: HttpRequestMethods.Get,
                     url: searchCase.url,
                   },
                 },
@@ -581,7 +612,7 @@ describe('Composition Bundle _search API (integration)', () => {
         let searchPayload: any;
         for (let i = 0; i < 50; i++) {
           const pollResp = await invokeExpress(app, {
-            method: 'POST',
+            method: HttpRequestMethods.Post,
             url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Bundle/_search-response`,
             headers: { 'content-type': 'application/json' },
             body: { thid: searchCase.thid },
@@ -633,7 +664,7 @@ describe('Composition Bundle _search API (integration)', () => {
         [ClaimsServiceSchemaorg.category]: Sector.SYSTEM,
       };
       const hostCollectionName = generateTenantCollectionNameFromClaims(hostBootstrapClaims as any);
-      const tenantClaims = testPayloadCreateTenant1.body.data[0].meta.claims as any;
+      const tenantClaims = testPayloadCreateTenant1.body.data[0].resource.meta.claims as any;
       const tenantVaultId = getTenantVaultId(tenantClaims[ClaimsServiceSchemaorg.category], testTenant1TenantId);
 
       const tenantConfig = {
@@ -653,7 +684,7 @@ describe('Composition Bundle _search API (integration)', () => {
       const subjectDid = 'did:web:api.acme.org:individual:ips-all-sections-001';
       const ipsBundle = loadIpsAllSectionsFixture(subjectDid);
       const documentReference = {
-        resourceType: 'DocumentReference',
+        resourceType: ResourceTypesFhirR4.DocumentReference,
         id: 'ips-all-sections-document-reference-001',
         subject: { reference: subjectDid },
         date: '2026-06-26T10:00:00Z',
@@ -684,17 +715,17 @@ describe('Composition Bundle _search API (integration)', () => {
           [ClaimConsent.sourceReference]: 'https://portal.example/research',
         };
         const submit = await invokeExpress(app, {
-          method: 'POST',
+          method: HttpRequestMethods.Post,
           url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Consent/_batch`,
           headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
           body: {
             thid,
             body: {
-              resourceType: 'Bundle',
+              resourceType: ResourceTypesFhirR4.Bundle,
               type: 'batch',
               entry: [{
-                request: { method: 'POST', url: 'individual/org.hl7.fhir.r4/Consent' },
-                resource: { resourceType: 'Consent', meta: { claims } },
+                request: { method: HttpRequestMethods.Post, url: 'individual/org.hl7.fhir.r4/Consent' },
+                resource: { resourceType: ResourceTypesFhirR4.Consent, meta: { claims } },
               }],
             },
           },
@@ -702,7 +733,7 @@ describe('Composition Bundle _search API (integration)', () => {
         expect(submit.status).toBe(202);
         for (let attempt = 0; attempt < 50; attempt++) {
           const poll = await invokeExpress(app, {
-            method: 'POST',
+            method: HttpRequestMethods.Post,
             url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Consent/_batch-response`,
             headers: { 'content-type': 'application/json' },
             body: { thid },
@@ -719,19 +750,19 @@ describe('Composition Bundle _search API (integration)', () => {
       await setResearchDecision('permit', 'initial-permit');
 
       const submitResp = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch`,
         headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
         body: {
           thid: 'ips-all-sections-communication-001',
           body: {
-            resourceType: 'Bundle',
+            resourceType: ResourceTypesFhirR4.Bundle,
             type: 'batch',
             entry: [
               {
-                request: { method: 'POST', url: 'individual/org.hl7.fhir.r4/Communication' },
+                request: { method: HttpRequestMethods.Post, url: 'individual/org.hl7.fhir.r4/Communication' },
                 resource: {
-                  resourceType: 'Communication',
+                  resourceType: ResourceTypesFhirR4.Communication,
                   status: 'completed',
                   subject: { reference: subjectDid },
                   sent: '2026-06-26T10:00:00Z',
@@ -755,7 +786,7 @@ describe('Composition Bundle _search API (integration)', () => {
       let communicationPayload: any;
       for (let i = 0; i < 50; i++) {
         const pollResp = await invokeExpress(app, {
-          method: 'POST',
+          method: HttpRequestMethods.Post,
           url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch-response`,
           headers: { 'content-type': 'application/json' },
           body: { thid: 'ips-all-sections-communication-001' },
@@ -819,18 +850,18 @@ describe('Composition Bundle _search API (integration)', () => {
       // collections do not bleed into unrelated IPS sections and that the
       // Flag and DeviceUseStatement sections survive persistence.
       const completeSummaryResp = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch`,
         headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
         body: {
           thid: 'ips-all-sections-summary-001',
           body: {
-            resourceType: 'Bundle',
+            resourceType: ResourceTypesFhirR4.Bundle,
             type: 'batch',
             entry: [{
-              request: { method: 'POST', url: 'individual/org.hl7.fhir.r4/Communication' },
+              request: { method: HttpRequestMethods.Post, url: 'individual/org.hl7.fhir.r4/Communication' },
               resource: {
-                resourceType: 'Communication',
+                resourceType: ResourceTypesFhirR4.Communication,
                 status: 'completed',
                 subject: { reference: subjectDid },
                 payload: [{
@@ -848,7 +879,7 @@ describe('Composition Bundle _search API (integration)', () => {
       let completeSummaryPayload: any;
       for (let i = 0; i < 50; i++) {
         const pollResp = await invokeExpress(app, {
-          method: 'POST',
+          method: HttpRequestMethods.Post,
           url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch-response`,
           headers: { 'content-type': 'application/json' },
           body: { thid: 'ips-all-sections-summary-001' },
@@ -920,12 +951,12 @@ describe('Composition Bundle _search API (integration)', () => {
         },
       });
       const allergySectionBundle = {
-        resourceType: 'Bundle',
+        resourceType: ResourceTypesFhirR4.Bundle,
         type: 'batch',
         data: [{
-          type: 'AllergyIntolerance-edit-request-v1.0',
+          type: GatewayRequestEntryTypes.AllergyIntoleranceEdit,
           resource: {
-            resourceType: 'AllergyIntolerance',
+            resourceType: ResourceTypesFhirR4.AllergyIntolerance,
             id: 'allergy-section-update-integration-001',
             meta: { claims: {
               '@context': 'org.hl7.fhir.api',
@@ -942,24 +973,24 @@ describe('Composition Bundle _search API (integration)', () => {
 
       // Step 1: update exactly one clinical section using the explicit section contract.
       const sectionUpdateResp = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch`,
         headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
         body: {
           thid: 'allergy-section-update-integration-001',
           iss: clinicalControllerDid,
           body: {
-            resourceType: 'Bundle',
+            resourceType: ResourceTypesFhirR4.Bundle,
             type: 'batch',
             entry: [{
-              request: { method: 'POST', url: 'individual/org.hl7.fhir.r4/Communication' },
+              request: { method: HttpRequestMethods.Post, url: 'individual/org.hl7.fhir.r4/Communication' },
               meta: { claims: {
                 '@context': 'org.hl7.fhir.r4',
                 'Communication.subject': sectionSubjectDid,
                 'Composition.section': allergiesSection,
               } },
               resource: {
-                resourceType: 'Communication',
+                resourceType: ResourceTypesFhirR4.Communication,
                 status: 'completed',
                 subject: { reference: sectionSubjectDid },
                 payload: [{
@@ -979,7 +1010,7 @@ describe('Composition Bundle _search API (integration)', () => {
       let sectionUpdatePayload: any;
       for (let i = 0; i < 50; i++) {
         const pollResp = await invokeExpress(app, {
-          method: 'POST',
+          method: HttpRequestMethods.Post,
           url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch-response`,
           headers: { 'content-type': 'application/json' },
           body: { thid: 'allergy-section-update-integration-001' },
@@ -1018,18 +1049,18 @@ describe('Composition Bundle _search API (integration)', () => {
       // Step 3: read the section-only update through the canonical summary
       // contract and prove the claims-first AllergyIntolerance is returned.
       const summaryResp = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.api/Communication/_batch`,
         headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
         body: {
           thid: 'allergy-section-summary-integration-001',
           body: {
-            resourceType: 'Bundle',
+            resourceType: ResourceTypesFhirR4.Bundle,
             type: 'batch',
             data: [{
-              type: 'Communication',
+              type: ResourceTypesFhirR4.Communication,
               resource: {
-                resourceType: 'Communication',
+                resourceType: ResourceTypesFhirR4.Communication,
                 meta: {
                   claims: {
                     '@context': 'org.hl7.fhir.api',
@@ -1040,7 +1071,7 @@ describe('Composition Bundle _search API (integration)', () => {
                       'individual/org.hl7.fhir.api/Subject/$summary',
                     'Communication.content-attachment-type': 'application/fhir+json',
                     'Communication.content-attachment-data': Buffer.from(JSON.stringify({
-                      resourceType: 'Parameters',
+                      resourceType: ResourceTypesFhirR4.Parameters,
                       parameter: [
                         { name: 'subject', valueString: sectionSubjectDid },
                         { name: 'section', valueString: allergiesSection },
@@ -1058,7 +1089,7 @@ describe('Composition Bundle _search API (integration)', () => {
       let summaryPayload: any;
       for (let i = 0; i < 50; i++) {
         const pollResp = await invokeExpress(app, {
-          method: 'POST',
+          method: HttpRequestMethods.Post,
           url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.api/Communication/_batch-response`,
           headers: { 'content-type': 'application/json' },
           body: { thid: 'allergy-section-summary-integration-001' },
@@ -1070,7 +1101,7 @@ describe('Composition Bundle _search API (integration)', () => {
         await new Promise((r) => setTimeout(r, 50));
       }
 
-      expect(summaryPayload?.data?.[0]?.type).toBe('Bundle-summary-response-v1.0');
+      expect(summaryPayload?.data?.[0]?.type).toBe(GatewayResponseEntryTypes.BundleSummary);
       expect(summaryPayload?.data?.[0]?.resource?.type).toBe('document');
       const allergySummaryEntry = summaryPayload?.data?.[0]?.resource?.entry
         ?.find((entry: any) => entry?.resource?.resourceType === 'AllergyIntolerance');
@@ -1126,13 +1157,13 @@ describe('Composition Bundle _search API (integration)', () => {
 
       for (const searchCase of searchCases) {
         const searchResp = await invokeExpress(app, {
-          method: 'POST',
+          method: HttpRequestMethods.Post,
           url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.r4/ResearchSubject/_search`,
           headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
           body: {
             thid: searchCase.thid,
             body: {
-              resourceType: 'Parameters',
+              resourceType: ResourceTypesFhirR4.Parameters,
               parameter: searchCase.parameters,
             },
           },
@@ -1142,7 +1173,7 @@ describe('Composition Bundle _search API (integration)', () => {
         let searchPayload: any;
         for (let i = 0; i < 50; i++) {
           const pollResp = await invokeExpress(app, {
-            method: 'POST',
+            method: HttpRequestMethods.Post,
             url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.r4/ResearchSubject/_batch-response`,
             headers: { 'content-type': 'application/json' },
             body: { thid: searchCase.thid },
@@ -1155,7 +1186,7 @@ describe('Composition Bundle _search API (integration)', () => {
         }
 
         expect(searchPayload?.resourceType).toBe('Bundle');
-        expect(searchPayload?.data?.[0]?.type).toBe('ResearchSubject-search-response-v1.0');
+        expect(searchPayload?.data?.[0]?.type).toBe(GatewayResponseEntryTypes.ResearchSubjectSearch);
         const matches = extractBundleSearchResources(searchPayload);
         expect(matches.length).toBeGreaterThanOrEqual(1);
         const firstMatch = matches[0];
@@ -1184,35 +1215,35 @@ describe('Composition Bundle _search API (integration)', () => {
       expect(storedAllergyVersion).toBeTruthy();
 
       const deleteBundle = {
-        resourceType: 'Bundle',
+        resourceType: ResourceTypesFhirR4.Bundle,
         type: 'batch',
         entry: [{
           request: {
-            method: 'DELETE',
+            method: HttpRequestMethods.Delete,
             url: 'AllergyIntolerance/allergy-section-update-integration-001',
             ifMatch: `W/"${storedAllergyVersion}"`,
           },
         }],
       };
       const deleteResp = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch`,
         headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
         body: {
           thid: 'allergy-section-delete-integration-001',
           iss: clinicalControllerDid,
           body: {
-            resourceType: 'Bundle',
+            resourceType: ResourceTypesFhirR4.Bundle,
             type: 'batch',
             entry: [{
-              request: { method: 'POST', url: 'individual/org.hl7.fhir.r4/Communication' },
+              request: { method: HttpRequestMethods.Post, url: 'individual/org.hl7.fhir.r4/Communication' },
               meta: { claims: {
                 '@context': 'org.hl7.fhir.r4',
                 'Communication.subject': sectionSubjectDid,
                 'Composition.section': allergiesSection,
               } },
               resource: {
-                resourceType: 'Communication',
+                resourceType: ResourceTypesFhirR4.Communication,
                 status: 'completed',
                 subject: { reference: sectionSubjectDid },
                 payload: [{ contentAttachment: {
@@ -1230,7 +1261,7 @@ describe('Composition Bundle _search API (integration)', () => {
       let deletePayload: any;
       for (let i = 0; i < 50; i++) {
         const pollResp = await invokeExpress(app, {
-          method: 'POST',
+          method: HttpRequestMethods.Post,
           url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch-response`,
           headers: { 'content-type': 'application/json' },
           body: { thid: 'allergy-section-delete-integration-001' },
@@ -1244,7 +1275,7 @@ describe('Composition Bundle _search API (integration)', () => {
       expect(deletePayload?.data).toEqual(expect.arrayContaining([
         expect.objectContaining({
           id: 'allergy-section-update-integration-001',
-          response: { status: '204' },
+          response: { status: String(HttpStatusCodes.NoContent) },
         }),
       ]));
       expect(await vaultRepository.get<any>(
@@ -1260,18 +1291,18 @@ describe('Composition Bundle _search API (integration)', () => {
           === 'urn:uuid:allergy-section-update-integration-001')).toBe(false);
 
       const summaryAfterDeleteResp = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.api/Communication/_batch`,
         headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
         body: {
           thid: 'allergy-section-summary-after-delete-integration-001',
           body: {
-            resourceType: 'Bundle',
+            resourceType: ResourceTypesFhirR4.Bundle,
             type: 'batch',
             data: [{
-              type: 'Communication',
+              type: ResourceTypesFhirR4.Communication,
               resource: {
-                resourceType: 'Communication',
+                resourceType: ResourceTypesFhirR4.Communication,
                 meta: { claims: {
                   '@context': 'org.hl7.fhir.api',
                   'Communication.status': 'completed',
@@ -1280,7 +1311,7 @@ describe('Composition Bundle _search API (integration)', () => {
                   'Communication.content-reference': 'individual/org.hl7.fhir.api/Subject/$summary',
                   'Communication.content-attachment-type': 'application/fhir+json',
                   'Communication.content-attachment-data': Buffer.from(JSON.stringify({
-                    resourceType: 'Parameters',
+                    resourceType: ResourceTypesFhirR4.Parameters,
                     parameter: [
                       { name: 'subject', valueString: sectionSubjectDid },
                       { name: 'section', valueString: allergiesSection },
@@ -1296,7 +1327,7 @@ describe('Composition Bundle _search API (integration)', () => {
       let summaryAfterDeletePayload: any;
       for (let i = 0; i < 50; i++) {
         const pollResp = await invokeExpress(app, {
-          method: 'POST',
+          method: HttpRequestMethods.Post,
           url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.api/Communication/_batch-response`,
           headers: { 'content-type': 'application/json' },
           body: { thid: 'allergy-section-summary-after-delete-integration-001' },
@@ -1313,13 +1344,13 @@ describe('Composition Bundle _search API (integration)', () => {
 
       const purgeThid = 'ips-index-provider-offboarding-001';
       const purgeSubmit = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/ResearchSubject/_purge`,
         headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
         body: {
           thid: purgeThid,
           body: {
-            resourceType: 'Parameters',
+            resourceType: ResourceTypesFhirR4.Parameters,
             parameter: [{ name: 'subject', valueString: subjectDid }],
           },
         },
@@ -1328,7 +1359,7 @@ describe('Composition Bundle _search API (integration)', () => {
       let purgePayload: any;
       for (let i = 0; i < 50; i++) {
         const poll = await invokeExpress(app, {
-          method: 'POST',
+          method: HttpRequestMethods.Post,
           url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/ResearchSubject/_purge-response`,
           headers: { 'content-type': 'application/json' },
           body: { thid: purgeThid },
@@ -1384,7 +1415,7 @@ describe('Composition Bundle _search API (integration)', () => {
         [ClaimsServiceSchemaorg.category]: Sector.SYSTEM,
       };
       const hostCollectionName = generateTenantCollectionNameFromClaims(hostBootstrapClaims as any);
-      const tenantClaims = testPayloadCreateTenant1.body.data[0].meta.claims as any;
+      const tenantClaims = testPayloadCreateTenant1.body.data[0].resource.meta.claims as any;
       const tenantVaultId = getTenantVaultId(tenantClaims[ClaimsServiceSchemaorg.category], testTenant1TenantId);
 
       const tenantConfig = {
@@ -1404,7 +1435,7 @@ describe('Composition Bundle _search API (integration)', () => {
       const subjectDid = await getOrCreateDigitalTwinSubjectId({
         vaultRepository,
         tenantVaultId,
-        sourceSubject: 'did:web:api.acme.org:individual:research-selection-subject-001',
+        sourceSubject: EXAMPLE_SUBJECT_DID,
       });
       const hostedOrganizationDid = buildOrganizationDidWeb({
         hostDidWeb: `did:web:${EXAMPLE_HOST_PUBLIC_HOSTNAME}`,
@@ -1418,111 +1449,108 @@ describe('Composition Bundle _search API (integration)', () => {
         email: ExampleEmployeeEmails.SharedProfessional,
         role: ExampleEmployeeRoles.Doctor,
       });
-      const selectionCompositionId = 'research-selection-01JZ4CV2G1X2M5Y8Y3V4W6Q7R8';
-      const selectionTag = {
-        id: 'Composition.meta.tag[0]',
-        system: 'urn:research:tag:score',
-        code: '10',
-      };
+      const selectionCompositionId = EXAMPLE_RESEARCHER_WORKING_SELECTION_COMPOSITION_ID;
+      const selectionTag = EXAMPLE_RESEARCHER_WORKING_SELECTION_TAG;
+      const buildSelectionPath = (resourceType: string, action: string) =>
+        buildGwCoreTenantResourceActionPath({
+          tenantId: testTenant1TenantId,
+          jurisdiction: EXAMPLE_JURISDICTION,
+          version: EXAMPLE_ROUTE_VERSION,
+          sector: Sector.HEALTH_CARE,
+          section: SUBJECT_SECTION_DIGITAL_TWIN,
+          format: Format.FHIR_R4,
+          resourceType,
+          action,
+        });
 
       // The author is the authenticated operational employee DID. The hosted
       // provider-tenant DID is routing/recipient identity, not a portal alias.
       const saveResp = await invokeExpress(app, {
-        method: 'POST',
-        url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.r4/Composition/_batch`,
-        headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
+        method: HttpRequestMethods.Post,
+        url: buildSelectionPath(ResourceTypesFhirR4.Composition, JobAction.BATCH),
+        headers: {
+          [HttpHeaderNames.ContentType]: HttpMediaTypes.Json,
+          [HttpHeaderNames.Authorization]: EXAMPLE_RESEARCHER_WORKING_SELECTION_AUTHORIZATION,
+        },
         body: {
-          thid: 'researcher-selection-composition-save-001',
-          body: {
-            resourceType: 'Bundle',
-            type: 'batch',
-            entry: [{
-              type: 'Composition',
-              request: {
-                method: 'POST',
-                url: 'digitaltwin/org.hl7.fhir.r4/Composition',
-              },
-              resource: {
-                resourceType: 'Composition',
-                id: selectionCompositionId,
-                meta: {
-                  claims: {
-                    '@context': 'org.hl7.fhir.r4',
-                    '@type': 'Composition:ResearcherWorkingSelection',
-                    'Composition.identifier': selectionCompositionId,
-                    'Composition.subject': subjectDid,
-                    'Composition.section': HealthcareBasicSections.HistoryOfMedicationUse.attributeValue,
-                    'Composition.type': HealthcareBasicSections.PatientSummaryDocument.attributeValue,
-                    'Composition.author': operationalEmployeeDid,
-                    'Composition.date': '2026-07-01T10:00:00Z',
-                  },
-                  tag: [selectionTag],
-                },
-              },
-            }],
-          },
+          thid: EXAMPLE_RESEARCHER_WORKING_SELECTION_THREAD_ID,
+          body: buildResearcherWorkingSelectionBundle({
+            compositionId: selectionCompositionId,
+            subjectId: subjectDid,
+            authorId: operationalEmployeeDid,
+            tag: selectionTag,
+          }),
         },
       });
-      expect(saveResp.status).toBe(202);
+      expect(saveResp.status).toBe(HttpStatusCodes.Accepted);
 
       let savePayload: any;
       for (let i = 0; i < 50; i++) {
         const pollResp = await invokeExpress(app, {
-          method: 'POST',
-          url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.r4/Composition/_batch-response`,
-          headers: { 'content-type': 'application/json' },
-          body: { thid: 'researcher-selection-composition-save-001' },
+          method: HttpRequestMethods.Post,
+          url: buildSelectionPath(ResourceTypesFhirR4.Composition, JobAction.BATCH_RESPONSE),
+          headers: { [HttpHeaderNames.ContentType]: HttpMediaTypes.Json },
+          body: { thid: EXAMPLE_RESEARCHER_WORKING_SELECTION_THREAD_ID },
         });
-        if (pollResp.status === 200) {
+        if (pollResp.status === HttpStatusCodes.Ok) {
           savePayload = JSON.parse(pollResp.text);
           break;
         }
         await new Promise((r) => setTimeout(r, 50));
       }
-      expect(savePayload?.data?.[0]?.response?.status).toBe('201');
+      expect(savePayload?.data?.[0]?.response?.status).toBe(String(HttpStatusCodes.Created));
 
       const searchResp = await invokeExpress(app, {
-        method: 'POST',
-        url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.r4/ResearchSubject/_search`,
-        headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
+        method: HttpRequestMethods.Post,
+        url: buildSelectionPath(ResourceTypesFhirR4.ResearchSubject, JobAction.SEARCH),
+        headers: {
+          [HttpHeaderNames.ContentType]: HttpMediaTypes.Json,
+          [HttpHeaderNames.Authorization]: EXAMPLE_RESEARCHER_WORKING_SELECTION_AUTHORIZATION,
+        },
         body: {
-          thid: 'researcher-selection-composition-search-001',
+          thid: EXAMPLE_RESEARCHER_WORKING_SELECTION_SEARCH_THREAD_ID,
           body: {
-            resourceType: 'Parameters',
+            resourceType: ResourceTypesFhirR4.Parameters,
             parameter: [
-              { name: 'section', valueString: HealthcareBasicSections.HistoryOfMedicationUse.attributeValue },
-              { name: 'Composition.meta-tag', valueCoding: { system: 'urn:research:tag:score', code: '10' } },
+              {
+                name: CompositionSearchParameterNames.Section,
+                valueString: HealthcareBasicSections.HistoryOfMedicationUse.attributeValue,
+              },
+              { name: CompositionSearchParameterNames.MetaTag, valueCoding: {
+                system: selectionTag.system,
+                code: selectionTag.code,
+              } },
             ],
           },
         },
       });
-      expect(searchResp.status).toBe(202);
+      expect(searchResp.status).toBe(HttpStatusCodes.Accepted);
 
       let searchPayload: any;
       for (let i = 0; i < 50; i++) {
         const pollResp = await invokeExpress(app, {
-          method: 'POST',
-          url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.r4/ResearchSubject/_batch-response`,
-          headers: { 'content-type': 'application/json' },
-          body: { thid: 'researcher-selection-composition-search-001' },
+          method: HttpRequestMethods.Post,
+          url: buildSelectionPath(ResourceTypesFhirR4.ResearchSubject, JobAction.BATCH_RESPONSE),
+          headers: { [HttpHeaderNames.ContentType]: HttpMediaTypes.Json },
+          body: { thid: EXAMPLE_RESEARCHER_WORKING_SELECTION_SEARCH_THREAD_ID },
         });
-        if (pollResp.status === 200) {
+        if (pollResp.status === HttpStatusCodes.Ok) {
           searchPayload = JSON.parse(pollResp.text);
           break;
         }
         await new Promise((r) => setTimeout(r, 50));
       }
 
-      expect(searchPayload?.resourceType).toBe('Bundle');
-      expect(searchPayload?.data?.[0]?.type).toBe('ResearchSubject-search-response-v1.0');
+      expect(searchPayload?.resourceType).toBe(ResourceTypesFhirR4.Bundle);
+      expect(searchPayload?.data?.[0]?.type).toBe(GatewayResponseEntryTypes.ResearchSubjectSearch);
       const matches = extractBundleSearchResources(searchPayload);
       expect(matches).toHaveLength(1);
       const savedResearchSubject = matches[0];
-      expect(savedResearchSubject?.resourceType).toBe('ResearchSubject');
-      expect(savedResearchSubject?.['ResearchSubject.identifier']).toBe(subjectDid);
+      expect(savedResearchSubject?.resourceType).toBe(ResourceTypesFhirR4.ResearchSubject);
+      expect(savedResearchSubject?.[ResearchSubjectClaim.Identifier]).toBe(subjectDid);
       expect(savedResearchSubject?.composition?.id).toBe(selectionCompositionId);
-      expect(savedResearchSubject?.meta?.tag?.[0]?.system).toBe('urn:research:tag:score');
-      expect(savedResearchSubject?.meta?.tag?.[0]?.code).toBe('10');
+      expect(savedResearchSubject?.meta?.tag?.[0]?.system).toBe(selectionTag.system);
+      expect(savedResearchSubject?.meta?.tag?.[0]?.code).toBe(selectionTag.code);
     } finally {
       queueAdapter.stop();
     }
@@ -1556,7 +1584,7 @@ describe('Composition Bundle _search API (integration)', () => {
         [ClaimsServiceSchemaorg.category]: Sector.SYSTEM,
       };
       const hostCollectionName = generateTenantCollectionNameFromClaims(hostBootstrapClaims as any);
-      const tenantClaims = testPayloadCreateTenant1.body.data[0].meta.claims as any;
+      const tenantClaims = testPayloadCreateTenant1.body.data[0].resource.meta.claims as any;
       const tenantVaultId = getTenantVaultId(tenantClaims[ClaimsServiceSchemaorg.category], testTenant1TenantId);
 
       const tenantConfig = {
@@ -1587,7 +1615,7 @@ describe('Composition Bundle _search API (integration)', () => {
       });
       const ipsBundle = loadIpsAllSectionsFixture(subjectDid);
       const documentReference = {
-        resourceType: 'DocumentReference',
+        resourceType: ResourceTypesFhirR4.DocumentReference,
         id: 'ips-twin-materialization-document-reference-001',
         subject: { reference: subjectDid },
         date: '2026-06-26T10:00:00Z',
@@ -1605,19 +1633,19 @@ describe('Composition Bundle _search API (integration)', () => {
       };
 
       const ingestResp = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch`,
         headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
         body: {
           thid: 'ips-twin-materialization-ingest-001',
           body: {
-            resourceType: 'Bundle',
+            resourceType: ResourceTypesFhirR4.Bundle,
             type: 'batch',
             entry: [
               {
-                request: { method: 'POST', url: 'individual/org.hl7.fhir.r4/Communication' },
+                request: { method: HttpRequestMethods.Post, url: 'individual/org.hl7.fhir.r4/Communication' },
                 resource: {
-                  resourceType: 'Communication',
+                  resourceType: ResourceTypesFhirR4.Communication,
                   status: 'completed',
                   subject: { reference: subjectDid },
                   sent: '2026-06-26T10:00:00Z',
@@ -1640,7 +1668,7 @@ describe('Composition Bundle _search API (integration)', () => {
 
       for (let i = 0; i < 50; i++) {
         const pollResp = await invokeExpress(app, {
-          method: 'POST',
+          method: HttpRequestMethods.Post,
           url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch-response`,
           headers: { 'content-type': 'application/json' },
           body: { thid: 'ips-twin-materialization-ingest-001' },
@@ -1655,13 +1683,13 @@ describe('Composition Bundle _search API (integration)', () => {
       expect(twinSubjectId).toMatch(/^urn:uuid:/);
 
       const searchResp = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.r4/ResearchSubject/_search`,
         headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
         body: {
           thid: 'ips-twin-materialization-search-001',
           body: {
-            resourceType: 'Parameters',
+            resourceType: ResourceTypesFhirR4.Parameters,
             parameter: [
               { name: 'section', valueString: HealthcareBasicSections.HistoryOfMedicationUse.attributeValue },
               { name: 'MedicationStatement.code', valueString: 'http://snomed.info/sct|108575001' },
@@ -1674,7 +1702,7 @@ describe('Composition Bundle _search API (integration)', () => {
       let searchPayload: any;
       for (let i = 0; i < 50; i++) {
         const pollResp = await invokeExpress(app, {
-          method: 'POST',
+          method: HttpRequestMethods.Post,
           url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.r4/ResearchSubject/_batch-response`,
           headers: { 'content-type': 'application/json' },
           body: { thid: 'ips-twin-materialization-search-001' },
@@ -1695,19 +1723,19 @@ describe('Composition Bundle _search API (integration)', () => {
       expect(matchedSubject).toBe(twinSubjectId);
 
       const r4MaterializeResp = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.r4/Communication/_batch`,
         headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
         body: {
           thid: 'ips-twin-materialization-r4-001',
           body: {
-            resourceType: 'Bundle',
+            resourceType: ResourceTypesFhirR4.Bundle,
             type: 'batch',
             entry: [
               {
-                request: { method: 'POST', url: 'digitaltwin/org.hl7.fhir.r4/Communication' },
+                request: { method: HttpRequestMethods.Post, url: 'digitaltwin/org.hl7.fhir.r4/Communication' },
                 resource: {
-                  resourceType: 'Communication',
+                  resourceType: ResourceTypesFhirR4.Communication,
                   status: 'completed',
                   subject: { reference: twinSubjectId },
                   sent: '2026-06-26T11:00:00Z',
@@ -1729,7 +1757,7 @@ describe('Composition Bundle _search API (integration)', () => {
       let r4Payload: any;
       for (let i = 0; i < 50; i++) {
         const pollResp = await invokeExpress(app, {
-          method: 'POST',
+          method: HttpRequestMethods.Post,
           url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.r4/Communication/_batch-response`,
           headers: { 'content-type': 'application/json' },
           body: { thid: 'ips-twin-materialization-r4-001' },
@@ -1741,7 +1769,7 @@ describe('Composition Bundle _search API (integration)', () => {
         await new Promise((r) => setTimeout(r, 50));
       }
 
-      expect(r4Payload?.data?.[0]?.type).toBe('Bundle-summary-response-v1.0');
+      expect(r4Payload?.data?.[0]?.type).toBe(GatewayResponseEntryTypes.BundleSummary);
       expect(r4Payload?.data?.[0]?.resource?.resourceType).toBe('Bundle');
       expect(r4Payload?.data?.[0]?.resource?.type).toBe('document');
       expect(r4Payload?.data?.[0]?.resource?.entry?.[0]?.fullUrl).toMatch(/^urn:uuid:/);
@@ -1754,19 +1782,19 @@ describe('Composition Bundle _search API (integration)', () => {
       ).toBe(true);
 
       const apiMaterializeResp = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.api/Communication/_batch`,
         headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
         body: {
           thid: 'ips-twin-materialization-api-001',
           body: {
-            resourceType: 'Bundle',
+            resourceType: ResourceTypesFhirR4.Bundle,
             type: 'batch',
             entry: [
               {
-                request: { method: 'POST', url: 'digitaltwin/org.hl7.fhir.api/Communication' },
+                request: { method: HttpRequestMethods.Post, url: 'digitaltwin/org.hl7.fhir.api/Communication' },
                 resource: {
-                  resourceType: 'Communication',
+                  resourceType: ResourceTypesFhirR4.Communication,
                   status: 'completed',
                   subject: { reference: twinSubjectId },
                   sent: '2026-06-26T11:05:00Z',
@@ -1778,7 +1806,7 @@ describe('Composition Bundle _search API (integration)', () => {
                       contentAttachment: {
                         contentType: 'application/fhir+json',
                         data: Buffer.from(JSON.stringify({
-                          resourceType: 'Parameters',
+                          resourceType: ResourceTypesFhirR4.Parameters,
                           parameter: [
                             { name: 'subject', valueString: twinSubjectId },
                             {
@@ -1801,7 +1829,7 @@ describe('Composition Bundle _search API (integration)', () => {
       let apiPayload: any;
       for (let i = 0; i < 50; i++) {
         const pollResp = await invokeExpress(app, {
-          method: 'POST',
+          method: HttpRequestMethods.Post,
           url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.api/Communication/_batch-response`,
           headers: { 'content-type': 'application/json' },
           body: { thid: 'ips-twin-materialization-api-001' },
@@ -1813,7 +1841,7 @@ describe('Composition Bundle _search API (integration)', () => {
         await new Promise((r) => setTimeout(r, 50));
       }
 
-      expect(apiPayload?.data?.[0]?.type).toBe('Bundle-summary-response-v1.0');
+      expect(apiPayload?.data?.[0]?.type).toBe(GatewayResponseEntryTypes.BundleSummary);
       expect(apiPayload?.data?.[0]?.resource?.resourceType).toBe('Bundle');
       expect(apiPayload?.data?.[0]?.resource?.entry?.[0]?.fullUrl).toMatch(/^urn:uuid:/);
       expect(apiPayload?.data?.[0]?.resource?.entry?.[0]?.resource?.section?.[0]?.entry?.length)

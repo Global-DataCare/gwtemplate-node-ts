@@ -1,4 +1,5 @@
 // TDD contract: write this test red first; make it green only with the complete real behavior.
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
 import { describe, expect, it, jest } from '@jest/globals';
 import express from 'express';
 import {
@@ -36,7 +37,7 @@ describe('auth token exchange sector contract', () => {
     });
 
     const response = await invokeExpress(app, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       url: '/auth/token',
       headers: { authorization: `Bearer ${EXAMPLE_DEMO_PORTAL_ID_TOKEN}`, 'content-type': 'application/json' },
       body: { subject_token: EXAMPLE_EMPLOYEE_ACTIVATION_CODE },
@@ -54,7 +55,7 @@ describe('auth token exchange sector contract', () => {
     });
 
     const response = await invokeExpress(app, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       url: '/auth/token',
       headers: { authorization: `Bearer ${EXAMPLE_DEMO_PORTAL_ID_TOKEN}`, 'content-type': 'application/json' },
       body: { subject_token: EXAMPLE_EMPLOYEE_ACTIVATION_CODE },

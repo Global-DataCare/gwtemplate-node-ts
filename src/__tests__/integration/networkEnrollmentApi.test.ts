@@ -1,6 +1,7 @@
 // TDD contract: write this test red first; make it green only with the complete real behavior.
 // src/__tests__/integration/networkEnrollmentApi.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
 
 import express from 'express';
 import { createApiRouter } from '../../routes/api';
@@ -121,7 +122,7 @@ describe('Network Enrollment API', () => {
 
       // --- Act ---
       const response = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: enrollmentUrl,
         headers: { 'content-type': 'application/x-www-form-urlencoded', authorization: 'Bearer test-id-token' },
         body: { request: testEncryptedJwe1 },
@@ -174,7 +175,7 @@ describe('Network Enrollment API', () => {
       
       // --- Act ---
       const response = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: enrollmentUrl,
         headers: { 'content-type': 'application/x-www-form-urlencoded', authorization: 'Bearer test-id-token' },
         body: { request: testEncryptedJwe1 },
@@ -277,7 +278,7 @@ describe('Network Enrollment API', () => {
 
       // --- Act ---
       const response = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: enrollmentUrl,
         headers: { 'content-type': 'application/x-www-form-urlencoded', authorization: 'Bearer test-id-token' },
         body: { request: testEncryptedJwe1 },

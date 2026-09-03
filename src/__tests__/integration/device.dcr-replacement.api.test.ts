@@ -1,4 +1,5 @@
 // TDD contract: write this test red first; make it green only with the complete real behavior.
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
 process.env.DEV_SEED = 'true';
 process.env.NODE_ENV = 'test';
 process.env.SECURITY_MODE = 'demo';
@@ -250,7 +251,7 @@ describe('Device DCR replacement route story', () => {
     const dcrUrl = `/${testTenant1AlternateName}/cds-es/v1/${tenantSector}/${DCR_REGISTRATION_JOB.section}/${DCR_REGISTRATION_JOB.format}/${DCR_REGISTRATION_JOB.resourceType}/${DCR_REGISTRATION_JOB.action}`;
 
     const response = await invokeExpress(app, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       url: dcrUrl,
       headers: {
         'content-type': 'application/x-www-form-urlencoded',
@@ -274,7 +275,7 @@ describe('Device DCR replacement route story', () => {
     addJob.mockClear();
     verifyInitialAccessToken.mockRejectedValueOnce(new Error(INITIAL_ACCESS_TOKEN_EXCHANGE_RESPONSE.jti));
     const rejectedToken = await invokeExpress(app, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       url: dcrUrl,
       headers: {
         'content-type': 'application/x-www-form-urlencoded',
@@ -288,7 +289,7 @@ describe('Device DCR replacement route story', () => {
     verifyInitialAccessToken.mockResolvedValue(INITIAL_ACCESS_TOKEN_VERIFIED_CLAIMS);
     verifySignature.mockResolvedValueOnce(false);
     const rejectedSignature = await invokeExpress(app, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       url: dcrUrl,
       headers: {
         'content-type': 'application/x-www-form-urlencoded',
@@ -391,7 +392,7 @@ describe('Device DCR replacement route story', () => {
     } as ConfidentialStorageDoc], getEnvSectionId('device-licenses'));
 
     const submit = await invokeExpress(app, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       url: '/acme-id/cds-es/v1/health-care/identity/openid/Device/_dcr',
       headers: {
         'content-type': 'application/json',
@@ -429,7 +430,7 @@ describe('Device DCR replacement route story', () => {
 
     const pollPath = new URL(submit.headers.location, 'http://localhost').pathname;
     const poll = await invokeExpress(app, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       url: pollPath,
       headers: { 'content-type': 'application/json' },
       body: { thid: 'device-dcr-replacement-thid' },

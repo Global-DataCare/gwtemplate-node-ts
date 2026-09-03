@@ -9,6 +9,8 @@
  */
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/__tests__/unit/managers/HostingManager.OfferOrder.test.ts
+import { GatewayResponseEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
+import { GatewayRequestEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
 
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { VaultMemRepository } from '../../../database/repositories/vault/vault.mem.repository';
@@ -174,9 +176,9 @@ describe('HostingManager - Offer/Order Flow', () => {
     const entry = responsePayload.body.data[0];
     expect(entry.response.status).toBe('201');
     expect(entry.type).toBe('Organization-registration-offer-v1.0');
-    expect(entry.meta.claims[ClaimsOfferSchemaorg.identifier]).toBeDefined();
+    expect(entry.resource.meta.claims[ClaimsOfferSchemaorg.identifier]).toBeDefined();
 
-    const claims = job.content!.body!.data[0]!.meta!.claims;
+    const claims = job.content!.body!.data[0]!.resource!.meta!.claims;
     // BUSINESS sector is used for vaultId (never network sector)
     const tenantAlternateName =
       claims[ClaimsOrganizationSchemaorg.alternateName]
@@ -203,14 +205,14 @@ describe('HostingManager - Offer/Order Flow', () => {
     // Step 1: Create the provisional registration to get an Offer ID
     const registrationJob = structuredClone(ORGANIZATION_REGISTRATION_JOB);
     const offerResponse = await hostingManager.process(registrationJob);
-    const offerId = offerResponse.body.data[0].meta.claims[
+    const offerId = offerResponse.body.data[0].resource.meta.claims[
       ClaimsOfferSchemaorg.identifier
     ] as string;
     expect(offerId).toBeDefined();
 
     // Step 2: Create and process the Order
     const orderJob = structuredClone(ORGANIZATION_ORDER_JOB);
-    orderJob.content!.body!.data[0]!.meta!.claims[
+    orderJob.content!.body!.data[0]!.resource!.meta!.claims[
       ClaimsOrderSchemaorg.acceptedOfferIdentifier
     ] = offerId;
 
@@ -219,7 +221,7 @@ describe('HostingManager - Offer/Order Flow', () => {
     // Assert the final response
     const finalEntry = finalResponse.body.data[0];
     expect(['201', '404']).toContain(finalEntry.response.status);
-    expect(['Organization-order-response-v1.0', 'Organization-order-request-v1.0']).toContain(finalEntry.type);
+    expect([GatewayResponseEntryTypes.OrganizationOrder, GatewayRequestEntryTypes.OrganizationOrder]).toContain(finalEntry.type);
     if (finalEntry.response.status === '201') {
       const finalClaims = finalEntry.resource?.meta?.claims || finalEntry.meta?.claims;
       expect(
@@ -228,7 +230,7 @@ describe('HostingManager - Offer/Order Flow', () => {
     }
 
     // Assert the state of the finalized tenant record in the host's vault
-    const regClaims = registrationJob.content!.body!.data[0]!.meta!.claims;
+    const regClaims = registrationJob.content!.body!.data[0]!.resource!.meta!.claims;
     // BUSINESS sector is used for vaultId (never network sector)
     const tenantAlternateName =
       regClaims[ClaimsOrganizationSchemaorg.alternateName]
@@ -286,17 +288,17 @@ describe('HostingManager - Offer/Order Flow', () => {
 
     const registrationJob = structuredClone(ORGANIZATION_REGISTRATION_JOB);
     const offerResponse = await hostingManager.process(registrationJob);
-    const registrationOfferId = offerResponse.body.data[0].meta.claims[
+    const registrationOfferId = offerResponse.body.data[0].resource.meta.claims[
       ClaimsOfferSchemaorg.identifier
     ] as string;
 
     const registrationOrder = structuredClone(ORGANIZATION_ORDER_JOB);
-    registrationOrder.content!.body!.data[0]!.meta!.claims[
+    registrationOrder.content!.body!.data[0]!.resource!.meta!.claims[
       ClaimsOrderSchemaorg.acceptedOfferIdentifier
     ] = registrationOfferId;
     await hostingManager.process(registrationOrder);
 
-    const regClaims = registrationJob.content!.body!.data[0]!.meta!.claims;
+    const regClaims = registrationJob.content!.body!.data[0]!.resource!.meta!.claims;
     const tenantAlternateName =
       regClaims[ClaimsOrganizationSchemaorg.alternateName]
       || regClaims[ClaimsOrganizationSchemaorg.identifierValue];
@@ -333,13 +335,13 @@ describe('HostingManager - Offer/Order Flow', () => {
     );
 
     const orderJob = structuredClone(ORGANIZATION_ORDER_JOB);
-    orderJob.content!.body!.data[0]!.meta!.claims[
+    orderJob.content!.body!.data[0]!.resource!.meta!.claims[
       ClaimsOrderSchemaorg.acceptedOfferIdentifier
     ] = String(extraOfferClaims[ClaimsOfferSchemaorg.identifier]);
-    orderJob.content!.body!.data[0]!.meta!.claims[
+    orderJob.content!.body!.data[0]!.resource!.meta!.claims[
       ClaimsOrderSchemaorg.paymentMethod
     ] = 'Stripe';
-    orderJob.content!.body!.data[0]!.meta!.claims[
+    orderJob.content!.body!.data[0]!.resource!.meta!.claims[
       ClaimsOrderSchemaorg.partOfInvoice
     ] = 'in_test_001';
 
@@ -347,11 +349,11 @@ describe('HostingManager - Offer/Order Flow', () => {
     const finalEntry = responsePayload.body.data[0];
 
     expect(finalEntry.response.status).toBe('201');
-    expect(finalEntry.type).toBe('Organization-order-response-v1.0');
-    expect(finalEntry.meta.claims[ClaimsOrderSchemaorg.acceptedOfferIdentifier]).toBe(
+    expect(finalEntry.type).toBe(GatewayResponseEntryTypes.OrganizationOrder);
+    expect(finalEntry.resource.meta.claims[ClaimsOrderSchemaorg.acceptedOfferIdentifier]).toBe(
       extraOfferClaims[ClaimsOfferSchemaorg.identifier],
     );
-    expect(finalEntry.meta.claims[ClaimsOrderSchemaorg.partOfInvoice]).toBe('in_test_001');
+    expect(finalEntry.resource.meta.claims[ClaimsOrderSchemaorg.partOfInvoice]).toBe('in_test_001');
     expect(finalEntry.resource?.resourceType).toBe('Bundle');
     expect(
       finalEntry.resource?.entry?.some?.((bundleEntry: any) => bundleEntry?.resource?.resourceType === 'Invoice'),
@@ -366,7 +368,7 @@ describe('HostingManager - Offer/Order Flow', () => {
 
   it('should return a 404 Not Found for an Order with an invalid offerId', async () => {
     const orderJob = structuredClone(ORGANIZATION_ORDER_JOB);
-    orderJob.content!.body!.data[0]!.meta!.claims[
+    orderJob.content!.body!.data[0]!.resource!.meta!.claims[
       ClaimsOrderSchemaorg.acceptedOfferIdentifier
     ] = EXAMPLE_LICENSE_INVALID_OFFER_ID;
 
@@ -390,9 +392,9 @@ describe('HostingManager - Offer/Order Flow', () => {
     // Step 1: remove both accepted-offer representations so the manager cannot
     // recover through alias resolution and must fail the consumer contract.
     const orderJob = structuredClone(ORGANIZATION_ORDER_JOB);
-    delete orderJob.content!.body!.data[0]!.meta!.claims.Order?.acceptedOffer;
-    delete orderJob.content!.body!.data[0]!.meta!.claims[HOST_ORDER_REQUIRED_INPUT_DISPLAY_CLAIMS[0]];
-    delete orderJob.content!.body!.data[0]!.meta!.claims[ClaimsOrderSchemaorg.acceptedOfferIdentifier];
+    delete orderJob.content!.body!.data[0]!.resource!.meta!.claims.Order?.acceptedOffer;
+    delete orderJob.content!.body!.data[0]!.resource!.meta!.claims[HOST_ORDER_REQUIRED_INPUT_DISPLAY_CLAIMS[0]];
+    delete orderJob.content!.body!.data[0]!.resource!.meta!.claims[ClaimsOrderSchemaorg.acceptedOfferIdentifier];
 
     const responsePayload = await hostingManager.process(orderJob);
 
@@ -411,17 +413,17 @@ describe('HostingManager - Offer/Order Flow', () => {
 
     const registrationJob = structuredClone(ORGANIZATION_REGISTRATION_JOB);
     const registrationOfferResponse = await hostingManager.process(registrationJob);
-    const registrationOfferId = registrationOfferResponse.body.data[0].meta.claims[
+    const registrationOfferId = registrationOfferResponse.body.data[0].resource.meta.claims[
       ClaimsOfferSchemaorg.identifier
     ] as string;
 
     const registrationOrder = structuredClone(ORGANIZATION_ORDER_JOB);
-    registrationOrder.content!.body!.data[0]!.meta!.claims[
+    registrationOrder.content!.body!.data[0]!.resource!.meta!.claims[
       ClaimsOrderSchemaorg.acceptedOfferIdentifier
     ] = registrationOfferId;
     await hostingManager.process(registrationOrder);
 
-    const regClaims = registrationJob.content!.body!.data[0]!.meta!.claims;
+    const regClaims = registrationJob.content!.body!.data[0]!.resource!.meta!.claims;
     const tenantAlternateName =
       regClaims[ClaimsOrganizationSchemaorg.alternateName]
       || regClaims[ClaimsOrganizationSchemaorg.identifierValue];
@@ -450,13 +452,13 @@ describe('HostingManager - Offer/Order Flow', () => {
     await vaultRepository.put(hostCollectionName, [secureOfferDoc], getEnvSectionId('communications'));
 
     const commercialOrder = structuredClone(ORGANIZATION_ORDER_JOB);
-    commercialOrder.content!.body!.data[0]!.meta!.claims[
+    commercialOrder.content!.body!.data[0]!.resource!.meta!.claims[
       ClaimsOrderSchemaorg.acceptedOfferIdentifier
     ] = offerId;
-    commercialOrder.content!.body!.data[0]!.meta!.claims[
+    commercialOrder.content!.body!.data[0]!.resource!.meta!.claims[
       ClaimsOrderSchemaorg.paymentMethod
     ] = 'Stripe';
-    commercialOrder.content!.body!.data[0]!.meta!.claims[
+    commercialOrder.content!.body!.data[0]!.resource!.meta!.claims[
       ClaimsOrderSchemaorg.partOfInvoice
     ] = 'in_test_search_001';
     await hostingManager.process(commercialOrder);
@@ -475,7 +477,7 @@ describe('HostingManager - Offer/Order Flow', () => {
       content: {
         body: {
           data: [{
-            type: 'Offer-search-request-v1.0',
+            type: GatewayRequestEntryTypes.OfferSearch,
             meta: { claims: { [ClaimsOfferSchemaorg.identifier]: offerId } },
             resource: { meta: { claims: { [ClaimsOfferSchemaorg.identifier]: offerId } } },
           }],
@@ -500,7 +502,7 @@ describe('HostingManager - Offer/Order Flow', () => {
       content: {
         body: {
           data: [{
-            type: 'Order-search-request-v1.0',
+            type: GatewayRequestEntryTypes.OrderSearch,
             meta: { claims: { [ClaimsOrderSchemaorg.acceptedOfferIdentifier]: offerId } },
             resource: { meta: { claims: { [ClaimsOrderSchemaorg.acceptedOfferIdentifier]: offerId } } },
           }],

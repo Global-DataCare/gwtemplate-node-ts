@@ -1,5 +1,7 @@
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 // TDD contract: write this test red first; make it green only with the complete real behavior.
 // src/__tests__/integration/identity/smart-token.test.ts
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
 
 import { invokeExpress } from '../helpers/invokeExpress';
 import { getTenantVaultId } from '../../../utils/tenant';
@@ -93,7 +95,7 @@ describe('SMART token issuance (integration)', () => {
       };
       const hostCollectionName = generateTenantCollectionNameFromClaims(hostBootstrapClaims);
 
-      const tenantClaims = testPayloadCreateTenant1.body.data[0].meta.claims as any;
+      const tenantClaims = testPayloadCreateTenant1.body.data[0].resource.meta.claims as any;
       const tenantVaultId = getTenantVaultId(
         tenantClaims[ClaimsServiceSchemaorg.category],
         tenantClaims['org.schema.Organization.alternateName'],
@@ -145,7 +147,7 @@ describe('SMART token issuance (integration)', () => {
       });
       const tokenUrl = `/${testTenant1AlternateName}/cds-ES/v1/health-care/identity/openid/smart/token`;
       const submitResp = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: tokenUrl,
         headers: { 'content-type': 'application/json', authorization: 'Bearer mock' },
         body: {
@@ -172,7 +174,7 @@ describe('SMART token issuance (integration)', () => {
       let finalPayload: any;
       for (let i = 0; i < 50; i++) {
         const pollResp = await invokeExpress(app, {
-          method: 'POST',
+          method: HttpRequestMethods.Post,
           url: `/${testTenant1AlternateName}/cds-ES/v1/health-care/identity/openid/smart/_batch-response`,
           headers: { 'content-type': 'application/json' },
           body: { thid: 'smart-token-thread-id' },
@@ -225,7 +227,7 @@ describe('SMART token issuance (integration)', () => {
       };
       const hostCollectionName = generateTenantCollectionNameFromClaims(hostBootstrapClaims);
 
-      const tenantClaims = testPayloadCreateTenant1.body.data[0].meta.claims as any;
+      const tenantClaims = testPayloadCreateTenant1.body.data[0].resource.meta.claims as any;
       const tenantVaultId = getTenantVaultId(
         tenantClaims[ClaimsServiceSchemaorg.category],
         tenantClaims['org.schema.Organization.alternateName'],
@@ -271,7 +273,7 @@ describe('SMART token issuance (integration)', () => {
 
       const tokenUrl = `/${testTenant1AlternateName}/cds-ES/v1/health-care/identity/openid/smart/token`;
       const submitResp = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: tokenUrl,
         headers: { 'content-type': 'application/json', authorization: 'Bearer mock' },
         body: {
@@ -297,7 +299,7 @@ describe('SMART token issuance (integration)', () => {
       let finalPayload: any;
       for (let i = 0; i < 50; i++) {
         const pollResp = await invokeExpress(app, {
-          method: 'POST',
+          method: HttpRequestMethods.Post,
           url: `/${testTenant1AlternateName}/cds-ES/v1/health-care/identity/openid/smart/_batch-response`,
           headers: { 'content-type': 'application/json' },
           body: { thid: 'smart-token-inter-tenant-thread-id' },
@@ -348,7 +350,7 @@ describe('SMART token issuance (integration)', () => {
       };
       const hostCollectionName = generateTenantCollectionNameFromClaims(hostBootstrapClaims);
 
-      const tenantClaims = testPayloadCreateTenant1.body.data[0].meta.claims as any;
+      const tenantClaims = testPayloadCreateTenant1.body.data[0].resource.meta.claims as any;
       const tenantVaultId = getTenantVaultId(
         tenantClaims[ClaimsServiceSchemaorg.category],
         tenantClaims['org.schema.Organization.alternateName'],
@@ -400,7 +402,7 @@ describe('SMART token issuance (integration)', () => {
 
       const tokenUrl = `/${testTenant1AlternateName}/cds-ES/v1/health-care/identity/openid/smart/token`;
       const submitResp = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: tokenUrl,
         headers: { 'content-type': 'application/json', authorization: `Bearer ${bearerToken}` },
         body: {
@@ -425,7 +427,7 @@ describe('SMART token issuance (integration)', () => {
       let finalPayload: any;
       for (let i = 0; i < 50; i++) {
         const pollResp = await invokeExpress(app, {
-          method: 'POST',
+          method: HttpRequestMethods.Post,
           url: `/${testTenant1AlternateName}/cds-ES/v1/health-care/identity/openid/smart/_batch-response`,
           headers: { 'content-type': 'application/json' },
           body: { thid: 'smart-token-external-research-thread-id' },
@@ -476,7 +478,7 @@ describe('SMART token issuance (integration)', () => {
       };
       const hostCollectionName = generateTenantCollectionNameFromClaims(hostBootstrapClaims);
 
-      const tenantClaims = testPayloadCreateTenant1.body.data[0].meta.claims as any;
+      const tenantClaims = testPayloadCreateTenant1.body.data[0].resource.meta.claims as any;
       const tenantVaultId = getTenantVaultId(
         tenantClaims[ClaimsServiceSchemaorg.category],
         tenantClaims['org.schema.Organization.alternateName'],
@@ -527,7 +529,7 @@ describe('SMART token issuance (integration)', () => {
 
       const tokenUrl = `/${testTenant1AlternateName}/cds-ES/v1/health-care/identity/openid/smart/token`;
       const submitResp = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: tokenUrl,
         headers: { 'content-type': 'application/json', authorization: `Bearer ${bearerToken}` },
         body: {
@@ -552,7 +554,7 @@ describe('SMART token issuance (integration)', () => {
       let finalPayload: any;
       for (let i = 0; i < 50; i++) {
         const pollResp = await invokeExpress(app, {
-          method: 'POST',
+          method: HttpRequestMethods.Post,
           url: `/${testTenant1AlternateName}/cds-ES/v1/health-care/identity/openid/smart/_batch-response`,
           headers: { 'content-type': 'application/json' },
           body: { thid: 'smart-token-external-research-rs-thread-id' },

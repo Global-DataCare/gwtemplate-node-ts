@@ -1,4 +1,6 @@
 // Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
+import { GatewayRequestEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
 import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
 import { extractBundleSearchResources } from 'gdc-common-utils-ts/utils/organization-employee-lifecycle';
 import type { StoryHarness } from './helpers/story-flow';
@@ -24,11 +26,14 @@ import {
   EXAMPLE_JOB_IDENTIFIER_LICENSE_SEARCH,
   EXAMPLE_THREAD_IDENTIFIER_LICENSE_SEARCH,
   EXAMPLE_EMAIL_RELATED_PERSON,
+  EXAMPLE_LICENSE_INVOICE_ID,
+  EXAMPLE_LICENSE_PAYMENT_METHOD_STRIPE,
   EXAMPLE_RELATED_PERSON_ROLE,
 } from 'gdc-common-utils-ts/examples/shared';
 import { buildLicenseIssueEntry, LicenseEntryTypes } from 'gdc-common-utils-ts/utils/license';
 import { Format, JobAction, Resource, Section } from 'gdc-common-utils-ts/constants/Schemas';
 import { DeviceAppTypes, DeviceUserClasses } from 'gdc-common-utils-ts/constants/device';
+import { FamilyRegistrationStatus, GatewayClaim } from '../../shared/gateway-claim-contract';
 
 describe('Family transaction Offer/Order route story', () => {
   let harness: StoryHarness;
@@ -51,7 +56,7 @@ describe('Family transaction Offer/Order route story', () => {
     registrationPayload.thid = 'family-transaction-story-thid';
     registrationPayload.jti = 'family-transaction-story-jti';
     const familyClaims = {
-      ...(registrationPayload.body.data[0].meta?.claims || {}),
+      ...(registrationPayload.body.data[0].resource?.meta?.claims || {}),
       [ClaimsOrganizationSchemaorg.alternateName]: 'ana-story',
       [ClaimsOrganizationSchemaorg.ownerEmail]: 'adult1@example.com',
       [ClaimsServiceSchemaorg.category]: 'health-care',
@@ -63,11 +68,11 @@ describe('Family transaction Offer/Order route story', () => {
     registrationPayload.body.data[0].resource.meta = {
       claims: familyClaims,
     };
-    registrationPayload.body.data[0].meta = { claims: familyClaims };
+    delete registrationPayload.body.data[0].meta;
     delete registrationPayload.attachments;
 
     const transactionSubmit = await invokeExpress(harness.app, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       url: `/${tenantId}/cds-es/v1/health-care/individual/org.schema/Organization/_transaction`,
       headers: { 'content-type': 'application/json' },
       body: registrationPayload,
@@ -82,7 +87,7 @@ describe('Family transaction Offer/Order route story', () => {
     expect(transactionPoll.status).toBe(200);
 
     const registrationEntry = transactionPoll.body.data[0];
-    const offerId = String(registrationEntry.meta?.claims?.[ClaimsOfferSchemaorg.identifier] || '');
+    const offerId = String(registrationEntry.resource?.meta?.claims?.[ClaimsOfferSchemaorg.identifier] || '');
 
     expect(registrationEntry.response.status).toBe('201');
     // The route, not an individual address claim, selects the Offer network.
@@ -93,27 +98,19 @@ describe('Family transaction Offer/Order route story', () => {
     const orderPayload = structuredClone(FAMILY_ORDER_REQUEST) as any;
     orderPayload.thid = 'family-order-story-thid';
     orderPayload.jti = 'family-order-story-jti';
-    orderPayload.body.data[0].meta = {
-      claims: {
-        '@context': 'org.schema',
-        'Order.acceptedOffer.identifier': offerId,
-        'Order.paymentMethod': 'Stripe',
-        'Order.partOfInvoice': 'family-transaction-story-invoice',
-      },
-    };
     orderPayload.body.data[0].resource = {
       meta: {
         claims: {
-          '@context': 'org.schema',
-          'Order.acceptedOffer.identifier': offerId,
-          'Order.paymentMethod': 'Stripe',
-          'Order.partOfInvoice': 'family-transaction-story-invoice',
+          '@context': Format.SCHEMA,
+          [ClaimsOrderSchemaorg.acceptedOfferIdentifier]: offerId,
+          [ClaimsOrderSchemaorg.paymentMethod]: EXAMPLE_LICENSE_PAYMENT_METHOD_STRIPE,
+          [ClaimsOrderSchemaorg.partOfInvoice]: EXAMPLE_LICENSE_INVOICE_ID,
         },
       },
     };
 
     const orderSubmit = await invokeExpress(harness.app, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       url: `/${tenantId}/cds-es/v1/health-care/individual/org.schema/Order/_batch`,
       headers: { 'content-type': 'application/json' },
       body: orderPayload,
@@ -129,7 +126,7 @@ describe('Family transaction Offer/Order route story', () => {
 
     const orderEntry = orderPoll.body.data[0];
     expect(orderEntry.response.status).toBe('201');
-    expect(orderEntry.meta?.claims?.[ClaimsOrderSchemaorg.acceptedOfferIdentifier]).toBe(offerId);
+    expect(orderEntry.resource?.meta?.claims?.[ClaimsOrderSchemaorg.acceptedOfferIdentifier]).toBe(offerId);
 
     const licenseSearchPayload = {
       thid: EXAMPLE_THREAD_IDENTIFIER_LICENSE_SEARCH,
@@ -143,7 +140,7 @@ describe('Family transaction Offer/Order route story', () => {
       },
     };
     const licenseSearchSubmit = await invokeExpress(harness.app, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       url: `/${tenantId}/cds-es/v1/health-care/${Section.INDIVIDUAL}/${Format.SCHEMA}/${Resource.LICENSE}/${JobAction.SEARCH}`,
       headers: { 'content-type': 'application/json' },
       body: licenseSearchPayload,
@@ -172,12 +169,12 @@ describe('Family transaction Offer/Order route story', () => {
         data: [{
           type: licenseIssueEntry.type,
           request: licenseIssueEntry.request,
-          resource: { meta: { claims: licenseIssueEntry.meta.claims } },
+          resource: { meta: { claims: licenseIssueEntry.resource.meta.claims } },
         }],
       },
     };
     const licenseIssueSubmit = await invokeExpress(harness.app, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       url: `/${tenantId}/cds-es/v1/health-care/${Section.INDIVIDUAL}/${Format.SCHEMA}/${Resource.LICENSE}/_issue`,
       headers: { 'content-type': 'application/json' },
       body: licenseIssuePayload,
@@ -203,14 +200,14 @@ describe('Family transaction Offer/Order route story', () => {
       type: 'application/json',
       body: {
         data: [{
-          type: 'Offer-search-request-v1.0',
+          type: GatewayRequestEntryTypes.OfferSearch,
           meta: { claims: { [ClaimsOfferSchemaorg.identifier]: offerId } },
           resource: { meta: { claims: { [ClaimsOfferSchemaorg.identifier]: offerId } } },
         }],
       },
     };
     const offerSearchSubmit = await invokeExpress(harness.app, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       url: `/${tenantId}/cds-es/v1/health-care/individual/org.schema/Offer/_search`,
       headers: { 'content-type': 'application/json' },
       body: offerSearchPayload,
@@ -233,7 +230,7 @@ describe('Family transaction Offer/Order route story', () => {
     repeatedRegistrationPayload.thid = 'family-transaction-repeat-story-thid';
     repeatedRegistrationPayload.jti = 'family-transaction-repeat-story-jti';
     const repeatedSubmit = await invokeExpress(harness.app, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       url: `/${tenantId}/cds-es/v1/health-care/individual/org.schema/Organization/_transaction`,
       headers: { 'content-type': 'application/json' },
       body: repeatedRegistrationPayload,
@@ -247,7 +244,7 @@ describe('Family transaction Offer/Order route story', () => {
     );
     expect(repeatedPoll.status).toBe(200);
     expect(repeatedPoll.body.data[0].response.status).toBe('200');
-    expect(repeatedPoll.body.data[0].meta.claims['org.schema.FamilyRegistration.status']).toBe('already_exists');
-    expect(repeatedPoll.body.data[0].meta.claims[ClaimsOfferSchemaorg.identifier]).toBe(offerId);
+    expect(repeatedPoll.body.data[0].resource.meta.claims[GatewayClaim.FamilyRegistrationStatus]).toBe(FamilyRegistrationStatus.Existing);
+    expect(repeatedPoll.body.data[0].resource.meta.claims[ClaimsOfferSchemaorg.identifier]).toBe(offerId);
   });
 });

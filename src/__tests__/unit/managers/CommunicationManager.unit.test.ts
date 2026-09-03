@@ -10,6 +10,11 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/__tests__/unit/CommunicationManager.unit.test.ts
 // Description: Unit tests for the CommunicationManager.
+import { DidcommPayloadTypes } from 'gdc-common-utils-ts/constants/didcomm';
+import { GatewayResponseEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
+import { GatewayRequestEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
+import { HttpStatusCodes } from 'gdc-common-utils-ts/constants/http';
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
 
 import { jest } from '@jest/globals';
 import { CommunicationManager } from '../../../managers/CommunicationManager';
@@ -112,7 +117,7 @@ describe('CommunicationManager Unit Tests', () => {
 
     function buildClinicalBatchJob(innerEntries: unknown[]): JobRequest {
       const attachedBundle = {
-        resourceType: 'Bundle',
+        resourceType: ResourceTypesFhirR4.Bundle,
         type: 'batch',
         data: innerEntries,
       };
@@ -126,7 +131,7 @@ describe('CommunicationManager Unit Tests', () => {
         sector: 'animal-care',
         section: 'individual',
         format: 'org.hl7.fhir.api' as any,
-        resourceType: 'Communication',
+        resourceType: ResourceTypesFhirR4.Communication,
         action: '_batch',
         content: {
           jti: randomUUID(),
@@ -136,12 +141,12 @@ describe('CommunicationManager Unit Tests', () => {
           exp: Math.floor(Date.now() / 1000) + 300,
           type: 'org.hl7.fhir.api.Bundle',
           body: {
-            resourceType: 'Bundle',
+            resourceType: ResourceTypesFhirR4.Bundle,
             type: 'batch',
             data: [{
-              type: 'Communication',
+              type: ResourceTypesFhirR4.Communication,
               resource: {
-                resourceType: 'Communication',
+                resourceType: ResourceTypesFhirR4.Communication,
                 meta: {
                   claims: {
                     [CommunicationClaim.Subject]: subjectDid,
@@ -172,18 +177,18 @@ describe('CommunicationManager Unit Tests', () => {
 
       // Step 2. The same verified DID conditionally deletes it through the attached batch.
       const response = await communicationManager.process(buildClinicalBatchJob([{
-        type: 'Immunization-delete-request-v1.0',
+        type: GatewayRequestEntryTypes.ImmunizationDelete,
         request: {
-          method: 'DELETE',
+          method: HttpRequestMethods.Delete,
           url: 'Immunization/immunization-mistake',
         },
-        resource: { resourceType: 'Immunization', id: 'immunization-mistake', meta: { claims: {} } },
+        resource: { resourceType: ResourceTypesFhirR4.Immunization, id: 'immunization-mistake', meta: { claims: {} } },
       }]));
 
       expect((response.body as any).data).toEqual(expect.arrayContaining([
         expect.objectContaining({
           id: 'immunization-mistake',
-          response: expect.objectContaining({ status: '204' }),
+          response: expect.objectContaining({ status: String(HttpStatusCodes.NoContent) }),
         }),
       ]));
       expect(mockVaultRepository.delete).toHaveBeenCalledTimes(1);
@@ -198,13 +203,13 @@ describe('CommunicationManager Unit Tests', () => {
         'Immunization.meta.versionId': 'version-current',
       } as any);
       const response = await communicationManager.process(buildClinicalBatchJob([{
-        type: 'Immunization-delete-request-v1.0',
+        type: GatewayRequestEntryTypes.ImmunizationDelete,
         request: {
-          method: 'DELETE',
+          method: HttpRequestMethods.Delete,
           url: 'Immunization/immunization-mistake',
           ifMatch: 'W/"version-stale"',
         },
-        resource: { resourceType: 'Immunization', id: 'immunization-mistake', meta: { claims: {} } },
+        resource: { resourceType: ResourceTypesFhirR4.Immunization, id: 'immunization-mistake', meta: { claims: {} } },
       }]));
       expect((response.body as any).data[0].response.status).toBe('412');
       expect(mockVaultRepository.delete).not.toHaveBeenCalled();
@@ -233,9 +238,9 @@ describe('CommunicationManager Unit Tests', () => {
 
       // Step 2. One creator-authorized delete removes both the operational error and only its correlated projection.
       const response = await communicationManager.process(buildClinicalBatchJob([{
-        type: 'Immunization-delete-request-v1.0',
-        request: { method: 'DELETE', url: 'Immunization/immunization-mistake' },
-        resource: { resourceType: 'Immunization', id: 'immunization-mistake', meta: { claims: {} } },
+        type: GatewayRequestEntryTypes.ImmunizationDelete,
+        request: { method: HttpRequestMethods.Delete, url: 'Immunization/immunization-mistake' },
+        resource: { resourceType: ResourceTypesFhirR4.Immunization, id: 'immunization-mistake', meta: { claims: {} } },
       }]));
 
       expect((response.body as any).data[0].response.status).toBe('204');
@@ -260,27 +265,27 @@ describe('CommunicationManager Unit Tests', () => {
       // Step 2. Batch semantics preserve the successful create and report the failed delete separately.
       const response = await communicationManager.process(buildClinicalBatchJob([
         {
-          type: 'Observation-create-request-v1.0',
-          request: { method: 'POST', url: 'Observation' },
+          type: GatewayRequestEntryTypes.ObservationCreate,
+          request: { method: HttpRequestMethods.Post, url: 'Observation' },
           resource: {
-            resourceType: 'Observation',
+            resourceType: ResourceTypesFhirR4.Observation,
             id: 'observation-new',
             meta: { claims: { 'Observation.subject': subjectDid } },
           },
         },
         {
-          type: 'AllergyIntolerance-delete-request-v1.0',
+          type: GatewayRequestEntryTypes.AllergyIntoleranceDelete,
           request: {
-            method: 'DELETE',
+            method: HttpRequestMethods.Delete,
             url: 'AllergyIntolerance/allergy-owned-by-other',
             ifMatch: 'W/"version-current"',
           },
-          resource: { resourceType: 'AllergyIntolerance', id: 'allergy-owned-by-other', meta: { claims: {} } },
+          resource: { resourceType: ResourceTypesFhirR4.AllergyIntolerance, id: 'allergy-owned-by-other', meta: { claims: {} } },
         },
       ]));
 
       expect((response.body as any).data).toEqual(expect.arrayContaining([
-        expect.objectContaining({ id: 'observation-new', response: expect.objectContaining({ status: '201' }) }),
+        expect.objectContaining({ id: 'observation-new', response: expect.objectContaining({ status: String(HttpStatusCodes.Created) }) }),
         expect.objectContaining({ id: 'allergy-owned-by-other', response: expect.objectContaining({ status: '403' }) }),
       ]));
       expect(mockVaultRepository.put).toHaveBeenCalledWith(
@@ -294,7 +299,7 @@ describe('CommunicationManager Unit Tests', () => {
 
   describe('convertFhirToCommMsg', () => {
     it('should correctly convert a FHIR Communication resource to a CommMsgExtended object', () => {
-      const fhirResource = { ...testCommunicationAppointmentFhirR4, resourceType: 'Communication' as const };
+      const fhirResource = { ...testCommunicationAppointmentFhirR4, resourceType: ResourceTypesFhirR4.Communication as const };
       const expectedCommMsg = testCommMsgExtAppointmentRequest;
       const testThid = expectedCommMsg.thid;
       
@@ -320,7 +325,7 @@ describe('CommunicationManager Unit Tests', () => {
       expect(expectedReference).toBeDefined();
       if (referenceItem && expectedReference && expectedReference.resource) {
         expect(referenceItem.resource.reference).toEqual(expectedReference.resource.reference);
-        expect(referenceItem.meta?.claims?.['Communication.note-text']).toEqual(testAppointmentRequestText);
+        expect(referenceItem.resource?.meta?.claims?.[CommunicationClaim.NoteText]).toEqual(testAppointmentRequestText);
         expect(typeof referenceItem.id).toBe('string');
       }
 
@@ -333,14 +338,14 @@ describe('CommunicationManager Unit Tests', () => {
         expect(attachmentItem.resource.contentType).toEqual(expectedAttachment.resource.contentType);
         expect(attachmentItem.resource.data).toEqual(expectedAttachment.resource.data);
         expect(attachmentItem.resource.title).toEqual(expectedAttachment.resource.title);
-        expect(attachmentItem.meta?.claims?.['Communication.note-text']).toEqual(testAppointmentRequestText);
+        expect(attachmentItem.resource?.meta?.claims?.[CommunicationClaim.NoteText]).toEqual(testAppointmentRequestText);
         expect(typeof attachmentItem.id).toBe('string');
       }
     });
 
     it('distributes note texts across payload entries when counts match', () => {
       const fhirResource = {
-        resourceType: 'Communication' as const,
+        resourceType: ResourceTypesFhirR4.Communication as const,
         status: 'completed',
         payload: [
           { contentReference: { reference: 'https://example.org/ref-1' } },
@@ -355,8 +360,8 @@ describe('CommunicationManager Unit Tests', () => {
       const result = communicationManager.convertFhirToCommMsg('thread-notes-001', testServerDid, fhirResource as any);
 
       expect(result.body.data).toHaveLength(2);
-      expect(result.body.data[0].meta?.claims?.['Communication.note-text']).toBe('first note');
-      expect(result.body.data[1].meta?.claims?.['Communication.note-text']).toBe('second note');
+      expect(result.body.data[0].resource?.meta?.claims?.[CommunicationClaim.NoteText]).toBe('first note');
+      expect(result.body.data[1].resource?.meta?.claims?.[CommunicationClaim.NoteText]).toBe('second note');
     });
   });
 
@@ -372,11 +377,11 @@ describe('CommunicationManager Unit Tests', () => {
         exp: Math.floor(Date.now() / 1000) + 300,
         type: 'org.hl7.fhir.r4.Bundle',
         body: {
-          resourceType: 'Bundle',
+          resourceType: ResourceTypesFhirR4.Bundle,
           type: 'batch',
           data: [
             {
-              type: 'Communication',
+              type: ResourceTypesFhirR4.Communication,
               meta: {
                 claims: {
                   '@context': 'org.hl7.fhir.api',
@@ -387,7 +392,7 @@ describe('CommunicationManager Unit Tests', () => {
                   'Communication.text': 'Alergias: soy alérgico al látex.',
                 },
               },
-              request: { method: 'POST', url: 'individual/org.hl7.fhir.api/Communication' },
+              request: { method: HttpRequestMethods.Post, url: 'individual/org.hl7.fhir.api/Communication' },
             },
           ],
         } as any,
@@ -403,7 +408,7 @@ describe('CommunicationManager Unit Tests', () => {
         sector: 'emergency',
         section: 'individual',
         format: 'org.hl7.fhir.api' as any,
-        resourceType: 'Communication',
+        resourceType: ResourceTypesFhirR4.Communication,
         action: '_batch',
         content: decoded,
       };
@@ -427,11 +432,11 @@ describe('CommunicationManager Unit Tests', () => {
         exp: Math.floor(Date.now() / 1000) + 300,
         type: 'org.hl7.fhir.r4.Bundle',
         body: {
-          resourceType: 'Bundle',
+          resourceType: ResourceTypesFhirR4.Bundle,
           type: 'batch',
           entry: [
             {
-              type: 'Communication',
+              type: ResourceTypesFhirR4.Communication,
               meta: {
                 claims: {
                   '@context': 'org.hl7.fhir.api',
@@ -442,7 +447,7 @@ describe('CommunicationManager Unit Tests', () => {
                   'Communication.text': 'Alergias: soy alérgico al látex.',
                 },
               },
-              request: { method: 'POST', url: 'individual/org.hl7.fhir.api/Communication' },
+              request: { method: HttpRequestMethods.Post, url: 'individual/org.hl7.fhir.api/Communication' },
             },
           ],
         } as any,
@@ -458,7 +463,7 @@ describe('CommunicationManager Unit Tests', () => {
         sector: 'emergency',
         section: 'individual',
         format: 'org.hl7.fhir.api' as any,
-        resourceType: 'Communication',
+        resourceType: ResourceTypesFhirR4.Communication,
         action: '_batch',
         content: decoded,
       };
@@ -476,7 +481,7 @@ describe('CommunicationManager Unit Tests', () => {
     const subjectDid = 'did:web:api.acme.org:individual:abc';
 
     it.each([
-      ['application/fhir+json', Buffer.from(JSON.stringify({ resourceType: 'Observation', status: 'final' }), 'utf8').toString('base64')],
+      ['application/fhir+json', Buffer.from(JSON.stringify({ resourceType: ResourceTypesFhirR4.Observation, status: 'final' }), 'utf8').toString('base64')],
       ['application/pdf', Buffer.from('%PDF-1.7 fake', 'utf8').toString('base64')],
       ['image/png', Buffer.from('png-binary', 'utf8').toString('base64')],
       ['image/jpeg', Buffer.from('jpg-binary', 'utf8').toString('base64')],
@@ -492,11 +497,11 @@ describe('CommunicationManager Unit Tests', () => {
         exp: Math.floor(Date.now() / 1000) + 300,
         type: 'org.hl7.fhir.r4.Bundle',
         body: {
-          resourceType: 'Bundle',
+          resourceType: ResourceTypesFhirR4.Bundle,
           type: 'batch',
           data: [
             {
-              type: 'Communication',
+              type: ResourceTypesFhirR4.Communication,
               meta: {
                 claims: {
                   '@context': 'org.hl7.fhir.r4',
@@ -507,7 +512,7 @@ describe('CommunicationManager Unit Tests', () => {
                 },
               },
               resource: {
-                resourceType: 'Communication',
+                resourceType: ResourceTypesFhirR4.Communication,
                 status: 'completed',
                 subject: { reference: subjectDid },
                 recipient: [{ reference: subjectDid }],
@@ -528,7 +533,7 @@ describe('CommunicationManager Unit Tests', () => {
         sector: 'health-care',
         section: 'individual',
         format: 'org.hl7.fhir.r4' as any,
-        resourceType: 'Communication',
+        resourceType: ResourceTypesFhirR4.Communication,
         action: '_batch',
         content: decoded,
       };
@@ -563,11 +568,11 @@ describe('CommunicationManager Unit Tests', () => {
         exp: Math.floor(Date.now() / 1000) + 300,
         type: 'org.hl7.fhir.r4.Bundle',
         body: {
-          resourceType: 'Bundle',
+          resourceType: ResourceTypesFhirR4.Bundle,
           type: 'batch',
           data: [
             {
-              type: 'Communication',
+              type: ResourceTypesFhirR4.Communication,
               meta: {
                 claims: {
                   '@context': 'org.hl7.fhir.r4',
@@ -576,7 +581,7 @@ describe('CommunicationManager Unit Tests', () => {
                 },
               },
               resource: {
-                resourceType: 'Communication',
+                resourceType: ResourceTypesFhirR4.Communication,
                 status: 'completed',
                 subject: { reference: subjectDid },
                 payload: [{ contentAttachment: { contentType: 'application/pdf', data: dataBase64, title: 'sample' } }],
@@ -596,7 +601,7 @@ describe('CommunicationManager Unit Tests', () => {
         sector: 'health-care',
         section: 'individual',
         format: 'org.hl7.fhir.r4' as any,
-        resourceType: 'Communication',
+        resourceType: ResourceTypesFhirR4.Communication,
         action: '_batch',
         content: decoded,
       };
@@ -630,7 +635,7 @@ describe('CommunicationManager Unit Tests', () => {
       mockVaultRepository.vaultExists.mockResolvedValue(true as any);
 
       const embeddedDocumentReference = {
-        resourceType: 'DocumentReference',
+        resourceType: ResourceTypesFhirR4.DocumentReference,
         id: 'docref-ips-001',
         subject: { reference: subjectDid },
         date: '2026-05-17T10:00:00Z',
@@ -641,7 +646,7 @@ describe('CommunicationManager Unit Tests', () => {
             attachment: {
               contentType: 'application/fhir+json',
               title: 'ips-medications.json',
-              data: Buffer.from(JSON.stringify({ resourceType: 'Bundle', type: 'document', entry: [] }), 'utf8').toString('base64'),
+              data: Buffer.from(JSON.stringify({ resourceType: ResourceTypesFhirR4.Bundle, type: 'document', entry: [] }), 'utf8').toString('base64'),
             },
           },
         ],
@@ -655,11 +660,11 @@ describe('CommunicationManager Unit Tests', () => {
         exp: Math.floor(Date.now() / 1000) + 300,
         type: 'org.hl7.fhir.r4.Bundle',
         body: {
-          resourceType: 'Bundle',
+          resourceType: ResourceTypesFhirR4.Bundle,
           type: 'batch',
           data: [
             {
-              type: 'Communication',
+              type: ResourceTypesFhirR4.Communication,
               meta: {
                 claims: {
                   '@context': 'org.hl7.fhir.r4',
@@ -668,7 +673,7 @@ describe('CommunicationManager Unit Tests', () => {
                 },
               },
               resource: {
-                resourceType: 'Communication',
+                resourceType: ResourceTypesFhirR4.Communication,
                 status: 'completed',
                 subject: { reference: subjectDid },
                 payload: [{
@@ -694,7 +699,7 @@ describe('CommunicationManager Unit Tests', () => {
         sector: 'health-care',
         section: 'individual',
         format: 'org.hl7.fhir.r4' as any,
-        resourceType: 'Communication',
+        resourceType: ResourceTypesFhirR4.Communication,
         action: '_batch',
         content: decoded,
       };
@@ -752,7 +757,7 @@ describe('CommunicationManager Unit Tests', () => {
         sector: 'health-care',
         section: 'individual',
         format: 'org.hl7.fhir.r4' as any,
-        resourceType: 'Communication',
+        resourceType: ResourceTypesFhirR4.Communication,
         action: '_batch',
         content: {
           jti: randomUUID(),
@@ -762,12 +767,12 @@ describe('CommunicationManager Unit Tests', () => {
           exp: Math.floor(Date.now() / 1000) + 300,
           type: 'org.hl7.fhir.r4.Bundle',
           body: {
-            resourceType: 'Bundle',
+            resourceType: ResourceTypesFhirR4.Bundle,
             type: 'batch',
             data: [{
-              type: 'Communication',
+              type: ResourceTypesFhirR4.Communication,
               resource: {
-                resourceType: 'Communication',
+                resourceType: ResourceTypesFhirR4.Communication,
                 status: 'completed',
                 subject: { reference: subjectDid },
                 topic: { coding: [{ system: 'http://loinc.org', code: '48765-2' }] },
@@ -786,12 +791,12 @@ describe('CommunicationManager Unit Tests', () => {
 
       // Step 1. The individual controller authors one clinical resource.
       await communicationManager.process(buildJob({
-        resourceType: 'Bundle',
+        resourceType: ResourceTypesFhirR4.Bundle,
         type: 'batch',
         entry: [{
-          request: { method: 'POST', url: 'AllergyIntolerance' },
+          request: { method: HttpRequestMethods.Post, url: 'AllergyIntolerance' },
           resource: {
-            resourceType: 'AllergyIntolerance',
+            resourceType: ResourceTypesFhirR4.AllergyIntolerance,
             id: allergyId,
             identifier: [{ value: `urn:uuid:${allergyId}` }],
             patient: { reference: subjectDid },
@@ -814,13 +819,13 @@ describe('CommunicationManager Unit Tests', () => {
 
       // Step 2. The same authenticated controller deletes exactly that version.
       const deleteResult = await communicationManager.process(buildJob({
-        resourceType: 'Bundle',
+        resourceType: ResourceTypesFhirR4.Bundle,
         type: 'batch',
         entry: [
           {
-            request: { method: 'POST', url: 'AllergyIntolerance' },
+            request: { method: HttpRequestMethods.Post, url: 'AllergyIntolerance' },
             resource: {
-              resourceType: 'AllergyIntolerance',
+              resourceType: ResourceTypesFhirR4.AllergyIntolerance,
               id: mixedCreateId,
               identifier: [{ value: `urn:uuid:${mixedCreateId}` }],
               patient: { reference: subjectDid },
@@ -828,7 +833,7 @@ describe('CommunicationManager Unit Tests', () => {
           },
           {
             request: {
-              method: 'DELETE',
+              method: HttpRequestMethods.Delete,
               url: `AllergyIntolerance/${allergyId}`,
               ifMatch: `W/"${versionId}"`,
             },
@@ -848,18 +853,18 @@ describe('CommunicationManager Unit Tests', () => {
       expect((deleteResult.body as any).data).toEqual(expect.arrayContaining([
         expect.objectContaining({
           id: allergyId,
-          response: { status: '204' },
+          response: { status: String(HttpStatusCodes.NoContent) },
         }),
       ]));
 
       // Step 4. A different actor cannot delete a controller-authored resource.
       await communicationManager.process(buildJob({
-        resourceType: 'Bundle',
+        resourceType: ResourceTypesFhirR4.Bundle,
         type: 'batch',
         entry: [{
-          request: { method: 'POST', url: 'AllergyIntolerance' },
+          request: { method: HttpRequestMethods.Post, url: 'AllergyIntolerance' },
           resource: {
-            resourceType: 'AllergyIntolerance',
+            resourceType: ResourceTypesFhirR4.AllergyIntolerance,
             id: allergyId,
             identifier: [{ value: `urn:uuid:${allergyId}` }],
             patient: { reference: subjectDid },
@@ -873,11 +878,11 @@ describe('CommunicationManager Unit Tests', () => {
       }));
       const recreated = await mockVaultRepository.get(tenantVaultId, allergyId, allergySectionId) as any;
       const staleResult = await communicationManager.process(buildJob({
-        resourceType: 'Bundle',
+        resourceType: ResourceTypesFhirR4.Bundle,
         type: 'batch',
         entry: [{
           request: {
-            method: 'DELETE',
+            method: HttpRequestMethods.Delete,
             url: `AllergyIntolerance/${allergyId}`,
             ifMatch: 'W/"stale-version"',
           },
@@ -892,13 +897,13 @@ describe('CommunicationManager Unit Tests', () => {
       expect(await mockVaultRepository.get(tenantVaultId, allergyId, allergySectionId)).toBeDefined();
 
       const forbiddenResult = await communicationManager.process(buildJob({
-        resourceType: 'Bundle',
+        resourceType: ResourceTypesFhirR4.Bundle,
         type: 'batch',
         entry: [
           {
-            request: { method: 'POST', url: 'AllergyIntolerance' },
+            request: { method: HttpRequestMethods.Post, url: 'AllergyIntolerance' },
             resource: {
-              resourceType: 'AllergyIntolerance',
+              resourceType: ResourceTypesFhirR4.AllergyIntolerance,
               id: partialSuccessCreateId,
               identifier: [{ value: `urn:uuid:${partialSuccessCreateId}` }],
               patient: { reference: subjectDid },
@@ -906,7 +911,7 @@ describe('CommunicationManager Unit Tests', () => {
           },
           {
             request: {
-              method: 'DELETE',
+              method: HttpRequestMethods.Delete,
               url: `AllergyIntolerance/${allergyId}`,
               ifMatch: recreated['AllergyIntolerance.meta.versionId'],
             },
@@ -920,7 +925,7 @@ describe('CommunicationManager Unit Tests', () => {
       expect((forbiddenResult.body as any).data).toEqual(expect.arrayContaining([
         expect.objectContaining({
           id: partialSuccessCreateId,
-          response: expect.objectContaining({ status: '201' }),
+          response: expect.objectContaining({ status: String(HttpStatusCodes.Created) }),
         }),
         expect.objectContaining({ response: expect.objectContaining({ status: '403' }) }),
       ]));
@@ -1025,7 +1030,7 @@ describe('CommunicationManager Unit Tests', () => {
         resourceType: ResourceTypesFhirR4.Bundle,
         type: BundleTypes.batch,
         entry: [{ request: {
-          method: 'DELETE',
+          method: HttpRequestMethods.Delete,
           url: `${ResourceTypesFhirR4.AllergyIntolerance}/${allergyId}`,
         } }],
       };
@@ -1067,12 +1072,12 @@ describe('CommunicationManager Unit Tests', () => {
 
       const section = 'LOINC|48765-2';
       const sectionBatch = {
-        resourceType: 'Bundle',
+        resourceType: ResourceTypesFhirR4.Bundle,
         type: 'batch',
         data: [{
-          type: 'AllergyIntolerance-edit-request-v1.0',
+          type: GatewayRequestEntryTypes.AllergyIntoleranceEdit,
           resource: {
-            resourceType: 'AllergyIntolerance',
+            resourceType: ResourceTypesFhirR4.AllergyIntolerance,
             id: 'allergy-section-update-001',
             identifier: [{ value: 'urn:uuid:allergy-section-update-001' }],
             patient: { reference: subjectDid },
@@ -1100,12 +1105,12 @@ describe('CommunicationManager Unit Tests', () => {
         exp: Math.floor(Date.now() / 1000) + 300,
         type: 'org.hl7.fhir.r4.Bundle',
         body: {
-          resourceType: 'Bundle',
+          resourceType: ResourceTypesFhirR4.Bundle,
           type: 'batch',
           data: [{
-            type: 'Communication',
+            type: ResourceTypesFhirR4.Communication,
             resource: {
-              resourceType: 'Communication',
+              resourceType: ResourceTypesFhirR4.Communication,
               status: 'completed',
               subject: { reference: subjectDid },
               topic: {
@@ -1133,7 +1138,7 @@ describe('CommunicationManager Unit Tests', () => {
         sector: 'health-care',
         section: 'individual',
         format: 'org.hl7.fhir.r4' as any,
-        resourceType: 'Communication',
+        resourceType: ResourceTypesFhirR4.Communication,
         action: '_batch',
         content: decoded,
       };
@@ -1201,12 +1206,12 @@ describe('CommunicationManager Unit Tests', () => {
       mockVaultRepository.vaultExists.mockResolvedValue(true as any);
 
       const unscopedBatch = {
-        resourceType: 'Bundle',
+        resourceType: ResourceTypesFhirR4.Bundle,
         type: 'batch',
         data: [{
-          type: 'AllergyIntolerance-edit-request-v1.0',
+          type: GatewayRequestEntryTypes.AllergyIntoleranceEdit,
           resource: {
-            resourceType: 'AllergyIntolerance',
+            resourceType: ResourceTypesFhirR4.AllergyIntolerance,
             id: 'allergy-unscoped-001',
             meta: { claims: {
               '@context': 'org.hl7.fhir.api',
@@ -1224,16 +1229,16 @@ describe('CommunicationManager Unit Tests', () => {
         exp: Math.floor(Date.now() / 1000) + 300,
         type: 'org.hl7.fhir.r4.Bundle',
         body: {
-          resourceType: 'Bundle',
+          resourceType: ResourceTypesFhirR4.Bundle,
           type: 'batch',
           data: [{
-            type: 'Communication',
+            type: ResourceTypesFhirR4.Communication,
             meta: { claims: {
               '@context': 'org.hl7.fhir.r4',
               'Communication.subject': subjectDid,
             } },
             resource: {
-              resourceType: 'Communication',
+              resourceType: ResourceTypesFhirR4.Communication,
               status: 'completed',
               subject: { reference: subjectDid },
               payload: [{
@@ -1256,7 +1261,7 @@ describe('CommunicationManager Unit Tests', () => {
         sector: 'health-care',
         section: 'individual',
         format: 'org.hl7.fhir.r4' as any,
-        resourceType: 'Communication',
+        resourceType: ResourceTypesFhirR4.Communication,
         action: '_batch',
         content: decoded,
       };
@@ -1278,12 +1283,12 @@ describe('CommunicationManager Unit Tests', () => {
       mockVaultRepository.vaultExists.mockResolvedValue(true as any);
 
       const documentBundle = {
-        resourceType: 'Bundle',
+        resourceType: ResourceTypesFhirR4.Bundle,
         type: 'document',
         entry: [
           {
             resource: {
-              resourceType: 'Composition',
+              resourceType: ResourceTypesFhirR4.Composition,
               id: 'ips-composition-001',
               status: 'final',
               subject: { reference: subjectDid },
@@ -1292,7 +1297,7 @@ describe('CommunicationManager Unit Tests', () => {
           },
           {
             resource: {
-              resourceType: 'MedicationStatement',
+              resourceType: ResourceTypesFhirR4.MedicationStatement,
               id: 'medication-001',
               status: 'active',
               language: 'es',
@@ -1312,7 +1317,7 @@ describe('CommunicationManager Unit Tests', () => {
           },
           {
             resource: {
-              resourceType: 'Observation',
+              resourceType: ResourceTypesFhirR4.Observation,
               id: 'observation-001',
               status: 'final',
               language: 'es',
@@ -1341,11 +1346,11 @@ describe('CommunicationManager Unit Tests', () => {
         exp: Math.floor(Date.now() / 1000) + 300,
         type: 'org.hl7.fhir.r4.Bundle',
         body: {
-          resourceType: 'Bundle',
+          resourceType: ResourceTypesFhirR4.Bundle,
           type: 'batch',
           data: [
             {
-              type: 'Communication',
+              type: ResourceTypesFhirR4.Communication,
               meta: {
                 claims: {
                   '@context': 'org.hl7.fhir.r4',
@@ -1356,7 +1361,7 @@ describe('CommunicationManager Unit Tests', () => {
                 },
               },
               resource: {
-                resourceType: 'Communication',
+                resourceType: ResourceTypesFhirR4.Communication,
                 status: 'completed',
                 subject: { reference: subjectDid },
                 payload: [
@@ -1384,7 +1389,7 @@ describe('CommunicationManager Unit Tests', () => {
         sector: 'health-care',
         section: 'individual',
         format: 'org.hl7.fhir.r4' as any,
-        resourceType: 'Communication',
+        resourceType: ResourceTypesFhirR4.Communication,
         action: '_batch',
         content: decoded,
       };
@@ -1476,12 +1481,12 @@ describe('CommunicationManager Unit Tests', () => {
       mockVaultRepository.vaultExists.mockResolvedValue(true as any);
 
       const documentBundle = {
-        resourceType: 'Bundle',
+        resourceType: ResourceTypesFhirR4.Bundle,
         type: 'document',
         entry: [
           {
             resource: {
-              resourceType: 'Composition',
+              resourceType: ResourceTypesFhirR4.Composition,
               id: 'ips-composition-embedded-001',
               status: 'final',
               subject: { reference: subjectDid },
@@ -1490,7 +1495,7 @@ describe('CommunicationManager Unit Tests', () => {
           },
           {
             resource: {
-              resourceType: 'MedicationStatement',
+              resourceType: ResourceTypesFhirR4.MedicationStatement,
               id: 'medication-embedded-001',
               status: 'active',
               subject: { reference: subjectDid },
@@ -1502,7 +1507,7 @@ describe('CommunicationManager Unit Tests', () => {
         ],
       };
       const embeddedDocumentReference = {
-        resourceType: 'DocumentReference',
+        resourceType: ResourceTypesFhirR4.DocumentReference,
         subject: { reference: subjectDid },
         identifier: [{ value: 'urn:uuid:docref-embedded-001' }],
         content: [
@@ -1524,11 +1529,11 @@ describe('CommunicationManager Unit Tests', () => {
         exp: Math.floor(Date.now() / 1000) + 300,
         type: 'org.hl7.fhir.r4.Bundle',
         body: {
-          resourceType: 'Bundle',
+          resourceType: ResourceTypesFhirR4.Bundle,
           type: 'batch',
           data: [
             {
-              type: 'Communication',
+              type: ResourceTypesFhirR4.Communication,
               meta: {
                 claims: {
                   '@context': 'org.hl7.fhir.r4',
@@ -1539,7 +1544,7 @@ describe('CommunicationManager Unit Tests', () => {
                 },
               },
               resource: {
-                resourceType: 'Communication',
+                resourceType: ResourceTypesFhirR4.Communication,
                 status: 'completed',
                 subject: { reference: subjectDid },
                 payload: [
@@ -1567,7 +1572,7 @@ describe('CommunicationManager Unit Tests', () => {
         sector: 'health-care',
         section: 'individual',
         format: 'org.hl7.fhir.r4' as any,
-        resourceType: 'Communication',
+        resourceType: ResourceTypesFhirR4.Communication,
         action: '_batch',
         content: decoded,
       };
@@ -1594,12 +1599,12 @@ describe('CommunicationManager Unit Tests', () => {
       mockVaultRepository.get.mockResolvedValue({ status: 'enabled' } as any);
 
       const documentBundle = {
-        resourceType: 'Bundle',
+        resourceType: ResourceTypesFhirR4.Bundle,
         type: 'document',
         entry: [
           {
             resource: {
-              resourceType: 'Composition',
+              resourceType: ResourceTypesFhirR4.Composition,
               id: 'ips-composition-sections-001',
               status: 'final',
               subject: { reference: subjectDid },
@@ -1622,7 +1627,7 @@ describe('CommunicationManager Unit Tests', () => {
           },
           {
             resource: {
-              resourceType: 'MedicationStatement',
+              resourceType: ResourceTypesFhirR4.MedicationStatement,
               id: 'medication-sections-001',
               status: 'active',
               subject: { reference: subjectDid },
@@ -1632,7 +1637,7 @@ describe('CommunicationManager Unit Tests', () => {
           },
           {
             resource: {
-              resourceType: 'Observation',
+              resourceType: ResourceTypesFhirR4.Observation,
               id: 'observation-sections-001',
               status: 'final',
               subject: { reference: subjectDid },
@@ -1656,7 +1661,7 @@ describe('CommunicationManager Unit Tests', () => {
         sector: 'health-care',
         section: 'individual',
         format: 'org.hl7.fhir.r4' as any,
-        resourceType: 'Communication',
+        resourceType: ResourceTypesFhirR4.Communication,
         action: '_batch',
         content: {
           jti: randomUUID(),
@@ -1666,11 +1671,11 @@ describe('CommunicationManager Unit Tests', () => {
           exp: Math.floor(Date.now() / 1000) + 300,
           type: 'org.hl7.fhir.r4.Bundle',
           body: {
-            resourceType: 'Bundle',
+            resourceType: ResourceTypesFhirR4.Bundle,
             type: 'batch',
             data: [
               {
-                type: 'Communication',
+                type: ResourceTypesFhirR4.Communication,
                 meta: {
                   claims: {
                     '@context': 'org.hl7.fhir.r4',
@@ -1681,7 +1686,7 @@ describe('CommunicationManager Unit Tests', () => {
                   },
                 },
                 resource: {
-                  resourceType: 'Communication',
+                  resourceType: ResourceTypesFhirR4.Communication,
                   status: 'completed',
                   subject: { reference: subjectDid },
                   sent: '2026-05-22T10:00:00Z',
@@ -1741,12 +1746,12 @@ describe('CommunicationManager Unit Tests', () => {
       mockVaultRepository.vaultExists.mockResolvedValue(true as any);
 
       const buildDocumentBundle = (suffix: string, compositionDate: string) => ({
-        resourceType: 'Bundle',
+        resourceType: ResourceTypesFhirR4.Bundle,
         type: 'document',
         entry: [
           {
             resource: {
-              resourceType: 'Composition',
+              resourceType: ResourceTypesFhirR4.Composition,
               id: `ips-composition-${suffix}`,
               status: 'final',
               date: compositionDate,
@@ -1761,7 +1766,7 @@ describe('CommunicationManager Unit Tests', () => {
           },
           {
             resource: {
-              resourceType: 'MedicationStatement',
+              resourceType: ResourceTypesFhirR4.MedicationStatement,
               id: `medication-${suffix}`,
               status: 'active',
               subject: { reference: subjectDid },
@@ -1782,7 +1787,7 @@ describe('CommunicationManager Unit Tests', () => {
           },
           {
             resource: {
-              resourceType: 'Observation',
+              resourceType: ResourceTypesFhirR4.Observation,
               id: `observation-${suffix}`,
               status: 'final',
               subject: { reference: subjectDid },
@@ -1812,11 +1817,11 @@ describe('CommunicationManager Unit Tests', () => {
         exp: Math.floor(Date.now() / 1000) + 300,
         type: 'org.hl7.fhir.r4.Bundle',
         body: {
-          resourceType: 'Bundle',
+          resourceType: ResourceTypesFhirR4.Bundle,
           type: 'batch',
           data: [
             {
-              type: 'Communication',
+              type: ResourceTypesFhirR4.Communication,
               meta: {
                 claims: {
                   '@context': 'org.hl7.fhir.r4',
@@ -1827,7 +1832,7 @@ describe('CommunicationManager Unit Tests', () => {
                 },
               },
               resource: {
-                resourceType: 'Communication',
+                resourceType: ResourceTypesFhirR4.Communication,
                 status: 'completed',
                 subject: { reference: subjectDid },
                 sent,
@@ -1856,7 +1861,7 @@ describe('CommunicationManager Unit Tests', () => {
         sector: 'health-care',
         section: 'individual',
         format: 'org.hl7.fhir.r4' as any,
-        resourceType: 'Communication',
+        resourceType: ResourceTypesFhirR4.Communication,
         action: '_batch',
         content: makeDecoded('thread-ips-replay-1', 'v1', '2026-05-22T10:00:00Z'),
       };
@@ -1919,12 +1924,12 @@ describe('CommunicationManager Unit Tests', () => {
       mockVaultRepository.vaultExists.mockResolvedValue(true as any);
 
       const documentBundle = {
-        resourceType: 'Bundle',
+        resourceType: ResourceTypesFhirR4.Bundle,
         type: 'document',
         entry: [
           {
             resource: {
-              resourceType: 'Composition',
+              resourceType: ResourceTypesFhirR4.Composition,
               id: 'ips-composition-stable-001',
               identifier: [{ value: 'urn:uuid:ips-composition-stable-001' }],
               status: 'final',
@@ -1944,11 +1949,11 @@ describe('CommunicationManager Unit Tests', () => {
         exp: Math.floor(Date.now() / 1000) + 300,
         type: 'org.hl7.fhir.r4.Bundle',
         body: {
-          resourceType: 'Bundle',
+          resourceType: ResourceTypesFhirR4.Bundle,
           type: 'batch',
           data: [
             {
-              type: 'Communication',
+              type: ResourceTypesFhirR4.Communication,
               meta: {
                 claims: {
                   '@context': 'org.hl7.fhir.r4',
@@ -1957,7 +1962,7 @@ describe('CommunicationManager Unit Tests', () => {
                 },
               },
               resource: {
-                resourceType: 'Communication',
+                resourceType: ResourceTypesFhirR4.Communication,
                 status: 'completed',
                 subject: { reference: subjectDid },
                 payload: [
@@ -1985,7 +1990,7 @@ describe('CommunicationManager Unit Tests', () => {
         sector: 'health-care',
         section: 'individual',
         format: 'org.hl7.fhir.r4' as any,
-        resourceType: 'Communication',
+        resourceType: ResourceTypesFhirR4.Communication,
         action: '_batch',
         content: makeDecoded('thread-composition-stable-1'),
       };
@@ -2035,11 +2040,11 @@ describe('CommunicationManager Unit Tests', () => {
         exp: Math.floor(Date.now() / 1000) + 300,
         type: 'org.hl7.fhir.r4.Bundle',
         body: {
-          resourceType: 'Bundle',
+          resourceType: ResourceTypesFhirR4.Bundle,
           type: 'batch',
           data: [
             {
-              type: 'Communication',
+              type: ResourceTypesFhirR4.Communication,
               meta: {
                 claims: {
                   '@context': 'org.hl7.fhir.r4',
@@ -2051,7 +2056,7 @@ describe('CommunicationManager Unit Tests', () => {
                 },
               },
               resource: {
-                resourceType: 'Communication',
+                resourceType: ResourceTypesFhirR4.Communication,
                 status: 'completed',
                 subject: { reference: subjectDid },
                 recipient: [{ reference: subjectDid }],
@@ -2084,7 +2089,7 @@ describe('CommunicationManager Unit Tests', () => {
         sector: 'health-care',
         section: 'individual',
         format: 'org.hl7.fhir.r4' as any,
-        resourceType: 'Communication',
+        resourceType: ResourceTypesFhirR4.Communication,
         action: '_batch',
         content: decoded,
       };
@@ -2192,16 +2197,16 @@ describe('CommunicationManager Unit Tests', () => {
         thid: 'thread-ips-search-001',
         type: 'transaction-response',
         body: {
-          resourceType: 'Bundle',
+          resourceType: ResourceTypesFhirR4.Bundle,
           type: 'batch-response',
           data: [
             {
-              type: 'Bundle-search-response-v1.0',
-              response: { status: '200' },
+              type: GatewayResponseEntryTypes.BundleSearch,
+              response: { status: String(HttpStatusCodes.Ok) },
               resource: {
-                resourceType: 'Bundle',
+                resourceType: ResourceTypesFhirR4.Bundle,
                 type: 'document',
-                entry: [{ resource: { resourceType: 'Composition' } }],
+                entry: [{ resource: { resourceType: ResourceTypesFhirR4.Composition } }],
               },
             },
           ],
@@ -2216,11 +2221,11 @@ describe('CommunicationManager Unit Tests', () => {
         exp: Math.floor(Date.now() / 1000) + 300,
         type: 'org.hl7.fhir.r4.Bundle',
         body: {
-          resourceType: 'Bundle',
+          resourceType: ResourceTypesFhirR4.Bundle,
           type: 'batch',
           data: [
             {
-              type: 'Communication',
+              type: ResourceTypesFhirR4.Communication,
               meta: {
                 claims: {
                   '@context': 'org.hl7.fhir.r4',
@@ -2230,7 +2235,7 @@ describe('CommunicationManager Unit Tests', () => {
                 },
               },
               resource: {
-                resourceType: 'Communication',
+                resourceType: ResourceTypesFhirR4.Communication,
                 status: 'completed',
                 subject: { reference: subjectDid },
                 payload: [
@@ -2256,7 +2261,7 @@ describe('CommunicationManager Unit Tests', () => {
         sector: 'health-care',
         section: 'individual',
         format: 'org.hl7.fhir.r4' as any,
-        resourceType: 'Communication',
+        resourceType: ResourceTypesFhirR4.Communication,
         action: '_batch',
         content: decoded,
       };
@@ -2264,7 +2269,7 @@ describe('CommunicationManager Unit Tests', () => {
       const response = await communicationManager.process(job);
       const data = (response.body as any)?.data;
       expect(Array.isArray(data)).toBe(true);
-      expect(data[0]?.type).toBe('Bundle-search-response-v1.0');
+      expect(data[0]?.type).toBe(GatewayResponseEntryTypes.BundleSearch);
       expect(data[0]?.resource?.type).toBe('document');
       expect(mockCompositionManager.process).toHaveBeenCalledTimes(1);
       const forwardedJob = mockCompositionManager.process.mock.calls[0][0] as JobRequest;
@@ -2290,14 +2295,14 @@ describe('CommunicationManager Unit Tests', () => {
         thid: 'thread-subject-summary-001',
         type: 'transaction-response',
         body: {
-          resourceType: 'Bundle',
+          resourceType: ResourceTypesFhirR4.Bundle,
           type: 'batch-response',
           data: [
             {
-              type: 'Bundle-summary-response-v1.0',
-              response: { status: '200' },
+              type: GatewayResponseEntryTypes.BundleSummary,
+              response: { status: String(HttpStatusCodes.Ok) },
               resource: {
-                resourceType: 'Bundle',
+                resourceType: ResourceTypesFhirR4.Bundle,
                 type: 'document',
               },
             },
@@ -2313,13 +2318,13 @@ describe('CommunicationManager Unit Tests', () => {
         exp: Math.floor(Date.now() / 1000) + 300,
         type: 'org.hl7.fhir.r4.Bundle',
         body: {
-          resourceType: 'Bundle',
+          resourceType: ResourceTypesFhirR4.Bundle,
           type: 'batch',
           data: [
             {
-              type: 'Communication',
+              type: ResourceTypesFhirR4.Communication,
               resource: {
-                resourceType: 'Communication',
+                resourceType: ResourceTypesFhirR4.Communication,
                 status: 'completed',
                 subject: { reference: subjectDid },
                 payload: [
@@ -2345,7 +2350,7 @@ describe('CommunicationManager Unit Tests', () => {
         sector: 'health-care',
         section: 'individual',
         format: 'org.hl7.fhir.r4' as any,
-        resourceType: 'Communication',
+        resourceType: ResourceTypesFhirR4.Communication,
         action: '_batch',
         content: decoded,
       };
@@ -2355,7 +2360,7 @@ describe('CommunicationManager Unit Tests', () => {
       // the forwarded job below into a direct Subject/$summary HTTP request.
       const data = (response.body as any)?.data;
       expect(Array.isArray(data)).toBe(true);
-      expect(data[0]?.type).toBe('Bundle-summary-response-v1.0');
+      expect(data[0]?.type).toBe(GatewayResponseEntryTypes.BundleSummary);
       const forwardedJob = mockCompositionManager.process.mock.calls[0][0] as JobRequest;
       expect(forwardedJob.resourceType).toBe('Subject');
       expect(forwardedJob.action).toBe('$summary');
@@ -2378,13 +2383,13 @@ describe('CommunicationManager Unit Tests', () => {
         thid: 'thread-subject-summary-parameters-001',
         type: 'transaction-response',
         body: {
-          resourceType: 'Bundle',
+          resourceType: ResourceTypesFhirR4.Bundle,
           type: 'batch-response',
           data: [{
-            type: 'Bundle-summary-response-v1.0',
-            response: { status: '200' },
+            type: GatewayResponseEntryTypes.BundleSummary,
+            response: { status: String(HttpStatusCodes.Ok) },
             resource: {
-              resourceType: 'Bundle',
+              resourceType: ResourceTypesFhirR4.Bundle,
               type: 'document',
               meta: { forwardedBody: (forwardedJob.content as any)?.body },
             },
@@ -2394,7 +2399,7 @@ describe('CommunicationManager Unit Tests', () => {
       });
 
       const parameters = {
-        resourceType: 'Parameters',
+        resourceType: ResourceTypesFhirR4.Parameters,
         parameter: [
           { name: 'subject', valueString: subjectDid },
           { name: 'document-type', valueString: 'http://loinc.org|60591-5' },
@@ -2409,12 +2414,12 @@ describe('CommunicationManager Unit Tests', () => {
         exp: Math.floor(Date.now() / 1000) + 300,
         type: 'org.hl7.fhir.api.Bundle',
         body: {
-          resourceType: 'Bundle',
+          resourceType: ResourceTypesFhirR4.Bundle,
           type: 'batch',
           data: [{
-            type: 'Communication',
+            type: ResourceTypesFhirR4.Communication,
             resource: {
-              resourceType: 'Communication',
+              resourceType: ResourceTypesFhirR4.Communication,
               meta: {
                 claims: {
                   '@context': 'org.hl7.fhir.api',
@@ -2440,7 +2445,7 @@ describe('CommunicationManager Unit Tests', () => {
         sector: 'health-care',
         section: 'individual',
         format: 'org.hl7.fhir.api' as any,
-        resourceType: 'Communication',
+        resourceType: ResourceTypesFhirR4.Communication,
         action: '_batch',
         content: decoded,
       };
@@ -2465,14 +2470,14 @@ describe('CommunicationManager Unit Tests', () => {
         thid: 'thread-patient-summary-001',
         type: 'transaction-response',
         body: {
-          resourceType: 'Bundle',
+          resourceType: ResourceTypesFhirR4.Bundle,
           type: 'batch-response',
           data: [
             {
-              type: 'Bundle-summary-response-v1.0',
-              response: { status: '200' },
+              type: GatewayResponseEntryTypes.BundleSummary,
+              response: { status: String(HttpStatusCodes.Ok) },
               resource: {
-                resourceType: 'Bundle',
+                resourceType: ResourceTypesFhirR4.Bundle,
                 type: 'document',
               },
             },
@@ -2488,13 +2493,13 @@ describe('CommunicationManager Unit Tests', () => {
         exp: Math.floor(Date.now() / 1000) + 300,
         type: 'org.hl7.fhir.r4.Bundle',
         body: {
-          resourceType: 'Bundle',
+          resourceType: ResourceTypesFhirR4.Bundle,
           type: 'batch',
           data: [
             {
-              type: 'Communication',
+              type: ResourceTypesFhirR4.Communication,
               resource: {
-                resourceType: 'Communication',
+                resourceType: ResourceTypesFhirR4.Communication,
                 status: 'completed',
                 subject: { reference: subjectDid },
                 payload: [
@@ -2520,7 +2525,7 @@ describe('CommunicationManager Unit Tests', () => {
         sector: 'health-care',
         section: 'individual',
         format: 'org.hl7.fhir.r4' as any,
-        resourceType: 'Communication',
+        resourceType: ResourceTypesFhirR4.Communication,
         action: '_batch',
         content: decoded,
       };
@@ -2545,14 +2550,14 @@ describe('CommunicationManager Unit Tests', () => {
         thid: 'thread-subject-search-001',
         type: 'transaction-response',
         body: {
-          resourceType: 'Bundle',
+          resourceType: ResourceTypesFhirR4.Bundle,
           type: 'batch-response',
           data: [
             {
-              type: 'Subject-search-response-v1.0',
-              response: { status: '200' },
+              type: GatewayResponseEntryTypes.SubjectSearch,
+              response: { status: String(HttpStatusCodes.Ok) },
               resource: {
-                resourceType: 'Bundle',
+                resourceType: ResourceTypesFhirR4.Bundle,
                 type: 'searchset',
                 total: 3,
                 data: [{ id: 'consent-1' }, { id: 'consent-2' }, { id: 'consent-3' }],
@@ -2563,7 +2568,7 @@ describe('CommunicationManager Unit Tests', () => {
       } as any);
 
       const parametersResource = {
-        resourceType: 'Parameters',
+        resourceType: ResourceTypesFhirR4.Parameters,
         parameter: [
           { name: 'subject', valueString: 'did:web:api.acme.org:individual:123' },
         ],
@@ -2577,13 +2582,13 @@ describe('CommunicationManager Unit Tests', () => {
         exp: Math.floor(Date.now() / 1000) + 300,
         type: 'org.hl7.fhir.r4.Bundle',
         body: {
-          resourceType: 'Bundle',
+          resourceType: ResourceTypesFhirR4.Bundle,
           type: 'batch',
           data: [
             {
-              type: 'Communication',
+              type: ResourceTypesFhirR4.Communication,
               resource: {
-                resourceType: 'Communication',
+                resourceType: ResourceTypesFhirR4.Communication,
                 status: 'completed',
                 subject: { reference: 'did:web:api.acme.org:individual:123' },
                 payload: [
@@ -2614,7 +2619,7 @@ describe('CommunicationManager Unit Tests', () => {
         sector: 'health-care',
         section: 'individual',
         format: 'org.hl7.fhir.r4' as any,
-        resourceType: 'Communication',
+        resourceType: ResourceTypesFhirR4.Communication,
         action: '_batch',
         content: decoded,
       };
@@ -2622,7 +2627,7 @@ describe('CommunicationManager Unit Tests', () => {
       const response = await communicationManager.process(job);
       const data = (response.body as any)?.data;
       expect(Array.isArray(data)).toBe(true);
-      expect(data[0]?.type).toBe('Subject-search-response-v1.0');
+      expect(data[0]?.type).toBe(GatewayResponseEntryTypes.SubjectSearch);
       expect(mockIndividualManager.process).toHaveBeenCalledTimes(1);
       const forwardedJob = mockIndividualManager.process.mock.calls[0][0] as JobRequest;
       expect(forwardedJob.resourceType).toBe('Subject');
@@ -2636,7 +2641,7 @@ describe('CommunicationManager Unit Tests', () => {
       mockTenantsCacheManager.getTenantDid.mockResolvedValue(testServerDid as any);
 
       const fhirResource = {
-        resourceType: 'Communication' as const,
+        resourceType: ResourceTypesFhirR4.Communication as const,
         status: 'completed',
         subject: { reference: 'did:web:subject.example' },
         sender: { reference: 'mailto:Sender@Example.org' },
@@ -2657,7 +2662,7 @@ describe('CommunicationManager Unit Tests', () => {
         sector: 'health-care',
         section: 'individual',
         format: 'org.hl7.fhir.r4' as any,
-        resourceType: 'Communication',
+        resourceType: ResourceTypesFhirR4.Communication,
         action: '_batch',
         content: {
           jti: randomUUID(),
@@ -2667,7 +2672,7 @@ describe('CommunicationManager Unit Tests', () => {
           exp: Math.floor(Date.now() / 1000) + 300,
           type: 'api+json',
           body: {
-            resourceType: 'Bundle',
+            resourceType: ResourceTypesFhirR4.Bundle,
             type: 'batch',
             data: [{ resource: fhirResource }],
           },
@@ -2705,7 +2710,7 @@ describe('CommunicationManager Unit Tests', () => {
           return [
             {
               ...firstProjection,
-              type: 'CommMsgExtended',
+              type: DidcommPayloadTypes.ExtendedCommunicationMessage,
               resource: { id: 'comm-1' },
               [CommunicationClaim.Identifier]: 'comm-1',
               [CommunicationClaim.Subject]: firstProjection.subject,
@@ -2724,7 +2729,7 @@ describe('CommunicationManager Unit Tests', () => {
           });
         return [{
           ...secondProjection,
-          type: 'CommMsgExtended',
+          type: DidcommPayloadTypes.ExtendedCommunicationMessage,
           resource: { id: 'comm-2' },
           [CommunicationClaim.Identifier]: 'comm-2',
           [CommunicationClaim.Subject]: secondProjection.subject,
@@ -2746,7 +2751,7 @@ describe('CommunicationManager Unit Tests', () => {
         sector: 'health-care',
         section: 'individual',
         format: 'org.hl7.fhir.r4' as any,
-        resourceType: 'Communication',
+        resourceType: ResourceTypesFhirR4.Communication,
         action: '_search',
         content: {
           jti: randomUUID(),
@@ -2767,10 +2772,10 @@ describe('CommunicationManager Unit Tests', () => {
       const data = (response.body as any).data;
       expect(data).toHaveLength(1);
       expect(data[0].id).toBe('communication-participant-record-001');
-      expect(data[0].meta.claims['@context']).toBe(Format.FHIR_API);
-      expect(Object.keys(data[0].meta.claims).some((key) =>
+      expect(data[0].resource.meta.claims['@context']).toBe(Format.FHIR_API);
+      expect(Object.keys(data[0].resource.meta.claims).some((key) =>
         key.startsWith(`${Format.FHIR_R4}.Communication.`))).toBe(false);
-      expect(data[0].meta.claims[CommunicationClaim.Identifier]).toBe('comm-1');
+      expect(data[0].resource.meta.claims[CommunicationClaim.Identifier]).toBe('comm-1');
     });
   });
 });

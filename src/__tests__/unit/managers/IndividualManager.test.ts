@@ -1,6 +1,10 @@
 // Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/__tests__/unit/managers/IndividualManager.test.ts
+import { GatewayResponseEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
+import { GatewayRequestEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 
 import { jest } from '@jest/globals';
 import { mock, MockProxy } from 'jest-mock-extended';
@@ -149,8 +153,8 @@ describe('IndividualManager', () => {
                     [ClaimsPersonSchemaorg.email]: 'new.customer@example.com',
                   },
                 },
-                request: { method: 'POST', url: '/' },
-                type: 'Customer-form-v1.0',
+                request: { method: HttpRequestMethods.Post, url: '/' },
+                type: GatewayRequestEntryTypes.CustomerForm,
               },
             ],
           },
@@ -221,8 +225,8 @@ describe('IndividualManager', () => {
 
       const response = await individualManager.process(job);
       const entry = response.body.data[0] as any;
-      expect(entry.type).toBe('Individual-license-offer-v1.0');
-      expect(entry.meta?.claims?.[ClaimsOfferSchemaorg.identifier]).toBeDefined();
+      expect(entry.type).toBe(GatewayResponseEntryTypes.IndividualLicenseOffer);
+      expect(entry.resource?.meta?.claims?.[ClaimsOfferSchemaorg.identifier]).toBeDefined();
       expect(mockVaultRepository.put).toHaveBeenCalledTimes(1);
     });
   });
@@ -240,7 +244,7 @@ describe('IndividualManager', () => {
         section: 'test-network',
         format: 'org.schema',
         action: '_discovery',
-        resourceType: 'Person',
+        resourceType: ResourceTypesFhirR4.Person,
         content: {
           jti: 'discovery-jti',
           thid: 'thid-test-batch',
@@ -251,17 +255,17 @@ describe('IndividualManager', () => {
             data: [
               // EU-based identifier
               {
-                type: 'Person-discover-v1.0',
+                type: GatewayRequestEntryTypes.PersonDiscover,
                 meta: { claims: { [ClaimsPersonSchemaorg.identifierType]: 'NNES', [ClaimsPersonSchemaorg.identifierValue]: '12345678Z' } }
               },
               // Global identifier
               {
-                type: 'Person-discover-v1.0',
+                type: GatewayRequestEntryTypes.PersonDiscover,
                 meta: { claims: { [ClaimsPersonSchemaorg.telephone]: '+15551234567' } }
               },
               // Another EU-based identifier to test grouping
               {
-                type: 'Person-discover-v1.0',
+                type: GatewayRequestEntryTypes.PersonDiscover,
                 meta: { claims: { [ClaimsPersonSchemaorg.identifierType]: 'PPNFR', [ClaimsPersonSchemaorg.identifierValue]: '987654321' } }
               },
             ]
@@ -356,7 +360,7 @@ describe('IndividualManager', () => {
           exp: Math.floor(Date.now() / 1000) + 300,
           type: 'api+json',
           body: {
-            resourceType: 'Parameters',
+            resourceType: ResourceTypesFhirR4.Parameters,
             parameter: [
               { name: 'subject', valueString: subjectDid },
             ],
@@ -371,7 +375,7 @@ describe('IndividualManager', () => {
         tenantVaultId,
         getSubjectScopedSectionId(subjectDid, 'individual', 'consents'),
       );
-      expect(responseEntry.type).toBe('Subject-search-response-v1.0');
+      expect(responseEntry.type).toBe(GatewayResponseEntryTypes.SubjectSearch);
       expect(responseEntry.response.status).toBe('200');
       expect(extractBundleSearchResources(response)).toHaveLength(2);
     });
@@ -428,7 +432,7 @@ describe('IndividualManager', () => {
           exp: Math.floor(Date.now() / 1000) + 300,
           type: 'api+json',
           body: {
-            resourceType: 'Parameters',
+            resourceType: ResourceTypesFhirR4.Parameters,
             parameter: [
               { name: 'subject', valueString: subjectDid },
               { name: 'actor-identifier', valueString: providerDid },

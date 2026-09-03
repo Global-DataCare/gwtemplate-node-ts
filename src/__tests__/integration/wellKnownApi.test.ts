@@ -2,6 +2,7 @@
 // src/__tests__/integration/wellKnownApi.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // Always create JSDoc, do not use strings inline in keys nor values, use types instead, and reuse the data test examples.
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
 
 import { jest } from '@jest/globals';
 import express from 'express';
@@ -122,7 +123,7 @@ describe('Well-Known DID Discovery API', () => {
     mockTenantsCacheManager.getDidDocument.mockResolvedValue(expectedDidDoc);
 
     // --- Act ---
-    const response = await invokeExpress(app, { method: 'GET', url: expectedUrl });
+    const response = await invokeExpress(app, { method: HttpRequestMethods.Get, url: expectedUrl });
 
     // --- Assert ---
     expect(response.status).toBe(200);
@@ -147,7 +148,7 @@ describe('Well-Known DID Discovery API', () => {
     ));
 
     const response = await invokeExpress(app, {
-      method: 'GET',
+      method: HttpRequestMethods.Get,
       url: `/vates-b00000000/cds-es/v1/${sector}/.well-known/did.json`,
     });
 
@@ -166,7 +167,7 @@ describe('Well-Known DID Discovery API', () => {
     } as any);
 
     const response = await invokeExpress(app, {
-      method: 'GET',
+      method: HttpRequestMethods.Get,
       url: `/${testTenant1AlternateName}/cds-${urnParts.jurisdiction}/${urnParts.version}/${urnParts.sector}/.well-known/tenant-status.json`,
     });
 
@@ -203,7 +204,7 @@ describe('Well-Known DID Discovery API', () => {
     }] as any);
 
     const response = await invokeExpress(app, {
-      method: 'GET',
+      method: HttpRequestMethods.Get,
       url: `/${testTenant1AlternateName}/cds-${urnParts.jurisdiction}/${urnParts.version}/${urnParts.sector}/employee/${memberId}/${role}/did.json`,
     });
 
@@ -220,7 +221,7 @@ describe('Well-Known DID Discovery API', () => {
     );
 
     const response = await invokeExpress(app, {
-      method: 'GET',
+      method: HttpRequestMethods.Get,
       url: `/${testTenant1AlternateName}/cds-${urnParts.jurisdiction}/${urnParts.version}/${urnParts.sector}/fhir/metadata`,
     });
     const statement = JSON.parse(response.text);
@@ -254,7 +255,7 @@ describe('Well-Known JWKS Discovery API', () => {
     mockTenantsCacheManager.getDidDocument.mockResolvedValue({ id: 'did:web:host' } as any);
 
     // --- Act ---
-    const response = await invokeExpress(app, { method: 'GET', url: expectedUrl });
+    const response = await invokeExpress(app, { method: HttpRequestMethods.Get, url: expectedUrl });
 
     // --- Assert ---
     expect(response.status).toBe(200);
@@ -274,7 +275,7 @@ describe('Well-Known JWKS Discovery API', () => {
     mockTenantsCacheManager.getDidDocument.mockResolvedValue({ id: testTenant1IdentifierUrn } as any);
 
     // --- Act ---
-    const response = await invokeExpress(app, { method: 'GET', url: expectedUrl });
+    const response = await invokeExpress(app, { method: HttpRequestMethods.Get, url: expectedUrl });
 
     // --- Assert ---
     expect(response.status).toBe(200);
@@ -293,7 +294,7 @@ describe('Well-Known JWKS Discovery API', () => {
     } as any);
     mockTenantsCacheManager.getDidDocument.mockResolvedValue({ id: testTenant1IdentifierUrn } as any);
 
-    const response = await invokeExpress(app, { method: 'GET', url: expectedUrl });
+    const response = await invokeExpress(app, { method: HttpRequestMethods.Get, url: expectedUrl });
     const parsed = JSON.parse(response.text);
 
     expect(response.status).toBe(200);
@@ -313,7 +314,7 @@ describe('Well-Known Ping API', () => {
     mockTenantsCacheManager.getDidDocument.mockResolvedValue({ id: 'did:web:host' } as any);
 
     const response = await invokeExpress(app, {
-      method: 'GET',
+      method: HttpRequestMethods.Get,
       url: `/host/cds-eu/v1/${HostNetworkTypes.Test}/.well-known/ping`,
     });
     const parsed = JSON.parse(response.text);
@@ -341,7 +342,7 @@ describe('Well-Known Tenant Artifacts API', () => {
     mockKmsService.getPublicJwks.mockResolvedValue({ keys: [{ kid: 'tenant-vc-sign', use: 'sig', purpose: 'vc_sign' }] } as any);
     mockKmsService.createCompactJws.mockResolvedValue('header.payload.signature');
 
-    const response = await invokeExpress(app, { method: 'GET', url: expectedUrl });
+    const response = await invokeExpress(app, { method: HttpRequestMethods.Get, url: expectedUrl });
     expect(response.status).toBe(200);
     expect(JSON.parse(response.text)).toEqual({
       ...expectedVc,
@@ -362,7 +363,7 @@ describe('Well-Known Tenant Artifacts API', () => {
     mockTenantsCacheManager.getDidDocument.mockResolvedValue({ id: testTenant1IdentifierUrn } as any);
     mockTenantsCacheManager.getTenant.mockResolvedValue({ governanceVc: expectedVc } as any);
 
-    const response = await invokeExpress(app, { method: 'GET', url: expectedUrl });
+    const response = await invokeExpress(app, { method: HttpRequestMethods.Get, url: expectedUrl });
     expect(response.status).toBe(200);
     expect(JSON.parse(response.text)).toEqual(expectedVc);
     expect(mockTenantsCacheManager.getTenant).toHaveBeenCalledWith(testTenant1VaultId);
@@ -377,7 +378,7 @@ describe('Well-Known Tenant Artifacts API', () => {
     mockTenantsCacheManager.getDidDocument.mockResolvedValue({ id: testTenant1IdentifierUrn } as any);
     mockTenantsCacheManager.getTenant.mockResolvedValue({ selfDescriptionVc: expectedSelfDesc } as any);
 
-    const response = await invokeExpress(app, { method: 'GET', url: expectedUrl });
+    const response = await invokeExpress(app, { method: HttpRequestMethods.Get, url: expectedUrl });
     expect(response.status).toBe(200);
     expect(JSON.parse(response.text)).toEqual(expectedSelfDesc);
     expect(mockTenantsCacheManager.getTenant).toHaveBeenCalledWith(testTenant1VaultId);
@@ -412,7 +413,7 @@ describe('Well-Known Tenant Artifacts API', () => {
       },
     } as any);
 
-    const response = await invokeExpress(app, { method: 'GET', url: expectedUrl });
+    const response = await invokeExpress(app, { method: HttpRequestMethods.Get, url: expectedUrl });
     const parsed = JSON.parse(response.text);
 
     expect(response.status).toBe(200);
@@ -462,7 +463,7 @@ describe('Well-Known Tenant Artifacts API', () => {
       },
     } as any);
 
-    const response = await invokeExpress(app, { method: 'GET', url: expectedUrl });
+    const response = await invokeExpress(app, { method: HttpRequestMethods.Get, url: expectedUrl });
 
     expect(response.status).toBe(404);
   });
@@ -480,7 +481,7 @@ describe('Well-Known Tenant Artifacts API', () => {
     mockTenantsCacheManager.getDidDocument.mockResolvedValue({ id: testTenant1IdentifierUrn } as any);
     mockTenantsCacheManager.isTenantOperational.mockResolvedValue(false);
 
-    const response = await invokeExpress(app, { method: 'GET', url: expectedUrl });
+    const response = await invokeExpress(app, { method: HttpRequestMethods.Get, url: expectedUrl });
     expect(response.status).toBe(404);
   });
 });
@@ -502,7 +503,7 @@ describe('Well-Known Legal Participant VC API', () => {
     mockTenantsCacheManager.getDidDocument.mockResolvedValue(hostDidDoc as any);
 
     const response = await invokeExpress(app, {
-      method: 'GET',
+      method: HttpRequestMethods.Get,
       url: `/host/cds-${EXAMPLE_COVERAGE_SCOPE_EU}/v1/${HostNetworkTypes.Test}/.well-known/legal-participant.vc.json`,
     });
 
@@ -532,7 +533,7 @@ describe('DSP Discovery API', () => {
     mockTenantsCacheManager.getDidDocument.mockResolvedValue({ id: 'did:web:host' } as any);
 
     const response = await invokeExpress(app, {
-      method: 'GET',
+      method: HttpRequestMethods.Get,
       url: buildGwDspaceVersionWellKnownPath({
         participantId: 'host',
         jurisdiction: 'eu',
@@ -596,7 +597,7 @@ describe('DSP Discovery API', () => {
     ] as any);
 
     const response = await invokeExpress(app, {
-      method: 'GET',
+      method: HttpRequestMethods.Get,
       url: buildGwCatalogArtifactPath({
         participantId: 'host',
         jurisdiction: 'eu',
@@ -663,7 +664,7 @@ describe('DSP Discovery API', () => {
     ] as any);
 
     const response = await invokeExpress(app, {
-      method: 'GET',
+      method: HttpRequestMethods.Get,
       url: buildGwCatalogArtifactPath({
         participantId: 'host',
         jurisdiction: 'eu',
@@ -739,7 +740,7 @@ describe('DSP Discovery API', () => {
     ] as any);
 
     const response = await invokeExpress(app, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       url: '/api/dataspace-discovery/providers',
       headers: { host: EXAMPLE_HOST_PUBLIC_HOSTNAME, 'content-type': 'application/json' },
       body: {

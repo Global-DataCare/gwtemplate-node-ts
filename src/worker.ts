@@ -183,6 +183,7 @@ export class Worker {
 
       // 2. Delegate to the manager to get the plaintext response.
       const payloadResponse = await manager.process(job);
+      this.normalizeBundleClaimsPlacement(jobName, payloadResponse.body);
       this.logResponseOperationOutcomes(jobName, job, payloadResponse);
       if (resourceType !== 'Subscription' && resourceType !== 'SubscriptionTopic') {
         await this.managers.subscriptionManager?.captureEvents?.(job, payloadResponse);
@@ -268,18 +269,21 @@ export class Worker {
    * Canonical contract:
    * - Batch endpoints: `entry.resource.meta.claims`
    *
-   * During migration we accept both shapes and normalize to BOTH locations
-   * so existing managers/tests continue working:
-   * - `entry.resource.meta.claims`
-   * - `entry.meta.claims`
+   * During migration we accept both shapes, but the in-memory job is
+   * canonicalized to `entry.resource.meta.claims` only. Legacy placement emits
+   * one deprecation warning; already-canonical payloads stay silent.
    */
   private normalizeClaimsPlacement(jobName: string, job: JobRequest): void {
-    const body: any = job.content?.body;
+    this.normalizeBundleClaimsPlacement(jobName, job.content?.body);
+  }
+
+  private normalizeBundleClaimsPlacement(jobName: string, body: unknown): void {
     if (!body || typeof body !== 'object') return;
 
     const candidates: any[] = [];
-    if (Array.isArray(body.data)) candidates.push(...body.data);
-    if (Array.isArray(body.entry)) candidates.push(...body.entry);
+    const bundle = body as any;
+    if (Array.isArray(bundle.data)) candidates.push(...bundle.data);
+    if (Array.isArray(bundle.entry)) candidates.push(...bundle.entry);
     if (candidates.length === 0) return;
 
     for (const item of candidates) {
@@ -293,22 +297,15 @@ export class Worker {
 
       if (!hasEntryClaims && !hasResourceClaims) continue;
 
-      // Canonical source is resource.meta.claims.
-      if (hasEntryClaims && !hasResourceClaims) {
+      if (hasEntryClaims) {
         if (!item.resource || typeof item.resource !== 'object') item.resource = {};
         if (!item.resource.meta || typeof item.resource.meta !== 'object') item.resource.meta = {};
-        item.resource.meta.claims = { ...entryClaims };
+        if (!hasResourceClaims) item.resource.meta.claims = { ...entryClaims };
         console.warn(
           `[Worker] Deprecated claims placement detected for '${resourceType}' in '${jobName}'. ` +
           `Use resource.meta.claims (canonical). entry.meta.claims is accepted temporarily for compatibility.`
         );
-      }
-
-      // Compatibility mirror for managers that still read entry.meta.claims.
-      const canonicalClaims = item?.resource?.meta?.claims;
-      if (canonicalClaims && typeof canonicalClaims === 'object' && !hasEntryClaims) {
-        if (!item.meta || typeof item.meta !== 'object') item.meta = {};
-        item.meta.claims = { ...canonicalClaims };
+        delete item.meta.claims;
       }
     }
   }

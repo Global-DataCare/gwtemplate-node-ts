@@ -1,4 +1,7 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
+import { GatewayResponseEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
+import { GatewayRequestEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
 process.env.DEV_SEED = 'true';
 process.env.NODE_ENV = 'test';
 process.env.SECURITY_MODE = 'demo';
@@ -115,14 +118,14 @@ function buildActivationPayload(): Record<string, unknown> {
       },
       data: [
         {
-          type: 'Organization-activation-request-v1.0',
+          type: GatewayRequestEntryTypes.OrganizationActivation,
           meta: {},
           resource: {
             meta: {
               claims: { ...testClaimsTenant1Registration },
             },
           },
-          request: { method: 'POST' },
+          request: { method: HttpRequestMethods.Post },
         },
       ],
     },
@@ -217,7 +220,7 @@ describe('Host activation Offer/Order route story', () => {
     const keyCallOffset = ensureKeySpy.mock.calls.length;
 
     const activationSubmit = await invokeExpress(app, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       url: activationUrl,
       headers: { 'content-type': 'application/json' },
       body: activationPayload,
@@ -230,7 +233,7 @@ describe('Host activation Offer/Order route story', () => {
 
     const activationPollPath = new URL(activationSubmit.headers.location, 'http://localhost').pathname;
     const activationPoll = await invokeExpress(app, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       url: activationPollPath,
       headers: { 'content-type': 'application/json' },
       body: { thid: activationPayload.thid },
@@ -240,11 +243,11 @@ describe('Host activation Offer/Order route story', () => {
 
     const activationResult = JSON.parse(activationPoll.text) as { data: Array<Record<string, any>> };
     const activationEntry = activationResult.data[0];
-    const canonicalOfferId = activationEntry.meta?.claims?.[ClaimsOfferSchemaorg.identifier];
+    const canonicalOfferId = activationEntry.resource?.meta?.claims?.[ClaimsOfferSchemaorg.identifier];
     const offerId = String(canonicalOfferId || '');
 
     expect(activationEntry.response.status).toBe('201');
-    expect(activationEntry.type).toBe('Organization-activation-response-v1.0');
+    expect(activationEntry.type).toBe(GatewayResponseEntryTypes.OrganizationActivation);
     expect(canonicalOfferId).toBeDefined();
     expect(typeof canonicalOfferId).toBe('string');
     expect(offerId).toContain(':Offer:');
@@ -262,7 +265,7 @@ describe('Host activation Offer/Order route story', () => {
     orderPayload.body.data[0].resource = orderPayload.body.data[0].resource || {};
     orderPayload.body.data[0].resource.meta = orderPayload.body.data[0].resource.meta || {};
     orderPayload.body.data[0].resource.meta.claims = {
-      ...(orderPayload.body.data[0].meta?.claims || {}),
+      ...(orderPayload.body.data[0].resource?.meta?.claims || {}),
       [ClaimsOrderSchemaorg.acceptedOfferIdentifier]: offerId,
       [ClaimsOrderSchemaorg.paymentMethod]: 'Stripe',
       [ClaimsOrderSchemaorg.partOfInvoice]: 'in_activation_route_story',
@@ -270,7 +273,7 @@ describe('Host activation Offer/Order route story', () => {
     orderPayload.body.data[0].meta = {};
 
     const orderSubmit = await invokeExpress(app, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       url: '/host/cds-es/v1/local-network/registry/org.schema/Order/_batch',
       headers: { 'content-type': 'application/json' },
       body: orderPayload,
@@ -283,7 +286,7 @@ describe('Host activation Offer/Order route story', () => {
 
     const orderPollPath = new URL(orderSubmit.headers.location, 'http://localhost').pathname;
     const orderPoll = await invokeExpress(app, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       url: orderPollPath,
       headers: { 'content-type': 'application/json' },
       body: { thid: orderPayload.thid },
@@ -320,7 +323,7 @@ describe('Host activation Offer/Order route story', () => {
     activationPayload.body.data[0].resource.meta.claims[ClaimsOrganizationSchemaorg.alternateName] = uniqueAlternateName;
 
     const activationSubmit = await invokeExpress(app, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       url: '/host/cds-es/v1/local-network/registry/org.schema/Organization/_activate',
       headers: { 'content-type': 'application/json' },
       body: activationPayload,
@@ -331,7 +334,7 @@ describe('Host activation Offer/Order route story', () => {
 
     const activationPollPath = new URL(activationSubmit.headers.location, 'http://localhost').pathname;
     const activationPoll = await invokeExpress(app, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       url: activationPollPath,
       headers: { 'content-type': 'application/json' },
       body: { thid: activationPayload.thid },
@@ -341,7 +344,7 @@ describe('Host activation Offer/Order route story', () => {
 
     const activationResult = JSON.parse(activationPoll.text) as { data: Array<Record<string, any>> };
     const offerId = String(
-      activationResult.data[0]?.meta?.claims?.[ClaimsOfferSchemaorg.identifier] || '',
+      activationResult.data[0]?.resource?.meta?.claims?.[ClaimsOfferSchemaorg.identifier] || '',
     );
     expect(offerId).toContain(':Offer:');
 
@@ -360,7 +363,7 @@ describe('Host activation Offer/Order route story', () => {
     orderPayload.body.data[0].meta = {};
 
     const wrongPathSubmit = await invokeExpress(app, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       url: '/host/cds-es/v1/health-care/registry/org.schema/Order/_batch',
       headers: { 'content-type': 'application/json' },
       body: orderPayload,

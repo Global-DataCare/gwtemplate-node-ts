@@ -97,7 +97,7 @@ We will create a file named `acme-registration.json`.
 
 -   `thid`: A unique transaction ID you generate.
 -   `iss` / `aud`: Your DID and the API's DID.
--   `body.data[].meta.claims`: A flat list of the core claims.
+-   `body.data[].resource.meta.claims`: A flat list of the core claims.
 
 ```json acme-registration.json
 {

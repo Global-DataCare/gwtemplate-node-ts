@@ -14,6 +14,10 @@ import { IVaultRepository } from '../database/repositories/vault/vault.repositor
 import { IKmsService } from '../gdc-backend-utils-node/models/IKmsService';
 import { getTenantVaultId } from '../utils/tenant';
 import { getEnvSectionId } from '../utils/section-env';
+import { HttpStatusCodes } from 'gdc-common-utils-ts/constants/http';
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
+import { GatewayClaim } from '../shared/gateway-claim-contract';
+import { GatewayEnvelopeTypes, GatewayResponseEntryTypes } from '../shared/gateway-response-types';
 
 type MessagingAction = '_send' | '_receive' | '_messages' | '_get' | '_delete';
 
@@ -37,14 +41,14 @@ export class MessagingManager {
       const resultEntry = await this.handleAction(job, action);
       const responseBundle: BundleJsonApi = {
         data: [resultEntry],
-        resourceType: 'Bundle',
+        resourceType: ResourceTypesFhirR4.Bundle,
         type: getBundleResponseTypeForAction(job.action),
         total: 1,
       };
 
       return {
         jti: uuidv4(),
-        type: 'messaging-response',
+        type: GatewayEnvelopeTypes.MessagingResponse,
         thid: job.content?.thid as string,
         iss: issuerDid,
         aud: job.content?.iss as string,
@@ -53,9 +57,9 @@ export class MessagingManager {
       };
     } catch (error: any) {
       const errorEntry: ErrorEntry = {
-        type: 'MessagingResponse-v1.0',
+        type: GatewayResponseEntryTypes.MessagingResponse,
         response: {
-          status: error?.status || '500',
+          status: error?.status || String(HttpStatusCodes.InternalServerError),
           outcome: createOperationOutcome(
             IssueLevel.Error,
             error?.code || IssueType.Exception,
@@ -65,13 +69,13 @@ export class MessagingManager {
       };
       const responseBundle: BundleJsonApi = {
         data: [errorEntry],
-        resourceType: 'Bundle',
+        resourceType: ResourceTypesFhirR4.Bundle,
         type: getBundleResponseTypeForAction(job.action),
         total: 1,
       };
       return {
         jti: uuidv4(),
-        type: 'messaging-response',
+        type: GatewayEnvelopeTypes.MessagingResponse,
         thid: job.content?.thid as string,
         iss: issuerDid,
         aud: job.content?.iss as string,
@@ -104,28 +108,28 @@ export class MessagingManager {
         };
         const secureDoc = await this.kmsService.protectConfidentialData(messageDoc, vaultId);
         await this.vaultRepository.put(vaultId, [secureDoc], getEnvSectionId('messaging'));
-        return { type: 'MessagingSendResponse-v1.0', meta: { claims: { id: messageId } }, response: { status: '201' } };
+        return { type: GatewayResponseEntryTypes.MessagingSend, resource: { meta: { claims: { [GatewayClaim.MessagingId]: messageId } } }, response: { status: String(HttpStatusCodes.Created) } };
       }
       case '_messages': {
         const docs = await this.vaultRepository.getContainersInSection<any>(vaultId, getEnvSectionId('messaging'));
-        return { type: 'MessagingListResponse-v1.0', meta: { claims: { count: docs.length } }, response: { status: '200' } };
+        return { type: GatewayResponseEntryTypes.MessagingList, resource: { meta: { claims: { [GatewayClaim.MessagingCount]: docs.length } } }, response: { status: String(HttpStatusCodes.Ok) } };
       }
       case '_get': {
         const messageId = job.content?.body?.id || job.content?.body?.messageId;
         if (!messageId) throw new ManagerError('Missing message id.', IssueType.Required);
         const doc = await this.vaultRepository.get<any>(vaultId, messageId, getEnvSectionId('messaging'));
         if (!doc) throw new ManagerError('Message not found.', IssueType.NotFound);
-        return { type: 'MessagingGetResponse-v1.0', meta: { claims: { id: messageId } }, response: { status: '200' }, resource: doc };
+        return { type: GatewayResponseEntryTypes.MessagingGet, response: { status: String(HttpStatusCodes.Ok) }, resource: { ...doc, meta: { ...(doc.meta || {}), claims: { [GatewayClaim.MessagingId]: messageId } } } };
       }
       case '_delete': {
         const messageId = job.content?.body?.id || job.content?.body?.messageId;
         if (!messageId) throw new ManagerError('Missing message id.', IssueType.Required);
         await this.vaultRepository.delete(vaultId, messageId, getEnvSectionId('messaging'));
-        return { type: 'MessagingDeleteResponse-v1.0', meta: { claims: { id: messageId } }, response: { status: '204' } };
+        return { type: GatewayResponseEntryTypes.MessagingDelete, resource: { meta: { claims: { [GatewayClaim.MessagingId]: messageId } } }, response: { status: String(HttpStatusCodes.NoContent) } };
       }
       case '_receive':
       default:
-        return { type: 'MessagingReceiveResponse-v1.0', response: { status: '202' } };
+        return { type: GatewayResponseEntryTypes.MessagingReceive, response: { status: String(HttpStatusCodes.Accepted) } };
     }
   }
 }

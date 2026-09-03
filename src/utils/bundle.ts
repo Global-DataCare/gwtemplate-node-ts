@@ -1,5 +1,7 @@
 // src/utils/bundle.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
+import { HttpStatusCodes } from 'gdc-common-utils-ts/constants/http';
 
 import { BundleJsonApi, ErrorEntry } from 'gdc-common-utils-ts/models/bundle';
 import { IssueLevel, IssueType } from 'gdc-common-utils-ts/models/issue';
@@ -54,9 +56,9 @@ export function createErrorBundle(errorMessage: string, action?: string, origina
     // Reflect the original type if known, otherwise use a generic error type.
     type: originalEntryType || 'unknown-error-v1.0',
     response: {
-      status: '500',
+      status: String(HttpStatusCodes.InternalServerError),
       outcome: {
-        resourceType: 'OperationOutcome',
+        resourceType: ResourceTypesFhirR4.OperationOutcome,
         issue: [{
           severity: IssueLevel.Error,
           code: IssueType.Exception,
@@ -67,7 +69,7 @@ export function createErrorBundle(errorMessage: string, action?: string, origina
   };
 
   return {
-    resourceType: 'Bundle',
+    resourceType: ResourceTypesFhirR4.Bundle,
     type: getBundleResponseTypeForAction(action),
     data: [errorEntry]
   };
@@ -140,7 +142,7 @@ export const convertPrimaryDocToBundleFHIR = (primaryDocument: any, bundleType: 
   if (primaryDocument.errors) {
     entries.push(...primaryDocument.errors.map((errorObject: any) => ({
       resource: {
-        resourceType: 'OperationOutcome',
+        resourceType: ResourceTypesFhirR4.OperationOutcome,
         id: errorObject.id,
         issue: [{
           code: errorObject.status,
@@ -153,7 +155,7 @@ export const convertPrimaryDocToBundleFHIR = (primaryDocument: any, bundleType: 
 
   const bundle: any = {
     entry: entries,
-    resourceType: 'Bundle',
+    resourceType: ResourceTypesFhirR4.Bundle,
     total: primaryDocument.data ? primaryDocument.data.length : 0,
     type: bundleType
   };

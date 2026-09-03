@@ -1,5 +1,6 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/routes/handlers/fhir/FhirController.ts
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 
 import { Request, Response, Router } from 'express';
 import { IAuthorizationManager } from '../../../managers/auth/IAuthorizationManager';
@@ -62,7 +63,7 @@ export class FhirController {
       section: SUBJECT_SECTION_INDIVIDUAL,
       format: 'org.hl7.fhir.r4',
       action: 'create',
-      resourceType: 'Communication',
+      resourceType: ResourceTypesFhirR4.Communication,
       tenantId: accessTokenClaims.iss, 
       sector: req.params.sector,
       content: {

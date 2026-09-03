@@ -1,4 +1,6 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
+import { GatewayRequestEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 import { describe, expect, it, jest } from '@jest/globals';
 import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { ClaimsOfferSchemaorg, ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
@@ -19,7 +21,7 @@ describe('processIndividualOrganizationRegistrationEntry', () => {
       section: 'individual',
       format: 'org.schema',
       action: '_batch',
-      resourceType: 'Organization',
+      resourceType: ResourceTypesFhirR4.Organization,
       content: { body: { data: [] } } as any,
     } as JobRequest;
   }
@@ -31,7 +33,7 @@ describe('processIndividualOrganizationRegistrationEntry', () => {
     const response = await processIndividualOrganizationRegistrationEntry({
       job: buildJob(),
       entry: {
-        type: 'Family-registration-request-v1.0',
+        type: GatewayRequestEntryTypes.FamilyRegistration,
         meta: {
           claims: {
             [ClaimsOrganizationSchemaorg.alternateName]: 'ana-story',
@@ -62,7 +64,7 @@ describe('processIndividualOrganizationRegistrationEntry', () => {
       })),
     });
 
-    const responseClaims = response.meta?.claims || {};
+    const responseClaims = (response as any).resource?.meta?.claims || {};
 
     // Step 1: the deprecated embedded flow persists only the administrative
     // subject registration inside an existing tenant.

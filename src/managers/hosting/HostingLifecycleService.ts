@@ -1,3 +1,6 @@
+import { GatewayResponseEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
+import { HttpStatusCodes } from 'gdc-common-utils-ts/constants/http';
 import { v4 as uuidv4 } from 'uuid';
 import { BundleEntry, ErrorEntry } from 'gdc-common-utils-ts/models/bundle';
 import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
@@ -34,6 +37,7 @@ import {
   ACTION_STATUS,
   SUBJECT_SECTION_INDIVIDUAL,
 } from '../../constants/domain';
+import { GatewayClaim } from '../../shared/gateway-claim-contract';
 
 type TenantLifecycleAction =
   | typeof ACTION_DISABLE
@@ -106,7 +110,7 @@ export class HostingLifecycleService {
       exp: Math.floor(Date.now() / 1000) + 300,
       body: {
         data: responseEntries,
-        resourceType: 'Bundle',
+        resourceType: ResourceTypesFhirR4.Bundle,
         type: getBundleResponseTypeForAction(job.action),
         total: responseEntries.length,
       },
@@ -118,7 +122,7 @@ export class HostingLifecycleService {
     action: TenantLifecycleAction,
     authorization: LifecycleAuthorizationContext,
   ): Promise<BundleEntry | ErrorEntry> {
-    const rawClaims = entry?.meta?.claims || entry?.resource?.meta?.claims;
+    const rawClaims = entry?.resource?.meta?.claims || entry?.meta?.claims;
     const claims = rawClaims ? normalizeContextualizedClaims(rawClaims) : undefined;
     if (!claims) {
       throw new ManagerError('Malformed lifecycle entry: missing meta.claims', IssueType.Required);
@@ -188,21 +192,19 @@ export class HostingLifecycleService {
         await this.tenantsCacheManager.refreshTenant('host');
 
         return {
-          type: 'Organization-purge-response-v1.0',
-          meta: {
-            claims: {
-              ...claims,
-              'org.schema.Organization.identifier.value': identifierValue,
-              'org.schema.Action.tenantAuthorization.status': 'revoked',
-              'org.schema.Action.tenantAuthorization.changedBy': authorization.actorDid || '',
-              'org.schema.Action.tenantAuthorization.lifecycleDisposition': 'purged',
-            },
-          },
+          type: GatewayResponseEntryTypes.OrganizationPurge,
           resource: {
-            resourceType: 'Organization',
+            resourceType: ResourceTypesFhirR4.Organization,
             id: tenantConfig.id,
+            meta: { claims: {
+              ...claims,
+              [ClaimsOrganizationSchemaorg.identifierValue]: identifierValue,
+              [GatewayClaim.TenantAuthorizationStatus]: 'revoked',
+              [GatewayClaim.TenantAuthorizationChangedBy]: authorization.actorDid || '',
+              [GatewayClaim.TenantAuthorizationLifecycleDisposition]: 'purged',
+            } },
           },
-          response: { status: '200' },
+          response: { status: String(HttpStatusCodes.Ok) },
         };
       }
       await this.assertTenantPurgeAllowed(currentStatus);
@@ -214,21 +216,19 @@ export class HostingLifecycleService {
       await this.tenantsCacheManager.refreshTenant(vaultId);
 
       return {
-        type: 'Organization-purge-response-v1.0',
-        meta: {
-          claims: {
-            ...claims,
-            'org.schema.Organization.identifier.value': identifierValue,
-            'org.schema.Action.tenantAuthorization.status': 'revoked',
-            'org.schema.Action.tenantAuthorization.changedBy': authorization.actorDid || '',
-            'org.schema.Action.tenantAuthorization.lifecycleDisposition': 'purged',
-          },
-        },
+        type: GatewayResponseEntryTypes.OrganizationPurge,
         resource: {
-          resourceType: 'Organization',
+          resourceType: ResourceTypesFhirR4.Organization,
           id: tenantConfig.id,
+          meta: { claims: {
+            ...claims,
+            [ClaimsOrganizationSchemaorg.identifierValue]: identifierValue,
+            [GatewayClaim.TenantAuthorizationStatus]: 'revoked',
+            [GatewayClaim.TenantAuthorizationChangedBy]: authorization.actorDid || '',
+            [GatewayClaim.TenantAuthorizationLifecycleDisposition]: 'purged',
+          } },
         },
-        response: { status: '200' },
+        response: { status: String(HttpStatusCodes.Ok) },
       };
     }
 
@@ -261,19 +261,17 @@ export class HostingLifecycleService {
 
     return {
       type: action === ACTION_DISABLE ? 'Organization-disable-response-v1.0' : 'Organization-enable-response-v1.0',
-      meta: {
-        claims: {
-          ...claims,
-          'org.schema.Organization.identifier.value': identifierValue,
-          'org.schema.Action.tenantAuthorization.status': nextStatus,
-          'org.schema.Action.tenantAuthorization.changedBy': authorization.actorDid || '',
-        },
-      },
       resource: {
-        resourceType: 'Organization',
+        resourceType: ResourceTypesFhirR4.Organization,
         id: tenantConfig.id,
+        meta: { claims: {
+          ...claims,
+          [ClaimsOrganizationSchemaorg.identifierValue]: identifierValue,
+          [GatewayClaim.TenantAuthorizationStatus]: nextStatus,
+          [GatewayClaim.TenantAuthorizationChangedBy]: authorization.actorDid || '',
+        } },
       },
-      response: { status: '200' },
+      response: { status: String(HttpStatusCodes.Ok) },
     };
   }
 
@@ -394,7 +392,7 @@ export class HostingLifecycleService {
   }
 
   private readDescendantKind(entry: BundleEntry): TenantDescendantKind {
-    const rawClaims = entry.meta?.claims || entry.resource?.meta?.claims || {};
+    const rawClaims = entry.resource?.meta?.claims || entry.meta?.claims || {};
     const kind = String(
       (entry.resource as any)?.lifecycle?.descendantKind
       || (rawClaims as any)['org.schema.Action.lifecycle.descendantKind']
@@ -420,11 +418,11 @@ export class HostingLifecycleService {
     descendants: TenantDescendantLifecycleSummary,
   ): BundleEntry {
     return {
-      type: 'Organization-lifecycle-status-response-v1.0',
-      meta: { claims: entry.meta?.claims || entry.resource?.meta?.claims || {} },
+      type: GatewayResponseEntryTypes.OrganizationLifecycleStatus,
       resource: {
-        resourceType: 'Organization',
+        resourceType: ResourceTypesFhirR4.Organization,
         id: tenantConfig.id,
+        meta: { claims: entry.resource?.meta?.claims || entry.meta?.claims || {} },
         lifecycle: {
           identifierValue,
           status,
@@ -435,7 +433,7 @@ export class HostingLifecycleService {
             && descendants.unpurgedIndividuals === 0,
         },
       } as any,
-      response: { status: '200' },
+      response: { status: String(HttpStatusCodes.Ok) },
     };
   }
 

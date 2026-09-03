@@ -1,5 +1,6 @@
 // Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 // Contract marker: a verified author ingests IPS data through the public conversation boundary.
+import { GatewayResponseEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
 import { startServer, resetServerConfig } from '../../../server';
 import {
   EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT,
@@ -102,7 +103,7 @@ describe('Research access conversation (integration)', () => {
       );
 
       expect(compositionSearchPayload?.resourceType).toBe('Bundle');
-      expect(compositionSearchPayload?.data?.[0]?.type).toBe('ResearchSubject-search-response-v1.0');
+      expect(compositionSearchPayload?.data?.[0]?.type).toBe(GatewayResponseEntryTypes.ResearchSubjectSearch);
       const compositionMatches = extractBundleSearchResources(compositionSearchPayload);
       expect(compositionMatches.length).toBeGreaterThanOrEqual(1);
 
@@ -124,7 +125,7 @@ describe('Research access conversation (integration)', () => {
 
       for (const payload of [novitaIbuprofenSearchPayload, novitaParacetamolSearchPayload]) {
         expect(payload?.resourceType).toBe('Bundle');
-        expect(payload?.data?.[0]?.type).toBe('ResearchSubject-search-response-v1.0');
+        expect(payload?.data?.[0]?.type).toBe(GatewayResponseEntryTypes.ResearchSubjectSearch);
         const matches = extractBundleSearchResources(payload);
         expect(matches).toHaveLength(1);
         const onlyMatch = matches[0];

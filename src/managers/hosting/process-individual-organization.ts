@@ -1,3 +1,5 @@
+import { GatewayResponseEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
+import { HttpStatusCodes } from 'gdc-common-utils-ts/constants/http';
 import { v4 as uuidv4 } from 'uuid';
 import type { BundleEntry, BundleJsonApi, ErrorEntry } from 'gdc-common-utils-ts/models/bundle';
 import type { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
@@ -17,6 +19,8 @@ import { splitIndexedEmails, splitIndexedPhones } from '../../utils/indexed-cont
 import { composeHostDidWebId } from '../../utils/did-backend';
 import { getTenantAuthorizationStatus } from '../../utils/tenant-lifecycle';
 import { SUBJECT_SECTION_INDIVIDUAL } from '../../constants/domain';
+import { FamilyRegistrationStatus, GatewayClaim } from '../../shared/gateway-claim-contract';
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 
 type IndividualOrganizationDeps = Readonly<{
   job: JobRequest;
@@ -30,9 +34,9 @@ type IndividualOrganizationDeps = Readonly<{
   extractResources: (claims: ClaimsRecord, environment?: string) => { organization: any };
 }>;
 
-const FAMILY_REGISTRATION_OFFER_TYPE = 'Family-registration-offer-v1.0';
-const FAMILY_SEARCH_RESULT_TYPE = 'Family-search-result-v1.0';
-const FAMILY_REGISTRATION_STATUS_CLAIM = 'org.schema.FamilyRegistration.status';
+const FAMILY_REGISTRATION_OFFER_TYPE = GatewayResponseEntryTypes.FamilyRegistrationOffer;
+const FAMILY_SEARCH_RESULT_TYPE = GatewayResponseEntryTypes.FamilySearch;
+const FAMILY_REGISTRATION_STATUS_CLAIM = GatewayClaim.FamilyRegistrationStatus;
 const OWNER_TELEPHONE_CLAIM = 'org.schema.Organization.owner.telephone';
 const OWNER_EMAIL_CLAIM = 'org.schema.Organization.owner.email';
 
@@ -90,7 +94,7 @@ export async function processIndividualOrganizationFlow(
 
   const responseBundle: BundleJsonApi = {
     data: responseEntries,
-    resourceType: 'Bundle',
+    resourceType: ResourceTypesFhirR4.Bundle,
     type: getBundleResponseTypeForAction(deps.job.action),
     total: responseEntries.length,
   };
@@ -170,7 +174,7 @@ export async function processIndividualOrganizationRegistrationEntry(input: {
   kmsService: any;
   extractResources: (claims: ClaimsRecord, environment?: string) => { organization: any };
 }): Promise<BundleEntry | ErrorEntry> {
-  const rawClaims = input.entry?.meta?.claims;
+  const rawClaims = input.entry?.resource?.meta?.claims ?? input.entry?.meta?.claims;
   const claims = rawClaims ? normalizeContextualizedClaims(rawClaims) : rawClaims;
   if (!claims) {
     throw new ManagerError('Malformed entry: missing meta.claims', IssueType.Required);
@@ -246,9 +250,8 @@ export async function processIndividualOrganizationRegistrationEntry(input: {
 
   return {
     type: FAMILY_REGISTRATION_OFFER_TYPE,
-    meta: { claims: { ...finalClaims, [FAMILY_REGISTRATION_STATUS_CLAIM]: 'new_created' } },
-    resource: { resourceType: 'Organization', id: docId },
-    response: { status: '201' },
+    resource: { resourceType: ResourceTypesFhirR4.Organization, id: docId, meta: { claims: { ...finalClaims, [FAMILY_REGISTRATION_STATUS_CLAIM]: FamilyRegistrationStatus.Created } } },
+    response: { status: String(HttpStatusCodes.Created) },
   };
 }
 
@@ -262,7 +265,7 @@ export async function processIndividualOrganizationSearchEntry(input: {
   vaultRepository: any;
   kmsService: any;
 }): Promise<BundleEntry | ErrorEntry> {
-  const rawClaims = input.entry?.meta?.claims;
+  const rawClaims = input.entry?.resource?.meta?.claims ?? input.entry?.meta?.claims;
   const claims = rawClaims ? normalizeContextualizedClaims(rawClaims) : rawClaims;
   if (!claims) {
     throw new ManagerError('Malformed entry: missing meta.claims', IssueType.Required);
@@ -302,17 +305,16 @@ export async function processIndividualOrganizationSearchEntry(input: {
   if (!found) {
     return {
       type: FAMILY_SEARCH_RESULT_TYPE,
-      meta: { claims: { [FAMILY_REGISTRATION_STATUS_CLAIM]: 'not_found' } },
-      response: { status: '200' },
+      resource: { meta: { claims: { [FAMILY_REGISTRATION_STATUS_CLAIM]: FamilyRegistrationStatus.NotFound } } },
+      response: { status: String(HttpStatusCodes.Ok) },
     };
   }
 
   const content = await input.kmsService.unprotectConfidentialData(found, tenantContext.tenantVaultId);
   return {
     type: FAMILY_SEARCH_RESULT_TYPE,
-    meta: { claims: { ...(content?.claims || {}), [FAMILY_REGISTRATION_STATUS_CLAIM]: 'already_exists' } },
-    resource: { resourceType: 'Organization', id: found.id },
-    response: { status: '200' },
+    resource: { resourceType: ResourceTypesFhirR4.Organization, id: found.id, meta: { claims: { ...(content?.claims || {}), [FAMILY_REGISTRATION_STATUS_CLAIM]: FamilyRegistrationStatus.Existing } } },
+    response: { status: String(HttpStatusCodes.Ok) },
   };
 }
 
@@ -382,8 +384,7 @@ function buildExistingFamilyRegistrationResponse(
 ): BundleEntry {
   return {
     type: FAMILY_REGISTRATION_OFFER_TYPE,
-    meta: { claims: { ...claims, [FAMILY_REGISTRATION_STATUS_CLAIM]: 'already_exists' } },
-    resource: { resourceType: 'Organization', id: resourceId },
-    response: { status: '200' },
+    resource: { resourceType: ResourceTypesFhirR4.Organization, id: resourceId, meta: { claims: { ...claims, [FAMILY_REGISTRATION_STATUS_CLAIM]: FamilyRegistrationStatus.Existing } } },
+    response: { status: String(HttpStatusCodes.Ok) },
   };
 }

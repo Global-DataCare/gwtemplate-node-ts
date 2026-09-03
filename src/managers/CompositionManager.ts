@@ -1,5 +1,6 @@
 // src/managers/CompositionManager.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
+import { HttpStatusCodes } from 'gdc-common-utils-ts/constants/http';
 
 import type { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
 import type { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
@@ -8,7 +9,9 @@ import type { RecordBase } from 'gdc-common-utils-ts/models/resource-document';
 import { IssueLevel, IssueType } from 'gdc-common-utils-ts/models/issue';
 import {
   DataCollectionIds,
+  CompositionSemanticTypes,
   HealthcareBasicSections,
+  JsonLdKeywords,
   ResourceTypesFhirR4,
 } from 'gdc-common-utils-ts/constants/index';
 import { createOperationOutcome } from '../utils/outcome';
@@ -52,7 +55,6 @@ import {
   extractRequestedBundleType,
   extractSearchResourceType,
 } from '../utils/search-request';
-import { GatewayLocalFhirResourceTypes } from '../shared/fhir-constants';
 import { GatewayResponseEntryTypes } from '../shared/gateway-response-types';
 import { BundleType } from '../utils/bundle';
 import type { ITenantsManager } from './ITenantsManager';
@@ -64,8 +66,6 @@ import {
   isRegisteredDigitalTwinSubjectId,
 } from '../utils/digital-twin-research-projection';
 import { purgeDigitalTwinSubjectLink } from '../utils/digital-twin-secondary-use';
-
-const RESEARCHER_WORKING_SELECTION_TYPE = 'Composition:ResearcherWorkingSelection';
 
 /**
  * Canonical HL7 IPS "all sections" example used to validate the current
@@ -272,7 +272,7 @@ export class CompositionManager implements IJobProcessor {
       sourceSubject,
     });
     return buildTransactionResponse(job, {
-      resourceType: 'Parameters',
+      resourceType: ResourceTypesFhirR4.Parameters,
       parameter: [{ name: 'purged', valueBoolean: result.purged }],
     } as any);
   }
@@ -313,7 +313,7 @@ export class CompositionManager implements IJobProcessor {
         data: [{
           type: context.isSummaryOperation ? GatewayResponseEntryTypes.BundleSummary : GatewayResponseEntryTypes.BundleSearch,
           resource: projectedBundle,
-          response: { status: '200' },
+          response: { status: String(HttpStatusCodes.Ok) },
         } as any],
         total: 1,
       });
@@ -412,13 +412,13 @@ export class CompositionManager implements IJobProcessor {
       try {
         const resourceType = String(entry?.resource?.resourceType || entry?.type || '').trim();
         const responseAction = `${context.normalizedAction}-response`;
-        if (resourceType === GatewayLocalFhirResourceTypes.OperationOutcome) {
+        if (resourceType === ResourceTypesFhirR4.OperationOutcome) {
           // Preconversion may include row-level OperationOutcome entries as warnings.
           // They are informational and should not be persisted as Composition claims.
           responseEntries.push({
             type: GatewayResponseEntryTypes.OperationOutcome,
             response: {
-              status: '200',
+              status: String(HttpStatusCodes.Ok),
               location: `/${job.tenantId}/cds-${context.jurisdiction}/v1/${job.sector}/${context.normalizedSection}/${context.normalizedFormat}/Composition/${responseAction}`,
               outcome: createOperationOutcome(
                 IssueLevel.Information,
@@ -431,8 +431,8 @@ export class CompositionManager implements IJobProcessor {
         }
 
         rawClaims =
-          (entry?.meta?.claims as Record<string, any> | undefined) ??
-          (entry?.resource?.meta?.claims as Record<string, any> | undefined);
+          (entry?.resource?.meta?.claims as Record<string, any> | undefined) ??
+          (entry?.meta?.claims as Record<string, any> | undefined);
 
         if (!rawClaims || typeof rawClaims !== 'object') {
           throw new Error('Missing meta.claims for Composition entry.');
@@ -453,10 +453,10 @@ export class CompositionManager implements IJobProcessor {
         if (!tenantExists) throw new Error(`Tenant vault not found: ${tenantVaultId}`);
 
         if (context.normalizedSection === SUBJECT_SECTION_DIGITAL_TWIN) {
-          const compositionType = String(claims['@type'] || '').trim();
-          if (compositionType !== RESEARCHER_WORKING_SELECTION_TYPE) {
+          const compositionType = String(claims[JsonLdKeywords.Type] || '').trim();
+          if (compositionType !== CompositionSemanticTypes.ResearcherWorkingSelection) {
             throw new Error(
-              `Direct digital twin Composition writes only accept @type=${RESEARCHER_WORKING_SELECTION_TYPE}.`,
+              `Direct digital twin Composition writes only accept @type=${CompositionSemanticTypes.ResearcherWorkingSelection}.`,
             );
           }
           if (!isDigitalTwinSubjectId(subject)) {
@@ -493,7 +493,7 @@ export class CompositionManager implements IJobProcessor {
         const versioning = applyFhirCidVersioningToEntry({
           entry,
           claims,
-          resourceType: 'Composition',
+          resourceType: ResourceTypesFhirR4.Composition,
           resourceId: fallbackId,
         });
         const id = String(entry?.resource?.id || fallbackId);
@@ -512,19 +512,19 @@ export class CompositionManager implements IJobProcessor {
         if (versioning.mapping) cidMappings.push(versioning.mapping);
 
         responseEntries.push({
-          type: 'Composition',
+          type: ResourceTypesFhirR4.Composition,
           response: {
-            status: '201',
+            status: String(HttpStatusCodes.Created),
             location: `/${job.tenantId}/cds-${context.jurisdiction}/v1/${job.sector}/${context.normalizedSection}/${context.normalizedFormat}/Composition/${responseAction}`,
           },
           ...(researchTags && researchTags.length > 0 ? { meta: { tag: researchTags } } : {}),
         } as any);
       } catch (e: any) {
         responseEntries.push({
-          type: 'Composition',
-          meta: { claims: rawClaims || {} },
+          type: ResourceTypesFhirR4.Composition,
+          resource: { resourceType: ResourceTypesFhirR4.OperationOutcome, meta: { claims: rawClaims || {} } },
           response: {
-            status: '400',
+            status: String(HttpStatusCodes.BadRequest),
             outcome: createOperationOutcome(IssueLevel.Error, IssueType.Invalid, e?.message || String(e)),
           },
         } as any);
@@ -539,7 +539,7 @@ export class CompositionManager implements IJobProcessor {
     });
 
     return buildTransactionResponse(job, {
-      resourceType: 'Bundle',
+      resourceType: ResourceTypesFhirR4.Bundle,
       type: 'batch-response',
       data: responseEntries,
     });

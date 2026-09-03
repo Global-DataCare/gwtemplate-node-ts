@@ -1254,7 +1254,7 @@ export function createApiDocsSetupOptions(
           let activationCode = '';
           let licenseId = '';
           for (const entry of entries) {
-            const claims = entry?.meta?.claims;
+            const claims = entry?.resource?.meta?.claims ?? entry?.meta?.claims;
             if (!claims || typeof claims !== 'object') continue;
             if (!offerId && typeof claims['org.schema.Offer.identifier'] === 'string') {
               offerId = claims['org.schema.Offer.identifier'];

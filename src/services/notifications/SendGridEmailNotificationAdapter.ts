@@ -1,3 +1,4 @@
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
 import type { IEmailNotificationAdapter } from './IEmailNotificationAdapter.js';
 import type { EmailNotificationPayload, EmailNotificationResult } from './types.js';
 
@@ -40,7 +41,7 @@ export class SendGridEmailNotificationAdapter implements IEmailNotificationAdapt
     };
 
     const response = await fetch(SENDGRID_API_URL, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       headers: {
         Authorization: `Bearer ${this.apiKey}`,
         'Content-Type': 'application/json',

@@ -1,5 +1,6 @@
 // src/database/storage/supabase.storage.adapter.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
 
 import { sha3_384 } from '@noble/hashes/sha3.js';
 import { encodeMultibase58btc } from 'gdc-common-utils-ts/utils/multibase58';
@@ -70,7 +71,7 @@ export class SupabaseStorageAdapter implements IStorageAdapter {
     const response = await this.fetchImpl(
       `${this.baseUrl}/storage/v1/object/${encodeURIComponent(this.bucketName)}/${encodeURIComponent(objectPath)}`,
       {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         headers: {
           authorization: `Bearer ${this.serviceRoleKey}`,
           apikey: this.serviceRoleKey,
@@ -102,7 +103,7 @@ export class SupabaseStorageAdapter implements IStorageAdapter {
     const response = await this.fetchImpl(
       `${this.baseUrl}/storage/v1/object/${encodeURIComponent(this.bucketName)}/${encodeURIComponent(encodedMultiHash)}`,
       {
-        method: 'GET',
+        method: HttpRequestMethods.Get,
         headers: {
           authorization: `Bearer ${this.serviceRoleKey}`,
           apikey: this.serviceRoleKey,
@@ -131,7 +132,7 @@ export class SupabaseStorageAdapter implements IStorageAdapter {
     const response = await this.fetchImpl(
       `${this.baseUrl}/storage/v1/object/${encodeURIComponent(this.bucketName)}/${encodeURIComponent(encodedMultiHash)}`,
       {
-        method: 'DELETE',
+        method: HttpRequestMethods.Delete,
         headers: {
           authorization: `Bearer ${this.serviceRoleKey}`,
           apikey: this.serviceRoleKey,

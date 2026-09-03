@@ -1,6 +1,9 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/managers/CommunicationManager.ts
 // Description: Manager for handling business logic related to FHIR Communications.
+import { FhirDataTypes } from 'gdc-common-utils-ts/constants/fhir-resource-types';
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
+import { HttpStatusCodes } from 'gdc-common-utils-ts/constants/http';
 
 import { CommMsgExtended, DataEntry, FhirCommunication } from 'gdc-common-utils-ts/models/comm';
 import {
@@ -10,6 +13,7 @@ import {
   ResourceTypesFhirR4,
 } from 'gdc-common-utils-ts/constants/index';
 import { CommunicationClaim } from 'gdc-common-utils-ts/models/interoperable-claims/communication-claims';
+import { CompositionClaim } from 'gdc-common-utils-ts/models/interoperable-claims/composition-claims';
 import { Format } from 'gdc-common-utils-ts/constants/Schemas';
 import { IssueType } from 'gdc-common-utils-ts/models/issue';
 import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
@@ -22,7 +26,6 @@ import {
 } from 'gdc-common-utils-ts/utils/communication-participant-search';
 import { SearchBundleTypes } from 'gdc-common-utils-ts/utils/fhir-search';
 import { normalizeClaimsFromFhirResource } from 'gdc-common-utils-ts/utils/interoperable-resource-operation';
-import { GatewayLocalFhirResourceTypes } from '../shared/fhir-constants';
 import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
 import { BundleJsonApi, BundleEntryResponse, ErrorEntry } from 'gdc-common-utils-ts/models/bundle';
 import { determineResourceId } from '../utils/resource';
@@ -169,7 +172,7 @@ interface CommunicationManagerOptions {
 const COMMUNICATION_RESOURCE_TYPE = 'Communication' as const;
 const COMMUNICATION_ENTRY_TYPE = 'CommMsgExtended' as const;
 const COMMUNICATION_SECTION_NAME = DataCollectionIds.communications;
-const FHIR_PARAMETERS_RESOURCE_TYPE = GatewayLocalFhirResourceTypes.Parameters;
+const FHIR_PARAMETERS_RESOURCE_TYPE = ResourceTypesFhirR4.Parameters;
 const SEARCH_RESPONSE_ENTRY_TYPE = GatewayResponseEntryTypes.CommunicationSearch;
 const COMMUNICATION_SECTION_PREFIX = getEnvSectionId(`${SUBJECT_SECTION_INDIVIDUAL}_${COMMUNICATION_SECTION_NAME}_`);
 
@@ -290,7 +293,7 @@ export class CommunicationManager implements IJobProcessor {
         const resourceId = determineResourceId(identifierClaim, process.env.NODE_ENV);
         
         bundleEntries.push({
-          response: { status: '200' },
+          response: { status: String(HttpStatusCodes.Ok) },
           id: resourceId,
           type: COMMUNICATION_ENTRY_TYPE,
           resource: commMsg,
@@ -303,9 +306,9 @@ export class CommunicationManager implements IJobProcessor {
         const resourceId = determineResourceId(identifierClaim, process.env.NODE_ENV);
         bundleEntries.push({
           response: {
-            status: '500',
+            status: String(HttpStatusCodes.InternalServerError),
             outcome: {
-              resourceType: GatewayLocalFhirResourceTypes.OperationOutcome,
+              resourceType: ResourceTypesFhirR4.OperationOutcome,
               issue: [{
                 severity: 'error',
                 code: 'processing',
@@ -363,17 +366,20 @@ export class CommunicationManager implements IJobProcessor {
     const records = await this.searchCommunicationChannelRecords(tenantVaultId, criteria);
     const pagedRecords = paginateCommunicationParticipantMatches(records, criteria);
     const data: Array<BundleEntryResponse | ErrorEntry> = pagedRecords.map((record) => ({
-      response: { status: '200' },
+      response: { status: String(HttpStatusCodes.Ok) },
       id: this.normalizeOptionalString(record.id) || determineResourceId(record[CommunicationClaim.Identifier], process.env.NODE_ENV),
       type: COMMUNICATION_ENTRY_TYPE,
-      meta: {
-        claims: this.buildSearchResponseClaims(record),
+      resource: {
+        ...(record.resource || record),
+        meta: {
+          ...((record.resource || record)?.meta || {}),
+          claims: this.buildSearchResponseClaims(record),
+        },
       },
-      resource: record.resource || record,
     }));
 
     const responseBundle: BundleJsonApi<BundleEntryResponse | ErrorEntry> = {
-      resourceType: 'Bundle',
+      resourceType: ResourceTypesFhirR4.Bundle,
       type: SearchBundleTypes.SearchResponse,
       total: records.length,
       data,
@@ -524,15 +530,15 @@ export class CommunicationManager implements IJobProcessor {
     return {
       section,
       format,
-      resourceType: 'Bundle',
+      resourceType: ResourceTypesFhirR4.Bundle,
       action: '_search',
       body: {
-        resourceType: 'Bundle',
+        resourceType: ResourceTypesFhirR4.Bundle,
         type: 'batch',
         entry: [
           {
             request: {
-              method: 'GET',
+              method: HttpRequestMethods.Get,
               url: requestUrl,
             },
           },
@@ -591,7 +597,7 @@ export class CommunicationManager implements IJobProcessor {
     }
 
     return {
-      resourceType: 'Parameters',
+      resourceType: ResourceTypesFhirR4.Parameters,
       parameter,
     };
   }
@@ -621,7 +627,7 @@ export class CommunicationManager implements IJobProcessor {
     }
 
     return {
-      resourceType: 'Parameters',
+      resourceType: ResourceTypesFhirR4.Parameters,
       parameter,
     };
   }
@@ -637,25 +643,25 @@ export class CommunicationManager implements IJobProcessor {
     if (!tenantExists) return;
 
     const rawSubject =
-      (entry?.meta?.claims?.[CommunicationClaim.Subject] as string | undefined)
-      || (entry?.resource?.meta?.claims?.[CommunicationClaim.Subject] as string | undefined)
+      (entry?.resource?.meta?.claims?.[CommunicationClaim.Subject] as string | undefined)
+      || (entry?.meta?.claims?.[CommunicationClaim.Subject] as string | undefined)
       || (fhirResource?.subject as any)?.reference
       || '';
     const subject = String(rawSubject || '').replace(/^Patient\//i, '').trim();
     if (!subject) return;
 
     const claimsSection = String(
-      (entry?.meta?.claims?.[CommunicationClaim.Topic] as string | undefined)
-      || (entry?.resource?.meta?.claims?.[CommunicationClaim.Topic] as string | undefined)
+      (entry?.resource?.meta?.claims?.[CommunicationClaim.Topic] as string | undefined)
+      || (entry?.meta?.claims?.[CommunicationClaim.Topic] as string | undefined)
       // Compatibility read for commands produced before Communication.topic
       // became the canonical section-scoped batch/collection claim.
-      || (entry?.meta?.claims?.['Composition.section'] as string | undefined)
-      || (entry?.resource?.meta?.claims?.['Composition.section'] as string | undefined)
+      || (entry?.resource?.meta?.claims?.[CompositionClaim.Section] as string | undefined)
+      || (entry?.meta?.claims?.[CompositionClaim.Section] as string | undefined)
       || '',
     ).trim();
     const claimsType = String(
-      (entry?.meta?.claims?.['Composition.type'] as string | undefined)
-      || (entry?.resource?.meta?.claims?.['Composition.type'] as string | undefined)
+      (entry?.resource?.meta?.claims?.[CompositionClaim.Type] as string | undefined)
+      || (entry?.meta?.claims?.[CompositionClaim.Type] as string | undefined)
       || '',
     ).trim();
     const payloadComposition = this.extractCompositionResourceFromCommunication(entry, fhirResource);
@@ -674,8 +680,8 @@ export class CommunicationManager implements IJobProcessor {
     const typeCode = claimsType || payloadType || HealthcareBasicSections.PatientSummaryDocument.attributeValue;
 
     const sent = String(
-      (entry?.meta?.claims?.[CommunicationClaim.Sent] as string | undefined)
-      || (entry?.resource?.meta?.claims?.[CommunicationClaim.Sent] as string | undefined)
+      (entry?.resource?.meta?.claims?.[CommunicationClaim.Sent] as string | undefined)
+      || (entry?.meta?.claims?.[CommunicationClaim.Sent] as string | undefined)
       || fhirResource?.sent
       || new Date().toISOString(),
     );
@@ -694,17 +700,17 @@ export class CommunicationManager implements IJobProcessor {
       ...(embeddedClaims || {}),
       '@context': Format.FHIR_API,
       'Composition.identifier': compositionIdentifier,
-      'Composition.subject': subject,
-      'Composition.section': sectionValue,
-      'Composition.author': this.resolveClinicalResourceAuthor(job, entry, fhirResource) || serverDid,
+      [CompositionClaim.Subject]: subject,
+      [CompositionClaim.Section]: sectionValue,
+      [CompositionClaim.Author]: this.resolveClinicalResourceAuthor(job, entry, fhirResource) || serverDid,
       'Composition.date': sent,
-      'Composition.type': typeCode,
+      [CompositionClaim.Type]: typeCode,
       'Composition.source': 'Communication',
     }, Format.FHIR_API);
     applyFhirCidVersioningToEntry({
-      entry: payloadComposition ? { resource: payloadComposition } : { resource: { resourceType: 'Composition', id: fallbackId } },
+      entry: payloadComposition ? { resource: payloadComposition } : { resource: { resourceType: ResourceTypesFhirR4.Composition, id: fallbackId } },
       claims,
-      resourceType: 'Composition',
+      resourceType: ResourceTypesFhirR4.Composition,
       resourceId: fallbackId,
     });
     const contentVersionId = claimsToContentCid(claims).cid;
@@ -736,7 +742,7 @@ export class CommunicationManager implements IJobProcessor {
     });
     const researchClaims = projectClaimsForDigitalTwin({
       claims,
-      resourceType: 'Composition',
+      resourceType: ResourceTypesFhirR4.Composition,
       twinSubjectId,
     });
     const researchVersionId = claimsToContentCid(researchClaims).cid;
@@ -1036,10 +1042,10 @@ export class CommunicationManager implements IJobProcessor {
     const clinicalAuthorDid = this.resolveClinicalResourceAuthor(job, entry, fhirResource);
     await this.persistClinicalAuthorIdentityBinding(job, tenantVaultId, clinicalAuthorDid);
     const explicitSection = String(
-      (entry?.meta?.claims?.[CommunicationClaim.Topic] as string | undefined)
-      || (entry?.resource?.meta?.claims?.[CommunicationClaim.Topic] as string | undefined)
-      || (entry?.meta?.claims?.['Composition.section'] as string | undefined)
-      || (entry?.resource?.meta?.claims?.['Composition.section'] as string | undefined)
+      (entry?.resource?.meta?.claims?.[CommunicationClaim.Topic] as string | undefined)
+      || (entry?.meta?.claims?.[CommunicationClaim.Topic] as string | undefined)
+      || (entry?.resource?.meta?.claims?.[CompositionClaim.Section] as string | undefined)
+      || (entry?.meta?.claims?.[CompositionClaim.Section] as string | undefined)
       || this.extractCompositionSectionsFromCommunication(entry, fhirResource)[0]
       || '',
     ).trim();
@@ -1126,7 +1132,7 @@ export class CommunicationManager implements IJobProcessor {
       response: {
         status,
         outcome: {
-          resourceType: GatewayLocalFhirResourceTypes.OperationOutcome,
+          resourceType: ResourceTypesFhirR4.OperationOutcome,
           issue: [{
             severity: 'error',
             code: status === '403' ? 'forbidden' : status === '412' ? 'conflict' : 'processing',
@@ -1192,7 +1198,7 @@ export class CommunicationManager implements IJobProcessor {
       if (!existing) {
         return errorResponse('404', 'Clinical record was not found for this subject.');
       }
-      const authors = String(existing['Composition.author'] || existing?.audit?.creatorDid || '')
+      const authors = String(existing[CompositionClaim.Author] || existing?.audit?.creatorDid || '')
         .split(',')
         .map((author) => author.trim())
         .filter(Boolean);
@@ -1229,7 +1235,7 @@ export class CommunicationManager implements IJobProcessor {
       return {
         id: recordId,
         type: responseType,
-        response: { status: '204' },
+        response: { status: String(HttpStatusCodes.NoContent) },
         resource: { resourceType, id: recordId },
       };
     }
@@ -1302,8 +1308,8 @@ export class CommunicationManager implements IJobProcessor {
       input.fhirResource,
       input.creatorDid,
     );
-    if (input.explicitSection && !getClaimValue<string>(claims, 'Composition.section')) {
-      claims['Composition.section'] = input.explicitSection;
+    if (input.explicitSection && !getClaimValue<string>(claims, CompositionClaim.Section)) {
+      claims[CompositionClaim.Section] = input.explicitSection;
     }
     const subjectRef = this.resolveProjectedResourceSubject(claims, config.subjectClaimKeys);
     if (!subjectRef) {
@@ -1342,7 +1348,7 @@ export class CommunicationManager implements IJobProcessor {
       return { recordId, versionId, created: false };
     }
     if (existing?.id === recordId) {
-      const existingAuthors = String(existing['Composition.author'] || existing?.audit?.creatorDid || '')
+      const existingAuthors = String(existing[CompositionClaim.Author] || existing?.audit?.creatorDid || '')
         .split(',')
         .map((author) => author.trim())
         .filter(Boolean);
@@ -1426,7 +1432,7 @@ export class CommunicationManager implements IJobProcessor {
       ? normalizeContextualizedClaims(composition.meta.claims as Record<string, any>)
       : {};
     const claimedAuthor = this.getFirstClaimValue(compositionClaims, [
-      'Composition.author',
+      CompositionClaim.Author,
       'org.hl7.fhir.r4.Composition.author',
     ]);
     const nativeAuthor = Array.isArray(composition?.author)
@@ -1554,7 +1560,7 @@ export class CommunicationManager implements IJobProcessor {
       }) as Record<string, any>,
     );
     baseClaims['@context'] = baseClaims['@context'] || 'org.hl7.fhir.api';
-    if (authorDid) baseClaims['Composition.author'] = authorDid;
+    if (authorDid) baseClaims[CompositionClaim.Author] = authorDid;
 
     const resourceSubjectRef = String(
       resource?.subject?.reference
@@ -1607,7 +1613,7 @@ export class CommunicationManager implements IJobProcessor {
     }
 
     const normalizedClaims = normalizeContextualizedClaims(baseClaims);
-    if (authorDid) normalizedClaims['Composition.author'] = authorDid;
+    if (authorDid) normalizedClaims[CompositionClaim.Author] = authorDid;
     return normalizedClaims;
   }
 
@@ -1758,8 +1764,9 @@ export class CommunicationManager implements IJobProcessor {
     return {
       type,
       id: uuidv4(),
-      resource: entryResource,
-      ...(Object.keys(claims).length > 0 ? { meta: { claims } } : {}),
+      resource: Object.keys(claims).length > 0
+        ? { ...entryResource, meta: { ...(entryResource.meta || {}), claims } }
+        : entryResource,
     };
   }
 
@@ -1803,14 +1810,14 @@ export class CommunicationManager implements IJobProcessor {
     if (bodyData.length === 0 && noteTexts.length > 0) {
       noteTexts.forEach((noteText) => {
         bodyData.push({
-          type: 'Annotation',
+          type: FhirDataTypes.Annotation,
           id: uuidv4(),
-          resource: { text: noteText },
-          meta: {
-            claims: {
+          resource: {
+            text: noteText,
+            meta: { claims: {
               [CommunicationClaim.NoteText]: noteText,
               [CommunicationClaim.Text]: noteText,
-            },
+            } },
           },
         });
       });
@@ -1939,11 +1946,11 @@ export class CommunicationManager implements IJobProcessor {
     const entryClaims = entry?.meta?.claims;
     const resourceClaims = (fhirResource as any)?.meta?.claims;
     return {
-      ...(entryClaims && typeof entryClaims === 'object' && !Array.isArray(entryClaims)
-        ? entryClaims
-        : {}),
       ...(resourceClaims && typeof resourceClaims === 'object' && !Array.isArray(resourceClaims)
         ? resourceClaims
+        : {}),
+      ...(entryClaims && typeof entryClaims === 'object' && !Array.isArray(entryClaims)
+        ? Object.fromEntries(Object.entries(entryClaims).filter(([key]) => !(key in (resourceClaims || {}))))
         : {}),
     };
   }
@@ -2009,8 +2016,8 @@ export class CommunicationManager implements IJobProcessor {
       ? (fhirResource as any).identifier.find((item: any) => typeof item?.value === 'string')?.value
       : undefined;
     return this.normalizeOptionalString(
-      entry?.meta?.claims?.[CommunicationClaim.Identifier]
-      || entry?.resource?.meta?.claims?.[CommunicationClaim.Identifier]
+      entry?.resource?.meta?.claims?.[CommunicationClaim.Identifier]
+      || entry?.meta?.claims?.[CommunicationClaim.Identifier]
       || resourceIdentifier
       || (fhirResource as any)?.id,
     );
@@ -2018,15 +2025,15 @@ export class CommunicationManager implements IJobProcessor {
 
   private resolveCommunicationSubject(entry: any, fhirResource: FhirCommunication): string | undefined {
     const raw = this.normalizeOptionalString(
-      entry?.meta?.claims?.[CommunicationClaim.Subject]
-      || entry?.resource?.meta?.claims?.[CommunicationClaim.Subject]
+      entry?.resource?.meta?.claims?.[CommunicationClaim.Subject]
+      || entry?.meta?.claims?.[CommunicationClaim.Subject]
       || (fhirResource?.subject as any)?.reference,
     );
     return raw?.replace(/^Patient\//i, '').trim();
   }
 
   private resolveCommunicationRecipient(entry: any, fhirResource: FhirCommunication): string | undefined {
-    const claimValue = entry?.meta?.claims?.[CommunicationClaim.Recipient] || entry?.resource?.meta?.claims?.[CommunicationClaim.Recipient];
+    const claimValue = entry?.resource?.meta?.claims?.[CommunicationClaim.Recipient] || entry?.meta?.claims?.[CommunicationClaim.Recipient];
     if (typeof claimValue === 'string' && claimValue.trim()) return claimValue.trim();
     const recipients = Array.isArray(fhirResource?.recipient)
       ? fhirResource.recipient.map((recipient) => String(recipient?.reference || '').trim()).filter(Boolean)
@@ -2036,16 +2043,16 @@ export class CommunicationManager implements IJobProcessor {
 
   private resolveCommunicationSender(entry: any, fhirResource: FhirCommunication): string | undefined {
     return this.normalizeOptionalString(
-      entry?.meta?.claims?.[CommunicationClaim.Sender]
-      || entry?.resource?.meta?.claims?.[CommunicationClaim.Sender]
+      entry?.resource?.meta?.claims?.[CommunicationClaim.Sender]
+      || entry?.meta?.claims?.[CommunicationClaim.Sender]
       || (fhirResource?.sender as any)?.reference,
     );
   }
 
   private resolveCommunicationSent(entry: any, fhirResource: FhirCommunication): string | undefined {
     return this.normalizeOptionalString(
-      entry?.meta?.claims?.[CommunicationClaim.Sent]
-      || entry?.resource?.meta?.claims?.[CommunicationClaim.Sent]
+      entry?.resource?.meta?.claims?.[CommunicationClaim.Sent]
+      || entry?.meta?.claims?.[CommunicationClaim.Sent]
       || (fhirResource as any)?.sent,
     );
   }
@@ -2216,12 +2223,12 @@ export class CommunicationManager implements IJobProcessor {
       const existingClaims = resource?.meta?.claims && typeof resource.meta.claims === 'object'
         ? resource.meta.claims
         : {};
-      if (getClaimValue<string>(existingClaims, 'Composition.section')) continue;
+      if (getClaimValue<string>(existingClaims, CompositionClaim.Section)) continue;
       resource.meta = {
         ...(resource.meta || {}),
         claims: {
           ...existingClaims,
-          'Composition.section': Array.from(tokens).join(','),
+          [CompositionClaim.Section]: Array.from(tokens).join(','),
         },
       };
     }

@@ -173,11 +173,11 @@ export class TwinCompositionManager {
     const logicalId = subject.startsWith('urn:uuid:') ? subject.slice('urn:uuid:'.length) : subject;
     return {
       ...composition,
-      resourceType: 'ResearchSubject',
+      resourceType: ResourceTypesFhirR4.ResearchSubject,
       id: logicalId,
       'ResearchSubject.identifier': subject,
       'ResearchSubject.status': 'candidate',
-      composition: { ...composition, resourceType: 'Composition' },
+      composition: { ...composition, resourceType: ResourceTypesFhirR4.Composition },
     };
   }
 

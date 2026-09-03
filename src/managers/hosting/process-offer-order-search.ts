@@ -1,3 +1,4 @@
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 import { v4 as uuidv4 } from 'uuid';
 import type { BundleEntry, ErrorEntry } from 'gdc-common-utils-ts/models/bundle';
 import type { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
@@ -38,7 +39,7 @@ export async function processOfferOrderSearch(
     exp: Math.floor(Date.now() / 1000) + 300,
     body: {
       data: responseEntries,
-      resourceType: 'Bundle',
+      resourceType: ResourceTypesFhirR4.Bundle,
       type: getBundleResponseTypeForAction(deps.job.action),
       total: responseEntries.length,
     },

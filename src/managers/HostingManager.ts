@@ -1,6 +1,8 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/managers/HostingManager.ts
 // Always create JSDoc, do not use strings inline in keys nor values, use types instead, and reuse the data test examples.
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
+import { HttpStatusCodes } from 'gdc-common-utils-ts/constants/http';
 
 import { v4 as uuidv4, validate as uuidValidate } from 'uuid';
 import { IServerConfig } from '../config';
@@ -852,7 +854,7 @@ export class HostingManager {
         aud: job.content?.iss as string,
         body: {
           data: [errorEntry],
-          resourceType: 'Bundle',
+          resourceType: ResourceTypesFhirR4.Bundle,
           type: 'batch-response',
           total: 1,
         },
@@ -1695,7 +1697,7 @@ export class HostingManager {
       exp: Math.floor(Date.now() / 1000) + 300,
       body: {
         data: responseEntries,
-        resourceType: 'Bundle',
+        resourceType: ResourceTypesFhirR4.Bundle,
         type: getBundleResponseTypeForAction(job.action),
         total: responseEntries.length,
       },
@@ -1827,7 +1829,7 @@ export class HostingManager {
 
     const responseBundle: BundleJsonApi = {
       data: responseEntries,
-      resourceType: 'Bundle',
+      resourceType: ResourceTypesFhirR4.Bundle,
       type: getBundleResponseTypeForAction(job.action),
       total: responseEntries.length,
     };
@@ -1913,7 +1915,7 @@ export class HostingManager {
 
     const responseBundle: BundleJsonApi = {
       data: responseEntries,
-      resourceType: 'Bundle',
+      resourceType: ResourceTypesFhirR4.Bundle,
       type: getBundleResponseTypeForAction(job.action),
       total: responseEntries.length,
     };
@@ -1999,7 +2001,7 @@ export class HostingManager {
         type: entryType,
         meta: meta,
         response: {
-          status: '500',
+          status: String(HttpStatusCodes.InternalServerError),
           outcome: createOperationOutcome(IssueLevel.Error, IssueType.Exception, 'An unexpected internal server error occurred.'),
         },
       };

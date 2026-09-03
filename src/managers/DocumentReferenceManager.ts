@@ -1,5 +1,6 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/managers/DocumentReferenceManager.ts
+import { HttpStatusCodes } from 'gdc-common-utils-ts/constants/http';
 
 import { randomUUID } from 'crypto';
 import { IJobProcessor } from './registry';
@@ -10,6 +11,7 @@ import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
 import { IssueLevel, IssueType } from 'gdc-common-utils-ts/models/issue';
 import { createOperationOutcome } from '../utils/outcome';
 import { getClaimValue, normalizeContextualizedClaims } from '../utils/claims';
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 import { determineResourceId } from '../utils/resource';
 import { getTenantVaultId } from '../utils/tenant';
 import { getSubjectScopedSectionId, SubjectSectionScope } from '../utils/individual-sections';
@@ -88,7 +90,7 @@ export class DocumentReferenceManager implements IJobProcessor {
     const cidMappings: FhirCidVersionMapping[] = [];
 
     for (const entry of entries) {
-      const rawClaims = entry?.meta?.claims;
+      const rawClaims = entry?.resource?.meta?.claims ?? entry?.meta?.claims;
       try {
         if (!rawClaims || typeof rawClaims !== 'object') {
           throw new ManagerError('Missing meta.claims in DocumentReference entry.', IssueType.Required);
@@ -113,7 +115,7 @@ export class DocumentReferenceManager implements IJobProcessor {
         const versioning = applyFhirCidVersioningToEntry({
           entry,
           claims,
-          resourceType: 'DocumentReference',
+          resourceType: ResourceTypesFhirR4.DocumentReference,
           resourceId: fallbackId,
         });
         const id = String(entry?.resource?.id || fallbackId);
@@ -131,7 +133,7 @@ export class DocumentReferenceManager implements IJobProcessor {
           await this.blockchainAdapter.registerArtifactBundle({
             assetId: versioning.mapping.cid,
             payload: {
-              resourceType: 'DocumentReference',
+              resourceType: ResourceTypesFhirR4.DocumentReference,
               resourceId: id,
               fullUrl: entry?.fullUrl,
               subject,
@@ -144,22 +146,25 @@ export class DocumentReferenceManager implements IJobProcessor {
 
         const responseAction = `${normalizedAction}-response`;
         responseEntries.push({
-          type: 'DocumentReference',
+          type: ResourceTypesFhirR4.DocumentReference,
           response: {
-            status: '201',
+            status: String(HttpStatusCodes.Created),
             location: `/${job.tenantId}/cds-${jurisdiction}/v1/${job.sector}/${normalizedSection}/${normalizedFormat}/DocumentReference/${responseAction}`,
           },
-          meta: {
-            claims,
-            ...(researchTags && researchTags.length > 0 ? { tag: researchTags } : {}),
+          resource: {
+            resourceType: ResourceTypesFhirR4.DocumentReference,
+            meta: {
+              claims,
+              ...(researchTags && researchTags.length > 0 ? { tag: researchTags } : {}),
+            },
           },
         });
       } catch (e: any) {
         const status = e instanceof ManagerError ? e.status : '400';
         const code = e instanceof ManagerError ? e.code : IssueType.Invalid;
         responseEntries.push({
-          type: 'DocumentReference',
-          meta: { claims: rawClaims || {} },
+          type: ResourceTypesFhirR4.DocumentReference,
+          resource: { resourceType: ResourceTypesFhirR4.OperationOutcome, meta: { claims: rawClaims || {} } },
           response: {
             status,
             outcome: createOperationOutcome(IssueLevel.Error, code, e?.message || String(e)),
@@ -183,7 +188,7 @@ export class DocumentReferenceManager implements IJobProcessor {
       aud: job.content?.iss as string,
       exp: Math.floor(Date.now() / 1000) + 300,
       body: {
-        resourceType: 'Bundle',
+        resourceType: ResourceTypesFhirR4.Bundle,
         type: `${normalizedAction}-response`,
         data: responseEntries,
       },

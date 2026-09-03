@@ -1,5 +1,8 @@
 // Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 // TDD contract: locally authored Consent projections require one cryptographically verified actor.
+import { GatewayResponseEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 import { invokeExpress } from './helpers/invokeExpress';
 import { extractBundleSearchResources } from 'gdc-common-utils-ts/utils/organization-employee-lifecycle';
 import { getTenantVaultId, generateTenantCollectionNameFromClaims } from '../../utils/tenant';
@@ -84,7 +87,7 @@ describe('Consent via Communication API (integration)', () => {
         [ClaimsServiceSchemaorg.category]: Sector.SYSTEM,
       };
       const hostCollectionName = generateTenantCollectionNameFromClaims(hostBootstrapClaims as any);
-      const tenantClaims = testPayloadCreateTenant1.body.data[0].meta.claims as any;
+      const tenantClaims = testPayloadCreateTenant1.body.data[0].resource.meta.claims as any;
       const tenantVaultId = getTenantVaultId(
         tenantClaims[ClaimsServiceSchemaorg.category],
         testTenant1TenantId,
@@ -120,7 +123,7 @@ describe('Consent via Communication API (integration)', () => {
         action: string,
         attachmentData: string,
       ) => ({
-        resourceType: 'Consent',
+        resourceType: ResourceTypesFhirR4.Consent,
         status: 'active',
         meta: {
           claims: {
@@ -164,7 +167,7 @@ describe('Consent via Communication API (integration)', () => {
 
       const thidBatch = 'communication-consent-batch-001';
       const submitResp = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: buildCommunicationBatchPath(
           testTenant1TenantId,
           EXAMPLE_HEALTHCARE_JURISDICTION,
@@ -176,13 +179,13 @@ describe('Consent via Communication API (integration)', () => {
         body: {
           thid: thidBatch,
           body: {
-            resourceType: 'Bundle',
+            resourceType: ResourceTypesFhirR4.Bundle,
             type: 'batch',
             entry: [
               {
-                request: { method: 'POST', url: 'individual/org.hl7.fhir.r4/Communication' },
+                request: { method: HttpRequestMethods.Post, url: 'individual/org.hl7.fhir.r4/Communication' },
                 resource: {
-                  resourceType: 'Communication',
+                  resourceType: ResourceTypesFhirR4.Communication,
                   status: 'completed',
                   meta: {
                     claims: {
@@ -228,7 +231,7 @@ describe('Consent via Communication API (integration)', () => {
       let batchPayload: any;
       for (let i = 0; i < 50; i++) {
         const pollResp = await invokeExpress(app, {
-          method: 'POST',
+          method: HttpRequestMethods.Post,
           url: buildCommunicationBatchPath(
             testTenant1TenantId,
             EXAMPLE_HEALTHCARE_JURISDICTION,
@@ -313,16 +316,16 @@ describe('Consent via Communication API (integration)', () => {
         },
       };
       const draftConsentBundle = {
-        resourceType: 'Bundle',
+        resourceType: ResourceTypesFhirR4.Bundle,
         type: 'batch',
         entry: [{
-          request: { method: 'POST', url: 'Consent' },
+          request: { method: HttpRequestMethods.Post, url: 'Consent' },
           resource: draftConsent,
         }],
       };
       const thidDraft = 'communication-consent-draft-001';
       const draftSubmitResp = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: buildCommunicationBatchPath(
           testTenant1TenantId,
           EXAMPLE_HEALTHCARE_JURISDICTION,
@@ -334,12 +337,12 @@ describe('Consent via Communication API (integration)', () => {
         body: {
           thid: thidDraft,
           body: {
-            resourceType: 'Bundle',
+            resourceType: ResourceTypesFhirR4.Bundle,
             type: 'batch',
             entry: [{
-              request: { method: 'POST', url: 'individual/org.hl7.fhir.r4/Communication' },
+              request: { method: HttpRequestMethods.Post, url: 'individual/org.hl7.fhir.r4/Communication' },
               resource: {
-                resourceType: 'Communication',
+                resourceType: ResourceTypesFhirR4.Communication,
                 status: 'completed',
                 subject: { reference: subjectDid },
                 payload: [{
@@ -359,7 +362,7 @@ describe('Consent via Communication API (integration)', () => {
       let draftPayload: any;
       for (let i = 0; i < 50; i++) {
         const pollResp = await invokeExpress(app, {
-          method: 'POST',
+          method: HttpRequestMethods.Post,
           url: buildCommunicationBatchPath(
             testTenant1TenantId,
             EXAMPLE_HEALTHCARE_JURISDICTION,
@@ -384,7 +387,7 @@ describe('Consent via Communication API (integration)', () => {
 
       const thidRead = 'communication-consent-read-001';
       const readResp = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         url: buildCommunicationBatchPath(
           testTenant1TenantId,
           EXAMPLE_HEALTHCARE_JURISDICTION,
@@ -396,13 +399,13 @@ describe('Consent via Communication API (integration)', () => {
         body: {
           thid: thidRead,
           body: {
-            resourceType: 'Bundle',
+            resourceType: ResourceTypesFhirR4.Bundle,
             type: 'batch',
             entry: [
               {
-                request: { method: 'POST', url: 'individual/org.hl7.fhir.r4/Communication' },
+                request: { method: HttpRequestMethods.Post, url: 'individual/org.hl7.fhir.r4/Communication' },
                 resource: {
-                  resourceType: 'Communication',
+                  resourceType: ResourceTypesFhirR4.Communication,
                   status: 'completed',
                   subject: { reference: subjectDid },
                   payload: [
@@ -414,7 +417,7 @@ describe('Consent via Communication API (integration)', () => {
                         contentType: FHIR_JSON_MEDIA_TYPE,
                         title: 'subject-consent-search-parameters.json',
                         data: Buffer.from(JSON.stringify({
-                          resourceType: 'Parameters',
+                          resourceType: ResourceTypesFhirR4.Parameters,
                           parameter: [
                             { name: 'subject', valueString: subjectDid },
                           ],
@@ -433,7 +436,7 @@ describe('Consent via Communication API (integration)', () => {
       let readPayload: any;
       for (let i = 0; i < 50; i++) {
         const pollResp = await invokeExpress(app, {
-          method: 'POST',
+          method: HttpRequestMethods.Post,
           url: buildCommunicationBatchPath(
             testTenant1TenantId,
             EXAMPLE_HEALTHCARE_JURISDICTION,
@@ -453,7 +456,7 @@ describe('Consent via Communication API (integration)', () => {
 
       expect(readPayload?.resourceType).toBe('Bundle');
       expect(readPayload?.data?.[0]?.response?.status).toBe('200');
-      expect(readPayload?.data?.[0]?.type).toBe('Subject-search-response-v1.0');
+      expect(readPayload?.data?.[0]?.type).toBe(GatewayResponseEntryTypes.SubjectSearch);
       expect(extractBundleSearchResources(readPayload)).toHaveLength(3);
 
       const communications = await vaultRepository.getContainersInSection(

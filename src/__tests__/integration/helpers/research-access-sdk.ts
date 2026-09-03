@@ -1,5 +1,7 @@
 // TDD contract: write this test red first; make it green only with the complete real behavior.
 // TDD contract: research fixtures distinguish authenticated local authors from preserved external IPS provenance.
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 import { readFileSync } from 'fs';
 import path from 'path';
 import { HealthcareBasicSections } from 'gdc-common-utils-ts/constants/index';
@@ -103,7 +105,7 @@ export async function pollAcceptedGatewayOperation(input: {
 }): Promise<any> {
   for (let attempt = 0; attempt < 50; attempt += 1) {
     const pollResp = await invokeExpress(input.app, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       url: input.url,
       headers: { 'content-type': 'application/json' },
       body: { thid: input.thid },
@@ -159,7 +161,7 @@ export function loadResearchIpsAllSectionsFixture(subjectDid: string): any {
 
 function buildLabTenantClaims(): Record<string, unknown> {
   const baseClaims = {
-    ...(testPayloadCreateTenant1.body.data[0].meta.claims as Record<string, unknown>),
+    ...(testPayloadCreateTenant1.body.data[0].resource.meta.claims as Record<string, unknown>),
   };
   return {
     ...baseClaims,
@@ -203,7 +205,7 @@ export class TestResearchOrgControllerSdk {
    * registry used by the integration suite.
    */
   public async registerProviderTenant(): Promise<void> {
-    const providerClaims = testPayloadCreateTenant1.body.data[0].meta.claims as Record<string, unknown>;
+    const providerClaims = testPayloadCreateTenant1.body.data[0].resource.meta.claims as Record<string, unknown>;
     await this.registerHostedTenant({
       claims: providerClaims,
       didDocumentId: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.providerOrganizationDid,
@@ -331,7 +333,7 @@ export class TestResearchOrgControllerSdk {
   public async ingestProviderIpsFixture(): Promise<any> {
     const ipsBundle = loadResearchIpsAllSectionsFixture(RESEARCH_ACCESS_TEST_IDS.doraemonSubjectDid);
     const documentReference = {
-      resourceType: 'DocumentReference',
+      resourceType: ResourceTypesFhirR4.DocumentReference,
       id: RESEARCH_ACCESS_TEST_IDS.documentReferenceId,
       subject: { reference: RESEARCH_ACCESS_TEST_IDS.doraemonSubjectDid },
       date: '2026-06-29T10:00:00Z',
@@ -349,19 +351,19 @@ export class TestResearchOrgControllerSdk {
     };
 
     const submitResp = await invokeExpress(this.deps.app, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       url: `/${testTenant1AlternateName}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch`,
       headers: { 'content-type': 'application/json', authorization: this.authorizationHeader },
       body: {
         thid: RESEARCH_ACCESS_TEST_IDS.communicationThreadId,
         body: {
-          resourceType: 'Bundle',
+          resourceType: ResourceTypesFhirR4.Bundle,
           type: 'batch',
           entry: [
             {
-              request: { method: 'POST', url: 'individual/org.hl7.fhir.r4/Communication' },
+              request: { method: HttpRequestMethods.Post, url: 'individual/org.hl7.fhir.r4/Communication' },
               resource: {
-                resourceType: 'Communication',
+                resourceType: ResourceTypesFhirR4.Communication,
                 status: 'completed',
                 subject: { reference: RESEARCH_ACCESS_TEST_IDS.doraemonSubjectDid },
                 sent: '2026-06-29T10:00:00Z',
@@ -409,7 +411,7 @@ export class TestResearchOrgControllerSdk {
     });
 
     const submitResp = await invokeExpress(this.deps.app, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       url: `/${testTenant1AlternateName}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch`,
       headers: { 'content-type': 'application/json', authorization: this.authorizationHeader },
       body: request,
@@ -491,7 +493,7 @@ export class TestResearchDigitalTwinSdk {
    */
   public async requestResearchSmartAccessToken(vpToken: string): Promise<any> {
     const submitResp = await invokeExpress(this.deps.app, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       url: `/${testTenant1AlternateName}/cds-ES/v1/health-care/identity/openid/smart/token`,
       headers: { 'content-type': 'application/json', authorization: this.authorizationHeader },
       body: {
@@ -543,7 +545,7 @@ export class TestResearchDigitalTwinSdk {
     });
 
     const submitResp = await invokeExpress(this.deps.app, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       url: `/${testTenant1AlternateName}/cds-ES/v1/health-care/identity/openid/smart/token`,
       headers: { 'content-type': 'application/json', authorization: this.authorizationHeader },
       body: requestPayload,
@@ -576,13 +578,13 @@ export class TestResearchDigitalTwinSdk {
   ): Promise<any> {
     const searchThreadId = `${RESEARCH_ACCESS_TEST_IDS.compositionSearchThreadId}-${String(medicationCode || '').split('|').pop()}`;
     const submitResp = await invokeExpress(this.deps.app, {
-      method: 'POST',
+      method: HttpRequestMethods.Post,
       url: `/${testTenant1AlternateName}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.api/ResearchSubject/_search`,
       headers: { 'content-type': 'application/json', authorization: `Bearer ${accessToken}` },
       body: {
         thid: searchThreadId,
         body: {
-          resourceType: 'Parameters',
+          resourceType: ResourceTypesFhirR4.Parameters,
           parameter: [
             { name: 'section', valueString: RESEARCH_ACCESS_SEARCH_FIXTURE.section },
             { name: RESEARCH_ACCESS_SEARCH_FIXTURE.codeClaim, valueString: medicationCode },

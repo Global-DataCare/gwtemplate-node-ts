@@ -1,6 +1,8 @@
 // TDD contract: write this test red first; make it green only with the complete real behavior.
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/__tests__/data/employee.data.ts
+import { GatewayRequestEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
 import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-job';
 import { ClaimsRecord } from 'gdc-common-utils-ts/models/resource-document';
 import { ClaimsPersonSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
@@ -116,8 +118,8 @@ export const testBaseJobForEmployeeClaims = (claims: ClaimsRecord, tenantId: str
       data: [
         {
           meta: { claims },
-          request: { method: 'POST' },
-          type: 'Employee-form-v1.0',
+          request: { method: HttpRequestMethods.Post },
+          type: GatewayRequestEntryTypes.EmployeeForm,
         },
       ],
     },

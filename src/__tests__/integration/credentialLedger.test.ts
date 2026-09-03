@@ -1,6 +1,7 @@
 // TDD contract: write this test red first; make it green only with the complete real behavior.
 // src/__tests__/integration/credentialLedger.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
 
 import { invokeExpress } from './helpers/invokeExpress';
 import { CredentialLedgerAdapterMem } from '../../adapters/CredentialLedgerAdapterMem';
@@ -86,7 +87,7 @@ describe('Credential ledger endpoints (demo, mem)', () => {
 
     try {
     const statusResponse = await invokeExpress(app, {
-      method: 'GET',
+      method: HttpRequestMethods.Get,
       url: `/host/cds-ES/v1/health-care/identity/ledger/credential/_status?id=${encodeURIComponent(credentialId)}`,
     });
       expect(statusResponse.status).toBe(200);
@@ -94,7 +95,7 @@ describe('Credential ledger endpoints (demo, mem)', () => {
       expect(statusJson.status).toBe('active');
 
     const historyResponse = await invokeExpress(app, {
-      method: 'GET',
+      method: HttpRequestMethods.Get,
       url: `/host/cds-ES/v1/health-care/identity/ledger/credential/_history?id=${encodeURIComponent(credentialId)}`,
     });
       expect(historyResponse.status).toBe(200);
@@ -102,7 +103,7 @@ describe('Credential ledger endpoints (demo, mem)', () => {
       expect(historyJson.events.length).toBe(1);
 
       const asyncStatus = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
       url: `/host/cds-ES/v1/health-care/identity/ledger/credential/_status`,
         headers: { 'content-type': 'application/json' },
         body: { id: credentialId },
@@ -114,13 +115,13 @@ describe('Credential ledger endpoints (demo, mem)', () => {
       let pollStatus;
       for (let i = 0; i < 5; i += 1) {
         await new Promise((resolve) => setTimeout(resolve, 10));
-        pollStatus = await invokeExpress(app, { method: 'GET', url: statusLocation });
+        pollStatus = await invokeExpress(app, { method: HttpRequestMethods.Get, url: statusLocation });
         if (pollStatus.status === 200) break;
       }
       expect(pollStatus?.status).toBe(200);
 
       const asyncHistory = await invokeExpress(app, {
-        method: 'POST',
+        method: HttpRequestMethods.Post,
       url: `/host/cds-ES/v1/health-care/identity/ledger/credential/_history`,
         headers: { 'content-type': 'application/json' },
         body: { id: credentialId },
@@ -132,7 +133,7 @@ describe('Credential ledger endpoints (demo, mem)', () => {
       let pollHistory;
       for (let i = 0; i < 5; i += 1) {
         await new Promise((resolve) => setTimeout(resolve, 10));
-        pollHistory = await invokeExpress(app, { method: 'GET', url: historyLocation });
+        pollHistory = await invokeExpress(app, { method: HttpRequestMethods.Get, url: historyLocation });
         if (pollHistory.status === 200) break;
       }
       expect(pollHistory?.status).toBe(200);

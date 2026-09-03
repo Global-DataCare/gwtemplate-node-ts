@@ -1,5 +1,6 @@
 // TDD contract: write this test red first; make it green only with the complete real behavior.
 // src/__tests__/integration/server.robustness.test.ts
+import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
 
 import request from 'supertest';
 import { once } from 'node:events';
@@ -53,7 +54,7 @@ describe('Server Robustness', () => {
       const err = new SyntaxError('Unexpected token } in JSON at position 10');
       (err as any).body = '{"broken": }'; // Body-parser marks the error with a `body` property.
 
-      const req = { path: '/host/cds-xx/v1/test/ping/standard/resource/_batch', method: 'POST' } as any;
+      const req = { path: '/host/cds-xx/v1/test/ping/standard/resource/_batch', method: HttpRequestMethods.Post } as any;
 
       let statusCode = 200;
       let jsonBody: any;
@@ -94,7 +95,7 @@ describe('Server Robustness', () => {
 
       const req = {
         path: '/host/cds-xx/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch',
-        method: 'POST',
+        method: HttpRequestMethods.Post,
         params: { format: 'org.hl7.fhir.r4' },
         headers: { 'content-type': FHIR_JSON_MEDIA_TYPE },
       } as any;

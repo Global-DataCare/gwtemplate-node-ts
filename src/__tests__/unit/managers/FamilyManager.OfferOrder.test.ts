@@ -10,6 +10,9 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // Always create JSDoc, do not use strings inline in keys nor values, use types instead, and reuse the data test examples.
 // File: src/__tests__/unit/managers/FamilyManager.OfferOrder.test.ts
+import { GatewayResponseEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
+import { GatewayRequestEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 
 import { jest } from '@jest/globals';
 import { VaultMemRepository } from '../../../database/repositories/vault/vault.mem.repository';
@@ -41,7 +44,11 @@ import { testClaimsHostInitialization } from '../../data/end-to-end.data';
 import { generateLicenseOffer } from '../../../utils/offer';
 import { buildOfferOrderIndexedAttributes } from '../../../utils/offer-order-read-model';
 import { EntityLifecycleStatus } from '../../../gdc-backend-utils-node/models/enums';
-import { EXAMPLE_REGISTERED_SUBJECT_ALTERNATE_NAME } from 'gdc-common-utils-ts/examples/shared';
+import {
+  EXAMPLE_LICENSE_INVOICE_ID,
+  EXAMPLE_LICENSE_PAYMENT_METHOD_STRIPE,
+  EXAMPLE_REGISTERED_SUBJECT_ALTERNATE_NAME,
+} from 'gdc-common-utils-ts/examples/shared';
 
 
 const mockStorageAdapter: jest.Mocked<IStorageAdapter> = {
@@ -195,7 +202,7 @@ describe('FamilyManager - Offer/Order Flow', () => {
       section: 'individual',
       format: 'org.schema',
       action: '_batch',
-      resourceType: 'Organization',
+      resourceType: ResourceTypesFhirR4.Organization,
       content: buildFamilyRegistrationRequestWithoutPdfAttachment(),
     };
 
@@ -203,11 +210,11 @@ describe('FamilyManager - Offer/Order Flow', () => {
     const entry = responsePayload.body.data[0];
 
     expect(entry.response.status).toBe('201');
-    expect(entry.type).toBe('Family-registration-offer-v1.0');
-    expect(entry.meta.claims[ClaimsOfferSchemaorg.identifier]).toMatch(
+    expect(entry.type).toBe(GatewayResponseEntryTypes.FamilyRegistrationOffer);
+    expect(entry.resource.meta.claims[ClaimsOfferSchemaorg.identifier]).toMatch(
       /^urn:cds:ES:v1:health-care:product:org\.schema:Offer:/,
     );
-    expect(entry.meta.claims[ClaimsOfferSchemaorg.identifier]).not.toContain('undefined');
+    expect(entry.resource.meta.claims[ClaimsOfferSchemaorg.identifier]).not.toContain('undefined');
   });
 
   it('should process a family Order and finalize the family registration', async () => {
@@ -223,17 +230,17 @@ describe('FamilyManager - Offer/Order Flow', () => {
       section: 'individual',
       format: 'org.schema',
       action: '_batch',
-      resourceType: 'Organization',
+      resourceType: ResourceTypesFhirR4.Organization,
       content: buildFamilyRegistrationRequestWithoutPdfAttachment(),
     };
 
     const offerPayload = await familyManager.process(familyRegistrationJob);
     const firstEntry = offerPayload.body.data[0];
     expect(firstEntry.response.status).toBe('201');
-    const offerId = firstEntry.meta.claims[ClaimsOfferSchemaorg.identifier] as string;
+    const offerId = firstEntry.resource.meta.claims[ClaimsOfferSchemaorg.identifier] as string;
 
     const orderContent = structuredClone(FAMILY_ORDER_REQUEST) as any;
-    orderContent.body.data[0].meta.claims[ClaimsOrderSchemaorg.acceptedOfferIdentifier] = offerId;
+    orderContent.body.data[0].resource.meta.claims[ClaimsOrderSchemaorg.acceptedOfferIdentifier] = offerId;
 
     const familyOrderJob: JobRequest = {
       id: 'job-family-order-1',
@@ -252,8 +259,8 @@ describe('FamilyManager - Offer/Order Flow', () => {
     const finalPayload = await familyManager.process(familyOrderJob);
     const entry = finalPayload.body.data[0];
     expect(entry.response.status).toBe('201');
-    expect(entry.type).toBe('Family-order-response-v1.0');
-    expect(entry.meta.claims[ClaimsOrderSchemaorg.acceptedOfferIdentifier]).toBe(offerId);
+    expect(entry.type).toBe(GatewayResponseEntryTypes.FamilyOrder);
+    expect(entry.resource.meta.claims[ClaimsOrderSchemaorg.acceptedOfferIdentifier]).toBe(offerId);
 
     const tenantVaultId = tenantUtils.getTenantVaultId(Sector.HEALTH_CARE, tenantId);
     const tenantCollectionName = await tenantsCacheManager.getCollectionName(tenantVaultId);
@@ -278,17 +285,17 @@ describe('FamilyManager - Offer/Order Flow', () => {
       section: 'individual',
       format: 'org.schema',
       action: '_batch',
-      resourceType: 'Organization',
+      resourceType: ResourceTypesFhirR4.Organization,
       content: buildFamilyRegistrationRequestWithoutPdfAttachment(),
     };
 
     const offerPayload = await familyManager.process(familyRegistrationJob);
     const firstEntry = offerPayload.body.data[0];
     expect(firstEntry.response.status).toBe('201');
-    const offerId = firstEntry.meta.claims[ClaimsOfferSchemaorg.identifier] as string;
+    const offerId = firstEntry.resource.meta.claims[ClaimsOfferSchemaorg.identifier] as string;
 
     const orderContent = structuredClone(FAMILY_ORDER_REQUEST) as any;
-    orderContent.body.data[0].meta.claims[ClaimsOrderSchemaorg.acceptedOfferIdentifier] = offerId;
+    orderContent.body.data[0].resource.meta.claims[ClaimsOrderSchemaorg.acceptedOfferIdentifier] = offerId;
     await familyManager.process({
       id: 'job-family-search-order-1',
       status: JobStatus.DRAFT,
@@ -317,7 +324,7 @@ describe('FamilyManager - Offer/Order Flow', () => {
       content: {
         body: {
           data: [{
-            type: 'Offer-search-request-v1.0',
+            type: GatewayRequestEntryTypes.OfferSearch,
             meta: { claims: { [ClaimsOfferSchemaorg.identifier]: offerId } },
             resource: { meta: { claims: { [ClaimsOfferSchemaorg.identifier]: offerId } } },
           }],
@@ -342,7 +349,7 @@ describe('FamilyManager - Offer/Order Flow', () => {
       content: {
         body: {
           data: [{
-            type: 'Order-search-request-v1.0',
+            type: GatewayRequestEntryTypes.OrderSearch,
             meta: { claims: { [ClaimsOrderSchemaorg.acceptedOfferIdentifier]: offerId } },
             resource: { meta: { claims: { [ClaimsOrderSchemaorg.acceptedOfferIdentifier]: offerId } } },
           }],
@@ -366,14 +373,14 @@ describe('FamilyManager - Offer/Order Flow', () => {
       section: 'individual',
       format: 'org.schema',
       action: '_batch',
-      resourceType: 'Organization',
+      resourceType: ResourceTypesFhirR4.Organization,
       content: buildFamilyRegistrationRequestWithoutPdfAttachment('ZZ'),
     });
 
     const entry = response.body.data[0];
     expect(entry.response.status).toBe('201');
-    expect(entry.meta.claims[ClaimsOfferSchemaorg.identifier]).toMatch(/^urn:cds:ES:v1:health-care:/);
-    expect(entry.meta.claims[ClaimsOrganizationSchemaorg.addressCountry]).toBe('ZZ');
+    expect(entry.resource.meta.claims[ClaimsOfferSchemaorg.identifier]).toMatch(/^urn:cds:ES:v1:health-care:/);
+    expect(entry.resource.meta.claims[ClaimsOrganizationSchemaorg.addressCountry]).toBe('ZZ');
   });
 
   it('rejects an individual Offer when the route network is absent even if addressCountry exists', async () => {
@@ -387,7 +394,7 @@ describe('FamilyManager - Offer/Order Flow', () => {
       section: 'individual',
       format: 'org.schema',
       action: '_batch',
-      resourceType: 'Organization',
+      resourceType: ResourceTypesFhirR4.Organization,
       content: buildFamilyRegistrationRequestWithoutPdfAttachment('ES'),
     });
 
@@ -433,10 +440,10 @@ describe('FamilyManager - Offer/Order Flow', () => {
     );
 
     const orderContent = structuredClone(FAMILY_ORDER_REQUEST) as any;
-    orderContent.body.data[0].meta.claims[ClaimsOrderSchemaorg.acceptedOfferIdentifier] =
+    orderContent.body.data[0].resource.meta.claims[ClaimsOrderSchemaorg.acceptedOfferIdentifier] =
       String(extraOfferClaims[ClaimsOfferSchemaorg.identifier]);
-    orderContent.body.data[0].meta.claims[ClaimsOrderSchemaorg.paymentMethod] = 'Stripe';
-    orderContent.body.data[0].meta.claims[ClaimsOrderSchemaorg.partOfInvoice] = 'in_family_test_001';
+    orderContent.body.data[0].resource.meta.claims[ClaimsOrderSchemaorg.paymentMethod] = EXAMPLE_LICENSE_PAYMENT_METHOD_STRIPE;
+    orderContent.body.data[0].resource.meta.claims[ClaimsOrderSchemaorg.partOfInvoice] = EXAMPLE_LICENSE_INVOICE_ID;
 
     const familyOrderJob: JobRequest = {
       id: 'job-family-commercial-order-1',
@@ -455,8 +462,8 @@ describe('FamilyManager - Offer/Order Flow', () => {
     const responsePayload = await familyManager.process(familyOrderJob);
     const entry = responsePayload.body.data[0];
     expect(entry.response.status).toBe('201');
-    expect(entry.type).toBe('Family-order-response-v1.0');
-    expect(entry.meta.claims[ClaimsOrderSchemaorg.acceptedOfferIdentifier]).toBe(
+    expect(entry.type).toBe(GatewayResponseEntryTypes.FamilyOrder);
+    expect(entry.resource.meta.claims[ClaimsOrderSchemaorg.acceptedOfferIdentifier]).toBe(
       extraOfferClaims[ClaimsOfferSchemaorg.identifier],
     );
     expect(entry.resource?.resourceType).toBe('Bundle');
