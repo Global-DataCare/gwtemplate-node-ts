@@ -12,8 +12,11 @@
   },
   "authority": {
     "caUrl": "https://fabric-ica.example.invalid:7054",
+    "caName": "fabric-ica-example",
     "caAdminHome": "/secure/fabric-ca/admin",
     "caTlsCert": "/secure/fabric-ca/tls/ca-chain.pem",
+    "mspAdminOutputDir": "/secure/fabric-ca/governed-msp/admin",
+    "publicMspOutputDir": "/secure/fabric-ca/governed-msp/public",
     "authorizationOutput": "/secure/onboarding/authorization.json",
     "enrollmentGrantOutput": "/secure/onboarding/enrollment-grant.json",
     "clientEnrollmentGrantOutput": "/secure/onboarding/gw-client-enrollment-grant.json"

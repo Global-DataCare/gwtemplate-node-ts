@@ -149,6 +149,7 @@ test_fabric_governance_contract() {
   bash ./scripts/tests/evidence-runner-fail-closed.test.sh
   bash ./scripts/tests/public-deliverables-layout.test.sh
   node --test scripts/governance/tests/*.test.mjs scripts/onboarding/tests/*.test.mjs
+  bash ./scripts/onboarding/tests/msp-admin-custody.test.sh
   bash ./scripts/onboarding/tests/enrollment-grant.test.sh
   bash ./scripts/onboarding/tests/client-enrollment.test.sh
   bash ./scripts/onboarding/tests/create-local-audit-authorization.test.sh

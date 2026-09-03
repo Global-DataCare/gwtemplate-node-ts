@@ -35,6 +35,7 @@ PATH="${WORK}/bin:${PATH}" \
 FAKE_FABRIC_CA_CALLS="${WORK}/calls.log" \
 AUTHORIZATION_JSON="${WORK}/authorization.json" \
 CA_URL="https://fabric-ca.example.invalid:7054" \
+CA_NAME="fabric-ica-host2" \
 CA_ADMIN_HOME="${WORK}/ca-admin" \
 ENROLLMENT_OUTPUT_FILE="${grant}" \
 ENROLLMENT_GRANT_TTL_SECONDS=900 \
@@ -44,6 +45,7 @@ NOW_EPOCH_SECONDS=1785315960 \
 jq -e '
   .specVersion == "gdc.fabric.host-enrollment-grant/v1" and
   .networkKind == "test-network" and
+  .caName == "fabric-ica-host2" and
   .maxEnrollments == 2 and
   .issuedAt == "2026-07-29T09:06:00Z" and
   .expiresAt == "2026-07-29T09:21:00Z"
@@ -52,6 +54,7 @@ jq -e '
 ! grep -Fq 'enrollmentSecret' "${stderr}"
 credential_digest="$(printf '%s' 'urn:uuid:10000000-0000-4000-8000-000000000001' | shasum -a 256 | awk '{print $1}')"
 grep -Fq -- "gdc.hostCredentialSha256=${credential_digest}:ecert" "${WORK}/calls.log"
+grep -Fq -- '--caname fabric-ica-host2' "${WORK}/calls.log"
 
 weekend_grant="${WORK}/weekend-grant.json"
 PATH="${WORK}/bin:${PATH}" \

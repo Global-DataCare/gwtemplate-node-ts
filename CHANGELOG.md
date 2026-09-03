@@ -2,7 +2,14 @@
 
 ## [Unreleased]
 
-## [1.23.16] - 2026-09-02
+## [1.23.16] - 2026-09-03
+
+- Keep every Fabric MSP administrator under network-governance management, export
+  only its secret-free public MSP definition, and continue handing the host
+  only bounded peer/TLS and GW-client enrollment grants. Treat MSP identifiers
+  and channels as governance-assigned values rather than host-selected input;
+  reuse the same governed administrator for later peers of that MSP without
+  binding it to any one Host credential.
 
 - Emit licence search, purchase and issue, Order, clinical, lifecycle and
   internal job-response claims only at `entry.resource.meta.claims`. Keep the

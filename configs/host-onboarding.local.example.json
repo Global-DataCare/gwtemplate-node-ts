@@ -12,8 +12,11 @@
   },
   "authority": {
     "caUrl": "https://fabric-ca.localhost:7054",
+    "caName": "fabric-ica-local",
     "caAdminHome": "/tmp/gdc-host-onboarding/fabric-ca-admin",
     "caTlsCert": "/tmp/gdc-host-onboarding/fabric-ca/ca.crt",
+    "mspAdminOutputDir": "/tmp/gdc-host-onboarding/fabric-ca/governed-msp/admin",
+    "publicMspOutputDir": "/tmp/gdc-host-onboarding/fabric-ca/governed-msp/public",
     "authorizationOutput": "/tmp/gdc-host-onboarding/authorization.json",
     "enrollmentGrantOutput": "/tmp/gdc-host-onboarding/enrollment-grant.json",
     "clientEnrollmentGrantOutput": "/tmp/gdc-host-onboarding/gw-client-enrollment-grant.json"

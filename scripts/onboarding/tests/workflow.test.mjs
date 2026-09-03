@@ -1,5 +1,6 @@
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 /**
- * Flow contract:
+ * Journey:
  * - one assistant manifest keeps authority, host and platform custody separate;
  * - staging may share infrastructure while production must not claim that mode;
  * - apply requires the exact signed request ID and never treats a password as
@@ -35,7 +36,10 @@ function manifest(overrides = {}) {
     },
     authority: {
       caUrl: 'https://fabric-ca.example.invalid:7054',
+      caName: 'fabric-ica-hostexample',
       caAdminHome: '/secure/ca-admin',
+      mspAdminOutputDir: '/secure/authority/msp-admin',
+      publicMspOutputDir: '/secure/authority/public-msp',
       authorizationOutput: '/secure/authorization.json',
       enrollmentGrantOutput: '/secure/enrollment-grant.json',
       clientEnrollmentGrantOutput: '/secure/client-enrollment-grant.json',
@@ -94,6 +98,9 @@ test('ships a valid isolated production manifest with host-local key output', ()
   assert.match(value.host.runtimeOutputDir, /^\/secure\/host\//);
   assert.match(value.host.gwClientOutputDir, /^\/secure\/host\//);
   assert.match(value.host.gwFabricEnvOutput, /^\/secure\/host\//);
+  assert.match(value.authority.mspAdminOutputDir, /^\/secure\/fabric-ca\//);
+  assert.match(value.authority.publicMspOutputDir, /^\/secure\/fabric-ca\//);
+  assert.equal(value.authority.caName, 'fabric-ica-example');
   assert.doesNotMatch(JSON.stringify(example), /seed|privateKey/i);
 });
 
@@ -115,6 +122,13 @@ test('explains that host enrollment creates local keys and receives certificates
   assert.match(plan, /sanitized Helm runtime package/);
   assert.match(plan, /independent Fabric client identity/);
   assert.match(plan, /private GW Fabric environment/);
+});
+
+test('keeps the governed MSP administrator under the Fabric authority management', () => {
+  const plan = buildRolePlan(validateOnboardingManifest(manifest()), 'authority').join(' ');
+  assert.match(plan, /MSP administrator identity under governance management/);
+  assert.match(plan, /public MSP definition/);
+  assert.match(plan, /never transfer the MSP administrator/);
 });
 
 test('places peer runtime reconciliation before governed channel joins', () => {

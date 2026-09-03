@@ -9,6 +9,7 @@ spec_version="$(jq -r '.specVersion // empty' "${ENROLLMENT_GRANT_FILE}")"
 enrollment_id="$(jq -r '.enrollmentId // empty' "${ENROLLMENT_GRANT_FILE}")"
 enrollment_secret="$(jq -r '.enrollmentSecret // empty' "${ENROLLMENT_GRANT_FILE}")"
 ca_url="$(jq -r '.caUrl // empty' "${ENROLLMENT_GRANT_FILE}")"
+ca_name="$(jq -r '.caName // empty' "${ENROLLMENT_GRANT_FILE}")"
 expires_at="$(jq -r '.expiresAt // empty' "${ENROLLMENT_GRANT_FILE}")"
 max_enrollments="$(jq -r '.maxEnrollments // 0' "${ENROLLMENT_GRANT_FILE}")"
 if [[ "${spec_version}" != 'gdc.fabric.host-client-enrollment-grant/v1' \
@@ -37,5 +38,6 @@ enroll_url="${ca_scheme}://${enrollment_id}:${enrollment_secret}@${ca_authority%
 export FABRIC_CA_CLIENT_HOME="${HOST_CLIENT_OUTPUT_DIR}"
 enroll_args=(-u "${enroll_url}")
 [[ -z "${CA_TLS_CERT:-}" ]] || enroll_args+=(--tls.certfiles "${CA_TLS_CERT}")
+[[ -z "${ca_name}" ]] || enroll_args+=(--caname "${ca_name}")
 fabric-ca-client enroll "${enroll_args[@]}"
 echo "GW Fabric client identity generated locally in ${HOST_CLIENT_OUTPUT_DIR}" >&2
