@@ -29,6 +29,15 @@ Texto de transferencia para el equipo responsable:
 >
 > Chart Helm público:
 > https://github.com/orgs/Global-DataCare/packages/container/package/gdc-host
+>
+> El responsable del host recibe por canal seguro un paquete privado cifrado
+> formado por `peer-enrollment-grant.json`,
+> `gw-client-enrollment-grant.json`, `fabric-ica-ca-chain.pem`,
+> `fabric-endpoints.json`, `authorization.json`,
+> `host-apply-confirmation.json`, `onboarding.host.json` y
+> `manifest.sha256`. Verifica los hashes antes de ejecutar el rol `host`. La
+> Host VC-JWT, el PDF, el administrador del MSP, el registrador de Fabric CA y
+> el inventario completo no forman parte de esa entrega.
 
 Los dominios, IP, correos, datos, `values`, VC, grants, MSP/TLS, claves y
 Secrets reales se intercambian aparte mediante un canal privado.

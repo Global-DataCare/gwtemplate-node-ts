@@ -19,6 +19,39 @@ for document in \
 done
 grep -Fq 'deliverables/README.md' "${ROOT}/README.md"
 
+for document in \
+  PUESTA_EN_MARCHA_HOST_ES.md \
+  GUIA_OPERATIVA_HOST_ES.md \
+  GUIA_HOST_REPRODUCIBLE_ES.html \
+  RESUMEN_OPERATIVO_Y_ENLACES_ES.md; do
+  for handoff_file in \
+    peer-enrollment-grant.json \
+    gw-client-enrollment-grant.json \
+    fabric-ica-ca-chain.pem \
+    fabric-endpoints.json \
+    authorization.json \
+    host-apply-confirmation.json \
+    onboarding.host.json \
+    manifest.sha256; do
+    grep -Fq "${handoff_file}" "${ROOT}/deliverables/${document}"
+  done
+done
+
+docx_xml="$(mktemp)"
+trap 'rm -f "${docx_xml}"' EXIT
+unzip -p "${ROOT}/deliverables/GUIA_HOST_REPRODUCIBLE_ES.docx" word/document.xml > "${docx_xml}"
+for handoff_file in \
+  peer-enrollment-grant.json \
+  gw-client-enrollment-grant.json \
+  fabric-ica-ca-chain.pem \
+  fabric-endpoints.json \
+  authorization.json \
+  host-apply-confirmation.json \
+  onboarding.host.json \
+  manifest.sha256; do
+  grep -Fq "${handoff_file}" "${docx_xml}"
+done
+
 if rg -n '/Users/[^/[:space:]]+/|/home/[^/[:space:]]+/' "${ROOT}/deliverables"; then
   echo 'A public deliverable contains a personal absolute path.' >&2
   exit 1
