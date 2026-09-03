@@ -19,6 +19,18 @@
 {{- if and (eq .Values.environment "production") (not .Values.peer.enabled) -}}
 {{- fail "production requires a host-owned peer; a staging external peer is forbidden" -}}
 {{- end -}}
+{{- if and (eq .Values.environment "production") (empty .Values.peer.channels) -}}
+{{- fail "production requires peer.channels with the complete governed channel set" -}}
+{{- end -}}
+{{- if and (not (empty .Values.peer.channels)) (not (has .Values.host.identityChannel .Values.peer.channels)) -}}
+{{- fail "peer.channels must include host.identityChannel" -}}
+{{- end -}}
+{{- if and (not (empty .Values.peer.channels)) (not (has .Values.host.organizationIdentityChannel .Values.peer.channels)) -}}
+{{- fail "peer.channels must include host.organizationIdentityChannel" -}}
+{{- end -}}
+{{- if and (not (empty .Values.peer.channels)) (not (has .Values.host.dataChannel .Values.peer.channels)) -}}
+{{- fail "peer.channels must include host.dataChannel" -}}
+{{- end -}}
 {{- if and (not .Values.peer.enabled) (not .Values.externalPeer.host) -}}
 {{- fail "peer.enabled=false requires externalPeer.host" -}}
 {{- end -}}

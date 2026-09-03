@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Release `gdc-host` chart `0.3.2` with an explicit production
+  `peer.channels` contract, fail-closed validation that the GW defaults belong
+  to that set, and `HLF_BOOTSTRAP_CHANNELS` projection for governed
+  multi-channel peer onboarding.
+
 - Pin every public GW CORE deployment and deliverable example to the verified
   `1.23.15` OCI manifest, and document the independently published immutable
   data-space ICA runtime used by the migration procedure.

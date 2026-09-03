@@ -311,6 +311,22 @@ empleados usan `identity-eu`, personas `identity-global` y el contrato de
 consentimiento `health-care-eu`; cualquier cambio debe proceder del inventario
 gobernado, no del proveedor.
 
+El values declara también todos los canales Fabric aprobados para el peer. No
+confunda esta lista con `host.allowedSectors`:
+
+```yaml
+peer:
+  channels:
+    - identity-global
+    - identity-eu
+    - health-care-eu
+    - animal-pet-eu
+```
+
+`peer.channels` se proyecta como `HLF_BOOTSTRAP_CHANNELS`. El chart valida la
+configuración, pero la unión efectiva de cada canal corresponde al
+reconciliador ejecutado por el administrador de Fabric.
+
 ## 9. Secrets e instalación Helm
 
 Parta del fichero Fabric generado y añada únicamente la configuración privada
@@ -355,8 +371,8 @@ helm template "${HELM_RELEASE}" charts/gdc-host \
   --namespace "${KUBE_NAMESPACE}" \
   --values /secure/inventory/host.values.yaml > /secure/onboarding/rendered.yaml
 
-helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.3.1
-tar -xzf gdc-host-0.3.1.tgz -C /secure/onboarding
+helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.3.2
+tar -xzf gdc-host-0.3.2.tgz -C /secure/onboarding
 
 helm upgrade --install "${HELM_RELEASE}" /secure/onboarding/gdc-host \
   --kube-context "${KUBE_CONTEXT}" --namespace "${KUBE_NAMESPACE}" \

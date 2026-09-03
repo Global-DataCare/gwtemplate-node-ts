@@ -421,20 +421,31 @@ host:
   adminRole: <rol-ISCO-08>
   allowedSectors:
     - <sector-autorizado>
+peer:
+  channels:
+    - identity-global
+    - identity-eu
+    - health-care-eu
+    - animal-pet-eu
 ```
 
 Al arrancar, GW crea automáticamente el registro técnico reservado `host`,
 genera sus claves KMS y publica su DID operativo. Ese registro representa al
 operador del servicio; no ocupa ni sustituye el alta posterior de sus tenants.
 
+`peer.channels` contiene canales Fabric, no sectores del GW. Debe enumerar
+todos los canales ya aprobados para el MSP que el nuevo peer debe unir. Helm
+valida e inyecta la lista, mientras que el administrador de Fabric realiza y
+verifica la unión efectiva.
+
 ```bash
-helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.3.1
+helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.3.2
 
 bash scripts/validate-host-helm-values.sh \
   /secure/inventory/host.values.yaml '<namespace>' '<release>'
 
 helm upgrade --install '<release>' oci://ghcr.io/global-datacare/gdc-host \
-  --version 0.3.1 --namespace '<namespace>' --create-namespace \
+  --version 0.3.2 --namespace '<namespace>' --create-namespace \
   --values /secure/inventory/host.values.yaml \
   --atomic --wait --timeout 15m
 ```

@@ -73,6 +73,9 @@ peer:
   image: docker.io/hyperledger/fabric-peer@sha256:f3120ed321d406f8025e87b91b0708be0327fe512603be30f9f74924cf26afb2
   name: peer0
   mspId: HostMSP
+  # Complete governed channel set for this peer. When empty, Helm derives the
+  # three GW defaults above. Joining remains an administrator/reconciler step.
+  channels: []
   externalEndpoint: peer0.host.example.invalid:7051
   bootstrap: ""
   extraEnv: {}
