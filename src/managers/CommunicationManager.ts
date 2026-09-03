@@ -1077,6 +1077,7 @@ export class CommunicationManager implements IJobProcessor {
             batchResponses.push(await this.processProjectedClinicalBatchEntry({
               job,
               entry: attachedEntry,
+              creatorDid: clinicalAuthorDid,
               communicationSubject,
               explicitSection,
               fhirResource,
@@ -1112,6 +1113,7 @@ export class CommunicationManager implements IJobProcessor {
   private async processProjectedClinicalBatchEntry(input: {
     job: JobRequest;
     entry: any;
+    creatorDid?: string;
     communicationSubject?: string;
     explicitSection: string;
     fhirResource: FhirCommunication;
@@ -1168,7 +1170,7 @@ export class CommunicationManager implements IJobProcessor {
           explicitSection: input.explicitSection,
           fhirResource: input.fhirResource,
           tenantVaultId: input.tenantVaultId,
-          creatorDid: actorDid,
+          creatorDid: input.creatorDid || actorDid,
         });
         return {
           id: created.recordId,
@@ -1199,9 +1201,11 @@ export class CommunicationManager implements IJobProcessor {
         sectionId,
       );
       if (!existing) return errorResponse('404', 'Clinical record was not found for this subject.');
-      const authors = String(existing[CompositionClaim.Author] || existing?.audit?.creatorDid || '')
-        .split(',')
-        .map((author) => author.trim())
+      const authors = [
+        ...String(existing[CompositionClaim.Author] || existing?.audit?.creatorDid || '').split(','),
+        existing?.audit?.submitterDid,
+      ]
+        .map((author) => String(author || '').trim())
         .filter(Boolean);
       if (!await this.isAuthenticatedClinicalAuthor(input.job, input.tenantVaultId, authors)) {
         return errorResponse('403', 'Only the authenticated creator may update this clinical record.');
@@ -1235,7 +1239,7 @@ export class CommunicationManager implements IJobProcessor {
           explicitSection: input.explicitSection,
           fhirResource: input.fhirResource,
           tenantVaultId: input.tenantVaultId,
-          creatorDid: actorDid,
+          creatorDid: authors[0],
         });
         return {
           id: updated.recordId,
@@ -1270,9 +1274,11 @@ export class CommunicationManager implements IJobProcessor {
       if (!existing) {
         return errorResponse('404', 'Clinical record was not found for this subject.');
       }
-      const authors = String(existing[CompositionClaim.Author] || existing?.audit?.creatorDid || '')
-        .split(',')
-        .map((author) => author.trim())
+      const authors = [
+        ...String(existing[CompositionClaim.Author] || existing?.audit?.creatorDid || '').split(','),
+        existing?.audit?.submitterDid,
+      ]
+        .map((author) => String(author || '').trim())
         .filter(Boolean);
       if (!await this.isAuthenticatedClinicalAuthor(input.job, input.tenantVaultId, authors)) {
         return errorResponse('403', 'Only the authenticated creator may delete this clinical record.');
@@ -1367,9 +1373,15 @@ export class CommunicationManager implements IJobProcessor {
     const authenticatedActorDid = getAuthenticatedJobActorIdentifiers(input.job)
       .find((identifier) => identifier.startsWith('did:web:'));
     const isExternalAuthorUrn = Boolean(input.creatorDid?.startsWith('urn:'));
-    if (!input.creatorDid || (!isExternalAuthorUrn && input.creatorDid !== authenticatedActorDid)) {
+    const isRegisteredDelegatedAuthor = Boolean(
+      input.creatorDid
+      && authenticatedActorDid
+      && input.creatorDid !== authenticatedActorDid
+      && await this.isRegisteredClinicalAuthor(input.tenantVaultId, input.creatorDid),
+    );
+    if (!input.creatorDid || (!isExternalAuthorUrn && input.creatorDid !== authenticatedActorDid && !isRegisteredDelegatedAuthor)) {
       throw new ManagerError(
-        'Clinical Composition.author must equal the authenticated actor DID.',
+        'Clinical Composition.author must identify the authenticated actor or a registered clinical author.',
         IssueType.Security,
       );
     }
@@ -1420,9 +1432,11 @@ export class CommunicationManager implements IJobProcessor {
       return { recordId, versionId, created: false };
     }
     if (existing?.id === recordId) {
-      const existingAuthors = String(existing[CompositionClaim.Author] || existing?.audit?.creatorDid || '')
-        .split(',')
-        .map((author) => author.trim())
+      const existingAuthors = [
+        ...String(existing[CompositionClaim.Author] || existing?.audit?.creatorDid || '').split(','),
+        existing?.audit?.submitterDid,
+      ]
+        .map((author) => String(author || '').trim())
         .filter(Boolean);
       if (!await this.isAuthenticatedClinicalAuthor(input.job, input.tenantVaultId, existingAuthors)) {
         throw new ManagerError(
@@ -1449,7 +1463,12 @@ export class CommunicationManager implements IJobProcessor {
     const record: Record<string, any> = {
       id: recordId,
       ...claims,
-      ...(input.creatorDid ? { audit: { creatorDid: input.creatorDid } } : {}),
+      ...(input.creatorDid ? { audit: {
+        creatorDid: input.creatorDid,
+        ...(!isExternalAuthorUrn && authenticatedActorDid && input.creatorDid !== authenticatedActorDid
+          ? { submitterDid: existing?.audit?.submitterDid || authenticatedActorDid }
+          : {}),
+      } } : {}),
       indexed: { attributes: this.buildIndexedAttributesFromClaims(claims) },
     };
     await this.vaultRepository.put(input.tenantVaultId, [record as any], sectionId);
@@ -1494,11 +1513,27 @@ export class CommunicationManager implements IJobProcessor {
     return { recordId, versionId, created: true };
   }
 
+  /**
+   * Resolves explicit authorship independently from the authenticated sender.
+   * Document Bundles use their native Composition; section Bundles carry the
+   * projected author in resource.meta.claims. Only self-authoring falls back
+   * to the authenticated actor.
+   */
   private resolveClinicalResourceAuthor(
     job: JobRequest,
     entry: any,
     fhirResource: FhirCommunication,
   ): string | undefined {
+    const attachmentAuthor = this.resolveCommunicationAttachments(entry, fhirResource)
+      .map((resolved) => this.parseAttachmentJson(resolved.documentAttachment))
+      .map((resource) => resource?.meta?.claims && typeof resource.meta.claims === 'object'
+        ? normalizeContextualizedClaims(resource.meta.claims as Record<string, any>)
+        : {})
+      .map((claims) => this.getFirstClaimValue(claims, [
+        CompositionClaim.Author,
+        'org.hl7.fhir.r4.Composition.author',
+      ]))
+      .find(Boolean);
     const composition = this.extractCompositionResourceFromCommunication(entry, fhirResource);
     const compositionClaims = composition?.meta?.claims && typeof composition.meta.claims === 'object'
       ? normalizeContextualizedClaims(composition.meta.claims as Record<string, any>)
@@ -1515,6 +1550,7 @@ export class CommunicationManager implements IJobProcessor {
       : undefined;
     return claimedAuthor?.split(',')[0]?.trim()
       || nativeAuthor?.split(',')[0]?.trim()
+      || attachmentAuthor?.split(',')[0]?.trim()
       || getAuthenticatedJobActorIdentifiers(job)[0];
   }
 
@@ -1580,7 +1616,10 @@ export class CommunicationManager implements IJobProcessor {
     const bindingRecords = await this.vaultRepository.listContainersInSection(tenantVaultId, sectionId);
     const bindings = (bindingRecords as unknown[]).filter(isClinicalCreatorBinding);
     const stableBinding = resolveClinicalCreatorBinding(bindings, clinicalCreatorEvidence(job));
-    if (stableBinding?.actorDids?.some((actorDid) => authorDids.includes(actorDid))) return true;
+    if (
+      (stableBinding?.actorDids || []).some((actorDid) => authorDids.includes(actorDid))
+      || Boolean(stableBinding?.authorIdentifier && authorDids.includes(stableBinding.authorIdentifier))
+    ) return true;
     const verifiedContacts = authenticatedIdentifiers.filter((identifier) => !identifier.startsWith('did:web:'));
     if (verifiedContacts.length === 0) return false;
     for (const authorDid of authorDids) {
@@ -1593,6 +1632,16 @@ export class CommunicationManager implements IJobProcessor {
       if (binding?.verifiedContacts?.some((identifier) => verifiedContacts.includes(identifier))) return true;
     }
     return false;
+  }
+
+  private async isRegisteredClinicalAuthor(tenantVaultId: string, authorDid: string): Promise<boolean> {
+    const records = await this.vaultRepository.listContainersInSection(
+      tenantVaultId,
+      getClinicalCreatorBindingsSectionId(),
+    );
+    return (records as unknown[])
+      .filter(isClinicalCreatorBinding)
+      .some((binding) => binding.authorIdentifier === authorDid || binding.actorDids?.includes(authorDid));
   }
 
   private getSupportedProjectedResourceType(resourceType: unknown): SupportedProjectedResourceType | undefined {
