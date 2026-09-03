@@ -996,6 +996,9 @@ describe('CommunicationManager Unit Tests', () => {
         } }],
       };
 
+      // Direct clinical-write contract: the submitted author is the same
+      // operational actor DID authenticated by the envelope, never a stable
+      // multibase URN or portal alias. The provider tenant remains the route target.
       await communicationManager.process(buildJob(clinicalDocument));
       const tenantVaultId = `${Sector.HEALTH_CARE}_${tenantId}`;
       const sectionId = getSubjectScopedSectionId(EXAMPLE_SUBJECT_DID, 'individual', 'allergies');
@@ -1034,6 +1037,8 @@ describe('CommunicationManager Unit Tests', () => {
       expect((verifiedDeletion.body as any).data[0].response.status).toBe('204');
 
       const externallyAuthoredDocument = structuredClone(clinicalDocument);
+      // An imported source URN remains provenance; it cannot become the local
+      // authenticated actor merely because a later request repeats it.
       (externallyAuthoredDocument.entry[0].resource as any).author = [{
         reference: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_PROVIDER_ORGANIZATION_URN,
       }];

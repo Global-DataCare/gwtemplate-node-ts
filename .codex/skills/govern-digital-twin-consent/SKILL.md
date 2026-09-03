@@ -142,6 +142,16 @@ Verify current branches, versions and published npm state before release claims.
 
 ## Preserve authored clinical deletion
 
+- For the current direct `updateClinicalSummary(...)` call, set `sender` to
+  the operational `profile.actorDid`, never a stable multibase URN or a
+  DID/alias owned by the portal. Set `recipient` to the real provider-tenant
+  DID inside the host that accommodates that tenant, never the host DID or a
+  portal alias. The subject remains the individual DID.
+- To edit an imported IPS in a demo, first call
+  `cloneImportedClinicalDocumentForDemo(...)` with that same `profile.actorDid`.
+  The helper gives the copy new resource ids and sets
+  `Composition.author = profile.actorDid`; it never rewrites the imported
+  source document.
 - Require a locally declared `Composition.author` to equal the authenticated
   actor DID before first persistence. An anonymous bearer or body claim never
   becomes author evidence.
@@ -154,7 +164,10 @@ Verify current branches, versions and published npm state before release claims.
 - Store only the creator DID in the clinical resource as `Composition.author`. Never store email, phone or their stable hashes in that resource.
 - At delete time, authorize the exact subject and creator. Resolve linked verified email/phone login channels from private identity metadata outside the resource, so phone-created and email-created data remain manageable after account linking.
 - Remove the exact fact from later operational summaries and the synchronized research projection when enabled. This is neither secondary-use `deny` nor provider-offboarding link purge.
-- Keep 101 documentation at application level: typed batch entry, authorization result and visible summary behavior, without vault, queue or hashing plumbing.
+- Keep 101 documentation at application level: actor, subject, hosted
+  provider-tenant recipient, typed batch entry, authorization result and
+  visible summary behavior, without DIDComm rendering, vault, queue or hashing
+  plumbing.
 
 ## Keep every artifact aligned
 

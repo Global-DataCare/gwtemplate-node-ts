@@ -4,7 +4,11 @@
 
 - Clarify that local clinical authors remain operational role-bearing
   `did:web` actors. Stable `urn:multibase:z...` contact identifiers are private
-  account aliases and imported URNs remain immutable source provenance.
+  account aliases and imported URNs remain immutable source provenance. The
+  high-level clinical contract now also names the individual `subject`, the
+  authenticated profile `actorDid` used as direct-call `sender` and local
+  `Composition.author`, and the real hosted provider-tenant DID used as
+  `recipient`, explicitly excluding portal aliases and the host DID.
 
 - Release `gdc-host` chart `0.3.2` with an explicit production
   `peer.channels` contract, fail-closed validation that the GW defaults belong
