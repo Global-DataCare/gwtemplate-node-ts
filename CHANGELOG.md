@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [1.23.21] - 2026-09-03
+
+- Require product gateway ports to start from a clean product `main` and
+  reproduce the applicable GW CORE diff semantically, rather than merging or
+  cherry-picking upstream release commits across long-lived forks.
+
 ## [1.23.20] - 2026-09-03
 
 - Author organization and Order bootstrap overrides and read the resulting
