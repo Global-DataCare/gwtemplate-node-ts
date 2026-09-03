@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Clarify that local clinical authors remain operational role-bearing
+  `did:web` actors. Stable `urn:multibase:z...` contact identifiers are private
+  account aliases and imported URNs remain immutable source provenance.
+
 - Release `gdc-host` chart `0.3.2` with an explicit production
   `peer.channels` contract, fail-closed validation that the GW defaults belong
   to that set, and `HLF_BOOTSTRAP_CHANNELS` projection for governed
