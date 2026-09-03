@@ -186,7 +186,7 @@ async function main() {
     // --- 1.2 Organization Order (fail + success) ---
     {
       const badOrder = deepClone(ORGANIZATION_ORDER_REQUEST);
-      badOrder.body.data[0].meta.claims['Order.acceptedOffer.identifier'] = 'urn:cds:invalid:Offer:<uuid>';
+      badOrder.body.data[0].resource.meta.claims['Order.acceptedOffer.identifier'] = 'urn:cds:invalid:Offer:<uuid>';
 
       const req = {
         method: 'POST',
@@ -200,7 +200,7 @@ async function main() {
 
     if (orgOfferId) {
       const goodOrder = deepClone(ORGANIZATION_ORDER_REQUEST);
-      goodOrder.body.data[0].meta.claims['Order.acceptedOffer.identifier'] = orgOfferId;
+      goodOrder.body.data[0].resource.meta.claims['Order.acceptedOffer.identifier'] = orgOfferId;
       const req = {
         method: 'POST',
         url: `/host/cds-ES/v1/${hostRegistrySector}/registry/org.schema/Order/_batch`,
@@ -502,7 +502,7 @@ async function main() {
 
     {
       const badOrder = deepClone(FAMILY_ORDER_REQUEST);
-      badOrder.body.data[0].meta.claims['Order.acceptedOffer.identifier'] = 'urn:cds:invalid:Offer:<uuid>';
+      badOrder.body.data[0].resource.meta.claims['Order.acceptedOffer.identifier'] = 'urn:cds:invalid:Offer:<uuid>';
       const req = {
         method: 'POST',
         url: '/acme/cds-ES/v1/health-care/individual/org.schema/Order/_batch',
@@ -515,7 +515,7 @@ async function main() {
 
     if (familyOfferId) {
       const goodOrder = deepClone(FAMILY_ORDER_REQUEST);
-      goodOrder.body.data[0].meta.claims['Order.acceptedOffer.identifier'] = familyOfferId;
+      goodOrder.body.data[0].resource.meta.claims['Order.acceptedOffer.identifier'] = familyOfferId;
       const req = {
         method: 'POST',
         url: '/acme/cds-ES/v1/health-care/individual/org.schema/Order/_batch',

@@ -148,10 +148,10 @@ ORG_OFFER_REQ="$(render_example_payload ORGANIZATION_REGISTRATION_REQUEST "$(jq 
   --arg employeeEmail "$EMPLOYEE_EMAIL" \
   '{
     "/thid": $thid,
-    "/body/data/0/meta/claims/org.schema.Organization.identifier.value": $tenantId,
-    "/body/data/0/meta/claims/org.schema.Organization.address.addressCountry": $jurisdiction,
-    "/body/data/0/meta/claims/org.schema.Service.category": $sector,
-    "/body/data/0/meta/claims/org.schema.Person.email": $employeeEmail
+    "/body/data/0/resource/meta/claims/org.schema.Organization.identifier.value": $tenantId,
+    "/body/data/0/resource/meta/claims/org.schema.Organization.address.addressCountry": $jurisdiction,
+    "/body/data/0/resource/meta/claims/org.schema.Service.category": $sector,
+    "/body/data/0/resource/meta/claims/org.schema.Person.email": $employeeEmail
   }' )")"
 CODE="$(call_api POST \
   "$BASE_URL/host/cds-$JURISDICTION/v1/$HOST_REGISTRY_SECTOR/registry/org.schema/Organization/_batch" \
@@ -163,7 +163,7 @@ CODE="$(call_api POST \
   "$BASE_URL/host/cds-$JURISDICTION/v1/$HOST_REGISTRY_SECTOR/registry/org.schema/Organization/_batch-response" \
   "{\"thid\":\"$THID_ORG_OFFER\"}")"
 assert_route_available "Organization _batch poll (Offer)" "$CODE"
-ORDER_ACCEPTED_OFFER_ID="$(extract_json_value '.body.data[0].meta.claims["org.schema.Offer.identifier"] | select(type=="string" and length > 0)')"
+ORDER_ACCEPTED_OFFER_ID="$(extract_json_value '(.body.data[0].resource.meta.claims["org.schema.Offer.identifier"] // .body.data[0].meta.claims["org.schema.Offer.identifier"]) | select(type=="string" and length > 0)')"
 
 # 6) Organization order submit
 ORDER_OVERRIDES="$(jq -n --arg thid "$THID_ORG_ORDER" '{ "/thid": $thid }')"
@@ -173,7 +173,7 @@ if [[ -n "$ORDER_ACCEPTED_OFFER_ID" ]]; then
     --arg acceptedOfferId "$ORDER_ACCEPTED_OFFER_ID" \
     '{
       "/thid": $thid,
-      "/body/data/0/meta/claims/Order.acceptedOffer.identifier": $acceptedOfferId
+      "/body/data/0/resource/meta/claims/Order.acceptedOffer.identifier": $acceptedOfferId
     }')"
 fi
 ORG_ORDER_REQ="$(render_example_payload ORGANIZATION_ORDER_REQUEST "$ORDER_OVERRIDES")"
@@ -195,8 +195,8 @@ EMPLOYEE_REQ="$(render_example_payload EMPLOYEE_REGISTRATION_REQUEST "$(jq -n \
   --arg employeeRole "$EMPLOYEE_ROLE" \
   '{
     "/thid": $thid,
-    "/body/data/0/meta/claims/org.schema.Person.email": $employeeEmail,
-    "/body/data/0/meta/claims/org.schema.Person.hasOccupation.identifier.value": $employeeRole
+    "/body/data/0/resource/meta/claims/org.schema.Person.email": $employeeEmail,
+    "/body/data/0/resource/meta/claims/org.schema.Person.hasOccupation.identifier.value": $employeeRole
   }')")"
 CODE="$(call_api POST \
   "$BASE_URL/$TENANT_ID/cds-$JURISDICTION/v1/$SECTOR/entity/org.schema/Employee/_batch" \
@@ -252,7 +252,7 @@ FAMILY_REQ="$(render_example_payload FAMILY_REGISTRATION_REQUEST "$(jq -n \
   --arg familyOwnerEmail "$FAMILY_OWNER_EMAIL" \
   '{
     "/thid": $thid,
-    "/body/data/0/meta/claims/Organization.owner.email": $familyOwnerEmail
+    "/body/data/0/resource/meta/claims/Organization.owner.email": $familyOwnerEmail
   }' )")"
 CODE="$(call_api POST \
   "$BASE_URL/$TENANT_ID/cds-$JURISDICTION/v1/$SECTOR/individual/org.schema/Organization/_batch" \

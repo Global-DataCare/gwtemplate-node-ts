@@ -129,14 +129,14 @@ registration_overrides="$(jq -n \
     "/thid": $thid,
     "/iss": $iss,
     "/aud": $aud,
-    "/body/data/0/meta/claims/Organization.address.addressCountry": $jurisdiction,
-    "/body/data/0/meta/claims/Organization.identifier.value": $organizationIdentifier,
-    "/body/data/0/meta/claims/Organization.owner.email": $controllerEmail,
-    "/body/data/0/meta/claims/Organization.owner.telephone": $controllerPhone,
-    "/body/data/0/meta/claims/Person.email": $memberEmail,
-    "/body/data/0/meta/claims/Person.identifier.value": $memberIdentifier,
-    "/body/data/0/meta/claims/Service.category": $sector,
-    "/body/data/0/meta/claims/Organization.sameAs": $uhcId,
+    "/body/data/0/resource/meta/claims/Organization.address.addressCountry": $jurisdiction,
+    "/body/data/0/resource/meta/claims/Organization.identifier.value": $organizationIdentifier,
+    "/body/data/0/resource/meta/claims/Organization.owner.email": $controllerEmail,
+    "/body/data/0/resource/meta/claims/Organization.owner.telephone": $controllerPhone,
+    "/body/data/0/resource/meta/claims/Person.email": $memberEmail,
+    "/body/data/0/resource/meta/claims/Person.identifier.value": $memberIdentifier,
+    "/body/data/0/resource/meta/claims/Service.category": $sector,
+    "/body/data/0/resource/meta/claims/Organization.sameAs": $uhcId,
     "/body/data/0/meta/kyc": {
       "method": $signatureFlow,
       "individualAlternateName": $alternateName,
@@ -158,7 +158,7 @@ registration_overrides="$(jq -n \
   }')"
 
 if [[ -z "${INDIVIDUAL_UHC_ID}" ]]; then
-  registration_overrides="$(jq 'del(.["/body/data/0/meta/claims/Organization.sameAs"])' <<<"${registration_overrides}")"
+  registration_overrides="$(jq 'del(.["/body/data/0/resource/meta/claims/Organization.sameAs"])' <<<"${registration_overrides}")"
 fi
 
 if [[ "${INDIVIDUAL_SIGNATURE_FLOW}" == "certificate" ]]; then
@@ -186,7 +186,7 @@ echo "[individual] Polling ${INDIVIDUAL_ORGANIZATION_POLL_URL}"
 registration_done="$(poll_async "${INDIVIDUAL_ORGANIZATION_POLL_URL}" "${REGISTRATION_THID}")"
 echo "${registration_done}" | jq '.'
 
-offer_identifier="$(echo "${registration_done}" | jq -r '.body.data[0].meta.claims["org.schema.Offer.identifier"] // .data[0].meta.claims["org.schema.Offer.identifier"] // empty')"
+offer_identifier="$(echo "${registration_done}" | jq -r '.body.data[0].resource.meta.claims["org.schema.Offer.identifier"] // .data[0].resource.meta.claims["org.schema.Offer.identifier"] // .body.data[0].meta.claims["org.schema.Offer.identifier"] // .data[0].meta.claims["org.schema.Offer.identifier"] // empty')"
 if [[ -z "${offer_identifier}" ]]; then
   echo "ERROR: registration poll did not return org.schema.Offer.identifier"
   exit 1
@@ -204,7 +204,7 @@ order_overrides="$(jq -n \
     "/thid": $thid,
     "/iss": $iss,
     "/aud": $aud,
-    "/body/data/0/meta/claims/org.schema.Order.acceptedOffer.identifier": $offerIdentifier
+    "/body/data/0/resource/meta/claims/org.schema.Order.acceptedOffer.identifier": $offerIdentifier
   }')"
 order_payload="$(render_example_payload FAMILY_ORDER_REQUEST "$order_overrides")"
 
