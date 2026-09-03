@@ -52,6 +52,7 @@ import {
 import { isDigitalTwinSecondaryUseEnabled } from '../utils/digital-twin-secondary-use';
 import { getAuthenticatedJobActorIdentifiers } from '../utils/authenticated-job-actor';
 import { ClaimConsent, ConsentStatuses } from 'gdc-common-utils-ts/models/consent-rule';
+import { canonicalizeBundleEntryMetadata } from '../utils/canonical-entry-metadata';
 
 type SupportedProjectedResourceType =
   | 'MedicationStatement'
@@ -318,7 +319,7 @@ export class CommunicationManager implements IJobProcessor {
           },
           id: resourceId,
           type: GatewayResponseEntryTypes.OperationOutcome,
-          meta: entry.meta,
+          ...canonicalizeBundleEntryMetadata(entry.meta as Record<string, unknown> | undefined),
         });
       }
     }
@@ -1128,7 +1129,7 @@ export class CommunicationManager implements IJobProcessor {
     const errorResponse = (status: string, text: string): ErrorEntry => ({
       id: recordId,
       type: responseType,
-      meta: input.entry?.meta,
+      ...canonicalizeBundleEntryMetadata(input.entry?.meta as Record<string, unknown> | undefined),
       response: {
         status,
         outcome: {

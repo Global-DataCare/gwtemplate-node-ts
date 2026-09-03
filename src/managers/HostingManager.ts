@@ -70,6 +70,7 @@ import {
 } from '../utils/offer-order-read-model';
 import { HostingOfferOrderService } from './hosting/HostingOfferOrderService';
 import { HostingLifecycleService } from './hosting/HostingLifecycleService';
+import { canonicalizeBundleEntryMetadata } from '../utils/canonical-entry-metadata';
 import { processHostOrderEntry } from './hosting/process-order-entry';
 import { createPendingTenantRegistration } from './hosting/create-pending-tenant-registration';
 import {
@@ -1989,7 +1990,7 @@ export class HostingManager {
     if (error instanceof ManagerError) {
       return {
         type: entryType,
-        meta: meta,
+        ...canonicalizeBundleEntryMetadata(meta),
         response: {
           status: error.status,
           outcome: createOperationOutcome(IssueLevel.Error, error.code, error.message),
@@ -1999,7 +2000,7 @@ export class HostingManager {
       this.logger.error('Unexpected error during registration processing:', error);
       return {
         type: entryType,
-        meta: meta,
+        ...canonicalizeBundleEntryMetadata(meta),
         response: {
           status: String(HttpStatusCodes.InternalServerError),
           outcome: createOperationOutcome(IssueLevel.Error, IssueType.Exception, 'An unexpected internal server error occurred.'),

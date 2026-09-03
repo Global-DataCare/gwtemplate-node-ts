@@ -43,6 +43,7 @@ import { getClaimValue } from '../utils/claims';
 import { isEncryptionJwk, isSignatureJwk } from '../managers/hosting/registration-keys';
 import { DeviceBindingStatuses } from 'gdc-common-utils-ts/constants/device';
 import { isVerifiedBearerBoundToActorDid } from '../utils/authenticated-job-actor';
+import { requiresVerifiedBearerActorBindingForSecureRoute } from '../utils/secure-route-bearer-binding';
 import { resolveHostRegistrySector } from '../utils/services';
 import { decodeJwt } from 'jose';
 
@@ -3198,7 +3199,7 @@ export function createApiRouter(
    *     security:
    *       - BearerAuth: []
    *     responses:
-   *       '202': { description: Accepted. Poll `.../identity/openid/smart/_batch-response` with `thid`. }
+   *       '202': { description: Accepted. Poll `.../identity/openid/smart/token-response` with `thid`; `_batch-response` remains a temporary compatibility alias. }
    *
    * /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/smart/token-response:
    *   post:
@@ -3765,7 +3766,15 @@ export function createApiRouter(
             if (!clientId) {
               throw new Error(`Secure request for '${senderDid}' does not identify its registered DCR client.`);
             }
-            if (!isVerifiedBearerBoundToActorDid(verifiedBearerPayload, senderDid)) {
+            if (
+              requiresVerifiedBearerActorBindingForSecureRoute({
+                section,
+                format: req.params.format,
+                resourceType,
+                action,
+              })
+              && !isVerifiedBearerBoundToActorDid(verifiedBearerPayload, senderDid)
+            ) {
               throw new Error(`Verified bearer identity does not match secure-message issuer '${senderDid}'.`);
             }
             const deviceProfileDoc = await vaultRepository.get<ConfidentialStorageDoc>(

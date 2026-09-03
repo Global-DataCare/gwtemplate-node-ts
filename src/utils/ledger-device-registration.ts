@@ -11,6 +11,7 @@ import {
   resolveLedgerOrganizationId,
   tryGetJwkThumbprint,
 } from './ledger-organization-registration-helpers';
+import { getEmployeeRoleFromUrn, normalizeEmployeeRole } from './urn';
 
 function shouldSyncIdentityLedger(): boolean {
   return shouldUseFabricLedger();
@@ -39,6 +40,8 @@ export async function registerSubjectKeysOnLedger(params: {
   subjectId: string;
   /** Portal-specific DID retained as audit metadata when subjectId is the stable actor URN. */
   subjectDid?: string;
+  licensedRole?: string;
+  roleLicenseId?: string;
   verificationMethods: VerificationMethod[];
   deviceId?: string;
   relationshipPrefix?: 'employee-device' | 'legal-organization-controller';
@@ -46,6 +49,13 @@ export async function registerSubjectKeysOnLedger(params: {
   auditAttributes?: Record<string, unknown>;
 }): Promise<void> {
   if (!shouldSyncIdentityLedger()) return;
+
+  if (params.subjectType === 'employee'
+    && params.relationshipPrefix !== 'legal-organization-controller'
+    && (!params.licensedRole
+      || getEmployeeRoleFromUrn(params.subjectId) !== normalizeEmployeeRole(params.licensedRole))) {
+    throw new Error('Employee ledger key binding requires one role-bearing employee URN matching licensedRole.');
+  }
 
   const mspId = getLedgerMspId();
   if (!mspId) return;
@@ -97,6 +107,8 @@ export async function registerSubjectKeysOnLedger(params: {
       subjectType: params.subjectType,
       subjectId: params.subjectId,
       parentOrgId: params.organizationId,
+      licensedRole: params.licensedRole,
+      roleLicenseId: params.roleLicenseId,
       keyId,
       relationship,
       status: 'active',
@@ -153,11 +165,19 @@ export async function revokeSubjectKeysOnLedger(params: {
   subjectType: 'employee' | 'person';
   subjectId: string;
   subjectDid?: string;
+  licensedRole?: string;
+  roleLicenseId?: string;
   verificationMethods: VerificationMethod[];
   deviceId?: string;
   revokedAtEpochSec?: number;
 }): Promise<void> {
   if (!shouldSyncIdentityLedger()) return;
+
+  if (params.subjectType === 'employee'
+    && (!params.licensedRole
+      || getEmployeeRoleFromUrn(params.subjectId) !== normalizeEmployeeRole(params.licensedRole))) {
+    throw new Error('Employee ledger key revocation requires one role-bearing employee URN matching licensedRole.');
+  }
 
   const mspId = getLedgerMspId();
   if (!mspId) return;
@@ -186,6 +206,8 @@ export async function revokeSubjectKeysOnLedger(params: {
       subjectType: params.subjectType,
       subjectId: params.subjectId,
       parentOrgId: params.organizationId,
+      licensedRole: params.licensedRole,
+      roleLicenseId: params.roleLicenseId,
       keyId,
       relationship,
       status: 'revoked',

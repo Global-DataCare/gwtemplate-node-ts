@@ -9,3 +9,5 @@
 export const URN_NAMESPACE = 'unid';
 export const URN_NETWORK = 'test-network';
 export const URN_VERSION = 'v1';
+/** Reusable organization identifier segment for canonical test URNs. */
+export const URN_ORGANIZATION_ID_TYPE = 'tax';

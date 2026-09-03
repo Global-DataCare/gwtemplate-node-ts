@@ -4208,7 +4208,7 @@
         ],
         "responses": {
           "202": {
-            "description": "Accepted. Poll `.../identity/openid/smart/_batch-response` with `thid`."
+            "description": "Accepted. Poll `.../identity/openid/smart/token-response` with `thid`; `_batch-response` remains a temporary compatibility alias."
           }
         },
         "x-profile": "core",

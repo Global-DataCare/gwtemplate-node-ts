@@ -7,6 +7,14 @@ import { LicenseManager } from '../../managers/LicenseManager';
 
 import type { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
 import type { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
+import { ClaimsIndividualProductSchemaorg, ClaimsPersonSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { HealthcareActorRoles } from 'gdc-common-utils-ts/constants/healthcare';
+import {
+  EXAMPLE_ACCOUNT_OWNER_ID,
+  EXAMPLE_EMAIL_PROFESSIONAL,
+} from 'gdc-common-utils-ts/examples/shared';
+import { GatewayRouteFormats } from 'gdc-common-utils-ts/constants/gateway-response';
+import { LICENSE_CATEGORY_PROFESSIONAL, LICENSE_TYPE_MOBILE } from '../../constants/domain';
 
 describe('LicenseManager (_issue)', () => {
   let mockVaultRepository: MockProxy<IVaultRepository>;
@@ -64,12 +72,18 @@ describe('LicenseManager (_issue)', () => {
             {
               type: 'EmployeeLicenseInvitation-v1.0',
               meta: {
+                subjectId: EXAMPLE_ACCOUNT_OWNER_ID,
+              },
+              resource: {
+                resourceType: ResourceTypesFhirR4.OperationOutcome,
+                meta: {
                 claims: {
-                  '@context': 'org.schema',
-                  'org.schema.Person.email': 'doctor1@acme.org',
-                  'org.schema.Person.hasOccupation': 'ISCO-08|2211',
-                  'org.schema.IndividualProduct.category': 'professional',
-                  'org.schema.IndividualProduct.additionalType': 'mobile',
+                  '@context': GatewayRouteFormats.SchemaOrg,
+                  [ClaimsPersonSchemaorg.email]: EXAMPLE_EMAIL_PROFESSIONAL,
+                  [ClaimsPersonSchemaorg.hasOccupation]: HealthcareActorRoles.GeneralistMedicalPractitioner,
+                  [ClaimsIndividualProductSchemaorg.category]: LICENSE_CATEGORY_PROFESSIONAL,
+                  [ClaimsIndividualProductSchemaorg.additionalType]: LICENSE_TYPE_MOBILE,
+                },
                 },
               },
               request: { method: HttpRequestMethods.Post, url: '/acme/cds-ES/v1/health-care/identity/openid/License/_issue' },
@@ -94,6 +108,10 @@ describe('LicenseManager (_issue)', () => {
     expect(updated.status).toBe('issued');
     expect((updated.content as any).status).toBe('issued');
     expect((updated.content as any).activationCode).toMatch(/^lic-/);
-    expect((updated.content as any).issuedToEmail).toBe('doctor1@acme.org');
+    expect((updated.content as any).issuedToEmail).toBe(EXAMPLE_EMAIL_PROFESSIONAL);
+    expect((updated.content as any).subjectId).toBe(EXAMPLE_ACCOUNT_OWNER_ID);
+    expect((resp.body as any)?.data?.[0]?.meta?.subjectId).toBe(EXAMPLE_ACCOUNT_OWNER_ID);
+    expect((resp.body as any)?.data?.[0]?.meta?.claims).toBeUndefined();
+    expect((resp.body as any)?.data?.[0]?.resource?.meta?.claims).toBeDefined();
   });
 });

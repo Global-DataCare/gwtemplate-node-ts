@@ -65,6 +65,14 @@ import {
 } from '../data/example-payloads';
 import { DCR_REGISTRATION_JOB } from '../data/example-jobs';
 import { testTenant1AlternateName } from '../data/organization.data';
+import { HealthcareActorRoles } from 'gdc-common-utils-ts/constants/healthcare';
+import { createEmployeeUrn } from '../../utils/urn';
+import { URN_NAMESPACE, URN_NETWORK, URN_ORGANIZATION_ID_TYPE, URN_VERSION } from '../data/urn.data';
+import {
+  EXAMPLE_CONTROLLER_DID,
+  EXAMPLE_LEGAL_ORGANIZATION_TAX_ID,
+  EXAMPLE_TENANT_ROUTE_CONTEXT,
+} from 'gdc-common-utils-ts/examples/shared';
 
 describe('Device DCR replacement route story', () => {
   // Journey: 1) verify the host-issued initial access token, 2) verify the
@@ -307,18 +315,30 @@ describe('Device DCR replacement route story', () => {
     const bindingSpy = jest.spyOn(ManageAssetSubjectKeyBinding.prototype, 'upsertSubjectKeyBinding').mockResolvedValue({} as any);
 
     const employeeId = 'employee-1';
-    const employeeDid = 'did:web:api.acme.org:employee:doctor1@acme.org:ISCO-08|2211';
+    const employeeDid = EXAMPLE_CONTROLLER_DID;
+    const employeeUrn = createEmployeeUrn({
+      namespace: URN_NAMESPACE,
+      network: URN_NETWORK,
+      jurisdiction: EXAMPLE_TENANT_ROUTE_CONTEXT.jurisdiction,
+      version: URN_VERSION,
+      sector: EXAMPLE_TENANT_ROUTE_CONTEXT.sector,
+      idType: URN_ORGANIZATION_ID_TYPE,
+      idValue: EXAMPLE_LEGAL_ORGANIZATION_TAX_ID,
+      email: EXAMPLE_EMAIL_PROFESSIONAL,
+      role: HealthcareActorRoles.GeneralistMedicalPractitioner,
+    });
     const employeeConfig: EntityConfig = {
       id: employeeId,
       type: EntityType.Person,
       status: EntityLifecycleStatus.Active,
       claims: {
-        [ClaimsPersonSchemaorg.email]: 'doctor1@acme.org',
-        [ClaimsPersonSchemaorg.hasOccupation]: 'ISCO-08|2211',
+        [ClaimsPersonSchemaorg.email]: EXAMPLE_EMAIL_PROFESSIONAL,
+        [ClaimsPersonSchemaorg.hasOccupation]: HealthcareActorRoles.GeneralistMedicalPractitioner,
       } as any,
       didDocument: {
         '@context': 'https://www.w3.org/ns/did/v1',
         id: employeeDid,
+        alsoKnownAs: [employeeUrn],
         verificationMethod: [
           {
             id: `${employeeDid}#sig-old`,
@@ -382,6 +402,8 @@ describe('Device DCR replacement route story', () => {
       exp: Math.floor(Date.now() / 1000) + 3600,
       subjectId: employeeId,
       activatedBy: normalizeSameAsHash(EXAMPLE_EMAIL_PROFESSIONAL),
+      ownerOrganizationId: EXAMPLE_LEGAL_ORGANIZATION_TAX_ID,
+      issuedToRole: HealthcareActorRoles.GeneralistMedicalPractitioner,
       deviceId: previousDeviceId,
     } as any;
     await vaultRepository.put(tenantVaultId, [{

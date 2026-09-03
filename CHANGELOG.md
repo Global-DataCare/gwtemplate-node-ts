@@ -2,6 +2,30 @@
 
 ## [Unreleased]
 
+## [1.23.22] - 2026-09-03
+
+- Accept the SMART post-DCR `smart/token`, canonical
+  `smart/token-response`, and temporary `_batch-response` routes without an
+  already-bound SMART bearer while preserving OIDC, encrypted DIDComm, active
+  DCR profile, registered-key and authorized-subject checks. Bind
+  `client_assertion.iss` and `sub` to `body.client_id`, independently of the
+  operational actor DID. Persist the verified individual-controller DCR tuple
+  (actor, profile, authenticated account, authorized subject and licence) for
+  that post-DCR verification.
+- Bind professional licence issuance to the created employee resource id.
+  Resolve the canonical role-bearing employee URN from its DID document,
+  require its role to match `License.issuedToRole`, and write that URN plus the
+  licensed role and deterministic role-licence id to Fabric subject-key
+  bindings for both DCR and revocation. Never use `License.activatedBy` as the
+  Fabric binding subject.
+- Open and re-protect encrypted device-licence records during revocation, and
+  keep employee identity persistence on the tenant's physical collection.
+- Consume `gdc-common-utils-ts@2.7.8`, retain tolerant legacy claims reads,
+  and keep new licence issue responses canonical at
+  `entry.resource.meta.claims` only. Canonicalize claims carried by manager
+  error and discovery responses as well, with a source gate that rejects both
+  literal and indirect entry-level claim metadata writers.
+
 ## [1.23.21] - 2026-09-03
 
 - Require product gateway ports to start from a clean product `main` and

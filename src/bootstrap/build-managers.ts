@@ -166,7 +166,7 @@ export function buildManagers(options: {
     individualManager,
   });
   const subscriptionManager = new SubscriptionManager({ vaultRepository, kmsService, tenantsCacheManager: tenantManager });
-  const deviceRegistrationManager = new DeviceRegistrationManager(config.apiBaseUrl, vaultRepository, kmsService);
+  const deviceRegistrationManager = new DeviceRegistrationManager(config.apiBaseUrl, vaultRepository, kmsService, tenantManager);
   const licenseManager = new LicenseManager(vaultRepository, kmsService, tenantManager);
   const tokenVerifier = resolveTokenVerifierFromEnv(isTestEnv);
   const appAuthManager = new AppAuthorizationManager(

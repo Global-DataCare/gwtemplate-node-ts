@@ -60,8 +60,8 @@ describe('canonical Bundle entry writer boundary', () => {
         if (ts.isObjectLiteralExpression(node) && isBundleEntryWriter(node)) {
           const legacyMeta = node.properties.find((property) => ts.isPropertyAssignment(property)
             && propertyName(property.name) === 'meta'
-            && ts.isObjectLiteralExpression(property.initializer)
-            && hasProperty(property.initializer, 'claims'));
+            && (!ts.isObjectLiteralExpression(property.initializer)
+              || hasProperty(property.initializer, 'claims')));
           if (legacyMeta) {
             const location = source.getLineAndCharacterOfPosition(legacyMeta.getStart(source));
             violations.push(`${path.relative(process.cwd(), file)}:${location.line + 1}`);

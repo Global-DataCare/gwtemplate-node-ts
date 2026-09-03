@@ -53,6 +53,7 @@ import { ClaimConsent } from 'gdc-common-utils-ts/models/consent-rule';
 import { getClaimValue } from '../utils/claims';
 import { buildSearchResponseEntries } from '../utils/didcomm-response';
 import { GatewayResponseEntryTypes } from '../shared/gateway-response-types';
+import { canonicalizeBundleEntryMetadata } from '../utils/canonical-entry-metadata';
 
 
 const INDIVIDUAL_SECTION = getEnvSectionId(SUBJECT_SECTION_INDIVIDUAL);
@@ -257,7 +258,7 @@ export class IndividualManager {
       if (!prepResult.urn) {
         finalResults.push({
           type: entry.type,
-          meta: entry.meta,
+          ...canonicalizeBundleEntryMetadata(entry.meta as Record<string, unknown> | undefined),
           response: {
             status: String(HttpStatusCodes.BadRequest),
             outcome: createOperationOutcome(IssueLevel.Error, IssueType.Invalid, 'Unsupported discovery claim type'),
@@ -288,7 +289,7 @@ export class IndividualManager {
         const originalTask = tasks[index];
         finalResults.push({
           type: originalTask.originalEntry.type,
-          meta: originalTask.originalEntry.meta,
+          ...canonicalizeBundleEntryMetadata(originalTask.originalEntry.meta as Record<string, unknown> | undefined),
           response: did
             ? { status: String(HttpStatusCodes.Ok), location: did }
             : { status: '404', outcome: createOperationOutcome(IssueLevel.Information, IssueType.NotFound, 'Identifier not found on the network') },
@@ -300,8 +301,8 @@ export class IndividualManager {
     
     // Re-sort results to match the original input order, because Promise.all does not guarantee order
     const sortedResults = [...finalResults].sort((a, b) => {
-        const claimsA = JSON.stringify(a.meta?.claims);
-        const claimsB = JSON.stringify(b.meta?.claims);
+        const claimsA = JSON.stringify((a as BundleEntry).resource?.meta?.claims ?? a.meta?.claims);
+        const claimsB = JSON.stringify((b as BundleEntry).resource?.meta?.claims ?? b.meta?.claims);
         return Array.from(entryMap.keys()).findIndex(k => JSON.stringify(k) === claimsA) - Array.from(entryMap.keys()).findIndex(k => JSON.stringify(k) === claimsB);
     });
 
@@ -585,7 +586,7 @@ export class IndividualManager {
     if (error instanceof ManagerError) {
       return {
         type: entryType,
-        meta: meta,
+        ...canonicalizeBundleEntryMetadata(meta),
         response: {
           status: error.status,
           outcome: createOperationOutcome(IssueLevel.Error, error.code, error.message),
@@ -595,7 +596,7 @@ export class IndividualManager {
       console.error('Unexpected error during individual processing:', error);
       return {
         type: entryType,
-        meta: meta,
+        ...canonicalizeBundleEntryMetadata(meta),
         response: {
           status: String(HttpStatusCodes.InternalServerError),
           outcome: createOperationOutcome(
