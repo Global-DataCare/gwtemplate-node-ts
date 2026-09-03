@@ -20,7 +20,7 @@ import { normalizeCodeSystemAndValue } from '../utils/normalize-codeAndSystem';
 import { expandConsentActorRoles, normalizeConsentActorRole } from '../utils/consent';
 import { getMatchingInterTenantAccessContractFromVpToken } from 'gdc-common-utils-ts/utils/inter-tenant-access-contract';
 import { getMatchingSubjectIdentityBindingFromVpToken } from 'gdc-common-utils-ts/utils/subject-identity-binding';
-import { compactVerify, decodeProtectedHeader, importJWK, type JWK } from 'jose';
+import { calculateJwkThumbprint, compactVerify, decodeProtectedHeader, importJWK, type JWK } from 'jose';
 import { getEnvSectionId } from '../utils/section-env';
 import { ServiceCapability } from 'gdc-common-utils-ts/constants/service-capabilities';
 import { HealthcareConsentPurposes } from 'gdc-common-utils-ts/constants/healthcare';
@@ -37,6 +37,9 @@ import { normalizeIndexedEmail } from '../utils/indexed-contact';
 import { getPersonOccupationClaim } from '../utils/occupation';
 import { parseTenantUrn } from '../utils/urn';
 import { parseProfessionalDidIdentity } from '../utils/professional-did-identity';
+import { ActorKinds } from 'gdc-common-utils-ts/constants/actor-session';
+import { DeviceBindingStatuses } from 'gdc-common-utils-ts/constants/device';
+import { SmartClientAssertionTypes } from 'gdc-common-utils-ts/constants/identity-auth';
 import type {
   BreakGlassAuthorization,
   BreakGlassAuthorizer,
@@ -59,7 +62,7 @@ type TokenRequestBody = {
 };
 
 type AccessProofResult = {
-  mode: 'vp_token' | 'external_research_bearer';
+  mode: 'vp_token' | 'external_research_bearer' | 'registered_individual_controller';
   acr: string;
   amr: string[];
   vpHash?: string;
@@ -126,12 +129,11 @@ export class OpenIdAuthManager implements IJobProcessor {
       throw new ManagerError('Could not resolve token issuer DID.', IssueType.Exception);
     }
 
-    await this.validateClientAssertion({
+    const registeredDeviceProfile = await this.validateClientAssertion({
       body,
       clientId,
       issuerDid,
       tenantVaultId,
-      requestIssuerDid: String(job.content?.iss || '').trim() || undefined,
     });
 
     // --- Consent Rule Check (MVP) ---
@@ -171,6 +173,9 @@ export class OpenIdAuthManager implements IJobProcessor {
       vpToken,
       presentationSubmission: body.presentation_submission,
       bearerPayload: (job.content as any)?.meta?.bearer?.jwt?.payload,
+      registeredDeviceProfile,
+      actorDid: actor.sub,
+      subjectDid: subject,
     });
 
     // Inter-tenant research contract gate:
@@ -224,7 +229,7 @@ export class OpenIdAuthManager implements IJobProcessor {
             sector: job.sector,
           })
         : undefined;
-      if (!binding && !memberCredential) {
+      if (!binding && !memberCredential && accessProof.mode !== 'registered_individual_controller') {
         throw new ManagerError(
           `No trusted subject identity binding found between actor '${actor.sub}' and subject '${subject}'.`,
           IssueType.Forbidden,
@@ -295,7 +300,7 @@ export class OpenIdAuthManager implements IJobProcessor {
             .map((match) => match.rule)
           : [])
       : [];
-    const evaluation = sameTenantEmployeeResearchAccess
+    const evaluation = sameTenantEmployeeResearchAccess || accessProof.mode === 'registered_individual_controller'
       ? {
           allowed: true,
           missingSections: [] as string[],
@@ -479,6 +484,9 @@ export class OpenIdAuthManager implements IJobProcessor {
     vpToken?: string;
     presentationSubmission?: any;
     bearerPayload?: Record<string, any>;
+    registeredDeviceProfile?: Record<string, any>;
+    actorDid: string;
+    subjectDid: string;
   }): Promise<AccessProofResult> {
     if (params.vpToken) {
       const clearingResult = await this.clearingHouseService.verifyVpToken({
@@ -497,6 +505,23 @@ export class OpenIdAuthManager implements IJobProcessor {
         amr: Array.isArray(clearingResult.amr) ? clearingResult.amr : [],
         vpHash: clearingResult.vpHash,
         ledgerVerified: clearingResult.ledgerVerified,
+      };
+    }
+
+    const individualAcr = params.acrValues.find((value) => value.toLowerCase().includes('individual'));
+    const profile = params.registeredDeviceProfile;
+    if (individualAcr && profile
+      && String(profile.status || DeviceBindingStatuses.Active) === DeviceBindingStatuses.Active
+      && String(profile.actorDid || '') === params.actorDid
+      && String(profile.profileDid || '') === params.actorDid
+      && String(profile.authorizedSubjectDid || '') === params.subjectDid
+      && String(profile.authenticatedSubject || '')
+      && String(profile.licenseId || '')) {
+      return {
+        mode: 'registered_individual_controller',
+        acr: individualAcr,
+        amr: ['dcr', SmartClientAssertionTypes.PrivateKeyJwt, ActorKinds.IndividualController],
+        ledgerVerified: false,
       };
     }
 
@@ -571,12 +596,11 @@ export class OpenIdAuthManager implements IJobProcessor {
     clientId?: string;
     issuerDid: string;
     tenantVaultId: string;
-    requestIssuerDid?: string;
-  }): Promise<void> {
+  }): Promise<Record<string, any> | undefined> {
     const clientAssertion = params.body.client_assertion?.trim();
     const clientAssertionType = params.body.client_assertion_type?.trim();
     if (!clientAssertion && !clientAssertionType) {
-      return;
+      return undefined;
     }
 
     if (!clientAssertion) {
@@ -603,10 +627,6 @@ export class OpenIdAuthManager implements IJobProcessor {
       throw new ManagerError('client_assertion sub must match client identity.', IssueType.Forbidden);
     }
 
-    if (params.requestIssuerDid && assertionClientId !== params.requestIssuerDid) {
-      throw new ManagerError('client_assertion client identity must match request issuer.', IssueType.Forbidden);
-    }
-
     const audience = this.readAudienceString(payload?.aud);
     if (!audience) {
       throw new ManagerError('client_assertion must include aud.', IssueType.Required);
@@ -614,6 +634,54 @@ export class OpenIdAuthManager implements IJobProcessor {
     if (audience !== params.issuerDid && !audience.includes('/identity/openid/smart/token')) {
       throw new ManagerError('client_assertion aud does not target this SMART token endpoint.', IssueType.Forbidden);
     }
+    if (!params.clientId) return undefined;
+    const deviceProfileDoc = await this.vaultRepository.get<any>(
+      params.tenantVaultId,
+      params.clientId,
+      getEnvSectionId('device-profiles'),
+    );
+    if (!deviceProfileDoc || String(deviceProfileDoc.status || DeviceBindingStatuses.Active) !== DeviceBindingStatuses.Active) {
+      return undefined;
+    }
+    const profile = this.kmsService.unprotectConfidentialData
+      ? await this.kmsService.unprotectConfidentialData<any>(deviceProfileDoc, params.tenantVaultId).catch(() => undefined)
+      : deviceProfileDoc?.content;
+    if (!profile || typeof profile !== 'object') return undefined;
+    await this.assertClientAssertionUsesRegisteredKey(clientAssertion, profile);
+    return profile;
+  }
+
+  private async assertClientAssertionUsesRegisteredKey(
+    compact: string,
+    profile: Record<string, any>,
+  ): Promise<void> {
+    const header = decodeProtectedHeader(compact);
+    const alg = String(header.alg || '').trim();
+    const keys = Array.isArray(profile?.jwks?.keys) ? profile.jwks.keys as JWK[] : [];
+    const kid = String(header.kid || '').trim();
+    let candidates = kid
+      ? keys.filter((key) => String(key.kid || '').trim() === kid)
+      : keys;
+    if (header.jwk && typeof header.jwk === 'object') {
+      const embeddedThumbprint = await calculateJwkThumbprint(header.jwk as JWK);
+      const matches: JWK[] = [];
+      for (const key of candidates) {
+        if (await calculateJwkThumbprint(key) === embeddedThumbprint) matches.push(key);
+      }
+      candidates = matches;
+    }
+    for (const key of candidates) {
+      try {
+        await compactVerify(compact, await importJWK(key, alg));
+        return;
+      } catch {
+        // Try the next registered public key.
+      }
+    }
+    throw new ManagerError(
+      'client_assertion is not signed by the registered DCR device key.',
+      IssueType.Security,
+    );
   }
 
   private isSupportedClientAssertionType(value: string): boolean {

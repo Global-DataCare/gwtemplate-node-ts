@@ -275,7 +275,8 @@ export class LicenseManager implements IJobProcessor {
    * seat credential used for its bounded set of device installations.
    *
    * Input: accept both JSON:API (`body.data[]`) and FHIR-like (`body.entry[]`) envelopes,
-   * reading `entry.meta.claims`.
+   * reading canonical `entry.resource.meta.claims` and accepting the legacy
+   * entry-level location only during the compatibility window.
    */
   private async issueActivationCodes(job: JobRequest): Promise<IDecodedDidcommPayload> {
     const thid = job.content?.thid || uuidv4();
@@ -325,6 +326,10 @@ export class LicenseManager implements IJobProcessor {
 
         if (!inviteEmail) throw new Error('Missing required claim: org.schema.Person.email');
         if (!inviteRole) throw new Error('Missing required claim: org.schema.Person.hasOccupation');
+        const subjectId = String(entry?.meta?.subjectId || '').trim();
+        if (licenseUserClass === LICENSE_USER_CLASS_EMPLOYEE && !subjectId) {
+          throw new Error('Professional licence issuance requires meta.subjectId for the created employee resource.');
+        }
 
         const { activationCode, licenseId, maxDevices } = await issueActivationCodeFromPool({
           vaultRepository: this.vaultRepository,
@@ -334,6 +339,7 @@ export class LicenseManager implements IJobProcessor {
           type: licenseType as any,
           email: inviteEmail,
           role: inviteRole,
+          subjectId,
         });
 
         const issuedCategory =
@@ -351,7 +357,7 @@ export class LicenseManager implements IJobProcessor {
         responseEntries.push({
           type: GatewayResponseEntryTypes.LicenseIssued,
           response: { status: String(HttpStatusCodes.Created) },
-          meta: { licenseId, maxDevices },
+          meta: { licenseId, maxDevices, ...(subjectId ? { subjectId } : {}) },
           resource: {
             resourceType: ResourceTypesFhirR4.OperationOutcome,
             meta: { claims: responseClaims },

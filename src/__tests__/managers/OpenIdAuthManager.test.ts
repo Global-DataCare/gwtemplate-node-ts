@@ -25,7 +25,7 @@ import {
 } from 'gdc-common-utils-ts/examples/inter-tenant-access-contract';
 import { ClaimInterTenantAccessContract } from 'gdc-common-utils-ts/models/inter-tenant-access-contract';
 import { buildInterTenantAccessContractCredential } from 'gdc-common-utils-ts/utils/inter-tenant-access-contract';
-import { buildClientAssertionJwt } from 'gdc-common-utils-ts/utils/client-assertion';
+import { buildClientAssertionFixture, buildClientAssertionJwt } from 'gdc-common-utils-ts/utils/client-assertion';
 import { addVC, createVP } from 'gdc-common-utils-ts/utils/vp-token';
 import { ServiceCapability } from 'gdc-common-utils-ts/constants/service-capabilities';
 import {
@@ -48,10 +48,26 @@ import {
   EXAMPLE_TRUSTED_HEALTH_PORTAL_DID,
 } from 'gdc-common-utils-ts/examples/subject-identity-binding';
 import {
+  EXAMPLE_ACCOUNT_OWNER_ID,
   EXAMPLE_CONTROLLER_DID,
+  EXAMPLE_DEVICE_CLIENT_ID,
   EXAMPLE_HOSTING_OPERATOR_DID,
+  EXAMPLE_LICENSE_SUBJECT_ID_ACTIVE,
   EXAMPLE_SUBJECT_DID,
+  EXAMPLE_TENANT_ROUTE_CONTEXT,
 } from 'gdc-common-utils-ts/examples/shared';
+import { EXAMPLE_DEVICE_BOUND_SMART_DIDCOMM_MESSAGE } from 'gdc-common-utils-ts/examples/didcomm-identity';
+import {
+  IdentityAuthResourceTypes,
+  SmartClientAssertionTypes,
+  SmartOpenIdAcrValues,
+  SmartPostDcrActions,
+} from 'gdc-common-utils-ts/constants/identity-auth';
+import {
+  GatewayRouteFormats,
+  GatewayRouteSections,
+} from 'gdc-common-utils-ts/constants/gateway-response';
+import { DeviceBindingStatuses } from 'gdc-common-utils-ts/constants/device';
 
 const EXAMPLE_INTER_TENANT_DIGITAL_TWIN_SCOPE =
   `${ServiceCapability.DigitalTwinReader}?subject=${EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.subjectDid}`;
@@ -2533,7 +2549,7 @@ describe('OpenIdAuthManager', () => {
         body: {
           client_id: clientId,
           client_assertion: clientAssertion,
-          client_assertion_type: 'private_key_jwt',
+          client_assertion_type: SmartClientAssertionTypes.PrivateKeyJwt,
           sub: 'did:web:api.acme.org:employee:doctor1@acme.org:ISCO-08|2211',
           scope: 'organization/Composition.rs?subject=did:web:api.acme.org:individual:123&section=*',
           purpose: 'TREAT',
@@ -2546,5 +2562,74 @@ describe('OpenIdAuthManager', () => {
 
     expect(response.body.access_token).toBeDefined();
     expect(mockClearingHouse.verifyVpToken).toHaveBeenCalled();
+  });
+
+  it('accepts an operational actor DID issuer with its distinct DCR client assertion identity', async () => {
+    const issuerDid = EXAMPLE_HOSTING_OPERATOR_DID;
+    const subjectDid = EXAMPLE_SUBJECT_DID;
+    const actorDid = EXAMPLE_CONTROLLER_DID;
+    const clientId = EXAMPLE_DEVICE_CLIENT_ID;
+    const fixture = await buildClientAssertionFixture({ clientId, audience: issuerDid });
+    const deviceProfile = {
+      clientId,
+      status: DeviceBindingStatuses.Active,
+      actorDid,
+      profileDid: actorDid,
+      authorizedSubjectDid: subjectDid,
+      authenticatedSubject: EXAMPLE_ACCOUNT_OWNER_ID,
+      licenseId: EXAMPLE_LICENSE_SUBJECT_ID_ACTIVE,
+      jwks: { keys: [fixture.publicJwk] },
+    };
+    const vault = {
+      get: jest.fn().mockResolvedValue({
+        id: clientId,
+        status: DeviceBindingStatuses.Active,
+        content: deviceProfile,
+      }),
+      getContainersInSection: jest.fn().mockResolvedValue([]),
+    } as unknown as jest.Mocked<IVaultRepository>;
+    const manager = new OpenIdAuthManager(
+      {
+        getPublicVerificationKey: jest.fn().mockResolvedValue({ kid: EXAMPLE_DEVICE_CLIENT_ID }),
+        signWithManagedKey: jest.fn().mockResolvedValue({
+          payload: fixture.jwt.split('.')[1],
+          signatures: [{
+            protected: fixture.jwt.split('.')[0],
+            signature: fixture.jwt.split('.')[2],
+          }],
+        }),
+        unprotectConfidentialData: jest.fn(async (document: any) => document.content),
+      } as unknown as jest.Mocked<IKmsService>,
+      {
+        getDidDocument: jest.fn().mockResolvedValue({ id: issuerDid }),
+        tenantExists: jest.fn().mockResolvedValue(true),
+      } as unknown as jest.Mocked<TenantsCacheManager>,
+      vault,
+      { verifyVpToken: jest.fn() } as unknown as jest.Mocked<IClearingHouseService>,
+    );
+
+    const response = await manager.process({
+      ...EXAMPLE_TENANT_ROUTE_CONTEXT,
+      section: GatewayRouteSections.Identity,
+      format: GatewayRouteFormats.OpenId,
+      resourceType: IdentityAuthResourceTypes.Smart,
+      action: SmartPostDcrActions.Token,
+      content: {
+        thid: EXAMPLE_DEVICE_BOUND_SMART_DIDCOMM_MESSAGE.thid,
+        iss: actorDid,
+        aud: issuerDid,
+        body: {
+          client_id: clientId,
+          client_assertion: fixture.jwt,
+          client_assertion_type: SmartClientAssertionTypes.PrivateKeyJwt,
+          sub: actorDid,
+          scope: buildSmartCompositionReadScope({ subjectDid }),
+          purpose: HealthcareConsentPurposes.Treatment,
+          acr_values: SmartOpenIdAcrValues.Individual,
+        },
+      },
+    } as JobRequest);
+
+    expect(response.body.access_token).toBeDefined();
   });
 });

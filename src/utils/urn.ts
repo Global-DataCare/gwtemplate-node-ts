@@ -5,6 +5,8 @@ import baseX from 'base-x';
 
 const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 const base58btc = baseX(BASE58_ALPHABET);
+export const EMPLOYEE_URN_SEGMENT = ':employee:';
+export const EMPLOYEE_ROLE_URN_SEGMENT = ':role:';
 
 export interface EntityUrnBaseParams {
   namespace: string;
@@ -25,6 +27,12 @@ export interface EmployeeUrnParams extends OrganizationUrnParams {
   instanceId?: string;
 }
 
+export interface StableEmployeeUrnParams {
+  organizationUrn: string;
+  stableActorIdentifier: string;
+  role: string;
+}
+
 function hashEmployeeEmail(email: string): string {
   const bytes = new TextEncoder().encode(email.trim().toLowerCase());
   const digest = sha256(bytes);
@@ -35,7 +43,7 @@ function hashEmployeeEmail(email: string): string {
   return 'z' + base58btc.encode(multihash);
 }
 
-function normalizeEmployeeRole(role: string): string {
+export function normalizeEmployeeRole(role: string): string {
   const normalized = String(role || '').trim().toLowerCase();
   if (!normalized) return 'v3-rolecode|resprsn';
   if (normalized.includes('|')) {
@@ -47,6 +55,14 @@ function normalizeEmployeeRole(role: string): string {
     return `${system.trim()}|${(code || '').trim()}`;
   }
   return normalized;
+}
+
+/** Returns the normalized role carried by a canonical employee URN. */
+export function getEmployeeRoleFromUrn(employeeUrn: string): string | undefined {
+  const roleIndex = String(employeeUrn || '').lastIndexOf(EMPLOYEE_ROLE_URN_SEGMENT);
+  if (roleIndex < 0) return undefined;
+  const roleAndInstance = employeeUrn.slice(roleIndex + EMPLOYEE_ROLE_URN_SEGMENT.length);
+  return roleAndInstance.split(':instance:', 1)[0] || undefined;
 }
 
 /**
@@ -110,6 +126,29 @@ export function createEmployeeUrn(params: EmployeeUrnParams): string {
   const normalizedInstanceId = String(instanceId || '').trim().toLowerCase();
   const instanceSuffix = normalizedInstanceId ? `:instance:${normalizedInstanceId}` : '';
   return `${orgUrn}:employee:${hashEmployeeEmail(email)}:role:${normalizeEmployeeRole(role)}${instanceSuffix}`;
+}
+
+/** Builds the employee URN when the privacy-safe stable actor hash already exists. */
+export function createEmployeeUrnFromStableActorIdentifier(params: StableEmployeeUrnParams): string {
+  const organizationUrn = String(params.organizationUrn || '').trim();
+  const match = /^urn:multibase:(z[^:]+)$/.exec(String(params.stableActorIdentifier || '').trim());
+  if (!organizationUrn.startsWith('urn:') || !organizationUrn.includes(':entity:')) {
+    throw new Error('Employee URN requires its canonical organization URN.');
+  }
+  if (!match) throw new Error('Employee URN requires its stable actor identifier.');
+  return `${organizationUrn}${EMPLOYEE_URN_SEGMENT}${match[1]}${EMPLOYEE_ROLE_URN_SEGMENT}${normalizeEmployeeRole(params.role)}`;
+}
+
+/** Resolves the privacy-safe role-bearing employee URN from its DID document. */
+export function resolveRoleBearingEmployeeUrn(input: Readonly<{
+  id?: string;
+  alsoKnownAs?: readonly string[];
+}>): string | undefined {
+  return [input.id, ...(input.alsoKnownAs || [])]
+    .map((candidate) => String(candidate || '').trim())
+    .find((candidate) => candidate.startsWith('urn:')
+      && candidate.includes(EMPLOYEE_URN_SEGMENT)
+      && candidate.includes(EMPLOYEE_ROLE_URN_SEGMENT));
 }
 
 /**

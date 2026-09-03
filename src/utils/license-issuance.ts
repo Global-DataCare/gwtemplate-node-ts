@@ -32,6 +32,8 @@ export type IssueActivationCodeParams = {
   ownerOrganizationId?: string;
   relatedPersonId?: string;
   invitationId?: string;
+  /** Technical employee resource id that owns the issued professional seat. */
+  subjectId?: string;
   /** DID of the represented person/animal, never the DID of a physical card or PETD. */
   subjectDid?: string;
   /** Pre-verified code for a host-authorized postal licence; never log it. */
@@ -248,6 +250,7 @@ export async function issueActivationCodeFromPool(params: IssueActivationCodePar
     ownerOrganizationId,
     relatedPersonId,
     invitationId,
+    subjectId,
     subjectDid,
   } = params;
 
@@ -363,6 +366,7 @@ export async function issueActivationCodeFromPool(params: IssueActivationCodePar
   if (ownerOrganizationId) license.ownerOrganizationId = ownerOrganizationId;
   if (relatedPersonId) license.relatedPersonId = relatedPersonId;
   if (invitationId) license.invitationId = invitationId;
+  if (subjectId) license.subjectId = subjectId;
   if (subjectDid) license.authorizedSubjectDid = subjectDid;
   license.issuedAt = now;
   license.status = LICENSE_STATUS_ISSUED;

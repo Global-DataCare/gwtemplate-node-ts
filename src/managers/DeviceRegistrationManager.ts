@@ -30,13 +30,30 @@ import {
   IdentityAuthRequestFields,
   IdentityAuthResponseEntryTypes,
   IdentityAuthResponseTypes,
+  IdentityDcrMetadataFields,
 } from 'gdc-common-utils-ts/constants/identity-auth';
-import { DEFAULT_LICENSE_DEVICE_ALLOWANCE } from '../constants/domain';
+import {
+  DCR_REGISTER_SCOPE,
+  DEFAULT_LICENSE_DEVICE_ALLOWANCE,
+  LICENSE_USER_CLASS_EMPLOYEE,
+  LICENSE_USER_CLASS_INDIVIDUAL,
+} from '../constants/domain';
 import {
   findDeviceLicensesByActivationCode,
+  openDeviceLicenseDocument,
   prepareDeviceLicenseDocumentForWrite,
   type OpenedDeviceLicenseDocument,
 } from '../utils/device-license-storage';
+import type { ITenantsManager } from './ITenantsManager';
+import {
+  getEmployeeRoleFromUrn,
+  getTenantIdentifierUrnPrefix,
+  normalizeEmployeeRole,
+  parseTenantUrn,
+  resolveRoleBearingEmployeeUrn,
+} from '../utils/urn';
+import { buildOrganizationRoleLicenseId } from 'gdc-common-utils-ts/utils/organization-role-license';
+import { hasRoleCode } from 'gdc-common-utils-ts/utils/activation-policy';
 
 /**
  * Manages the business logic for a single device registration (DCR) request,
@@ -46,12 +63,19 @@ export class DeviceRegistrationManager implements IJobProcessor {
   private readonly apiBaseUrl: string;
   private readonly vaultRepository: IVaultRepository;
   private readonly kmsService?: IKmsService;
+  private readonly tenantsManager?: Pick<ITenantsManager, 'getCollectionName'>;
 
   // In the future, we'll inject dependencies like IVaultRepository and a client registry service.
-  constructor(apiBaseUrl: string, vaultRepository: IVaultRepository, kmsService?: IKmsService) {
+  constructor(
+    apiBaseUrl: string,
+    vaultRepository: IVaultRepository,
+    kmsService?: IKmsService,
+    tenantsManager?: Pick<ITenantsManager, 'getCollectionName'>,
+  ) {
     this.apiBaseUrl = apiBaseUrl;
     this.vaultRepository = vaultRepository;
     this.kmsService = kmsService;
+    this.tenantsManager = tenantsManager;
   }
 
   /**
@@ -142,6 +166,15 @@ export class DeviceRegistrationManager implements IJobProcessor {
       const openedLicense = await this.resolveLicenseByActivationCode(code as string, vaultId);
       const licenseDoc = openedLicense?.document;
       const license = openedLicense?.license;
+      const individualAuthorization = license?.userClass === LICENSE_USER_CLASS_INDIVIDUAL
+        ? this.validateIndividualControllerRegistration({
+          job,
+          registrationRequest: registrationRequest as DcrRegistrationRequest & Record<string, any>,
+          license,
+          licenseDocId: licenseDoc!.id,
+          code: String(code),
+        })
+        : undefined;
       const fingerprint: DeviceInfo = {
         clientInstanceId: deviceInfo?.device_id || clientId,
         os: deviceInfo?.os,
@@ -156,6 +189,12 @@ export class DeviceRegistrationManager implements IJobProcessor {
         licenseDoc: licenseDoc && license ? { ...licenseDoc, content: license } : undefined,
         clientId,
       });
+      if (license?.userClass === LICENSE_USER_CLASS_EMPLOYEE && license.subjectId && !deviceIdentityContext) {
+        throw new ManagerError(
+          'DCR could not bind the device keys to the licensed controller identity.',
+          IssueType.Conflict,
+        );
+      }
       const deviceProfile = {
         type: 'DeviceProfile',
         clientId,
@@ -174,6 +213,7 @@ export class DeviceRegistrationManager implements IJobProcessor {
         subjectId: deviceIdentityContext?.subjectId,
         stableActorIdentifier: deviceIdentityContext?.actorIdentifier,
         verificationMethodIds: deviceIdentityContext?.newVerificationMethods.map((method) => method.id),
+        ...(individualAuthorization || {}),
         createdAt: new Date().toISOString(),
       };
 
@@ -346,6 +386,72 @@ export class DeviceRegistrationManager implements IJobProcessor {
     return Number.isInteger(value) && value > 0 ? value : DEFAULT_LICENSE_DEVICE_ALLOWANCE;
   }
 
+  /** Converts a verified individual activation into one exact DCR authorization tuple. */
+  private validateIndividualControllerRegistration(params: {
+    job: JobRequest;
+    registrationRequest: DcrRegistrationRequest & Record<string, any>;
+    license: DeviceLicense & Record<string, any>;
+    licenseDocId: string;
+    code: string;
+  }): {
+    actorDid: string;
+    profileDid: string;
+    authorizedSubjectDid: string;
+    authenticatedSubject: string;
+    licenseId: string;
+  } {
+    const bearer = (params.job.content as any)?.meta?.bearer?.jwt?.payload || {};
+    const authenticatedSubject = String(bearer.sub || '').trim();
+    if (!authenticatedSubject || String(bearer.scope || '').trim() !== DCR_REGISTER_SCOPE) {
+      throw new ManagerError('Individual-controller DCR requires a verified initial access token.', IssueType.Security);
+    }
+    if (String(bearer.act_code || '').trim() !== params.code) {
+      throw new ManagerError('DCR activation code does not match the verified initial access token.', IssueType.Forbidden);
+    }
+    const actorDid = String(params.registrationRequest[IdentityDcrMetadataFields.ActorDid] || '').trim();
+    const profileDid = String(params.registrationRequest[IdentityDcrMetadataFields.ProfileDid] || '').trim();
+    const authorizedSubjectDid = String(params.license.authorizedSubjectDid || '').trim();
+    if (!actorDid || profileDid !== actorDid || !authorizedSubjectDid) {
+      throw new ManagerError(
+        'Individual-controller DCR is missing its exact actor, profile or authorized subject binding.',
+        IssueType.Forbidden,
+      );
+    }
+    const familyPrefix = `${authorizedSubjectDid}:family:`;
+    if (!actorDid.startsWith(familyPrefix)) {
+      throw new ManagerError('Individual-controller actor does not belong to the licensed subject.', IssueType.Forbidden);
+    }
+    const encodedRemainder = actorDid.slice(familyPrefix.length);
+    const separator = encodedRemainder.indexOf(':');
+    const actorIdentifier = decodeURIComponent(separator >= 0 ? encodedRemainder.slice(0, separator) : encodedRemainder);
+    const actorRole = decodeURIComponent(separator >= 0 ? encodedRemainder.slice(separator + 1) : '');
+    const issuedRoleCode = String(params.license.issuedToRole || '').split(/[|:]/).pop()?.toLowerCase();
+    const actorRoleCode = actorRole.split(/[|:]/).pop()?.toLowerCase();
+    if (actorIdentifier !== authenticatedSubject
+      || !issuedRoleCode
+      || issuedRoleCode !== actorRoleCode
+      || !hasRoleCode(actorRole)
+      || !hasRoleCode(params.license.issuedToRole)) {
+      if (!hasRoleCode(actorRole) || !hasRoleCode(params.license.issuedToRole)) {
+        throw new ManagerError(
+          'Individual-controller DCR requires the licensed controller role RESPRSN.',
+          IssueType.Forbidden,
+        );
+      }
+      throw new ManagerError(
+        'Individual-controller actor does not match the activated account or licensed role.',
+        IssueType.Forbidden,
+      );
+    }
+    return {
+      actorDid,
+      profileDid,
+      authorizedSubjectDid,
+      authenticatedSubject,
+      licenseId: params.licenseDocId,
+    };
+  }
+
   private getDeviceBindings(license: DeviceLicense & Record<string, any>): any[] {
     if (Array.isArray(license.deviceBindings)) return license.deviceBindings;
     const clientId = String(license.deviceId || '').trim();
@@ -380,6 +486,11 @@ export class DeviceRegistrationManager implements IJobProcessor {
   }): Promise<{
     subjectId: string;
     actorIdentifier: string;
+    employeeUrn: string;
+    licensedRole: string;
+    roleLicenseId: string;
+    organizationId: string;
+    jurisdiction: string;
     employeeDoc: ConfidentialStorageDoc;
     employeeContent: EntityConfig;
     previousDeviceId?: string;
@@ -390,8 +501,9 @@ export class DeviceRegistrationManager implements IJobProcessor {
     const subjectId = String((params.licenseDoc?.content as any)?.subjectId || '').trim();
     if (!subjectId) return undefined;
 
+    const employeeCollectionName = await this.resolveEmployeeCollectionName(params.vaultId);
     const employeeDoc = await this.vaultRepository.get<ConfidentialStorageDoc>(
-      params.vaultId,
+      employeeCollectionName,
       subjectId,
       getEnvSectionId('employees'),
     );
@@ -407,6 +519,23 @@ export class DeviceRegistrationManager implements IJobProcessor {
     if (!/^urn:multibase:z[^:]+$/.test(actorIdentifier)) {
       throw new ManagerError('DCR license is missing its stable actor identifier.', IssueType.BusinessRule);
     }
+    const employeeUrn = resolveRoleBearingEmployeeUrn(employeeContent.didDocument);
+    if (!employeeUrn) {
+      throw new ManagerError('DCR employee identity is missing its role-bearing employee URN.', IssueType.BusinessRule);
+    }
+    const licensedRole = String(license.issuedToRole || '').trim();
+    if (getEmployeeRoleFromUrn(employeeUrn) !== normalizeEmployeeRole(licensedRole)) {
+      throw new ManagerError('DCR licence role does not match the role-bearing employee identity.', IssueType.Conflict);
+    }
+    const employeeTenantUrn = parseTenantUrn(getTenantIdentifierUrnPrefix(employeeUrn));
+    const jurisdiction = String(params.job.jurisdiction || employeeTenantUrn?.jurisdiction || '').trim();
+    const organizationId = String(employeeTenantUrn?.idValue || params.job.tenantId || params.vaultId).trim();
+    const roleLicenseId = buildOrganizationRoleLicenseId({
+      organizationOfficialId: String(license.ownerOrganizationId || organizationId).trim(),
+      jurisdiction: jurisdiction.toLowerCase(),
+      stableContactIdentifier: actorIdentifier,
+      licensedRole,
+    });
     const clientInstanceId = String((params.registrationRequest.ext_device_info as any)?.device_id || params.clientId).trim();
     const replacedBinding = this.getDeviceBindings(license).find((binding) =>
       binding.status === DeviceBindingStatuses.Active && binding.clientInstanceId === clientInstanceId);
@@ -427,6 +556,11 @@ export class DeviceRegistrationManager implements IJobProcessor {
     return {
       subjectId,
       actorIdentifier,
+      employeeUrn,
+      licensedRole,
+      roleLicenseId,
+      organizationId,
+      jurisdiction,
       employeeDoc,
       employeeContent,
       previousDeviceId,
@@ -442,6 +576,11 @@ export class DeviceRegistrationManager implements IJobProcessor {
     };
   }
 
+  /** Employee identities may live in the tenant's physical collection. */
+  private async resolveEmployeeCollectionName(vaultId: string): Promise<string> {
+    return await this.tenantsManager?.getCollectionName(vaultId) || vaultId;
+  }
+
   private async finalizeEmployeeDeviceIdentityContext(params: {
     job: JobRequest;
     vaultId: string;
@@ -449,6 +588,11 @@ export class DeviceRegistrationManager implements IJobProcessor {
     context: {
       subjectId: string;
       actorIdentifier: string;
+      employeeUrn: string;
+      licensedRole: string;
+      roleLicenseId: string;
+      organizationId: string;
+      jurisdiction: string;
       employeeDoc: ConfidentialStorageDoc;
       employeeContent: EntityConfig;
       previousDeviceId?: string;
@@ -465,7 +609,11 @@ export class DeviceRegistrationManager implements IJobProcessor {
       previousVerificationMethods,
       newVerificationMethods,
       subjectId,
-      actorIdentifier,
+      employeeUrn,
+      licensedRole,
+      roleLicenseId,
+      organizationId,
+      jurisdiction,
     } = params.context;
 
     const updatedDidDocument = this.mergeDeviceVerificationMethods(
@@ -511,27 +659,31 @@ export class DeviceRegistrationManager implements IJobProcessor {
     const protectedEmployeeDoc = this.kmsService
       ? await this.kmsService.protectConfidentialData(updatedEmployeeDoc, params.vaultId)
       : updatedEmployeeDoc;
-    await this.vaultRepository.put(params.vaultId, [protectedEmployeeDoc], getEnvSectionId('employees'));
+    const employeeCollectionName = await this.resolveEmployeeCollectionName(params.vaultId);
+    await this.vaultRepository.put(employeeCollectionName, [protectedEmployeeDoc], getEnvSectionId('employees'));
 
-    const organizationId = String(params.job.tenantId || '').trim() || params.vaultId;
     if (previousVerificationMethods.length > 0) {
       await revokeSubjectKeysOnLedger({
-        jurisdiction: params.job.jurisdiction,
+        jurisdiction,
         organizationId,
         subjectType: 'employee',
-        subjectId: actorIdentifier,
+        subjectId: employeeUrn,
         subjectDid: updatedDidDocument.id,
+        licensedRole,
+        roleLicenseId,
         verificationMethods: previousVerificationMethods,
         deviceId: previousDeviceId,
       });
     }
     if (newVerificationMethods.length > 0) {
       await registerSubjectKeysOnLedger({
-        jurisdiction: params.job.jurisdiction,
+        jurisdiction,
         organizationId,
         subjectType: 'employee',
-        subjectId: actorIdentifier,
+        subjectId: employeeUrn,
         subjectDid: updatedDidDocument.id,
+        licensedRole,
+        roleLicenseId,
         verificationMethods: newVerificationMethods,
         deviceId: params.clientId,
       });
@@ -733,7 +885,7 @@ export class DeviceRegistrationManager implements IJobProcessor {
       vaultId, licenseId, getEnvSectionId('device-licenses'),
     );
     if (!licenseDoc) throw new ManagerError('License not found.', IssueType.NotFound);
-    const license = licenseDoc.content as DeviceLicense & Record<string, any>;
+    const { license } = await openDeviceLicenseDocument(licenseDoc, vaultId, this.kmsService);
     const bindings = this.getDeviceBindings(license);
     const target = bindings.find((binding) => binding.status === DeviceBindingStatuses.Active && binding.clientId === clientId);
     if (!target) throw new ManagerError('Active device binding not found for this license.', IssueType.NotFound);
@@ -743,7 +895,13 @@ export class DeviceRegistrationManager implements IJobProcessor {
       ? { ...binding, status: DeviceBindingStatuses.Revoked, revokedAt: now }
       : binding);
     licenseDoc.sequence = (licenseDoc.sequence || 0) + 1;
-    await this.vaultRepository.put(vaultId, [licenseDoc], getEnvSectionId('device-licenses'));
+    const updatedLicenseDocument = await prepareDeviceLicenseDocumentForWrite({
+      document: licenseDoc,
+      license,
+      vaultId,
+      kmsService: this.kmsService,
+    });
+    await this.vaultRepository.put(vaultId, [updatedLicenseDocument], getEnvSectionId('device-licenses'));
 
     const profileDoc = await this.vaultRepository.get<ConfidentialStorageDoc>(
       vaultId, clientId, getEnvSectionId('device-profiles'),
@@ -765,14 +923,32 @@ export class DeviceRegistrationManager implements IJobProcessor {
 
     const subjectId = String(license.subjectId || '').trim();
     if (subjectId && profile) {
+      const employeeCollectionName = await this.resolveEmployeeCollectionName(vaultId);
       const employeeDoc = await this.vaultRepository.get<ConfidentialStorageDoc>(
-        vaultId, subjectId, getEnvSectionId('employees'),
+        employeeCollectionName, subjectId, getEnvSectionId('employees'),
       );
       if (employeeDoc) {
         const employee = this.kmsService
           ? await this.kmsService.unprotectConfidentialData<EntityConfig>(employeeDoc, vaultId)
           : employeeDoc.content as EntityConfig;
         if (employee.didDocument) {
+          const employeeUrn = resolveRoleBearingEmployeeUrn(employee.didDocument);
+          if (!employeeUrn) {
+            throw new ManagerError('DCR employee identity is missing its role-bearing employee URN.', IssueType.BusinessRule);
+          }
+          const licensedRole = String(license.issuedToRole || '').trim();
+          if (getEmployeeRoleFromUrn(employeeUrn) !== normalizeEmployeeRole(licensedRole)) {
+            throw new ManagerError('DCR licence role does not match the role-bearing employee identity.', IssueType.Conflict);
+          }
+          const employeeTenantUrn = parseTenantUrn(getTenantIdentifierUrnPrefix(employeeUrn));
+          const jurisdiction = String(job.jurisdiction || employeeTenantUrn?.jurisdiction || '').trim();
+          const organizationId = String(employeeTenantUrn?.idValue || tenantId).trim();
+          const roleLicenseId = buildOrganizationRoleLicenseId({
+            organizationOfficialId: String(license.ownerOrganizationId || organizationId).trim(),
+            jurisdiction: jurisdiction.toLowerCase(),
+            stableContactIdentifier: String(license.activatedBy || '').trim(),
+            licensedRole,
+          });
           const methods = this.extractVerificationMethodsFromProfile(employee.didDocument, profile);
           employee.didDocument = this.mergeDeviceVerificationMethods(
             employee.didDocument, methods.map((method) => method.id), [],
@@ -782,15 +958,17 @@ export class DeviceRegistrationManager implements IJobProcessor {
             sequence: (employeeDoc.sequence || 0) + 1,
             content: employee,
           };
-          await this.vaultRepository.put(vaultId, [this.kmsService
+          await this.vaultRepository.put(employeeCollectionName, [this.kmsService
             ? await this.kmsService.protectConfidentialData(updatedEmployeeDoc, vaultId)
             : updatedEmployeeDoc], getEnvSectionId('employees'));
           if (methods.length) await revokeSubjectKeysOnLedger({
-            jurisdiction: job.jurisdiction,
-            organizationId: tenantId,
+            jurisdiction,
+            organizationId,
             subjectType: 'employee',
-            subjectId: String(license.activatedBy || subjectId),
+            subjectId: employeeUrn,
             subjectDid: employee.didDocument.id,
+            licensedRole,
+            roleLicenseId,
             verificationMethods: methods,
             deviceId: clientId,
           });

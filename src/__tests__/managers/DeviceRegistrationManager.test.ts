@@ -20,16 +20,31 @@ import { ManageAssetCryptographicKey } from '../../blockchain/fabric/v3/manageAs
 import { ManageAssetSubjectKeyBinding } from '../../blockchain/fabric/v3/manageAssetSubjectKeyBinding';
 import { normalizeSameAsHash } from 'gdc-common-utils-ts/utils/same-as';
 import { DeviceBindingStatuses } from 'gdc-common-utils-ts/constants/device';
-import { IdentityAuthActions, IdentityAuthRequestFields } from 'gdc-common-utils-ts/constants/identity-auth';
 import {
+  IdentityAuthActions,
+  IdentityAuthRequestFields,
+  IdentityDcrMetadataFields,
+} from 'gdc-common-utils-ts/constants/identity-auth';
+import {
+  EXAMPLE_CONTROLLER_DID,
+  EXAMPLE_EMAIL_PROFESSIONAL,
   EXAMPLE_EMPLOYEE_DEVICE_CLIENT_ID_PRIMARY,
   EXAMPLE_EMPLOYEE_DEVICE_INSTANCE_ID_TERTIARY,
+  EXAMPLE_LEGAL_ORGANIZATION_TAX_ID,
+  EXAMPLE_TENANT_ROUTE_CONTEXT,
   ExampleHttpStatusText,
 } from 'gdc-common-utils-ts/examples/shared';
 import {
   EXAMPLE_EMPLOYEE_ACTIVE_DEVICE_BINDINGS,
   EXAMPLE_LICENSE_ACTIVE_RECORD,
 } from 'gdc-common-utils-ts/examples/license';
+import { HealthcareActorRoles } from 'gdc-common-utils-ts/constants/healthcare';
+import { createEmployeeUrn } from '../../utils/urn';
+import { URN_NAMESPACE, URN_NETWORK, URN_ORGANIZATION_ID_TYPE, URN_VERSION } from '../data/urn.data';
+import { testIndividualControllerDcrIdentity } from '../data/identity.data';
+import { DeviceAppTypes, DeviceUserClasses } from 'gdc-common-utils-ts/constants/device';
+import { LicenseStatuses } from 'gdc-common-utils-ts/utils/license';
+import { HttpStatusCodes } from 'gdc-common-utils-ts/constants/http';
 
 const TEST_API_BASE_URL = 'http://localhost:3001';
 const FABRIC_LEDGER_TEST_ENV = {
@@ -109,9 +124,11 @@ describe('DeviceRegistrationManager', () => {
       const responseBody = result.body as BundleJsonApi;
       const responseEntry = responseBody.data[0] as BundleEntryResponse;
       expect(responseEntry.response.status).toEqual('201');
+      expect((responseEntry as any).meta?.claims).toBeUndefined();
       
       const resource = responseEntry.resource as any;
       expect(resource.resourceType).toEqual('Device');
+      expect(resource.meta?.claims).toBeDefined();
       expect(uuidValidate(resource.client_id)).toBe(true);
       expect(resource.client_id_issued_at).toBeCloseTo(Math.floor(Date.now() / 1000), -1);
       expect(resource.registration_client_uri).toBe(`${TEST_API_BASE_URL}/clients/${resource.client_id}`);
@@ -139,6 +156,59 @@ describe('DeviceRegistrationManager', () => {
       expect((updatedContent as any).deviceBindings).toHaveLength(1);
       expect(updatedContent.status).toBe('active');
       expect(updatedLicense?.status).toBe('active');
+    });
+
+    it('binds an individual-controller DCR to the verified account and licensed subject', async () => {
+      const job = cloneDeep(DCR_REGISTRATION_JOB);
+      const activationCode = String((job.content?.body as any)?.[IdentityAuthRequestFields.Code]);
+      Object.assign(job.content!.body as any, {
+        [IdentityDcrMetadataFields.ActorDid]: testIndividualControllerDcrIdentity.actorDid,
+        [IdentityDcrMetadataFields.ProfileDid]: testIndividualControllerDcrIdentity.actorDid,
+      });
+      job.content!.meta = {
+        bearer: { jwt: { payload: {
+          sub: testIndividualControllerDcrIdentity.authenticatedSubject,
+          act_code: activationCode,
+          scope: testIndividualControllerDcrIdentity.scope,
+        } } },
+      } as any;
+      const vaultId = getTenantVaultId(job.sector as any, job.tenantId as string);
+      const license = {
+        ...EXAMPLE_LICENSE_ACTIVE_RECORD,
+        tenantId: job.tenantId,
+        orderId: EXAMPLE_LICENSE_ACTIVE_RECORD.id,
+        activationCode,
+        userClass: DeviceUserClasses.Individual,
+        type: DeviceAppTypes.Mobile,
+        status: LicenseStatuses.Active,
+        issuedToRole: testIndividualControllerDcrIdentity.role,
+        authorizedSubjectDid: testIndividualControllerDcrIdentity.subjectDid,
+      } as DeviceLicense & Record<string, any>;
+      await vaultRepository.put(vaultId, [{
+        id: license.id,
+        status: license.status,
+        sequence: 0,
+        content: license,
+      }], getEnvSectionId('device-licenses'));
+
+      const result = await manager.process(job);
+
+      const entry = (result.body as BundleJsonApi).data[0] as BundleEntryResponse;
+      expect(entry.response.status).toBe(String(HttpStatusCodes.Created));
+      const clientId = String((entry.resource as any).client_id);
+      const stored = await vaultRepository.get<ConfidentialStorageDoc>(
+        vaultId,
+        clientId,
+        getEnvSectionId('device-profiles'),
+      );
+      const profile = await mockKmsService.unprotectConfidentialData<any>(stored!, vaultId);
+      expect(profile).toEqual(expect.objectContaining({
+        actorDid: testIndividualControllerDcrIdentity.actorDid,
+        profileDid: testIndividualControllerDcrIdentity.actorDid,
+        authorizedSubjectDid: testIndividualControllerDcrIdentity.subjectDid,
+        authenticatedSubject: testIndividualControllerDcrIdentity.authenticatedSubject,
+        licenseId: license.id,
+      }));
     });
 
     it('decrypts and updates the protected seat selected by its activation-code index', async () => {
@@ -226,18 +296,30 @@ describe('DeviceRegistrationManager', () => {
       const vaultId = getTenantVaultId(job.sector as any, job.tenantId as string);
 
       const employeeId = 'employee-1';
-      const employeeDid = 'did:web:api.acme.org:employee:doctor1@acme.org:ISCO-08|2211';
+      const employeeDid = EXAMPLE_CONTROLLER_DID;
+      const employeeUrn = createEmployeeUrn({
+        namespace: URN_NAMESPACE,
+        network: URN_NETWORK,
+        jurisdiction: EXAMPLE_TENANT_ROUTE_CONTEXT.jurisdiction,
+        version: URN_VERSION,
+        sector: EXAMPLE_TENANT_ROUTE_CONTEXT.sector,
+        idType: URN_ORGANIZATION_ID_TYPE,
+        idValue: EXAMPLE_LEGAL_ORGANIZATION_TAX_ID,
+        email: EXAMPLE_EMAIL_PROFESSIONAL,
+        role: HealthcareActorRoles.GeneralistMedicalPractitioner,
+      });
       const employeeConfig: EntityConfig = {
         id: employeeId,
         type: EntityType.Person,
         status: EntityLifecycleStatus.Active,
         claims: {
-          [ClaimsPersonSchemaorg.email]: 'doctor1@acme.org',
-          [ClaimsPersonSchemaorg.hasOccupation]: 'ISCO-08|2211',
+          [ClaimsPersonSchemaorg.email]: EXAMPLE_EMAIL_PROFESSIONAL,
+          [ClaimsPersonSchemaorg.hasOccupation]: HealthcareActorRoles.GeneralistMedicalPractitioner,
         } as any,
         didDocument: {
           '@context': 'https://www.w3.org/ns/did/v1',
           id: employeeDid,
+          alsoKnownAs: [employeeUrn],
           verificationMethod: [
             {
               id: `${employeeDid}#sig-old`,
@@ -312,7 +394,9 @@ describe('DeviceRegistrationManager', () => {
         reactivationEnabled: false,
         exp: Math.floor(Date.now() / 1000) + 3600,
         subjectId: employeeId,
-        activatedBy: normalizeSameAsHash('employee@example.org'),
+        activatedBy: normalizeSameAsHash(EXAMPLE_EMAIL_PROFESSIONAL),
+        ownerOrganizationId: EXAMPLE_LEGAL_ORGANIZATION_TAX_ID,
+        issuedToRole: HealthcareActorRoles.GeneralistMedicalPractitioner,
         deviceId: previousDeviceId,
       } as any;
       const licenseDoc: ConfidentialStorageDoc = {
@@ -374,9 +458,11 @@ describe('DeviceRegistrationManager', () => {
       expect(bindingSpy).toHaveBeenCalled();
       expect(bindingSpy).toHaveBeenCalledWith(
         expect.any(String),
-        expect.stringContaining('urn:multibase:'),
+        expect.stringContaining(employeeUrn),
         expect.objectContaining({
-          subjectId: license.activatedBy,
+          subjectId: employeeUrn,
+          licensedRole: HealthcareActorRoles.GeneralistMedicalPractitioner,
+          roleLicenseId: expect.stringMatching(/^urn:multibase:/),
           meta: expect.objectContaining({
             attributes: expect.objectContaining({ did: employeeDid }),
           }),
@@ -411,14 +497,15 @@ describe('DeviceRegistrationManager', () => {
         [IdentityAuthRequestFields.ClientId]: EXAMPLE_EMPLOYEE_DEVICE_CLIENT_ID_PRIMARY,
       } as any;
       const vaultId = getTenantVaultId(job.sector as any, job.tenantId as string);
-      await vaultRepository.put(vaultId, [{
+      const protectedLicense = await mockKmsService.protectConfidentialData({
         id: EXAMPLE_LICENSE_ACTIVE_RECORD.id, status: EXAMPLE_LICENSE_ACTIVE_RECORD.status, sequence: 0, content: {
           id: EXAMPLE_LICENSE_ACTIVE_RECORD.id, tenantId: job.tenantId, orderId: 'order', userClass: 'employee',
           type: 'web', status: 'active', plan: 'default', renewalCycle: '12m',
           reactivationEnabled: false, exp: Math.floor(Date.now() / 1000) + 3600, maxDevices: 2,
           deviceBindings: EXAMPLE_EMPLOYEE_ACTIVE_DEVICE_BINDINGS,
         },
-      } as any], getEnvSectionId('device-licenses'));
+      } as ConfidentialStorageDoc, vaultId);
+      await vaultRepository.put(vaultId, [protectedLicense], getEnvSectionId('device-licenses'));
       const profile = await mockKmsService.protectConfidentialData({
         id: EXAMPLE_EMPLOYEE_DEVICE_CLIENT_ID_PRIMARY, status: DeviceBindingStatuses.Active, sequence: 0,
         content: { clientId: EXAMPLE_EMPLOYEE_DEVICE_CLIENT_ID_PRIMARY, verificationMethodIds: [] },
@@ -430,9 +517,13 @@ describe('DeviceRegistrationManager', () => {
       const updated = await vaultRepository.get<ConfidentialStorageDoc>(
         vaultId, EXAMPLE_LICENSE_ACTIVE_RECORD.id, getEnvSectionId('device-licenses'),
       );
-      expect((updated?.content as any).deviceBindings.filter((binding: any) => binding.status === DeviceBindingStatuses.Active))
+      const updatedContent = await mockKmsService.unprotectConfidentialData<DeviceLicense & Record<string, any>>(
+        updated!, vaultId,
+      );
+      const updatedBindings = updatedContent.deviceBindings || [];
+      expect(updatedBindings.filter((binding: any) => binding.status === DeviceBindingStatuses.Active))
         .toHaveLength(1);
-      expect((updated?.content as any).deviceBindings.find((binding: any) => binding.clientId === EXAMPLE_EMPLOYEE_DEVICE_CLIENT_ID_PRIMARY).status)
+      expect(updatedBindings.find((binding: any) => binding.clientId === EXAMPLE_EMPLOYEE_DEVICE_CLIENT_ID_PRIMARY)?.status)
         .toBe(DeviceBindingStatuses.Revoked);
       const revokedProfile = await vaultRepository.get<ConfidentialStorageDoc>(
         vaultId, EXAMPLE_EMPLOYEE_DEVICE_CLIENT_ID_PRIMARY, getEnvSectionId('device-profiles'),

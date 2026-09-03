@@ -21,6 +21,9 @@ export const LICENSE_STATUS_AVAILABLE = 'available';
 export const LICENSE_STATUS_ISSUED = 'issued';
 export const LICENSE_STATUS_ACTIVE = 'active';
 
+/** Initial-access-token scope authorizing one dynamic client registration. */
+export const DCR_REGISTER_SCOPE = 'dcr:register';
+
 /** Default number of independently revocable channel/device installations per actor seat. */
 export const DEFAULT_LICENSE_DEVICE_ALLOWANCE = 5;
 

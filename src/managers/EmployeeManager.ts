@@ -41,6 +41,7 @@ import type { ITenantDidRegistryMutator } from './ITenantDidRegistryMutator';
 import type { IHostRuntime } from './IHostRuntime';
 import { buildOfferOrderIndexedAttributes } from '../utils/offer-order-read-model';
 import { buildSearchResponseEntries } from '../utils/didcomm-response';
+import { canonicalizeBundleEntryMetadata } from '../utils/canonical-entry-metadata';
 import {
   ACTION_PURGE,
   LICENSE_STATUS_AVAILABLE,
@@ -826,7 +827,7 @@ export class EmployeeManager {
     if (error instanceof ManagerError) {
       return {
         type: entryType,
-        meta: meta,
+        ...canonicalizeBundleEntryMetadata(meta),
         response: {
           status: error.status,
           outcome: createOperationOutcome(IssueLevel.Error, error.code, error.message),
@@ -836,7 +837,7 @@ export class EmployeeManager {
       console.error('Unexpected error during employee processing:', error);
       return {
         type: entryType,
-        meta: meta,
+        ...canonicalizeBundleEntryMetadata(meta),
         response: {
           status: String(HttpStatusCodes.InternalServerError),
           outcome: createOperationOutcome(

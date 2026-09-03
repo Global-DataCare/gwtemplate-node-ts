@@ -1,7 +1,22 @@
 // TDD contract: write this test red first; make it green only with the complete real behavior.
 
-import { createEmployeeUrn } from "../../../utils/urn";
-import { URN_NAMESPACE, URN_VERSION } from "../../data/urn.data";
+import {
+    createEmployeeUrn,
+    createEmployeeUrnFromStableActorIdentifier,
+    createOrganizationUrn,
+    getEmployeeRoleFromUrn,
+    normalizeEmployeeRole,
+    resolveRoleBearingEmployeeUrn,
+} from "../../../utils/urn";
+import { URN_NAMESPACE, URN_ORGANIZATION_ID_TYPE, URN_VERSION } from "../../data/urn.data";
+import { normalizeSameAsHash } from 'gdc-common-utils-ts/utils/same-as';
+import { HealthcareActorRoles } from 'gdc-common-utils-ts/constants/healthcare';
+import {
+    EXAMPLE_CONTROLLER_DID,
+    EXAMPLE_EMAIL_PROFESSIONAL,
+    EXAMPLE_LEGAL_ORGANIZATION_TAX_ID,
+    EXAMPLE_TENANT_ROUTE_CONTEXT,
+} from 'gdc-common-utils-ts/examples/shared';
 
 describe('createEmployeeUrn', () => {
     const baseParams = {
@@ -10,7 +25,7 @@ describe('createEmployeeUrn', () => {
         jurisdiction: 'ES',
         version: URN_VERSION,
         sector: 'health-care',
-        idType: 'vat',
+        idType: URN_ORGANIZATION_ID_TYPE,
         idValue: 'B12345678',
         email: 'John.Doe@Example.com',
     };
@@ -50,6 +65,26 @@ describe('createEmployeeUrn', () => {
         const params = { ...baseParams, role: '1120', instanceId: 'ABC-123' };
         const urn = createEmployeeUrn(params);
         expect(urn.endsWith(':role:1120:instance:abc-123')).toBe(true);
+    });
+
+    it('builds and resolves a role-bearing employee URN from the stable actor identifier', () => {
+        const organizationUrn = createOrganizationUrn({
+            ...baseParams,
+            jurisdiction: EXAMPLE_TENANT_ROUTE_CONTEXT.jurisdiction,
+            sector: EXAMPLE_TENANT_ROUTE_CONTEXT.sector,
+            idValue: EXAMPLE_LEGAL_ORGANIZATION_TAX_ID,
+        });
+        const employeeUrn = createEmployeeUrnFromStableActorIdentifier({
+            organizationUrn,
+            stableActorIdentifier: normalizeSameAsHash(EXAMPLE_EMAIL_PROFESSIONAL),
+            role: HealthcareActorRoles.GeneralistMedicalPractitioner,
+        });
+        expect(getEmployeeRoleFromUrn(employeeUrn))
+            .toBe(normalizeEmployeeRole(HealthcareActorRoles.GeneralistMedicalPractitioner));
+        expect(resolveRoleBearingEmployeeUrn({
+            id: EXAMPLE_CONTROLLER_DID,
+            alsoKnownAs: [employeeUrn],
+        })).toBe(employeeUrn);
     });
 });
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
