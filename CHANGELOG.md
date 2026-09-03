@@ -5,6 +5,9 @@
 - Accept creator-authorized `PUT ResourceType/id` entries in section-scoped
   clinical batches, including optional weak-ETag matching, while preserving
   subject and creator ownership checks independently for every batch entry.
+- Preauthorize UUID-backed Employee/Occupation FHIR creator bindings for roles
+  in the governed clinical catalog, matching GW VET while excluding unrelated
+  occupational records from DCR alias resolution and IPS author projection.
 - Clarify that the stable PractitionerRole/RelatedPerson assignment UUID is
   GW's technical Occupation or relationship record, not an employment or
   caregiver contract lifecycle.
