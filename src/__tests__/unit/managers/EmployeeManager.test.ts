@@ -18,8 +18,10 @@ import { mock, MockProxy } from 'jest-mock-extended';
 import type { IVaultRepository } from '../../../database/repositories/vault/vault.repository';
 import type { IKmsService } from '../../../gdc-backend-utils-node/models/IKmsService';
 import {
+  FhirIpsCreatorKinds,
   OrganizationEmployeeSearchResponseEntryTypes,
 } from 'gdc-common-utils-ts';
+import { HealthcareActorRoles } from 'gdc-common-utils-ts/constants/healthcare';
 import { ClaimsOfferSchemaorg, ClaimsPersonSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { RecordBase, ClaimsRecord } from 'gdc-common-utils-ts/models/resource-document';
 import { JwkSet } from '../../../gdc-backend-utils-node/models/jwk';
@@ -43,6 +45,8 @@ import {
   SearchResponseProfileEnvironment,
   SearchResponseProfiles,
 } from '../../../utils/didcomm-response';
+import { buildStableActorIdentifier } from 'gdc-common-utils-ts/utils/actor-identifier';
+import { getClinicalCreatorBindingsSectionId } from '../../../utils/clinical-creator-binding';
 
 const uuidMock = {
   v4: jest.fn(),
@@ -227,6 +231,57 @@ describe('EmployeeManager', () => {
 
       expect(response.body.data[0].response.status).toBe('201');
       expect(response.iss).toBe(TENANT_URN);
+    });
+
+    it('preauthorizes governed employee and occupation UUIDs as one stable professional creator', async () => {
+      const employeeUuid = '31b2c3d4-e5f6-7890-1234-567890abcdef';
+      const occupationUuid = '41b2c3d4-e5f6-7890-1234-567890abcdef';
+      const providerDid = 'did:web:provider.example.com';
+      const claims = {
+        ...testClaimsTenant1Receptionist1,
+        [ClaimsPersonSchemaorg.hasOccupation]: HealthcareActorRoles.Veterinarian,
+      };
+      const job = testBaseJobForEmployeeClaims(claims, TENANT_ALTERNATE_NAME, TENANT_SECTOR);
+      (job.content as any).aud = providerDid;
+      ((job.content as any).body.data[0] as any).resource = { id: employeeUuid };
+      (uuidv4 as jest.Mock).mockReturnValue(occupationUuid);
+      mockVaultRepository.put.mockResolvedValue(true);
+      mockTenantsCacheManager.getTenantIdentifierUrn.mockResolvedValue(TENANT_URN);
+
+      await employeeManager.process(job);
+
+      expect(mockVaultRepository.put).toHaveBeenNthCalledWith(
+        2,
+        TENANT_VAULT_ID,
+        [{
+          id: `urn:uuid:${occupationUuid}`,
+          kind: FhirIpsCreatorKinds.Professional,
+          actorIdentifier: `urn:uuid:${employeeUuid}`,
+          authorIdentifier: `urn:uuid:${occupationUuid}`,
+          ownerIdentifier: providerDid,
+          role: HealthcareActorRoles.Veterinarian,
+          verifiedContactIdentifiers: [buildStableActorIdentifier({
+            contactKind: 'email',
+            contact: claims[ClaimsPersonSchemaorg.email],
+          })],
+        }],
+        getClinicalCreatorBindingsSectionId(),
+      );
+    });
+
+    it('does not create an IPS creator binding for a role outside the governed clinical catalog', async () => {
+      const claims = { ...testClaimsTenant1Receptionist1, [ClaimsPersonSchemaorg.hasOccupation]: 'ISCO-08|3240' };
+      const job = testBaseJobForEmployeeClaims(claims, TENANT_ALTERNATE_NAME, TENANT_SECTOR);
+      (job.content as any).aud = 'did:web:provider.example.com';
+      ((job.content as any).body.data[0] as any).resource = { id: '31b2c3d4-e5f6-7890-1234-567890abcdef' };
+      mockVaultRepository.put.mockResolvedValue(true);
+      mockTenantsCacheManager.getTenantIdentifierUrn.mockResolvedValue(TENANT_URN);
+
+      await employeeManager.process(job);
+
+      expect(mockVaultRepository.put).not.toHaveBeenCalledWith(
+        expect.anything(), expect.anything(), getClinicalCreatorBindingsSectionId(),
+      );
     });
 
     it('should leave seat issuance to the following License operation', async () => {

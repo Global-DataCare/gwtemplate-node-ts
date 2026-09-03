@@ -3,9 +3,10 @@
 import { GatewayResponseEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
 import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 import { HttpStatusCodes } from 'gdc-common-utils-ts/constants/http';
+import { getHealthcareRoleByClaim } from 'gdc-common-utils-ts/constants/healthcare';
 
 import { v4 as uuidv4 } from 'uuid';
-import { OrganizationEmployeeSearchResponseEntryTypes } from 'gdc-common-utils-ts';
+import { FhirIpsCreatorKinds, normalizeUuid, OrganizationEmployeeSearchResponseEntryTypes } from 'gdc-common-utils-ts';
 import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
 import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
 import { IssueLevel, IssueType } from 'gdc-common-utils-ts/models/issue';
@@ -41,6 +42,9 @@ import type { ITenantDidRegistryMutator } from './ITenantDidRegistryMutator';
 import type { IHostRuntime } from './IHostRuntime';
 import { buildOfferOrderIndexedAttributes } from '../utils/offer-order-read-model';
 import { buildSearchResponseEntries } from '../utils/didcomm-response';
+import { buildStableActorIdentifier } from 'gdc-common-utils-ts/utils/actor-identifier';
+import type { ClinicalCreatorBinding } from 'gdc-common-utils-ts/utils/fhir-ips-creator-identity';
+import { getClinicalCreatorBindingsSectionId } from '../utils/clinical-creator-binding';
 import { canonicalizeBundleEntryMetadata } from '../utils/canonical-entry-metadata';
 import {
   ACTION_PURGE,
@@ -50,6 +54,13 @@ import {
 
 const EMPLOYEE_SECTION = getEnvSectionId('employees');
 const DEVICE_LICENSE_SECTION = getEnvSectionId('device-licenses');
+
+function canonicalUuidUrn(value: string): string | undefined {
+  const hex = normalizeUuid(value);
+  if (!hex) return undefined;
+  const uuid = `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+  return `urn:uuid:${uuid}`;
+}
 
 export class EmployeeManager {
   private vaultRepository: IVaultRepository;
@@ -133,6 +144,7 @@ export class EmployeeManager {
           environment,
           job.sector,
           job.jurisdiction,
+          job.content.aud as string,
         );
         responseEntries.push(resultEntry);
       } catch (error: any) {
@@ -281,6 +293,7 @@ export class EmployeeManager {
     environment?: string,
     sector?: string,
     jurisdiction?: string,
+    ownerIdentifier?: string,
   ): Promise<BundleEntry> {
     const requestEntry = entry as BundleEntryRequest;
     const { request, type } = requestEntry;
@@ -303,7 +316,7 @@ export class EmployeeManager {
         if (!claims) {
           throw new ManagerError('Entry requires resource.meta.claims.', IssueType.Required);
         }
-        return this.createEmployee(tenantVaultId, employeeCollectionName, tenantId, tenantUrn, employeeId, claims, type, meta, contentType);
+        return this.createEmployee(tenantVaultId, employeeCollectionName, tenantId, tenantUrn, employeeId, claims, type, meta, contentType, ownerIdentifier);
       case 'DELETE':
         return this.disableEmployee(employeeCollectionName, tenantVaultId, employeeId, type);
       default:
@@ -333,6 +346,7 @@ export class EmployeeManager {
     entryType: string,
     jobMeta: IDecodedDidcommPayload['meta'],
     contentType?: string,
+    ownerIdentifier?: string,
   ): Promise<BundleEntry> {
     let signerJwk: PublicJwk | undefined;
     let encrypterJwk: PublicJwk | undefined;
@@ -506,6 +520,14 @@ export class EmployeeManager {
     // The tenant's vaultId is used for the security context.
     const secureDoc = await this.kmsService.protectConfidentialData(docToProtect, tenantVaultId);
     await this.vaultRepository.put(employeeCollectionName, [secureDoc, occupationDoc], EMPLOYEE_SECTION);
+    await this.persistProfessionalClinicalCreatorBinding({
+      tenantVaultId,
+      employeeId,
+      occupationId: occupationDoc.id,
+      ownerIdentifier,
+      role: roleCode,
+      email,
+    });
 
     return {
       type: entryType,
@@ -517,6 +539,36 @@ export class EmployeeManager {
       },
       response: { status: String(HttpStatusCodes.Created) },
     };
+  }
+
+  /** Preauthorizes the UUID-backed FHIR export identity only for governed clinical roles. */
+  private async persistProfessionalClinicalCreatorBinding(params: {
+    tenantVaultId: string;
+    employeeId: string;
+    occupationId: string;
+    ownerIdentifier?: string;
+    role: string;
+    email: string;
+  }): Promise<void> {
+    if (!getHealthcareRoleByClaim(params.role)) return;
+    const actorIdentifier = canonicalUuidUrn(params.employeeId);
+    const authorIdentifier = canonicalUuidUrn(params.occupationId);
+    const ownerIdentifier = String(params.ownerIdentifier || '').trim();
+    if (!actorIdentifier || !authorIdentifier || !ownerIdentifier) return;
+    const binding: ClinicalCreatorBinding & { id: string } = {
+      id: authorIdentifier,
+      kind: FhirIpsCreatorKinds.Professional,
+      actorIdentifier,
+      authorIdentifier,
+      ownerIdentifier,
+      role: params.role,
+      verifiedContactIdentifiers: [buildStableActorIdentifier({ contactKind: 'email', contact: params.email })],
+    };
+    await this.vaultRepository.put(
+      params.tenantVaultId,
+      [binding],
+      getClinicalCreatorBindingsSectionId(),
+    );
   }
 
   /**
