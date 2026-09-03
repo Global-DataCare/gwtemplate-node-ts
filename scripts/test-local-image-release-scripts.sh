@@ -206,8 +206,13 @@ grep -Fq 'ready_status_count' ./scripts/smoke-consentaccess-local-network.sh
 grep -Fq 'poll_async_until' ./scripts/bootstrap-single-tenant.sh
 grep -Fq '.body.data[0].resource.meta.claims["org.schema.Offer.identifier"]' \
   ./scripts/bootstrap-single-tenant.sh
-if rg -n '"/body/data/0/meta/claims/' ./scripts/bootstrap-single-tenant.sh; then
-  echo 'ERROR: tenant bootstrap still authors legacy entry.meta.claims overrides.' >&2
+if rg -n '"/body/data/0/meta/claims/' \
+  ./scripts/bootstrap-single-tenant.sh \
+  ./scripts/demo-create-individual-organization.sh \
+  ./scripts/portal-web-go-no-go.sh \
+  || rg -n 'body\.data\[0\]\.meta\.claims\[[^]]+\][[:space:]]*=' \
+  ./scripts/run-api-integrators-guide-flow.mts; then
+  echo 'ERROR: an executable acceptance flow still authors legacy entry.meta.claims.' >&2
   exit 1
 fi
 grep -Fq '"/body/data/0/resource/meta/claims/org.schema.Organization.identifier.value"' \
