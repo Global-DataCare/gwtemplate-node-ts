@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Accept creator-authorized `PUT ResourceType/id` entries in section-scoped
+  clinical batches, including optional weak-ETag matching, while preserving
+  subject and creator ownership checks independently for every batch entry.
 - Clarify that the stable PractitionerRole/RelatedPerson assignment UUID is
   GW's technical Occupation or relationship record, not an employment or
   caregiver contract lifecycle.

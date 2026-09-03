@@ -221,6 +221,30 @@ describe('CommunicationManager Unit Tests', () => {
       expect(mockVaultRepository.delete).not.toHaveBeenCalled();
     });
 
+    it('lets the authenticated creator replace the same clinical resource through PUT', async () => {
+      mockTenantsCacheManager.getTenantDid.mockResolvedValue(testServerDid as any);
+      mockVaultRepository.get.mockResolvedValue({
+        id: 'observation-existing', audit: { creatorDid },
+        'Observation.subject': subjectDid, 'Observation.meta.versionId': 'version-current',
+      } as any);
+      const response = await communicationManager.process(buildClinicalBatchJob([{
+        type: 'Observation-update-request-v1.0',
+        request: { method: 'PUT', url: 'Observation/observation-existing', ifMatch: 'W/"version-current"' },
+        resource: {
+          resourceType: 'Observation', id: 'observation-existing',
+          subject: { reference: subjectDid }, status: 'final', code: { text: 'Corrected result' },
+        },
+      }]));
+      expect((response.body as any).data[0]).toEqual(expect.objectContaining({
+        id: 'observation-existing', response: expect.objectContaining({ status: '200' }),
+      }));
+      expect(mockVaultRepository.put).toHaveBeenCalledWith(
+        'animal-care_acme',
+        [expect.objectContaining({ id: 'observation-existing', audit: { creatorDid } })],
+        expect.any(String),
+      );
+    });
+
     it('removes the correlated digital-twin projection when the creator deletes an erroneous record', async () => {
       // Step 1. The operational record has an enabled secondary-use projection and a stable twin alias.
       const twinSubjectDid = 'urn:uuid:7b419936-4999-4a18-b21e-681dc3e6a8c0';
