@@ -237,18 +237,43 @@ ventana cualquier identificador no consumido.
 
 ## 7. Fase B: proveedor del host
 
-Se transfieren únicamente los dos grants `0600` y la cadena TLS pública de Fabric CA.
-La identidad `<MSP>.admin` y su clave privada permanecen en la infraestructura
-de la gobernanza. El proveedor genera solamente las identidades de peer/TLS y
-cliente GW que necesita su runtime.
+Se transfiere por un canal seguro un paquete privado cifrado con este contenido
+mínimo y suficiente:
+
+```text
+peer-enrollment-grant.json
+gw-client-enrollment-grant.json
+fabric-ica-ca-chain.pem
+fabric-endpoints.json
+authorization.json
+host-apply-confirmation.json
+onboarding.host.json
+manifest.sha256
+```
+
+Los dos grants son secretos temporales. La cadena y los endpoints son públicos;
+`authorization.json` es el resultado saneado de la autorización y
+`host-apply-confirmation.json` contiene el `requestId` exacto del guard de
+aplicación. `onboarding.host.json` referencia esos ficheros y las rutas privadas
+de salida del host. El proveedor verifica `manifest.sha256` antes de consumir
+nada. La Host VC-JWT, el PDF, el inventario completo, la identidad `<MSP>.admin`
+y la identidad registradora de Fabric CA quedan fuera de la entrega.
+
+El proveedor genera solamente las identidades de peer/TLS y cliente GW que
+necesita su runtime.
 El proveedor ejecuta plan y aplicación:
 
 ```bash
-node scripts/onboarding/host-onboarding-assistant.mjs \
-  --manifest /secure/onboarding/onboarding.json --role host
+cd /secure/onboarding
+shasum -a 256 -c manifest.sha256
+request_id="$(jq -r '.governanceDecision.decision.requestId' \
+  host-apply-confirmation.json)"
 
 node scripts/onboarding/host-onboarding-assistant.mjs \
-  --manifest /secure/onboarding/onboarding.json --role host \
+  --manifest /secure/onboarding/onboarding.host.json --role host
+
+node scripts/onboarding/host-onboarding-assistant.mjs \
+  --manifest /secure/onboarding/onboarding.host.json --role host \
   --apply --confirm-request "${request_id}"
 ```
 

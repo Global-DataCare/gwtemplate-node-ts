@@ -167,12 +167,29 @@ node scripts/onboarding/host-onboarding-assistant.mjs \
 node scripts/onboarding/host-onboarding-assistant.mjs \
   --manifest /secure/onboarding/onboarding.json --role authority \
   --apply --confirm-request "${request_id}"</pre>
-  <p>El proveedor recibe únicamente el grant 0600 y la cadena TLS pública de
-  Fabric CA. Las claves se crean en su infraestructura:</p>
-  <pre>node scripts/onboarding/host-onboarding-assistant.mjs \
-  --manifest /secure/onboarding/onboarding.json --role host
+  <p>El proveedor recibe por un canal seguro un paquete privado cifrado. La
+  identidad administradora del MSP, el registrador de Fabric CA, la Host VC-JWT,
+  el PDF y el inventario completo de red quedan fuera de la entrega:</p>
+  <pre>peer-enrollment-grant.json
+gw-client-enrollment-grant.json
+fabric-ica-ca-chain.pem
+fabric-endpoints.json
+authorization.json
+host-apply-confirmation.json
+onboarding.host.json
+manifest.sha256</pre>
+  <p>Los grants son secretos temporales. <code>authorization.json</code> es el
+  resultado saneado, <code>host-apply-confirmation.json</code> proporciona el
+  <code>requestId</code> y <code>onboarding.host.json</code> fija las rutas del
+  rol del host. El proveedor comprueba los hashes antes de generar sus claves:</p>
+  <pre>cd /secure/onboarding
+shasum -a 256 -c manifest.sha256
+request_id="$(jq -r '.governanceDecision.decision.requestId' \
+  host-apply-confirmation.json)"
 node scripts/onboarding/host-onboarding-assistant.mjs \
-  --manifest /secure/onboarding/onboarding.json --role host \
+  --manifest /secure/onboarding/onboarding.host.json --role host
+node scripts/onboarding/host-onboarding-assistant.mjs \
+  --manifest /secure/onboarding/onboarding.host.json --role host \
   --apply --confirm-request "${request_id}"
 cd /secure/host/helm-runtime
 shasum -a 256 -c manifest.sha256</pre>

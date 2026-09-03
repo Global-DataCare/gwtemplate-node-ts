@@ -401,10 +401,27 @@ pueden pertenecer al mismo MSP.
 `authority.caName` identifica la ICA de Fabric exacta y se conserva en ambos
 grants para que el host no pueda enrolarse accidentalmente contra otra CA.
 
-Salida hacia el DevOps del host: grant de dos usos para MSP/TLS, grant de un
-uso para el cliente GW y cadena TLS pública de la ICA de Fabric. Nunca se
-entrega la identidad administradora del MSP ni la identidad registradora de la
-ICA de Fabric.
+Salida hacia el DevOps del host: un paquete privado cifrado, verificable por su
+manifiesto de hashes y compuesto exactamente por:
+
+```text
+peer-enrollment-grant.json
+gw-client-enrollment-grant.json
+fabric-ica-ca-chain.pem
+fabric-endpoints.json
+authorization.json
+host-apply-confirmation.json
+onboarding.host.json
+manifest.sha256
+```
+
+`authorization.json` es el resultado saneado que vincula la Host VC verificada,
+el dominio, la red, el MSP y los canales aprobados; no contiene la VC-JWT.
+`host-apply-confirmation.json` contiene el `requestId` que protege la aplicación
+y `onboarding.host.json` fija únicamente las rutas y salidas privadas que usa el
+rol `host`. Nunca se entrega la identidad administradora del MSP, la identidad
+registradora de la ICA de Fabric, el inventario completo de la red ni claves
+privadas de la entidad gobernadora.
 
 El tiempo predeterminado del asistente es 15 minutos. Para una entrega acordada
 de viernes a lunes, el administrador puede generar ambos grants con una ventana
@@ -423,12 +440,17 @@ el identificador si llega el final de la ventana sin haberse consumido.
 ## 8. DevOps del host: generar MSP/TLS dentro del host
 
 ```bash
-node scripts/onboarding/host-onboarding-assistant.mjs \
-  --manifest /secure/onboarding/onboarding.json --role host
+cd /secure/onboarding
+shasum -a 256 -c manifest.sha256
+request_id="$(jq -r '.governanceDecision.decision.requestId' \
+  host-apply-confirmation.json)"
 
 node scripts/onboarding/host-onboarding-assistant.mjs \
-  --manifest /secure/onboarding/onboarding.json --role host \
-  --apply --confirm-request '<request-id-firmado>'
+  --manifest /secure/onboarding/onboarding.host.json --role host
+
+node scripts/onboarding/host-onboarding-assistant.mjs \
+  --manifest /secure/onboarding/onboarding.host.json --role host \
+  --apply --confirm-request "${request_id}"
 ```
 
 Salida: MSP/TLS del peer, identidad cliente del GW, `gw.fabric.env` y paquete

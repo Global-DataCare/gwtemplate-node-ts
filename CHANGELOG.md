@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Complete the public host handoff contract with the two bounded Fabric grants,
+  Fabric CA chain, endpoints, sanitized authorization, request confirmation,
+  host-role manifest and checksum manifest required by the executable host
+  assistant, without publishing provider-specific infrastructure or authority
+  material.
 - Accept creator-authorized `PUT ResourceType/id` entries in section-scoped
   clinical batches, including optional weak-ETag matching, while preserving
   subject and creator ownership checks independently for every batch entry.
