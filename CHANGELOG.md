@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [1.23.17] - 2026-09-03
+
+- Align the Family manager contract tests with canonical Bundle response
+  claims at `entry.resource.meta.claims`, matching the production response
+  writers and preventing stale entry-level assertions from blocking release.
+
 ## [1.23.16] - 2026-09-03
 
 - Keep every Fabric MSP administrator under network-governance management, export

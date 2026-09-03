@@ -1,4 +1,4 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 // src/__tests__/managers/FamilyManager.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // Always create JSDoc, do not use strings inline in keys nor values, use types instead, and reuse the data test examples.
@@ -512,7 +512,7 @@ describe('FamilyManager', () => {
       const body = response.body as BundleJsonApi;
       const entry = body.data[0] as BundleEntry;
 
-      expect(entry.meta?.claims?.['org.schema.FamilyRegistration.status']).toBe('new_created');
+      expect(entry.resource?.meta?.claims?.['org.schema.FamilyRegistration.status']).toBe('new_created');
       expect(entry.response?.status).toBe('201');
       expect(mockVaultRepository.put).toHaveBeenCalledTimes(1);
     });
@@ -529,7 +529,7 @@ describe('FamilyManager', () => {
       const body = response.body as BundleJsonApi;
       const entry = body.data[0] as BundleEntry;
 
-      expect(entry.meta?.claims?.['org.schema.FamilyRegistration.status']).toBe('already_exists');
+      expect(entry.resource?.meta?.claims?.['org.schema.FamilyRegistration.status']).toBe('already_exists');
       expect(mockVaultRepository.put).not.toHaveBeenCalled();
     });
 
@@ -545,7 +545,7 @@ describe('FamilyManager', () => {
       const body = response.body as BundleJsonApi;
       const entry = body.data[0] as BundleEntry;
 
-      expect(entry.meta?.claims?.['org.schema.FamilyRegistration.status']).toBe('resume_required');
+      expect(entry.resource?.meta?.claims?.['org.schema.FamilyRegistration.status']).toBe('resume_required');
       expect(mockVaultRepository.put).not.toHaveBeenCalled();
     });
 
@@ -595,7 +595,7 @@ describe('FamilyManager', () => {
       const protectedDoc = mockKmsService.protectConfidentialData.mock.calls[0]?.[0] as ConfidentialStorageDoc;
       const persistedClaims = (protectedDoc.content as any).claims as Record<string, unknown>;
 
-      expect(entry.meta?.claims).toEqual(expect.objectContaining({
+      expect(entry.resource?.meta?.claims).toEqual(expect.objectContaining({
         [ClaimsOrganizationSchemaorg.alternateName]: EXAMPLE_REGISTERED_SUBJECT_ALTERNATE_NAME,
         [ClaimsOrganizationSchemaorg.ownerAlternateName]: EXAMPLE_REGISTERED_SUBJECT_ALTERNATE_NAME,
         [ClaimsOrganizationSchemaorg.ownerEmail]: EXAMPLE_SELF_REGISTERED_INDIVIDUAL_EMAIL_NORMALIZED,
@@ -770,7 +770,7 @@ describe('FamilyManager', () => {
           expect(mapped[ClaimsPersonSchemaorg.gender]).toBe(fixture.expectedControllerGender);
         }
 
-        expect(entry.meta?.claims).toEqual(expect.objectContaining({
+        expect(entry.resource?.meta?.claims).toEqual(expect.objectContaining({
           'org.schema.FamilyRegistration.status': 'new_created',
           [ClaimsOrganizationSchemaorg.alternateName]: fixture.expectedOrganizationAlternateName,
           [ClaimsOrganizationSchemaorg.ownerAlternateName]: fixture.expectedOrganizationAlternateName,
@@ -808,7 +808,7 @@ describe('FamilyManager', () => {
         const entry = body.data[0] as BundleEntry;
 
         expect(body.type).toBe('transaction-response');
-        expect(entry.meta?.claims).toEqual(expect.objectContaining({
+        expect(entry.resource?.meta?.claims).toEqual(expect.objectContaining({
           'org.schema.FamilyRegistration.status': 'new_created',
           [ClaimsOrganizationSchemaorg.alternateName]: fixture.expectedOrganizationAlternateName,
           [ClaimsOrganizationSchemaorg.ownerAlternateName]: fixture.expectedOrganizationAlternateName,
@@ -856,7 +856,7 @@ describe('FamilyManager', () => {
             'https://www.dropbox.com/scl/fi/example/signed-individual-form.pdf?dl=1',
             { redirect: 'follow' },
           );
-          expect(entry.meta?.claims).toEqual(expect.objectContaining({
+          expect(entry.resource?.meta?.claims).toEqual(expect.objectContaining({
             'org.schema.FamilyRegistration.status': 'new_created',
             [ClaimsOrganizationSchemaorg.alternateName]: fixture.expectedOrganizationAlternateName,
             [ClaimsOrganizationSchemaorg.ownerAlternateName]: fixture.expectedOrganizationAlternateName,
@@ -926,7 +926,7 @@ describe('FamilyManager', () => {
       const body = response.body as BundleJsonApi;
       const entry = body.data[0] as BundleEntry;
 
-      expect(entry.meta?.claims?.['org.schema.FamilyRegistration.status']).toBe('not_found');
+      expect(entry.resource?.meta?.claims?.['org.schema.FamilyRegistration.status']).toBe('not_found');
     });
 
     it('already_exists: returns already_exists from _search when Active record is found', async () => {
@@ -944,7 +944,7 @@ describe('FamilyManager', () => {
       const body = response.body as BundleJsonApi;
       const entry = body.data[0] as BundleEntry;
 
-      expect(entry.meta?.claims?.['org.schema.FamilyRegistration.status']).toBe('already_exists');
+      expect(entry.resource?.meta?.claims?.['org.schema.FamilyRegistration.status']).toBe('already_exists');
     });
 
     it('resume_required: returns resume_required from _search when Pending record is found', async () => {
@@ -962,7 +962,7 @@ describe('FamilyManager', () => {
       const body = response.body as BundleJsonApi;
       const entry = body.data[0] as BundleEntry;
 
-      expect(entry.meta?.claims?.['org.schema.FamilyRegistration.status']).toBe('resume_required');
+      expect(entry.resource?.meta?.claims?.['org.schema.FamilyRegistration.status']).toBe('resume_required');
     });
   });
 
@@ -980,7 +980,7 @@ describe('FamilyManager', () => {
       const body = response.body as BundleJsonApi;
       const entry = body.data[0] as BundleEntry;
 
-      expect(entry.meta?.claims?.['org.schema.FamilyRegistration.status']).toBe('disabled');
+      expect(entry.resource?.meta?.claims?.['org.schema.FamilyRegistration.status']).toBe('disabled');
       expect(entry.response?.status).toBe('200');
       const updatedDocs = mockVaultRepository.put.mock.calls[0][1] as ConfidentialStorageDoc[];
       expect(updatedDocs[0].status).toBe(EntityLifecycleStatus.Inactive);
@@ -1031,7 +1031,7 @@ describe('FamilyManager', () => {
       const body = response.body as BundleJsonApi;
       const entry = body.data[0] as BundleEntry;
 
-      expect(entry.meta?.claims?.['org.schema.FamilyRegistration.status']).toBe('purged');
+      expect(entry.resource?.meta?.claims?.['org.schema.FamilyRegistration.status']).toBe('purged');
       expect(entry.response?.status).toBe('200');
       expect(mockVaultRepository.put).toHaveBeenCalledTimes(1);
       const updatedLicenseDocs = mockVaultRepository.put.mock.calls[0][1] as ConfidentialStorageDoc[];
