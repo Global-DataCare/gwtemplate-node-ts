@@ -168,7 +168,9 @@ Verify current branches, versions and published npm state before release claims.
 - In that protected metadata, store the actor/member UUID, a distinct
   relationship or professional-assignment UUID, its owner and governed role.
   Operational DIDs, verified contacts, DCR clients and `kid` values are aliases
-  only. Consent targets the assignment UUID plus its separate role.
+  only. Consent targets the assignment UUID plus its separate role. An
+  assignment is the technical Occupation or relationship record; do not claim
+  that GW manages employment/caregiver contracts, periods or renewals.
 - Require an employee/member import or authorized onboarding record before DCR
   may link a stable creator binding. DCR can add its verified client, actor DID
   and public `kid` aliases to the exact existing binding; it cannot create or

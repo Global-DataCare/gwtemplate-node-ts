@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Clarify that the stable PractitionerRole/RelatedPerson assignment UUID is
+  GW's technical Occupation or relationship record, not an employment or
+  caregiver contract lifecycle.
+
 ## [1.24.1] - 2026-09-03
 
 - Normalize a canonical organization authorization URN stored in
