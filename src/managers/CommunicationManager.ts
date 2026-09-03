@@ -1182,6 +1182,73 @@ export class CommunicationManager implements IJobProcessor {
       }
     }
 
+    if (requestMethod === 'PUT') {
+      if (!recordId || this.normalizeOptionalString(request.url) !== `${resourceType}/${recordId}`) {
+        return errorResponse('400', 'Clinical update request.url must address resource.resourceType/resource.id.');
+      }
+      const subject = this.normalizeOptionalString(input.communicationSubject);
+      if (!subject) return errorResponse('400', 'Clinical update requires Communication.subject.');
+      const sectionId = getSubjectScopedSectionId(
+        subject,
+        SUBJECT_SECTION_INDIVIDUAL,
+        PROJECTED_RESOURCE_CONFIG[resourceType].collectionId,
+      );
+      const existing = await this.vaultRepository.get<{ id: string; [key: string]: any }>(
+        input.tenantVaultId,
+        recordId,
+        sectionId,
+      );
+      if (!existing) return errorResponse('404', 'Clinical record was not found for this subject.');
+      const authors = String(existing[CompositionClaim.Author] || existing?.audit?.creatorDid || '')
+        .split(',')
+        .map((author) => author.trim())
+        .filter(Boolean);
+      if (!await this.isAuthenticatedClinicalAuthor(input.job, input.tenantVaultId, authors)) {
+        return errorResponse('403', 'Only the authenticated creator may update this clinical record.');
+      }
+      const storedSubject = this.resolveProjectedResourceSubject(
+        existing,
+        PROJECTED_RESOURCE_CONFIG[resourceType].subjectClaimKeys,
+      );
+      if (storedSubject !== subject) {
+        return errorResponse('403', 'Clinical record does not belong to Communication.subject.');
+      }
+      const expectedVersion = this.parseIfMatchVersion(request.ifMatch);
+      if (request.ifMatch !== undefined) {
+        if (!expectedVersion) {
+          return errorResponse('400', 'Clinical update request.ifMatch must contain a weak ETag version.');
+        }
+        const currentVersion = this.getFirstClaimValue(existing, [
+          `${resourceType}.meta.versionId`,
+          `org.hl7.fhir.r4.${resourceType}.meta.versionId`,
+        ]);
+        if (!currentVersion || currentVersion !== expectedVersion) {
+          return errorResponse('412', 'Clinical record version does not match request.ifMatch.');
+        }
+      }
+      try {
+        const updated = await this.persistProjectedClinicalResource({
+          job: input.job,
+          resource,
+          resourceType,
+          communicationSubject: input.communicationSubject,
+          explicitSection: input.explicitSection,
+          fhirResource: input.fhirResource,
+          tenantVaultId: input.tenantVaultId,
+          creatorDid: actorDid,
+        });
+        return {
+          id: updated.recordId,
+          type: responseType,
+          response: { status: '200', etag: `W/"${updated.versionId}"` },
+          resource: { resourceType, id: updated.recordId },
+        };
+      } catch (error) {
+        const status = error instanceof ManagerError ? error.status : '400';
+        return errorResponse(status, error instanceof Error ? error.message : 'Clinical update failed.');
+      }
+    }
+
     if (requestMethod === 'DELETE') {
       if (!recordId || this.normalizeOptionalString(request.url) !== `${resourceType}/${recordId}`) {
         return errorResponse('400', 'Clinical delete request.url must address resource.resourceType/resource.id.');
