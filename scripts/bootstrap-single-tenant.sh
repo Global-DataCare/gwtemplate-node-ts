@@ -124,21 +124,21 @@ org_payload_overrides="$(jq -n \
   '{
     "/thid": $thid,
     "/iss": $iss,
-    "/body/data/0/meta/claims/org.schema.Organization.address.addressCountry": $jurisdiction,
-    "/body/data/0/meta/claims/org.schema.Organization.identifier.value": $taxId,
-    "/body/data/0/meta/claims/org.schema.Organization.legalName": $legalName,
-    "/body/data/0/meta/claims/org.schema.Organization.name": $displayName,
-    "/body/data/0/meta/claims/org.schema.Organization.numberOfEmployees.value": $employeeCount,
-    "/body/data/0/meta/claims/org.schema.Organization.url": $orgUrl,
-    "/body/data/0/meta/claims/org.schema.Person.email": $adminEmail,
-    "/body/data/0/meta/claims/org.schema.Person.hasOccupation": $personOccupation,
-    "/body/data/0/meta/claims/org.schema.Service.category": $sector,
-    "/body/data/0/meta/claims/org.schema.Service.identifier": $serviceIdentifier,
-    "/body/data/0/meta/claims/org.schema.Service.url": $serviceUrl,
-    "/body/data/0/meta/claims/org.schema.Service.areaServed": $serviceAreaServed,
-    "/body/data/0/meta/claims/org.schema.Service.termsOfService": $termsOfService
+    "/body/data/0/resource/meta/claims/org.schema.Organization.address.addressCountry": $jurisdiction,
+    "/body/data/0/resource/meta/claims/org.schema.Organization.identifier.value": $taxId,
+    "/body/data/0/resource/meta/claims/org.schema.Organization.legalName": $legalName,
+    "/body/data/0/resource/meta/claims/org.schema.Organization.name": $displayName,
+    "/body/data/0/resource/meta/claims/org.schema.Organization.numberOfEmployees.value": $employeeCount,
+    "/body/data/0/resource/meta/claims/org.schema.Organization.url": $orgUrl,
+    "/body/data/0/resource/meta/claims/org.schema.Person.email": $adminEmail,
+    "/body/data/0/resource/meta/claims/org.schema.Person.hasOccupation": $personOccupation,
+    "/body/data/0/resource/meta/claims/org.schema.Service.category": $sector,
+    "/body/data/0/resource/meta/claims/org.schema.Service.identifier": $serviceIdentifier,
+    "/body/data/0/resource/meta/claims/org.schema.Service.url": $serviceUrl,
+    "/body/data/0/resource/meta/claims/org.schema.Service.areaServed": $serviceAreaServed,
+    "/body/data/0/resource/meta/claims/org.schema.Service.termsOfService": $termsOfService
   } + (if $serviceType != "" then {
-    "/body/data/0/meta/claims/org.schema.Service.serviceType": $serviceType
+    "/body/data/0/resource/meta/claims/org.schema.Service.serviceType": $serviceType
   } else {} end)')"
 org_payload="$(render_example_payload ORGANIZATION_REGISTRATION_REQUEST "$org_payload_overrides")"
 
@@ -155,18 +155,18 @@ if [[ -z "$org_err" ]]; then
   org_poll="$(poll_async_until \
     "$BASE_URL/host/cds-$HOST_JURISDICTION/v1/$HOST_REGISTRY_SECTOR/registry/org.schema/Organization/_batch-response" \
     "$thid_org" \
-    '(.body.data[0].meta.claims["org.schema.Offer.identifier"] // .data[0].meta.claims["org.schema.Offer.identifier"] // "") | length > 0' \
+    '(.body.data[0].resource.meta.claims["org.schema.Offer.identifier"] // .data[0].resource.meta.claims["org.schema.Offer.identifier"] // .body.data[0].meta.claims["org.schema.Offer.identifier"] // .data[0].meta.claims["org.schema.Offer.identifier"] // "") | length > 0' \
     'organization Offer')"
   echo "$org_poll" | jq '.'
-  offer_id="$(echo "$org_poll" | jq -r '.body.data[0].meta.claims["org.schema.Offer.identifier"] // .data[0].meta.claims["org.schema.Offer.identifier"] // empty')"
+  offer_id="$(echo "$org_poll" | jq -r '.body.data[0].resource.meta.claims["org.schema.Offer.identifier"] // .data[0].resource.meta.claims["org.schema.Offer.identifier"] // .body.data[0].meta.claims["org.schema.Offer.identifier"] // .data[0].meta.claims["org.schema.Offer.identifier"] // empty')"
   [[ -n "$offer_id" ]] || { echo 'ERROR: organization registration completed without an Offer identifier.' >&2; exit 1; }
 
   thid_order="thid-order-${TAX_ID}-$(date +%s)"
   order_payload_overrides="$(jq -n --arg thid "$thid_order" --arg offer "$offer_id" --arg iss "$ADMIN_EMAIL" '{
     "/thid": $thid,
     "/iss": $iss,
-    "/body/data/0/meta/claims/org.schema.Order.acceptedOffer.identifier": $offer,
-    "/body/data/0/meta/claims/Order.acceptedOffer.identifier": $offer
+    "/body/data/0/resource/meta/claims/org.schema.Order.acceptedOffer.identifier": $offer,
+    "/body/data/0/resource/meta/claims/Order.acceptedOffer.identifier": $offer
   }')"
   order_payload="$(render_example_payload ORGANIZATION_ORDER_REQUEST "$order_payload_overrides")"
 

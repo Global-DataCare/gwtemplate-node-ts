@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [1.23.20] - 2026-09-03
+
+- Author organization and Order bootstrap overrides and read the resulting
+  Offer through canonical `entry.resource.meta.claims`, retaining the
+  documented response fallback so the immutable Docker local-network smoke
+  validates current GW responses with the requested tenant and thread ids.
+
 ## [1.23.19] - 2026-09-03
 
 - Make the mandatory secure local E2E runner start and health-check the local

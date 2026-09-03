@@ -204,6 +204,14 @@ grep -Fq 'Host1MSP' ./scripts/warm-local-fabric-chaincodes.sh
 grep -Fq 'tenant_rehydration=ok' ./scripts/smoke-docker-local-network.sh
 grep -Fq 'ready_status_count' ./scripts/smoke-consentaccess-local-network.sh
 grep -Fq 'poll_async_until' ./scripts/bootstrap-single-tenant.sh
+grep -Fq '.body.data[0].resource.meta.claims["org.schema.Offer.identifier"]' \
+  ./scripts/bootstrap-single-tenant.sh
+if rg -n '"/body/data/0/meta/claims/' ./scripts/bootstrap-single-tenant.sh; then
+  echo 'ERROR: tenant bootstrap still authors legacy entry.meta.claims overrides.' >&2
+  exit 1
+fi
+grep -Fq '"/body/data/0/resource/meta/claims/org.schema.Organization.identifier.value"' \
+  ./scripts/bootstrap-single-tenant.sh
 docker compose -f ./docker-compose.open-source-local.yml config >/dev/null
 node ./scripts/bootstrap-local-fabric-stack.mjs --help | grep -q -- '--prepare-only'
 node ./scripts/bootstrap-local-fabric-stack.mjs --help | grep -q 'LOCAL_FABRIC_CA_SOURCE=dataspace-ca'
