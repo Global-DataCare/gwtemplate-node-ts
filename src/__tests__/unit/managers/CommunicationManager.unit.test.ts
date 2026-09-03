@@ -121,10 +121,11 @@ describe('CommunicationManager Unit Tests', () => {
     const subjectDid = 'did:web:subject.example:animals:patient-1';
     const creatorDid = 'did:web:clinic-a.example:professionals:vet-1';
 
-    function buildClinicalBatchJob(innerEntries: unknown[]): JobRequest {
+    function buildClinicalBatchJob(innerEntries: unknown[], authorDid?: string): JobRequest {
       const attachedBundle = {
         resourceType: ResourceTypesFhirR4.Bundle,
         type: 'batch',
+        ...(authorDid ? { meta: { claims: { 'Composition.author': authorDid } } } : {}),
         data: innerEntries,
       };
       return {
@@ -327,6 +328,46 @@ describe('CommunicationManager Unit Tests', () => {
         expect.any(String),
       );
       expect(mockVaultRepository.delete).not.toHaveBeenCalled();
+    });
+
+    it('uses an explicit registered document author for a section-scoped create', async () => {
+      mockTenantsCacheManager.getTenantDid.mockResolvedValue(testServerDid as any);
+      await mockVaultRepository.put('animal-care_acme', [{
+        id: `urn:uuid:${EXAMPLE_KYC_CONTROLLER_UUID}`,
+        kind: FhirIpsCreatorKinds.Professional,
+        actorIdentifier: `urn:uuid:${EXAMPLE_KYC_CONTROLLER_USER_UUID}`,
+        authorIdentifier: `urn:uuid:${EXAMPLE_KYC_CONTROLLER_UUID}`,
+        ownerIdentifier: EXAMPLE_PROVIDER_ORGANIZATION_DID,
+        role: 'ISCO-08|2250',
+        actorDids: [EXAMPLE_PROFESSIONAL_DID],
+      } as any], getClinicalCreatorBindingsSectionId());
+      mockVaultRepository.listContainersInSection.mockImplementation(async (vaultId: string, sectionId: string) =>
+        [...storedRecords.entries()]
+          .filter(([key]) => key.startsWith(`${vaultId}|${sectionId}|`))
+          .map(([, value]) => value));
+
+      const response = await communicationManager.process(buildClinicalBatchJob([{
+        type: GatewayRequestEntryTypes.ObservationCreate,
+        request: { method: HttpRequestMethods.Post, url: ResourceTypesFhirR4.Observation },
+        resource: {
+          resourceType: ResourceTypesFhirR4.Observation,
+          id: 'observation-delegated-author',
+          subject: { reference: subjectDid },
+          status: 'final',
+          code: { text: 'Reviewed result' },
+        },
+      }], EXAMPLE_PROFESSIONAL_DID));
+
+      expect((response.body as any).data[0].response.status).toBe(String(HttpStatusCodes.Created));
+      expect(mockVaultRepository.put).toHaveBeenCalledWith(
+        'animal-care_acme',
+        [expect.objectContaining({
+          id: 'observation-delegated-author',
+          'Composition.author': EXAMPLE_PROFESSIONAL_DID,
+          audit: { creatorDid: EXAMPLE_PROFESSIONAL_DID, submitterDid: creatorDid },
+        })],
+        expect.any(String),
+      );
     });
   });
 

@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Separate authenticated Communication sender, explicit clinical author and
+  Observation performer. Section creates accept a registered author, delegated
+  submissions retain their submitter audit, and PUT/DELETE preserve authorship.
 - Complete the public host handoff contract with the two bounded Fabric grants,
   Fabric CA chain, endpoints, sanitized authorization, request confirmation,
   host-role manifest and checksum manifest required by the executable host
