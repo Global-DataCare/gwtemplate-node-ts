@@ -1425,6 +1425,8 @@ describe('Composition Bundle _search API (integration)', () => {
         code: '10',
       };
 
+      // The author is the authenticated operational employee DID. The hosted
+      // provider-tenant DID is routing/recipient identity, not a portal alias.
       const saveResp = await invokeExpress(app, {
         method: 'POST',
         url: `/${testTenant1TenantId}/cds-ES/v1/health-care/digitaltwin/org.hl7.fhir.r4/Composition/_batch`,
