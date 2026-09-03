@@ -39,6 +39,10 @@ grep -Fq '"$SCRIPT_DIR"' ./docker_build_local.sh
 grep -Fq '"$SCRIPT_DIR"' ./cloud_deploy.sh
 grep -Fq 'resolve_pushed_digest' ./cloud_deploy.sh
 grep -Fq 'DEPLOY_DRY_RUN' ./cloud_deploy.sh
+grep -Fq 'DATASPACE_ICA_ROOT=' ./scripts/run-secure-e2e-google-user.sh
+grep -Fq 'npm run api:local' ./scripts/run-secure-e2e-google-user.sh
+grep -Fq 'curl -fsS "${ICA_BASE_URL}/"' ./scripts/run-secure-e2e-google-user.sh
+grep -Fq 'ICA_URL_INTERNAL="$ICA_BASE_URL"' ./scripts/run-secure-e2e-google-user.sh
 grep -Fq 'HOST_LEGACY_REPRESENTATIVE_CONTROLLER="$HOST_LEGACY_REPRESENTATIVE_CONTROLLER"' ./cloud_deploy.sh
 grep -Fq '"AUTH_TOKEN_VERIFIER" "OIDC_TRUSTED_PROVIDERS_JSON" "TENANT_SERVICE_ROUTES_JSON"' ./cloud_deploy.sh
 grep -Fq '"GCP_KMS_RUNTIME_KEK_CIPHERTEXT" "GCP_KMS_RUNTIME_KEK_ID"' ./cloud_deploy.sh

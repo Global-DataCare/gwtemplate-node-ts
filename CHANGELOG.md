@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [1.23.19] - 2026-09-03
+
+- Make the mandatory secure local E2E runner start and health-check the local
+  data-space ICA explicitly, route GW CORE to that exact process, retain its
+  audit log, and fail closed when the ICA checkout or endpoint is unavailable.
+
 ## [1.23.18] - 2026-09-03
 
 - Reuse canonical shared lifecycle and gateway entry types in the Family
