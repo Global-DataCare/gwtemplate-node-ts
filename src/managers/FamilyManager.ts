@@ -17,7 +17,7 @@ import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-
 import { IssueLevel, IssueType } from 'gdc-common-utils-ts/models/issue';
 import { IncludedResource } from 'gdc-common-utils-ts/models/jsonapi';
 import { ClaimsRecord } from 'gdc-common-utils-ts/models/resource-document';
-import { ClaimsOfferSchemaorg, ClaimsOrderSchemaorg, ClaimsOrganizationSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { ClaimsIndividualProductSchemaorg, ClaimsOfferSchemaorg, ClaimsOrderSchemaorg, ClaimsOrganizationSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { BundleType, getBundleResponseTypeForAction } from '../utils/bundle';
 import { getClaimValue, normalizeContextualizedClaims } from '../utils/claims';
@@ -38,7 +38,7 @@ import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
 import { EntityLifecycleStatus } from '../gdc-backend-utils-node/models/enums';
 import type { ITenantsManager } from './ITenantsManager';
 import { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
-import { issueActivationCodeFromPool } from '../utils/license-issuance';
+import { issueActivationCodeFromPool, materializeFreeIndividualLicenses } from '../utils/license-issuance';
 import { buildPaymentCommunication, readOfferPaymentContext } from '../utils/order-communication';
 import { buildGatewayInvoiceBundle } from '../utils/invoice-bundle';
 import { verifyOrderPaymentConfirmation } from '../utils/payment-confirmation';
@@ -566,49 +566,20 @@ export class FamilyManager {
       status: EntityLifecycleStatus.Active,
     };
 
-    const updatedDoc: ConfidentialStorageDoc & { meta?: Record<string, unknown> } = {
-      id: secureDoc.id,
-      status: finalizedContent.status,
-      sequence: (secureDoc.sequence || 0) + 1,
-      // Offer/Order searches intentionally use non-hydrated projections. Keep
-      // the auditable public claims when transitioning pending -> active;
-      // dropping this field made a successfully confirmed Offer disappear
-      // from `_search` while its encrypted content still existed.
-      meta: (secureDoc as ConfidentialStorageDoc & { meta?: Record<string, unknown> }).meta
-        || { claims: finalizedContent.claims },
-      indexed: secureDoc.indexed,
-      content: finalizedContent,
-    };
-    const secureUpdatedDoc = await this.kmsService.protectConfidentialData(updatedDoc, tenantVaultId);
-    await this.vaultRepository.put(tenantCollectionName, [secureUpdatedDoc], INDIVIDUAL_SECTION);
-
     // Create individual (family member) license seats purchased via the family registration Offer and auto-issue one for the controller.
     const familySeats = finalizedContent.claims[ClaimsOfferSchemaorg.eligibleQuantityValue] as number | undefined;
     const familyOfferIdentifier = finalizedContent.claims[ClaimsOfferSchemaorg.identifier] as string | undefined;
     if (familySeats && familySeats > 0 && familyOfferIdentifier) {
-      const now = Date.now();
-      const expiryDate = new Date(now);
-      expiryDate.setFullYear(expiryDate.getFullYear() + 1);
-      const exp = Math.floor(expiryDate.getTime() / 1000);
-
-      const licenseDocs: ConfidentialStorageDoc[] = [];
-      for (let i = 0; i < familySeats; i++) {
-        const licenseId = uuidv4();
-        const license: DeviceLicense = {
-          id: licenseId,
-          tenantId,
-          orderId: familyOfferIdentifier,
-          userClass: LICENSE_USER_CLASS_INDIVIDUAL,
-          type: LICENSE_TYPE_MOBILE,
-          status: LICENSE_STATUS_AVAILABLE,
-          plan: 'default',
-          renewalCycle: '12m',
-          reactivationEnabled: false,
-          exp,
-        } as any;
-        licenseDocs.push({ id: licenseId, status: license.status, sequence: 0, content: license });
-      }
-      await this.vaultRepository.put(tenantVaultId, licenseDocs, DEVICE_LICENSE_SECTION);
+      await materializeFreeIndividualLicenses({
+        vaultRepository: this.vaultRepository,
+        tenantVaultId,
+        tenantId,
+        ownerOrganizationId: secureDoc.id,
+        quantity: familySeats,
+        ensureTotal: true,
+        orderId: familyOfferIdentifier,
+        type: LICENSE_TYPE_MOBILE,
+      });
 
       const controllerEmail =
         finalizedContent.claims[ClaimsOrganizationSchemaorg.ownerEmail] as string | undefined
@@ -629,13 +600,39 @@ export class FamilyManager {
             email: controllerContact,
             role: controllerRole,
           });
-          (finalizedContent.claims as any)['org.schema.IndividualProduct.serialNumber'] = activationCode;
-          (finalizedContent.claims as any)['org.schema.IndividualProduct.category'] = LICENSE_CATEGORY_INDIVIDUAL;
+          finalizedContent.claims[ClaimsIndividualProductSchemaorg.serialNumber] = activationCode;
+          finalizedContent.claims[ClaimsIndividualProductSchemaorg.category] = LICENSE_CATEGORY_INDIVIDUAL;
         } catch (e: any) {
-          this.logger.warn?.(`[FamilyManager] Failed to auto-issue family controller activation code: ${String(e?.message || e)}`);
+          throw new ManagerError(
+            `The family Order could not issue its controller activation code: ${String(e?.message || e)}`,
+            IssueType.Exception,
+          );
         }
       }
     }
+
+    if (!String(finalizedContent.claims[ClaimsIndividualProductSchemaorg.serialNumber] || '').trim()) {
+      throw new ManagerError(
+        'The family Order cannot become active without its controller activation code.',
+        IssueType.Conflict,
+      );
+    }
+
+    const updatedDoc: ConfidentialStorageDoc & { meta?: Record<string, unknown> } = {
+      id: secureDoc.id,
+      status: finalizedContent.status,
+      sequence: (secureDoc.sequence || 0) + 1,
+      // Offer/Order searches intentionally use non-hydrated projections. Keep
+      // the auditable public claims when transitioning pending -> active;
+      // dropping this field made a successfully confirmed Offer disappear
+      // from `_search` while its encrypted content still existed.
+      meta: (secureDoc as ConfidentialStorageDoc & { meta?: Record<string, unknown> }).meta
+        || { claims: finalizedContent.claims },
+      indexed: secureDoc.indexed,
+      content: finalizedContent,
+    };
+    const secureUpdatedDoc = await this.kmsService.protectConfidentialData(updatedDoc, tenantVaultId);
+    await this.vaultRepository.put(tenantCollectionName, [secureUpdatedDoc], INDIVIDUAL_SECTION);
 
     const tenantDid = await this.tenantsCacheManager.getTenantDid(tenantVaultId);
     if (!tenantDid) {
@@ -656,8 +653,8 @@ export class FamilyManager {
       addressLocality: finalizedContent.claims[ClaimsOrganizationSchemaorg.addressLocality] as string | undefined,
       postalCode: finalizedContent.claims[ClaimsOrganizationSchemaorg.postalCode] as string | undefined,
       streetAddress: finalizedContent.claims[ClaimsOrganizationSchemaorg.streetAddress] as string | undefined,
-      activationCode: (finalizedContent.claims as any)['org.schema.IndividualProduct.serialNumber'] as string | undefined,
-      activationCategory: (finalizedContent.claims as any)['org.schema.IndividualProduct.category'] as string | undefined,
+      activationCode: finalizedContent.claims[ClaimsIndividualProductSchemaorg.serialNumber] as string | undefined,
+      activationCategory: finalizedContent.claims[ClaimsIndividualProductSchemaorg.category] as string | undefined,
       paymentMethod: claims[ClaimsOrderSchemaorg.paymentMethod] as string | undefined,
       paymentUrl: claims[ClaimsOrderSchemaorg.paymentUrl] as string | undefined,
       invoiceId: claims[ClaimsOrderSchemaorg.partOfInvoice] as string | undefined,

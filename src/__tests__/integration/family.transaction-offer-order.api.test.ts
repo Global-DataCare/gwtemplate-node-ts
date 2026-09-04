@@ -13,6 +13,7 @@ import {
 } from './helpers/story-flow';
 import { invokeExpress } from './helpers/invokeExpress';
 import {
+  ClaimsIndividualProductSchemaorg,
   ClaimsOfferSchemaorg,
   ClaimsOrderSchemaorg,
   ClaimsOrganizationSchemaorg,
@@ -127,6 +128,8 @@ describe('Family transaction Offer/Order route story', () => {
     const orderEntry = orderPoll.body.data[0];
     expect(orderEntry.response.status).toBe('201');
     expect(orderEntry.resource?.meta?.claims?.[ClaimsOrderSchemaorg.acceptedOfferIdentifier]).toBe(offerId);
+    expect(orderEntry.resource?.meta?.claims?.[ClaimsIndividualProductSchemaorg.serialNumber])
+      .toEqual(expect.any(String));
 
     const licenseSearchPayload = {
       thid: EXAMPLE_THREAD_IDENTIFIER_LICENSE_SEARCH,
