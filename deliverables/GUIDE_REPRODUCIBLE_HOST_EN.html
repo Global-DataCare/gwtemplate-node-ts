@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Reproducible guide for registering and deploying a host</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 2cm; color: #1f2937; line-height: 1.45; }
+    h1 { color: #123b5d; font-size: 24pt; }
+    h2 { color: #175b7f; margin-top: 24pt; }
+    table { border-collapse: collapse; width: 100%; margin: 12pt 0; }
+    th, td { border: 1px solid #9ca3af; padding: 7pt; vertical-align: top; }
+    th { background: #e8f1f5; }
+    pre { background: #f3f4f6; padding: 10pt; white-space: pre-wrap; }
+    .notice { border-left: 5px solid #d97706; background: #fff7ed; padding: 10pt; }
+  </style>
+</head>
+<body>
+  <h1>Reproducible guide for registering and deploying a host</h1>
+  <p><strong>Public document for project reporting, consulting and integration.</strong></p>
+
+ <h2>Verified public OCI images</h2>
+  <ul>
+    <li>GW CORE: <a href="https://github.com/orgs/Global-DataCare/packages/container/package/gw-core">https://github.com/orgs/Global-DataCare/packages/container/package/gw-core</a>:
+      <code>ghcr.io/global-datacare/gw-core@sha256:724ba328915d9907d7254c7eeded845d70dc1ae05881bccff630e871fbc7389f</code>.</li>
+    <li>CCAAS Runtime: <a href="https://github.com/orgs/Global-DataCare/packages/container/package/host-runtime">https://github.com/orgs/Global-DataCare/packages/container/package/host-runtime</a>:
+      <code>ghcr.io/global-datacare/host-runtime@sha256:67e5c0fb93efbdc79812a3579ea0b9b0d8e230fca8d430c72e81666a7389f7ac</code>.</li>
+  </ul>
+  <p>GW CORE and CCAAS are different OCI artifacts. The CCAAS runtime contains
+  all nine chaincode servers, but the package IDs are generated for the
+  exact name, namespace and Services of each Helm release.</p>
+
+ <h2>1. What is the evidence collector</h2>
+  <p>The term "SEDIA runner" is informal. It is neither Helm nor an official
+  SEDIA tool. It refers to the public evidence collector
+  <code>scripts/collect-open-source-production-readiness-evidence.sh</code>,
+  invoked via <code>npm run evidence:open-source-production-readiness</code>.
+  Run the tests and generate statuses, healthy logs, summary and manifest with
+  hashes.</p>
+
+ <h2>2. Target flow</h2>
+  <pre>Host authorization
+        ↓
+HostingServiceCredential (VC JSON and VC-JWT)
+        ↓
+Governed registration with the Fabric ICA
+        ↓
+MSP and TLS enrollment with local private keys
+        ↓
+Kubernetes Secrets
+        ↓
+helm upgrade --install gdc-host
+        ↓
+Peer + CouchDB + GW CORE + PostgreSQL + IPFS + CCAAS
+        ↓
+Channels, write, read, denial and restart</pre>
+
+ <h2>3. Executed evidence</h2>
+  <ul>
+    <li>Local data-space CA with disposable Root and Issuer certificates.</li>
+    <li>Data-space ICA and Host VC JSON/VC-JWT without a PDF for a preauthorized host.</li>
+    <li>Fabric ICA, MSP/TLS certificates, Host1MSP, Host2MSP, channels and chaincodes.</li>
+    <li>GW CORE, PostgreSQL and IPFS with write, read and recovery after reboot.</li>
+    <li>Actual kind and Helm installation of a newly admitted Host2MSP peer, CouchDB, GW CORE, PostgreSQL, IPFS and nine CCAAS runtimes.</li>
+    <li>Joining the Kubernetes peer to the local channels and installing and approving the exact CCAAS packages.</li>
+    <li>The Host VC SHA-256 identifier is linked to the peer and GW client certificates. The GW signs as Host2MSP through that MSP's Kubernetes peer, with persistence and endorsement capability verified again after restarting the GW, peer and CCAAS runtimes.</li>
+    <li>Consented access and negative controls for unauthorized access.</li>
+  </ul>
+
+<div class="notice">
+    <strong>Proven separation:</strong> Docker maintains Fabric ICA,
+    the orderer and a reference peer as an external network. The peer deployed by
+    Helm joins that network, and the GW endorses exclusively through that
+    Kubernetes peer. The Docker peer path is used only for gossip/bootstrap.
+  </div>
+
+ <h2>4. What the Kubernetes gate actually does</h2>
+  <p>The test is not limited to <code>helm template</code>. It creates an
+  isolated kind cluster, namespace and Secrets; loads the approved image; runs
+  <code>helm upgrade --install</code>; waits for rollout; performs E2E
+  operations; checks channels and CouchDB; queries PostgreSQL and IPFS inside
+  the pods; installs and approves the nine CCAAS packages on the Kubernetes
+  peer; executes Consent and SMART through that peer; restarts the GW, peer and
+  CCAAS runtimes; and verifies recovery. <code>helm template</code> remains a
+  supplementary static check.</p>
+
+ <h2>5. Promotion of the same chart</h2>
+  <table>
+    <tr><th>Environment</th><th>Chart</th><th>Differences</th></tr>
+    <tr><td>local-network</td><td>gdc-host</td><td>Local images and ICAs, DNS .localhost and Kind StorageClass.</td></tr>
+    <tr><td>test-network</td><td>gdc-host</td><td>Published digests, staging ICAs, DNS/TLS and cloud storage.</td></tr>
+    <tr><td>Production</td><td>gdc-host</td><td>New Host VC and certificates, approved digests, KMS and Node Operator values.</td></tr>
+  </table>
+  <p>No MSP, TLS, keys, Secrets, enrollment grants or verifiable credentials
+  are reused between environments. The chart, configuration structure and
+  approved versions or digests are reused.</p>
+
+ <h2>6. Helm responsibility</h2>
+  <p>Helm does not create the Fabric network, administer either ICA or decide
+  which MSP enters a channel. Before installing an independent host, the
+  authorization, temporary enrollment grants, host-generated MSP/TLS material,
+  governed channel admission and Kubernetes Secrets must exist. The Fabric
+  DevOps team performs privileged reconciliation.</p>
+
+  <p>Authorization requires a <code>HostingServiceCredential</code> in
+  local-network and test-network as well. “No PDF” means that the data-space ICA
+  may issue that VC to a preauthorized host; it does not mean that the
+  credential is omitted. The Fabric ICA then registers a two-use enrollment ID
+  for the MSP and TLS certificates and a separate one-use enrollment ID for the
+  GW client identity. All three private keys are generated inside the host. The
+  helper records <code>issuedAt/expiresAt</code>; the Fabric DevOps team must
+  revoke an unconsumed enrollment ID because the Fabric ICA enforces the usage
+  limit but not the date recorded in the handoff file.</p>
+
+  <p>This guide uses <strong>Node Operator, acting as a Hosting Provider for
+  organizations that provide or consume index or digital-twin services</strong>,
+  as defined in the Rulebook: the accredited technical infrastructure that hosts
+  participants and provides services in the Data Space. The <strong>Node Operator
+  DevOps team</strong> executes the deployment and operation commands.</p>
+  <p>The <strong>Fabric ICA registrar identity</strong> and the
+  <strong>MSP administrator</strong> are different identities. Both are
+  <strong>Fabric administrative identities</strong>. The first
+  records enrollment identifiers in the Fabric ICA; the second
+  administers the MSP during authorized configuration and
+  lifecycle operations. The entity authorized to administer Fabric safeguards both
+  identities, and the Fabric DevOps team uses them to execute approved
+  operations. The Node Operator DevOps team receives neither identity: it
+  receives only temporary enrollment grants.</p>
+  <p>A temporary enrollment grant is not a certificate. It contains the
+  temporary enrollment ID and secret needed to request a certificate from the
+  Fabric ICA. The private key is generated inside the Node Operator
+  infrastructure. The peer grant permits MSP and TLS enrollments; the GW client
+  grant permits its MSP enrollment. A grant does not add the peer to any
+  channel.</p>
+  <p>The Fabric ICA returns the certificates directly to the Node Operator.
+  They do not pass through the Fabric DevOps team.</p>
+  <p>Pursuant to section 10.4 of the Rulebook, the Node Operator must demonstrate
+  technical capacity, identity and trust mechanisms, artifact publication and
+  Compute-to-Data controls where applicable. Its authorization
+  requires validation by the Data Space Operator when designated or, otherwise,
+  by the hosting Node Operator and the corresponding ICA. Rulebook section 13.3
+  assigns it contractual and regulatory obligations concerning security,
+  infrastructure availability and data protection.</p>
+
+ <h2>7. Information required from the Node Operator DevOps team</h2>
+  <ul>
+    <li>Kubernetes version, namespace, StorageClass and IngressClass.</li>
+    <li>DNS, TLS, network rules and image registration.</li>
+    <li>PVC, backups, restoration and observability.</li>
+    <li>Secrets manager and external custody of the KEK.</li>
+    <li>Non-secret release values and secure channel for grants and Secrets.</li>
+  </ul>
+
+ <h2>8. Reporting criteria</h2>
+  <p>The project report may state that the local Fabric network and the
+  Kubernetes deployment of the peer, CouchDB, GW CORE, PostgreSQL, IPFS and
+  CCAAS were tested reproducibly, including CCAAS lifecycle and GW E2E
+  operations through the Kubernetes peer. Promotion to another network reuses
+  the chart but requires new credentials, Secrets, digests, values and governed
+  reconciliation.</p>
+
+<h2>9. Complete reproducible validation on local-network</h2>
+  <pre>export REPO_ROOT="$(pwd)"
+export DATASPACE_CA_ROOT="/path/to/checkout/dataspace-ca-ts"
+export DATASPACE_ICA_ROOT="/path/to/checkout/dataspace-ica-ts"
+cd "${REPO_ROOT}"
+npm ci
+release_tag="$(node -p "require('./package.json').version")-$(git rev-parse --short HEAD)"
+export IMAGE_NAME="gw-core:${release_tag}"
+LOCAL_IMAGE_NAME="${IMAGE_NAME}" ./docker_build_local.sh
+npm run evidence:open-source-production-readiness</pre>
+  <p>The computer running the validation retains the directory advertised under
+  <code>artifacts/open-source-production-readiness/</code>, checks all
+  <code>PASS</code> states and verifies the hashes. No grant, token, PDF,
+  key, IP or env file is part of the public evidence.</p>
+  <p>The <code>21-dataspace-ica-postgres-ipfs-migration</code> gate runs the
+  open-source Firestore/GCS-to-PostgreSQL/IPFS migrator against the Firestore
+  emulator, PostgreSQL and Kubo. It uses synthetic data, reads the migrated
+  records and CIDs back, requires zero outstanding GCS references and compares
+  digests from the transformed source and destination. Signed documents,
+  personal data and real keys are never published.</p>
+
+ <h2>10. Authorization and enrollment phases</h2>
+  <p>The Fabric ICA is used for registrations, renewals and revocations, not for
+  normal peer and orderer traffic. The Fabric DevOps team may publish a TLS
+  access window restricted to the Node Operator's egress IP and close it after
+  enrollment. The Node Operator DevOps team receives the URL, CA name and public
+  TLS chain, but never the Fabric ICA registrar identity. Before enrollment, it
+  verifies connectivity:</p>
+  <pre>fabric-ca-client getcainfo \
+  -u "${FABRIC_CA_URL}" \
+  --caname "${FABRIC_CA_NAME}" \
+  --tls.certfiles "${FABRIC_CA_TLS_CERTFILES}"</pre>
+  <p>Through a secure channel, the Fabric DevOps team receives the URL,
+  requested MSP and Host VC-JWT. It combines them with the signed decision,
+  public DIDs, JWKS and governed Fabric inventory, and then runs:</p>
+  <pre>request_id="$(jq -r '.governanceDecision.decision.requestId' \
+  /secure/approvals/host-enrollment-request.json)"
+node scripts/onboarding/host-onboarding-assistant.mjs \
+  --manifest /secure/onboarding/onboarding.json --role authority
+node scripts/onboarding/host-onboarding-assistant.mjs \
+  --manifest /secure/onboarding/onboarding.json --role authority \
+  --apply --confirm-request "${request_id}"</pre>
+  <p>The Node Operator DevOps team receives an encrypted private package through
+  a secure channel. The MSP administrator, Fabric ICA registrar identity, Host
+  VC-JWT, PDF and full network inventory are not included in the handoff:</p>
+  <pre>peer-enrollment-grant.json
+gw-client-enrollment-grant.json
+fabric-ica-ca-chain.pem
+fabric-endpoints.json
+authorization.json
+host-apply-confirmation.json
+onboarding.host.json
+manifest.sha256</pre>
+  <p>The enrollment grants are temporary secrets.
+  <code>authorization.json</code> is the sanitized authorization result,
+  <code>host-apply-confirmation.json</code> provides the <code>requestId</code>,
+  and <code>onboarding.host.json</code> defines the host-role paths. The Node
+  Operator DevOps team verifies the hashes before generating its keys:</p>
+  <pre>cd /secure/onboarding
+shasum -a 256 -c manifest.sha256
+request_id="$(jq -r '.governanceDecision.decision.requestId' \
+  host-apply-confirmation.json)"
+node scripts/onboarding/host-onboarding-assistant.mjs \
+  --manifest /secure/onboarding/onboarding.host.json --role host
+node scripts/onboarding/host-onboarding-assistant.mjs \
+  --manifest /secure/onboarding/onboarding.host.json --role host \
+  --apply --confirm-request "${request_id}"
+cd /secure/host/helm-runtime
+shasum -a 256 -c manifest.sha256</pre>
+  <p>To validate the two enrollments separately, the same helpers are used
+  with explicit variables:</p>
+  <pre>ENROLLMENT_GRANT_FILE=/secure/grants/peer-grant.json \
+HOST_MSP_OUTPUT_DIR=/secure/host/fabric-peer \
+HOST_PEER_DNS="${HOST_PEER_DNS}" \
+CA_TLS_CERT=/secure/trust/fabric-ica-ca-chain.pem \
+  bash scripts/enrollment/enroll-host-msp.sh
+ENROLLMENT_GRANT_FILE=/secure/grants/gw-client-grant.json \
+HOST_CLIENT_OUTPUT_DIR=/secure/host/fabric-gw-client \
+CA_TLS_CERT=/secure/trust/fabric-ica-ca-chain.pem \
+  bash scripts/enrollment/enroll-host-client.sh</pre>
+  <p>The resulting package contains only <code>msp.tgz</code>,
+  <code>tls.tgz</code>, <code>authorization.json</code> and
+  <code>manifest.sha256</code>.</p>
+
+<h2>11. OCI image, values and package IDs</h2>
+  <pre>helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.3.2
+helm show chart oci://ghcr.io/global-datacare/gdc-host --version 0.3.2</pre>
+  <p>The OCI chart is the same artifact validated in local-network. Values,
+  Secrets, enrollment grants, MSP/TLS material and package IDs are generated
+  again for each environment.</p>
+  <pre>export GW_PUBLIC_IMAGE="ghcr.io/global-datacare/gw-core@sha256:724ba328915d9907d7254c7eeded845d70dc1ae05881bccff630e871fbc7389f"
+export CCAAS_PUBLIC_IMAGE="ghcr.io/global-datacare/host-runtime@sha256:67e5c0fb93efbdc79812a3579ea0b9b0d8e230fca8d430c72e81666a7389f7ac"
+docker buildx imagetools inspect "${GW_PUBLIC_IMAGE}"
+docker buildx imagetools inspect "${CCAAS_PUBLIC_IMAGE}"
+docker pull "${GW_PUBLIC_IMAGE}"
+docker pull "${CCAAS_PUBLIC_IMAGE}"</pre>
+  <p>GW CORE is a service and is not published through npm. The GW values use
+  its OCI digest. Each CCAAS entry uses the common runtime digest and a package
+  whose address is the exact Service for the release. The package ID is
+  <code>&lt;label&gt;:&lt;sha256-of-tgz&gt;</code>; any change of Service,
+  release, port or TLS forces it to be regenerated.</p>
+  <pre>HOST_FULLNAME="${HELM_RELEASE}" \
+KUBE_NAMESPACE="${KUBE_NAMESPACE}" \
+CCAAS_IMAGE="${CCAAS_PUBLIC_IMAGE}" \
+CCAAS_OUTPUT_DIR=/secure/onboarding/ccaas \
+  bash scripts/onboarding/prepare-ccaas-packages.sh
+shasum -a 256 -c /secure/onboarding/ccaas/manifest.sha256</pre>
+  <p>The result contains nine files, their package IDs in
+  <code>manifest.tsv</code> and the fragment
+  <code>chaincodes.values.yaml</code>.</p>
+
+ <h2>12. Secrets and Kubernetes installation</h2>
+  <pre>export KUBE_CONTEXT="cluster-context"
+export KUBE_NAMESPACE="host-namespace"
+export HELM_RELEASE="host-release-name"
+kubectl --context "${KUBE_CONTEXT}" create namespace "${KUBE_NAMESPACE}"
+HOST_RUNTIME_DIR=/secure/host/helm-runtime \
+POSTGRES_SECRET_ENV_FILE=/secure/host/postgresql.env \
+COUCHDB_SECRET_ENV_FILE=/secure/host/couchdb.env \
+GW_SECRET_ENV_FILE=/secure/host/gw.env \
+REDIS_SECRET_ENV_FILE=/secure/host/redis.env \
+  bash scripts/onboarding/materialize-kubernetes-secrets.sh
+bash scripts/validate-host-helm-values.sh \
+  /secure/inventory/host.values.yaml "${KUBE_NAMESPACE}" "${HELM_RELEASE}"
+helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.3.2
+tar -xzf gdc-host-0.3.2.tgz -C /secure/onboarding
+helm upgrade --install "${HELM_RELEASE}" /secure/onboarding/gdc-host \
+  --kube-context "${KUBE_CONTEXT}" --namespace "${KUBE_NAMESPACE}" \
+  --values /secure/inventory/host.values.yaml \
+  --atomic --wait --timeout 15m</pre>
+  <p>The process materializes six base Secrets—peer MSP, peer TLS,
+  authorization, PostgreSQL, CouchDB and GW—and a seventh when Redis is enabled.
+  Their secret values never appear in Helm values. In production, each pod
+  unwraps its KEK once through the KMS adapter; a flat KEK is valid only for
+  local/demo use.</p>
+
+ <h2>13. Reconciliation and acceptance</h2>
+  <pre>node scripts/onboarding/host-onboarding-assistant.mjs \
+  --manifest /secure/onboarding/onboarding.json --role platform
+node scripts/onboarding/host-onboarding-assistant.mjs \
+  --manifest /secure/onboarding/onboarding.json --role platform \
+  --apply --confirm-request "${request_id}"
+kubectl --context "${KUBE_CONTEXT}" -n "${KUBE_NAMESPACE}" get pods,pvc,svc
+kubectl --context "${KUBE_CONTEXT}" -n "${KUBE_NAMESPACE}" rollout status \
+  statefulset/"${HELM_RELEASE}"-peer --timeout=5m
+kubectl --context "${KUBE_CONTEXT}" -n "${KUBE_NAMESPACE}" rollout status \
+  deployment/"${HELM_RELEASE}"-gw --timeout=5m</pre>
+  <p>The Fabric DevOps team's private inventory contains the actual inspection
+  and apply commands for the MSP, enrollment grants, peer, channels and CCAAS
+  lifecycle. If any required value is missing, the reconciler fails closed.
+  Acceptance verifies writes and reads through the new peer, allow/deny
+  behavior and persistence after restarting the GW, peer and CCAAS runtimes; a
+  running pod alone is insufficient.</p>
+
+ <h2>14. Material delivered</h2>
+  <p>The delivery contains the commit, OCI digest, chart, sanitized values,
+  versions, gates, sanitized logs, audit record and checksum manifest. Actual
+  Node Operator data remains in a private annex. Local testing demonstrates
+  software reproducibility; it does not claim that a specific external
+  infrastructure has been deployed.</p>
+</body>
+</html>

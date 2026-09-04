@@ -67,8 +67,8 @@ Peer + CouchDB + GW CORE + PostgreSQL + IPFS + CCAAS
 Reconciliación de canales y chaincodes, escritura, lectura y reinicio
 ```
 
-La evidencia encadena una Host VC verificada, una identidad administradora del
-MSP gestionada por la entidad gobernadora de la red, su definición pública saneada, el
+La evidencia encadena una Host VC verificada, un administrador del MSP bajo
+custodia de la entidad autorizada para administrar Fabric, su definición pública saneada, el
 grant real de dos usos para el peer, un grant independiente de un uso para el cliente GW, la emisión de
 MSP/TLS y del certificado cliente vinculada al SHA-256 del identificador de esa
 VC, la admisión dinámica por
@@ -90,16 +90,17 @@ canales, lectura, autorización y persistencia PostgreSQL/IPFS.
   certificados MSP/TLS del peer y el certificado cliente independiente del GW.
 
 La `HostingServiceCredential` autoriza el alta, pero no es un certificado de
-Fabric. Después de verificarla, la autoridad asigna el MSP, genera y conserva
-su identidad administradora y exporta únicamente la definición MSP pública.
-También registra un identificador y un
+Fabric. Después de verificarla, el equipo DevOps de Fabric provisiona el
+administrador del MSP bajo custodia de la entidad autorizada para administrar
+Fabric y exporta únicamente la definición MSP pública. También registra un identificador y un
 secreto de enrolamiento limitado a dos usos en la ICA de Fabric para MSP/TLS,
 más otro identificador de un uso para el cliente GW. El helper
 añade una ventana operativa de caducidad y rechaza el grant una vez vencida;
-la autoridad revoca cualquier identificador no consumido porque Fabric CA no
-aplica por sí sola esa fecha del fichero. El host ejecuta el enrollment y genera
-localmente las claves privadas MSP/TLS y cliente GW; únicamente las CSR salen
-del host y únicamente los certificados firmados regresan.
+el equipo DevOps de Fabric revoca cualquier identificador no consumido porque
+la ICA de Fabric no aplica por sí sola esa fecha del fichero. El equipo DevOps
+del Nodo Operador ejecuta el enrollment y genera localmente las claves privadas
+MSP/TLS y cliente GW; únicamente las CSR salen del Nodo Operador y únicamente
+los certificados firmados regresan directamente desde la ICA de Fabric.
 
 Para `local-network`, un dominio configurado previamente en la ICA del espacio
 de datos puede obtener la credencial sin PDF. El operador de la ICA crea una
@@ -185,33 +186,33 @@ IMAGE_NAME="${image_name}" npm run helm:smoke:local-network
 
 El script Helm crea y elimina su propio clúster `kind` y usa en todos los
 comandos el contexto `kind-gdc-host-evidence`. No usa el contexto Kubernetes
-activo del operador.
+activo de la máquina.
 
 ## Promoción a test-network y producción
 
 Se promueven la misma imagen inmutable y el mismo chart; cambian los values y
 los secretos de cada entorno. Antes de instalar un host autónomo deben existir:
 
-- decisión de gobernanza y `HostingServiceCredential` verificadas;
+- aprobación formal y `HostingServiceCredential` verificadas;
 - grant de la ICA de Fabric limitado a dos enrolamientos para el peer y grant
   independiente de un uso para el cliente GW, ambos dentro de su ventana;
-- MSP, TLS e identidad cliente GW generados localmente por el host;
+- MSP, TLS e identidad cliente GW generados localmente por el Nodo Operador;
 - secretos Kubernetes para GW, peer, CouchDB, PostgreSQL y autorización;
-- DNS, TLS, StorageClass, IngressClass y KMS del proveedor;
+- DNS, TLS, StorageClass, IngressClass y KMS del Nodo Operador;
 - imágenes CCAAS por digest y package IDs calculados para la dirección de
   servicio concreta del release;
 - reconciliación aprobada de MSP, canales y lifecycle de chaincodes.
 
 Helm no posee credenciales de registrar, no decide qué MSP entra en la red y no
-modifica canales. Instala el runtime autorizado. La autoridad y el
-reconciliador realizan las mutaciones privilegiadas antes y después de la
-instalación, respectivamente.
+modifica canales. Instala el runtime autorizado. El equipo DevOps de Fabric
+realiza mediante el reconciliador las operaciones privilegiadas anteriores y
+posteriores a la instalación.
 
 | Entorno | Chart | Configuración específica |
 | --- | --- | --- |
 | `local-network` | `gdc-host` | Imágenes locales, autoridades locales, DNS `.localhost` y StorageClass de kind. |
 | `test-network` | El mismo `gdc-host` | Digests publicados, autoridades de staging, DNS/TLS y almacenamiento cloud. |
-| Producción | El mismo `gdc-host` | Host VC y certificados nuevos, digests aprobados, KMS y configuración del proveedor. |
+| Producción | El mismo `gdc-host` | Host VC y certificados nuevos, digests aprobados, KMS y configuración del Nodo Operador. |
 
 No se reutilizan MSP, TLS, claves, Secrets, grants ni credenciales verificables
 entre entornos. Se reutilizan el chart, la estructura de configuración y las
@@ -220,7 +221,7 @@ versiones o digests que hayan superado las puertas correspondientes.
 ## Archivos principales
 
 - `infra/fabric/local-network/`: Fabric Docker reproducible.
-- `charts/gdc-host/`: chart único para cualquier proveedor de host.
+- `charts/gdc-host/`: chart único para cualquier Nodo Operador.
 - `scripts/enrollment/`: autorización, registro y enrollment local.
 - `scripts/governance/`: decisión y reconciliación declarativa.
 - `scripts/onboarding/`: asistente por roles autoridad/host/plataforma.

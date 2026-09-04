@@ -1,6 +1,6 @@
 # Guía operativa auditable para incorporar y desplegar un host
 
-Esta guía es pública, neutral respecto del proveedor y válida para
+Esta guía es pública, neutral respecto del Nodo Operador y válida para
 `local-network`, `test-network` y `network`. Los dominios, endpoints, values,
 credenciales y nombres reales se mantienen en un inventario privado. Nunca se
 copian secretos en este repositorio ni en la salida de Helm.
@@ -13,23 +13,56 @@ documento conserva el detalle técnico de referencia y no sustituye ese orden.
 ## 1. Resultado y roles
 
 Una ejecución correcta deja una `HostingServiceCredential` VC-JWT, una
-autorización vinculada a URL/MSP/red/canales, un administrador del MSP
-gestionado por la entidad gobernadora de la red, certificados MSP y TLS con claves
+autorización vinculada a URL/MSP/red/canales, un administrador del MSP bajo
+custodia de la entidad autorizada para administrar Fabric, certificados MSP y TLS con claves
 privadas generadas por el host, el MSP admitido en los canales, el runtime
 instalado mediante Helm y evidencias de escritura, lectura, denegación y
 persistencia.
 
 | Rol | Responsabilidad | Entrega |
 | --- | --- | --- |
+| Comité de Gobernanza | Aprueba el procedimiento aplicable y los acuerdos sobre los canales | procedimiento y acuerdos aprobados |
+| Responsable de la validación técnica | Valida conforme a la sección 10.4 del Rulebook: el Operador del Espacio cuando esté designado o, en su defecto, el Nodo Operador anfitrión y la ICA correspondiente | resultado de validación |
 | ICA del espacio de datos | Verifica evidencia o preautorización y emite la Host VC | `host-credential.jwt` y DID público de la ICA |
-| Entidad gobernadora de la red/Fabric ICA | Asigna el MSP, verifica VC/decisión, gestiona `<MSP>.admin` y registra el enrolamiento | definición pública MSP, `authorization.json`, grants y cadena TLS |
-| Proveedor del host | Genera claves y solicita certificados MSP/TLS | identidad privada y paquete Helm saneado |
-| Operador de red | Admite el MSP y gobierna canales/lifecycle | estado y auditoría del reconciliador |
-| Operador Kubernetes | Crea Secrets, instala Helm y verifica | release, rollouts y evidencias operativas |
+| Nodo Operador | Aporta los datos legales y el dominio que deben autorizarse | identidad legal y dominio aprobados |
+| Equipo DevOps del Nodo Operador | Genera claves, solicita certificados MSP/TLS, crea Secrets y opera GW CORE, el peer y Helm | identidad privada, release y evidencias operativas |
+| Entidad autorizada para administrar Fabric | Custodia la identidad registradora de la ICA de Fabric y `<MSP>.admin` | definición pública MSP y custodia administrativa |
+| Equipo DevOps de Fabric | Verifica la Host VC, registra los grants y ejecuta los cambios de canales acordados | `authorization.json`, grants, cadena TLS y auditoría del reconciliador |
 
 La ICA del espacio de datos y la ICA de Fabric son servicios distintos. La Host
-VC no sustituye a los certificados X.509 de Fabric. El proveedor nunca recibe
-la identidad administradora de Fabric CA.
+VC no sustituye a los certificados X.509 de Fabric. Esta guía utiliza **Nodo
+Operador, que actúa como Proveedor de Alojamiento para alojar organizaciones
+proveedoras o consumidoras de servicios de índice o de gemelos digitales**, con
+el significado definido en el Rulebook: la infraestructura técnica acreditada
+que aloja participantes y presta servicios en el Espacio. El
+**equipo DevOps del Nodo Operador** ejecuta los comandos de despliegue y
+operación, y nunca recibe la identidad registradora de la ICA de Fabric.
+
+La **identidad registradora de la ICA de Fabric** y el **administrador del MSP**
+son identidades diferentes. Ambas son **identidades administrativas de Fabric**.
+La primera registra los identificadores de
+enrolamiento en la ICA de Fabric; la segunda administra el MSP en las
+operaciones autorizadas de configuración y lifecycle. La entidad autorizada para
+administrar Fabric custodia ambas identidades y el equipo DevOps de Fabric las
+utiliza para ejecutar las operaciones aprobadas. El equipo DevOps del Nodo
+Operador no recibe ninguna de las dos: solo recibe los grants temporales.
+
+Un grant temporal de enrolamiento no es un certificado. Contiene el
+identificador y el secreto temporales necesarios para solicitarlo a la ICA de
+Fabric. Al consumir el grant, la clave privada se genera dentro del Nodo
+Operador y la ICA de Fabric devuelve el certificado X.509. El grant del peer
+permite los enrolamientos MSP y TLS; el grant del cliente GW permite su
+enrolamiento MSP. Ninguno incorpora por sí solo el peer a los canales.
+La ICA de Fabric devuelve directamente los certificados al Nodo Operador. No
+pasan por el equipo DevOps de Fabric.
+
+Conforme a la sección 10.4 del Rulebook, el Nodo Operador debe demostrar
+capacidad técnica, mecanismos de identidad y confianza, publicación de
+artefactos y controles de Compute to Data cuando apliquen. Su habilitación exige
+la validación del Operador del Espacio cuando esté designado o, en su defecto,
+del Nodo Operador anfitrión y la ICA correspondiente. La sección 13.3 le atribuye las
+obligaciones contractuales y normativas sobre seguridad, disponibilidad de la
+infraestructura y protección de datos.
 
 ## 2. Requisitos
 
@@ -47,7 +80,7 @@ npm ci
 git status --short
 ```
 
-## 3. Prueba completa del auditor en local-network
+## 3. Validación reproducible completa en local-network
 
 Declare las rutas de los checkouts públicos; no las codifique en documentos:
 
@@ -61,7 +94,7 @@ LOCAL_IMAGE_NAME="${IMAGE_NAME}" ./docker_build_local.sh
 npm run evidence:open-source-production-readiness
 ```
 
-El auditor conserva el directorio anunciado bajo
+El equipo que ejecuta la validación conserva el directorio anunciado bajo
 `artifacts/open-source-production-readiness/`, comprueba que todos los ficheros
 de `gates/` contienen `PASS` y verifica los hashes. El recolector prueba CA e
 ICA desechables, Fabric Docker con `Host1MSP`/`Host2MSP`, PostgreSQL/IPFS y un
@@ -91,37 +124,34 @@ chmod 600 /secure/onboarding/onboarding.json /secure/inventory/host.values.yaml
 ```
 
 En `test-network`, cambie a `environment: staging`, `networkMode:
-test-network` y autoridades/credenciales de staging. En producción use
+test-network` e ICAs/credenciales de staging. En producción use
 `environment: production`, `networkMode: network` y credenciales nuevas. Nunca
 copie MSP, TLS, VC, grant, Secret o KEK entre entornos.
 
 El inventario fija URL, `mspId`, orderer, bootstrap peers, canales, namespace,
 release, StorageClass, IngressClass, DNS/TLS, digests OCI, package IDs CCAAS,
 adaptador KMS, backups, observabilidad, NetworkPolicies y puertos. `mspId` es
-asignado y aprobado por la gobernanza de Fabric. El proveedor lo copia
-exactamente; no lo elige unilateralmente. Varios peers del mismo operador y
-ámbito administrativo pueden reutilizar un MSP, mientras que los tenants
-alojados no se convierten en MSP.
+asignado conforme al procedimiento aprobado. El equipo DevOps del Nodo Operador
+lo copia exactamente; no lo elige unilateralmente. Varios peers del mismo Nodo Operador y
+ámbito administrativo pueden reutilizar un MSP.
 
 `authority.caName` fija el nombre exacto de la ICA de Fabric emisora. El
 asistente lo incorpora a los grants y `fabric-ca-client` lo aplica tanto al
 registro como a los enrolamientos MSP, TLS y cliente GW.
 
-El MSP asignado y aprobado por la gobernanza de Fabric es el único valor que
+El MSP asignado conforme al procedimiento aprobado es el único valor que
 puede aparecer en la solicitud, los certificados y Helm.
 
 Los values también fijan `host.adminEmail`, `host.adminUid` y
 `host.adminRole`: son el controller inicial del registro técnico reservado
 `host`. GW genera sus claves operativas mediante KMS y publica el DID raíz en
-`/.well-known/did.json`. Este registro del operador no es un tenant de negocio;
-la misma organización puede darse de alta después como primer tenant en uno de
-los `host.allowedSectors` autorizados.
+`/.well-known/did.json`.
 
 ## 5. Activación y HostingServiceCredential
 
 La preautorización del dominio y la red no sustituye la prueba de posesión de
-clave. Para evitar un `did.json` provisional, el operador de la ICA crea una
-activación de un solo uso desde el pod que comparte la base de datos de la ICA:
+clave. El operador de la ICA crea una activación de un solo uso desde el pod que
+comparte la base de datos de la ICA:
 
 ```bash
 export HOST_HANDOFF_DIR="${HOME}/gdc-host-handoff"
@@ -147,24 +177,24 @@ La copia privada de `approved-host.json` contiene los datos ya aprobados de
 dominio, URL, red, jurisdicción, contexto, identidad legal y controller. `<`
 los envía por entrada estándar sin copiarlos al disco del pod. `>` pertenece al
 shell que ejecuta `kubectl`: el fichero de activación queda en el ordenador del
-operador, no en el pod. La base de datos conserva el hash, los datos aprobados,
-la caducidad y el estado, pero nunca el código original. El operador entrega el
-fichero cifrado al proveedor; el asistente rechaza cualquier cambio respecto de
+operador de la ICA, no en el pod. La base de datos conserva el hash, los datos aprobados,
+la caducidad y el estado, pero nunca el código original. El operador de la ICA entrega el
+fichero cifrado al equipo DevOps del Nodo Operador; el asistente rechaza cualquier cambio respecto de
 la aprobación, genera localmente la clave y ejecuta la solicitud. Esta lleva la
 JWK pública, `kid` y JWS; `thid` solo consulta el trabajo asíncrono. La ICA
 consume la activación y emite la Host VC sin PDF.
 
-## 6. Fase A: autoridad y Fabric ICA
+## 6. Fase A: equipo DevOps de Fabric e ICA de Fabric
 
-### 6.1 Apertura controlada y comprobación desde el proveedor
+### 6.1 Apertura controlada y comprobación por el equipo DevOps
 
 La ICA de Fabric no participa en el tráfico normal de gossip, endoso, canales
 o consenso. Se necesita para alta inicial, renovación, revocación e
 incorporación de hosts. Por tanto, su LoadBalancer público puede limitarse a la
-IP fija de salida del proveedor y cerrarse después del enrolamiento.
+IP fija de salida del Nodo Operador y cerrarse después del enrolamiento.
 
-La autoridad conserva en su repositorio privado el procedimiento para abrir,
-restringir y cerrar esa ventana. Al proveedor sólo se le entregan la URL HTTPS,
+El equipo DevOps de Fabric conserva en su repositorio privado el procedimiento para abrir,
+restringir y cerrar esa ventana. Al equipo DevOps del Nodo Operador sólo se le entregan la URL HTTPS,
 el nombre de CA y la cadena pública. Antes de consumir ningún grant comprueba:
 
 ```bash
@@ -178,15 +208,17 @@ fabric-ca-client getcainfo \
   --tls.certfiles "${FABRIC_CA_TLS_CERTFILES}"
 ```
 
-La identidad registradora de la ICA de Fabric nunca se entrega al proveedor.
-La autoridad registra los identificadores y secretos acotados; el proveedor
+La identidad registradora de la ICA de Fabric nunca se entrega al equipo DevOps
+del Nodo Operador. El equipo DevOps de Fabric registra los
+identificadores y secretos acotados; el equipo DevOps
 los consume para generar sus claves privadas y certificados en su propia
 infraestructura.
 
-El administrador de Fabric recibe por canal seguro la petición con
-URL/MSP/Host VC-JWT y reúne, bajo su propia custodia, el envelope de gobernanza
-firmado, el DID del controller de gobernanza, el DID de la ICA emisora, los
-JWKS del operador autorizado y el inventario de Fabric. No necesita un DID
+El equipo DevOps de Fabric recibe por canal seguro la petición con
+URL/MSP/Host VC-JWT y reúne, bajo su propia custodia, la aprobación firmada, el
+DID de la persona autorizada que la firmó, el DID de la ICA emisora, los JWKS
+de la persona firmante y
+el inventario de Fabric. No necesita un DID
 público previo del nuevo host. Primero revisa el plan:
 
 ```bash
@@ -206,16 +238,17 @@ node scripts/onboarding/host-onboarding-assistant.mjs \
 ```
 
 `authorization.json` no contiene la VC-JWT. Antes de crear los grants, el
-asistente registra y enrola una identidad administrativa del MSP bajo las
-rutas privadas de la autoridad:
+asistente registra y enrola el administrador del MSP bajo las
+rutas privadas bajo custodia de la entidad autorizada para administrar Fabric:
 
 ```text
 authority.mspAdminOutputDir   clave y certificado <MSP>.admin; nunca se entrega
 authority.publicMspOutputDir  definición pública saneada para admitir el MSP
 ```
 
-La definición pública del MSP la produce la autoridad de Fabric; el host no la
-define ni entrega una clave administrativa. El script auditable que implementa
+La definición pública del MSP la produce el equipo DevOps de Fabric;
+el equipo DevOps del Nodo Operador no la define ni entrega una clave
+administrativa. El script auditable que implementa
 este límite es `scripts/enrollment/provision-governed-msp-admin.sh`.
 Una incorporación posterior del mismo MSP reutiliza esa identidad administrada si MSP, red e
 ICA coinciden; nunca rota ni sobrescribe el administrador como efecto colateral
@@ -225,17 +258,10 @@ Después, el asistente crea dos grants
 privados en modo `0600`: uno admite exactamente dos enrolamientos —MSP y TLS
 del peer— y otro admite un único enrolamiento para la identidad cliente del GW.
 Ambos contienen `issuedAt`/`expiresAt`. La fecha es una ventana aplicada por
-estos helpers; Fabric CA garantiza sus límites de usos. La autoridad revoca
+estos helpers; la ICA de Fabric aplica sus límites de usos. El equipo DevOps de Fabric revoca
 cualquier identificador que no se consuma dentro de la ventana.
 
-La ventana predeterminada es de 15 minutos y puede ampliarse hasta 72 horas con
-`ENROLLMENT_GRANT_TTL_SECONDS=259200` para una entrega operativa acordada, sin
-aumentar `maxEnrollments`: dos usos para MSP/TLS del peer y uno para el cliente
-GW. Como `expiresAt` es una comprobación del helper y no una caducidad impuesta
-por Fabric CA al secreto registrado, la autoridad debe revocar al cerrar la
-ventana cualquier identificador no consumido.
-
-## 7. Fase B: proveedor del host
+## 7. Fase B: equipo DevOps del Nodo Operador
 
 Se transfiere por un canal seguro un paquete privado cifrado con este contenido
 mínimo y suficiente:
@@ -255,13 +281,13 @@ Los dos grants son secretos temporales. La cadena y los endpoints son públicos;
 `authorization.json` es el resultado saneado de la autorización y
 `host-apply-confirmation.json` contiene el `requestId` exacto del guard de
 aplicación. `onboarding.host.json` referencia esos ficheros y las rutas privadas
-de salida del host. El proveedor verifica `manifest.sha256` antes de consumir
+de salida del host. El equipo DevOps del Nodo Operador verifica `manifest.sha256` antes de consumir
 nada. La Host VC-JWT, el PDF, el inventario completo, la identidad `<MSP>.admin`
-y la identidad registradora de Fabric CA quedan fuera de la entrega.
+y la identidad registradora de la ICA de Fabric quedan fuera de la entrega.
 
-El proveedor genera solamente las identidades de peer/TLS y cliente GW que
+El equipo DevOps del Nodo Operador genera solamente las identidades de peer/TLS y cliente GW que
 necesita su runtime.
-El proveedor ejecuta plan y aplicación:
+El equipo DevOps del Nodo Operador ejecuta plan y aplicación:
 
 ```bash
 cd /secure/onboarding
@@ -365,7 +391,7 @@ El resultado enumera los nueve package IDs en `manifest.tsv` y produce
 `chaincodes.values.yaml`. Para el perfil predeterminado, organizaciones y
 empleados usan `identity-eu`, personas `identity-global` y el contrato de
 consentimiento `health-care-eu`; cualquier cambio debe proceder del inventario
-gobernado, no del proveedor.
+gobernado, no del equipo DevOps del Nodo Operador.
 
 El values declara también todos los canales Fabric aprobados para el peer. No
 confunda esta lista con `host.allowedSectors`:
@@ -381,7 +407,7 @@ peer:
 
 `peer.channels` se proyecta como `HLF_BOOTSTRAP_CHANNELS`. El chart valida la
 configuración, pero la unión efectiva de cada canal corresponde al
-reconciliador ejecutado por el administrador de Fabric.
+reconciliador ejecutado por el equipo DevOps de Fabric.
 
 ## 9. Secrets e instalación Helm
 
@@ -440,16 +466,16 @@ No instale si el render contiene Secrets, VC-JWT, PDF, claves o imágenes sin
 digest. En producción cada pod desenvuelve una vez la KEK de runtime mediante
 el adaptador KMS; `KEK_SECRET` solo es válido en local/demo.
 
-## 10. Gobernanza de Fabric
+## 10. Operación autorizada de Fabric
 
-El operador revisa primero:
+El equipo DevOps de Fabric revisa primero:
 
 ```bash
 node scripts/onboarding/host-onboarding-assistant.mjs \
   --manifest /secure/onboarding/onboarding.json --role platform
 ```
 
-El `commandMap` privado del operador define comandos reales `inspect`/`apply`
+El `commandMap` privado del equipo DevOps de Fabric define comandos reales `inspect`/`apply`
 para admitir el MSP, aplicar grants, comprobar el peer, unir canales,
 instalar/aprobar package IDs y confirmar definiciones mediante el MSP
 gobernador. Nunca procede de la petición del host. Con el mapa revisado:
@@ -482,11 +508,11 @@ kubectl --context "${KUBE_CONTEXT}" -n "${KUBE_NAMESPACE}" rollout status \
 La aceptación demuestra: MSP/TLS esperados; solo los canales aprobados;
 package IDs, aprobaciones y definiciones correctos; escritura/lectura mediante
 el peer propio; permiso y denegación; persistencia PostgreSQL/IPFS tras reinicio
-de GW, peer y CCAAS; y restauración según la política del proveedor. Un pod
+de GW, peer y CCAAS; y restauración según la política del Nodo Operador. Un pod
 arrancado no basta.
 
-Entregue al auditor commit, digest OCI, chart, values saneado, versiones,
-gates, logs saneados, auditoría y manifiesto de hashes. No entregue grants,
+Conserve como evidencia commit, digest OCI, chart, values saneado, versiones,
+gates, logs saneados, auditoría y manifiesto de hashes. No incluya grants,
 VC-JWT, PDFs, claves, env privados, tokens, IPs internas ni dumps. La prueba
 local demuestra reproducibilidad del software; no afirma que una
 infraestructura externa concreta ya esté desplegada.

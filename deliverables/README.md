@@ -1,8 +1,10 @@
 # Entregables en español
 
+[English version](./README_EN.md)
+
 Esta carpeta contiene los documentos públicos y reutilizables para justificar
 y transferir el despliegue de un host. No contiene nombres de participantes,
-dominios, direcciones, credenciales ni inventarios de un proveedor concreto.
+dominios, direcciones, credenciales ni inventarios de un despliegue concreto.
 
 - `ENTREGABLE_LOCAL_REPRODUCIBLE_ES.md`: prueba local para auditoría; no es una
   migración ni un despliegue externo.
@@ -19,7 +21,18 @@ dominios, direcciones, credenciales ni inventarios de un proveedor concreto.
 - `ENTREGABLE_HOST_REPRODUCIBLE_ES.md`: alcance, ejecución y límites
   verificables del entregable de software.
 
-Los anexos específicos de un proveedor se mantienen fuera del repositorio
+Versiones inglesas equivalentes:
+
+- `EVIDENCE_REPRODUCIBLE_LOCAL_EN.md`
+- `MIGRATION_AND_DEPLOYMENT_ICA_EN.md`
+- `PROCEDURE_HOST_ONBOARDING_EN.md`
+- `REFERENCE_OPERATIONAL_SUMMARY_EN.md`
+- `GUIDE_REPRODUCIBLE_HOST_EN.docx`
+- `GUIDE_REPRODUCIBLE_HOST_EN.html`
+- `GUIDE_HOST_OPERATIONS_EN.md`
+- `EVIDENCE_REPRODUCIBLE_HOST_EN.md`
+
+Los anexos específicos de cada despliegue se mantienen fuera del repositorio
 público y deben fijar el commit y los checksums de esta entrega.
 
 Orden para una operación real:
@@ -49,9 +62,10 @@ Paquete: [gdc-host en GHCR](https://github.com/orgs/Global-DataCare/packages/con
 Digest del manifiesto OCI publicado:
 `sha256:1382c6d302dea258ee1c625e300e60c6a0b63959b3adef72da7d92a46e397784`.
 
-El proveedor puede usar el artefacto OCI o el directorio `charts/gdc-host` del
-commit entregado. Los `values`, Secrets, VC, grants, MSP/TLS, endpoints y
-package IDs son siempre propios del entorno y quedan fuera del repositorio.
+El equipo DevOps del Nodo Operador puede usar el artefacto OCI o el directorio
+`charts/gdc-host` del commit entregado. Los `values`, Secrets, VC, grants,
+MSP/TLS, endpoints y package IDs son siempre propios del entorno y quedan fuera
+del repositorio.
 
 ## Imágenes OCI públicas verificadas
 

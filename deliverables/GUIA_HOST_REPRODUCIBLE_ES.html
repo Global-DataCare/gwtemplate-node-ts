@@ -86,9 +86,9 @@ Canales, escritura, lectura, denegación y reinicio</pre>
   <h2>5. Promoción del mismo chart</h2>
   <table>
     <tr><th>Entorno</th><th>Chart</th><th>Diferencias</th></tr>
-    <tr><td>local-network</td><td>gdc-host</td><td>Imágenes y autoridades locales, DNS .localhost y StorageClass de kind.</td></tr>
-    <tr><td>test-network</td><td>gdc-host</td><td>Digests publicados, autoridades de staging, DNS/TLS y almacenamiento cloud.</td></tr>
-    <tr><td>Producción</td><td>gdc-host</td><td>Host VC y certificados nuevos, digests aprobados, KMS y values del proveedor.</td></tr>
+    <tr><td>local-network</td><td>gdc-host</td><td>Imágenes e ICAs locales, DNS .localhost y StorageClass de kind.</td></tr>
+    <tr><td>test-network</td><td>gdc-host</td><td>Digests publicados, ICAs de staging, DNS/TLS y almacenamiento cloud.</td></tr>
+    <tr><td>Producción</td><td>gdc-host</td><td>Host VC y certificados nuevos, digests aprobados, KMS y values del Nodo Operador.</td></tr>
   </table>
   <p>No se reutilizan MSP, TLS, claves, Secrets, grants ni credenciales
   verificables entre entornos. Se reutilizan el chart, su estructura de
@@ -99,7 +99,8 @@ Canales, escritura, lectura, denegación y reinicio</pre>
   decide qué MSP entra en los canales. Antes de instalar un host autónomo deben
   existir la autorización, el grant de enrolamiento, el material MSP/TLS
   generado por el host, la incorporación gobernada a los canales y los Secrets
-  Kubernetes. La reconciliación privilegiada se ejecuta por la autoridad.</p>
+  Kubernetes. La reconciliación privilegiada la ejecuta el equipo DevOps de
+  Fabric.</p>
 
   <p>La autorización exige una <code>HostingServiceCredential</code> también en
   local-network y test-network. «Sin PDF» significa que la ICA del espacio de
@@ -108,10 +109,41 @@ Canales, escritura, lectura, denegación y reinicio</pre>
   enrolamientos, uno MSP y otro TLS, y otro identificador de un solo uso para
   la identidad cliente del GW. Las tres claves privadas se generan dentro del
   host. El helper aplica
-  <code>issuedAt/expiresAt</code>; la autoridad debe revocar el identificador no
-  consumido porque Fabric CA garantiza el límite de usos, no esa fecha.</p>
+  <code>issuedAt/expiresAt</code>; el equipo DevOps de Fabric debe revocar el identificador no
+  consumido porque la ICA de Fabric aplica el límite de usos, no esa fecha.</p>
 
-  <h2>7. Datos requeridos al proveedor</h2>
+  <p>Esta guía utiliza <strong>Nodo Operador, que actúa como Proveedor de
+  Alojamiento para alojar organizaciones proveedoras o consumidoras de servicios
+  de índice o de gemelos digitales</strong>, con el significado definido en el
+  Rulebook: la infraestructura técnica acreditada que aloja participantes y
+  presta servicios en el Espacio. El <strong>equipo DevOps del Nodo
+  Operador</strong> ejecuta los comandos de despliegue y operación.</p>
+  <p>La <strong>identidad registradora de la ICA de Fabric</strong> y el
+  <strong>administrador del MSP</strong> son identidades diferentes. Ambas son
+  <strong>identidades administrativas de Fabric</strong>. La primera
+  registra los identificadores de enrolamiento en la ICA de Fabric; la segunda
+  administra el MSP en las operaciones autorizadas de configuración y
+  lifecycle. La entidad autorizada para administrar Fabric custodia ambas
+  identidades y el equipo DevOps de Fabric las utiliza para ejecutar las
+  operaciones aprobadas. El equipo DevOps del Nodo Operador no recibe ninguna
+  de las dos: solo recibe los grants temporales.</p>
+  <p>Un grant temporal de enrolamiento no es un certificado. Contiene el
+  identificador y el secreto temporales necesarios para solicitarlo a la ICA de
+  Fabric. Al consumir el grant, la clave privada se genera dentro del Nodo
+  Operador y la ICA de Fabric devuelve el certificado X.509. El grant del peer
+  permite los enrolamientos MSP y TLS; el grant del cliente GW permite su
+  enrolamiento MSP. Ninguno incorpora por sí solo el peer a los canales.</p>
+  <p>La ICA de Fabric devuelve directamente los certificados al Nodo Operador.
+  No pasan por el equipo DevOps de Fabric.</p>
+  <p>Conforme a la sección 10.4 del Rulebook, el Nodo Operador debe demostrar
+  capacidad técnica, mecanismos de identidad y confianza, publicación de
+  artefactos y controles de Compute to Data cuando apliquen. Su habilitación
+  exige la validación del Operador del Espacio cuando esté designado o, en su
+  defecto, del Nodo Operador anfitrión y la ICA correspondiente. La sección 13.3 le
+  atribuye las obligaciones contractuales y normativas sobre seguridad,
+  disponibilidad de la infraestructura y protección de datos.</p>
+
+  <h2>7. Datos requeridos al equipo DevOps del Nodo Operador</h2>
   <ul>
     <li>Versión de Kubernetes, namespace, StorageClass e IngressClass.</li>
     <li>DNS, TLS, reglas de red y registro de imágenes.</li>
@@ -127,7 +159,7 @@ Canales, escritura, lectura, denegación y reinicio</pre>
   Kubernetes. La promoción a otra red conserva el chart, pero exige nuevas
   credenciales, Secrets, digests, values y reconciliación gobernada.</p>
 
-  <h2>9. Prueba completa del auditor</h2>
+  <h2>9. Validación reproducible completa en local-network</h2>
   <pre>export REPO_ROOT="$(pwd)"
 export DATASPACE_CA_ROOT="/ruta/al/checkout/dataspace-ca-ts"
 export DATASPACE_ICA_ROOT="/ruta/al/checkout/dataspace-ica-ts"
@@ -137,7 +169,7 @@ release_tag="$(node -p "require('./package.json').version")-$(git rev-parse --sh
 export IMAGE_NAME="gw-core:${release_tag}"
 LOCAL_IMAGE_NAME="${IMAGE_NAME}" ./docker_build_local.sh
 npm run evidence:open-source-production-readiness</pre>
-  <p>El auditor conserva el directorio anunciado bajo
+  <p>El equipo que ejecuta la validación conserva el directorio anunciado bajo
   <code>artifacts/open-source-production-readiness/</code>, comprueba todos los
   estados <code>PASS</code> y verifica los hashes. Ningún grant, token, PDF,
   clave, IP o fichero env forma parte de la evidencia pública.</p>
@@ -150,15 +182,15 @@ npm run evidence:open-source-production-readiness</pre>
 
   <h2>10. Fases de autorización y enrolamiento</h2>
   <p>La ICA de Fabric se usa para altas, renovaciones y revocaciones, no para
-  el tráfico normal de peers y orderers. La autoridad puede publicar una
-  ventana TLS limitada a la IP de salida del proveedor y cerrarla después. El
-  proveedor recibe URL, nombre de CA y cadena pública, pero nunca la identidad
+  el tráfico normal de peers y orderers. El equipo DevOps de Fabric
+  puede publicar una ventana TLS limitada a la IP de salida del Nodo Operador y cerrarla después. El
+  equipo DevOps del Nodo Operador recibe URL, nombre de CA y cadena pública, pero nunca la identidad
   registradora de la ICA de Fabric. Antes del enrolamiento verifica:</p>
   <pre>fabric-ca-client getcainfo \
   -u "${FABRIC_CA_URL}" \
   --caname "${FABRIC_CA_NAME}" \
   --tls.certfiles "${FABRIC_CA_TLS_CERTFILES}"</pre>
-  <p>La autoridad recibe por canal seguro la petición con URL, MSP, Host VC-JWT,
+  <p>El equipo DevOps de Fabric recibe por canal seguro la petición con URL, MSP, Host VC-JWT,
   decisión firmada, DID públicos, JWKS e inventario gobernado. Ejecuta:</p>
   <pre>request_id="$(jq -r '.governanceDecision.decision.requestId' \
   /secure/approvals/host-enrollment-request.json)"
@@ -167,8 +199,8 @@ node scripts/onboarding/host-onboarding-assistant.mjs \
 node scripts/onboarding/host-onboarding-assistant.mjs \
   --manifest /secure/onboarding/onboarding.json --role authority \
   --apply --confirm-request "${request_id}"</pre>
-  <p>El proveedor recibe por un canal seguro un paquete privado cifrado. La
-  identidad administradora del MSP, el registrador de Fabric CA, la Host VC-JWT,
+  <p>El equipo DevOps del Nodo Operador recibe por un canal seguro un paquete privado cifrado. El
+  administrador del MSP, la identidad registradora de la ICA de Fabric, la Host VC-JWT,
   el PDF y el inventario completo de red quedan fuera de la entrega:</p>
   <pre>peer-enrollment-grant.json
 gw-client-enrollment-grant.json
@@ -181,7 +213,7 @@ manifest.sha256</pre>
   <p>Los grants son secretos temporales. <code>authorization.json</code> es el
   resultado saneado, <code>host-apply-confirmation.json</code> proporciona el
   <code>requestId</code> y <code>onboarding.host.json</code> fija las rutas del
-  rol del host. El proveedor comprueba los hashes antes de generar sus claves:</p>
+  rol del host. El equipo DevOps del Nodo Operador comprueba los hashes antes de generar sus claves:</p>
   <pre>cd /secure/onboarding
 shasum -a 256 -c manifest.sha256
 request_id="$(jq -r '.governanceDecision.decision.requestId' \
@@ -193,7 +225,7 @@ node scripts/onboarding/host-onboarding-assistant.mjs \
   --apply --confirm-request "${request_id}"
 cd /secure/host/helm-runtime
 shasum -a 256 -c manifest.sha256</pre>
-  <p>Para auditar los dos enrolamientos por separado se usan los mismos helpers
+  <p>Para validar los dos enrolamientos por separado se usan los mismos helpers
   con variables explícitas:</p>
   <pre>ENROLLMENT_GRANT_FILE=/secure/grants/peer-grant.json \
 HOST_MSP_OUTPUT_DIR=/secure/host/fabric-peer \
@@ -270,7 +302,7 @@ kubectl --context "${KUBE_CONTEXT}" -n "${KUBE_NAMESPACE}" rollout status \
   statefulset/"${HELM_RELEASE}"-peer --timeout=5m
 kubectl --context "${KUBE_CONTEXT}" -n "${KUBE_NAMESPACE}" rollout status \
   deployment/"${HELM_RELEASE}"-gw --timeout=5m</pre>
-  <p>El mapa privado del operador contiene comandos reales de inspección y
+  <p>El mapa privado del equipo DevOps de Fabric contiene comandos reales de inspección y
   aplicación para MSP, grants, peer, canales y lifecycle CCAAS. Si falta uno,
   el reconciliador falla cerrado. La aceptación prueba escritura/lectura por el
   peer propio, permiso/denegación y persistencia tras reiniciar GW, peer y
@@ -278,7 +310,7 @@ kubectl --context "${KUBE_CONTEXT}" -n "${KUBE_NAMESPACE}" rollout status \
 
   <h2>14. Material que se entrega</h2>
   <p>Commit, digest OCI, chart, values saneado, versiones, gates, logs saneados,
-  auditoría y manifiesto de hashes. Los datos reales del proveedor se mantienen
+  auditoría y manifiesto de hashes. Los datos reales del Nodo Operador se mantienen
   en un anexo privado. La prueba local demuestra reproducibilidad del software;
   no declara desplegada una infraestructura externa concreta.</p>
 </body>
