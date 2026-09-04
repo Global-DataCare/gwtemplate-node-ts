@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Accept the signed embedded wallet key as possession proof during encrypted
+  pre-DCR `Token/_exchange`, while retaining verified account bearer and
+  activation-licence authorization and registered-key enforcement elsewhere.
+
 ## [1.24.7] - 2026-09-04
 
 - Separate participant-local CCAAS installation from the network-governance

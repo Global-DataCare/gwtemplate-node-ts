@@ -2,7 +2,7 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 import { GatewayInternalResourceTypes } from 'gdc-common-utils-ts/constants/gateway-response';
 import { GatewayResponseEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
-import { GatewayRouteSections } from 'gdc-common-utils-ts/constants/gateway-response';
+import { GatewayRouteFormats, GatewayRouteSections } from 'gdc-common-utils-ts/constants/gateway-response';
 import { Format } from 'gdc-common-utils-ts/constants/Schemas';
 
 import * as express from 'express';
@@ -3551,6 +3551,11 @@ export function createApiRouter(
           && String(req.params.format || '').toLowerCase() === 'openid'
           && String(resourceType || '').toLowerCase() === 'device'
           && action === '_dcr';
+        const isIdentityTokenExchangeRoute =
+          section === GatewayRouteSections.Identity
+          && String(req.params.format || '').toLowerCase() === GatewayRouteFormats.OpenId
+          && String(resourceType || '').toLowerCase() === 'token'
+          && action === IdentityAuthActions.Exchange;
         const requireBearerHeader = section !== 'ping' && !allowNoBearerForActivate;
         if (requireBearerHeader && (!authToken || !authToken.startsWith('Bearer '))) {
           return sendDidcommEarlyError(req, res, 401, IssueType.Security, 'Missing or invalid Bearer token.');
@@ -3615,7 +3620,11 @@ export function createApiRouter(
           && String(req.params.format || '').toLowerCase() === 'org.schema'
           && String(resourceType || '').toLowerCase() === 'organization'
           && ['_batch', '_verify'].includes(action);
-        const allowsEmbeddedBootstrapKey = isIdentityDcrRoute
+        // Token/_exchange and Device/_dcr are the ordered pre-DCR bootstrap
+        // operations. The embedded key proves wallet possession only; the
+        // verified account bearer and activation licence remain authoritative.
+        const allowsEmbeddedBootstrapKey = isIdentityTokenExchangeRoute
+          || isIdentityDcrRoute
           || allowNoBearerForActivate
           || isLegacyHostOrganizationCommunicationBootstrap;
 

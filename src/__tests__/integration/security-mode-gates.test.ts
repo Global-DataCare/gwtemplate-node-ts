@@ -6,7 +6,8 @@ import {
   HttpMediaTypes,
   HttpStatusCodes,
 } from 'gdc-common-utils-ts/constants/http';
-import { GatewayRouteSections } from 'gdc-common-utils-ts/constants/gateway-response';
+import { GatewayRouteFormats, GatewayRouteSections } from 'gdc-common-utils-ts/constants/gateway-response';
+import { IdentityAuthActions, IdentityAuthRequestFields } from 'gdc-common-utils-ts/constants/identity-auth';
 import { Format, JobAction } from 'gdc-common-utils-ts/constants/Schemas';
 import { BundleTypes } from 'gdc-common-utils-ts/models/bundle-editor-types';
 import express from 'express';
@@ -30,6 +31,8 @@ import {
   EXAMPLE_TENANT_IDENTIFIER,
   EXAMPLE_TENANT_ROUTE_CONTEXT,
   EXAMPLE_COMMUNICATION_THREAD_ID,
+  EXAMPLE_CONTROLLER_DID,
+  EXAMPLE_CONTROLLER_SIGN_KEY,
 } from 'gdc-common-utils-ts/examples/shared';
 import { ClaimsOfferSchemaorg, ClaimsOrderSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { buildUnsignedJwt } from 'gdc-common-utils-ts/utils/jwt';
@@ -638,6 +641,76 @@ describe('SECURITY_MODE content-type gates', () => {
       subject_token: 'single-use-activation-code',
       client_instance_id: 'browser-installation',
     });
+  });
+
+  it('verifies the embedded wallet key during encrypted pre-DCR token exchange', async () => {
+    process.env = {
+      ...previousEnv,
+      SECURITY_MODE: 'strict',
+      DEMO_ALLOW_INSECURE_BEARER: 'false',
+      JSON_LEGACY: 'false',
+      FHIR_LEGACY: 'false',
+      DIDCOMM_PLAIN: 'false',
+    };
+    const embeddedJwk = EXAMPLE_CONTROLLER_SIGN_KEY;
+    const appAuthManager = {
+      verifyBearerToken: jest.fn(async () => ({
+        valid: true,
+        payload: { sub: EXAMPLE_ACCOUNT_OWNER_ID },
+      })),
+    };
+    const kmsService = {
+      decodeRequest: jest.fn(async () => ({
+        content: {
+          thid: EXAMPLE_COMMUNICATION_THREAD_ID,
+          iss: EXAMPLE_CONTROLLER_DID,
+          meta: {
+            jws: {
+              protected: { alg: embeddedJwk.alg, kid: embeddedJwk.kid, jwk: embeddedJwk },
+              signature: 'wallet-signature',
+            },
+            jwe: { header: { skid: 'new-wallet-encryption-key' } },
+          },
+          body: {
+            [IdentityAuthRequestFields.SubjectToken]: EXAMPLE_EMPLOYEE_ACTIVATION_CODE,
+            [IdentityAuthRequestFields.ClientInstanceId]: EXAMPLE_EMPLOYEE_DEVICE_INSTANCE_ID_PRIMARY,
+          },
+        },
+      })),
+      getHmacBase64Url: jest.fn(),
+      unprotectConfidentialData: jest.fn(),
+      getPublicVerificationKey: jest.fn(),
+      createDetachedJws: jest.fn(),
+    };
+    const tenantsCacheManager = {
+      tenantExists: jest.fn(async () => true),
+      findTenantVaultIdByIdentifierValue: jest.fn(),
+      getCollectionName: jest.fn(async () => 'tenant-physical-collection'),
+      getDidServiceConfig: jest.fn(async () => [{
+        id: '#identity:openid',
+        selector: { section: GatewayRouteSections.Identity, format: GatewayRouteFormats.OpenId },
+        serviceEndpoint: 'Token',
+        actions: [IdentityAuthActions.Exchange],
+      }]),
+      getTenant: jest.fn(async () => ({ authorizationStatus: 'active' })),
+    };
+    const harness = buildTestApp({ appAuthManager, kmsService, tenantsCacheManager });
+    harness.cryptographyService.verifyDetachedJws.mockResolvedValue(true);
+
+    const response = await request(harness.app)
+      .post(`/${EXAMPLE_TENANT_IDENTIFIER}/cds-${EXAMPLE_TENANT_ROUTE_CONTEXT.jurisdiction}/${EXAMPLE_ROUTE_VERSION}/${EXAMPLE_SECTOR}/${GatewayRouteSections.Identity}/${GatewayRouteFormats.OpenId}/Token/${IdentityAuthActions.Exchange}`)
+      .set(HttpHeaderNames.Authorization, `${HttpAuthorizationSchemes.Bearer} ${EXAMPLE_DEMO_PORTAL_ID_TOKEN}`)
+      .type('form')
+      .send({ request: 'opaque-jwe' });
+
+    expect(response.status).toBe(HttpStatusCodes.Accepted);
+    expect(harness.cryptographyService.verifyDetachedJws).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.any(String),
+      embeddedJwk,
+    );
+    expect(harness.vaultRepository.query).not.toHaveBeenCalled();
+    expect(harness.queueAdapter.addJob).toHaveBeenCalledTimes(1);
   });
 
   /**
