@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [1.24.9] - 2026-09-04
+
+- Make individual registration Order confirmation fail closed unless the
+  controller activation code is issued and returned as the canonical
+  `IndividualProduct.serialNumber`; keep the individual pending on issuance
+  failure and materialize its licence pool idempotently against the accepted
+  Offer.
+- Make branch closure, dependency publication and ordered environment
+  promotion explicit, indivisible release gates in repository instructions.
+
 ## [1.24.8] - 2026-09-04
 
 - Accept the signed embedded wallet key as possession proof during encrypted

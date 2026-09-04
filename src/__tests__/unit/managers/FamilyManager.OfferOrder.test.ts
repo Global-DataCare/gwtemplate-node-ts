@@ -27,6 +27,7 @@ import { FAMILY_ORDER_REQUEST, FAMILY_REGISTRATION_REQUEST } from '../../data/ex
 import { extractBundleSearchResources } from 'gdc-common-utils-ts/utils/organization-employee-lifecycle';
 import * as tenantUtils from '../../../utils/tenant';
 import {
+  ClaimsIndividualProductSchemaorg,
   ClaimsOfferSchemaorg,
   ClaimsOrderSchemaorg,
   ClaimsOrganizationSchemaorg,
@@ -261,6 +262,8 @@ describe('FamilyManager - Offer/Order Flow', () => {
     expect(entry.response.status).toBe('201');
     expect(entry.type).toBe(GatewayResponseEntryTypes.FamilyOrder);
     expect(entry.resource.meta.claims[ClaimsOrderSchemaorg.acceptedOfferIdentifier]).toBe(offerId);
+    expect(entry.resource.meta.claims[ClaimsIndividualProductSchemaorg.serialNumber])
+      .toEqual(expect.any(String));
 
     const tenantVaultId = tenantUtils.getTenantVaultId(Sector.HEALTH_CARE, tenantId);
     const tenantCollectionName = await tenantsCacheManager.getCollectionName(tenantVaultId);
@@ -270,6 +273,60 @@ describe('FamilyManager - Offer/Order Flow', () => {
       getEnvSectionId('communications'),
     );
     expect(communications.length).toBeGreaterThan(0);
+  });
+
+  it('does not activate a family Order when its controller activation code cannot be issued', async () => {
+    const tenantId = testTenant1TenantId;
+    const offerPayload = await familyManager.process({
+      id: FAMILY_REGISTRATION_REQUEST.jti,
+      status: JobStatus.DRAFT,
+      sequence: 0,
+      createdAtTimestamp: Date.now(),
+      tenantId,
+      jurisdiction: 'ES',
+      sector: Sector.HEALTH_CARE,
+      section: 'individual',
+      format: 'org.schema',
+      action: '_batch',
+      resourceType: ResourceTypesFhirR4.Organization,
+      content: buildFamilyRegistrationRequestWithoutPdfAttachment(),
+    });
+    const offerEntry = offerPayload.body.data[0];
+    const offerId = offerEntry.resource.meta.claims[ClaimsOfferSchemaorg.identifier] as string;
+    const orderContent = structuredClone(FAMILY_ORDER_REQUEST) as any;
+    orderContent.body.data[0].resource.meta.claims[ClaimsOrderSchemaorg.acceptedOfferIdentifier] = offerId;
+    mockKmsService.protectAttributesNameAndValue.mockRejectedValueOnce(
+      new Error('activation-code-index-unavailable'),
+    );
+
+    const orderPayload = await familyManager.process({
+      id: FAMILY_ORDER_REQUEST.jti,
+      status: JobStatus.DRAFT,
+      sequence: 0,
+      createdAtTimestamp: Date.now(),
+      tenantId,
+      sector: Sector.HEALTH_CARE,
+      section: 'individual',
+      format: 'org.schema',
+      action: '_batch',
+      resourceType: 'Order',
+      content: orderContent,
+    });
+
+    expect(orderPayload.body.data[0].response.status).toBe('500');
+    const tenantVaultId = tenantUtils.getTenantVaultId(Sector.HEALTH_CARE, tenantId);
+    const tenantCollectionName = await tenantsCacheManager.getCollectionName(tenantVaultId);
+    const storedIndividuals = await vaultRepository.getContainersInSection(
+      tenantCollectionName!,
+      getEnvSectionId('individual'),
+    );
+    const storedFamily = storedIndividuals.find((document) => document.id === offerEntry.resource.id);
+    const storedContent = await mockKmsService.unprotectConfidentialData(
+      storedFamily as ConfidentialStorageDoc,
+      tenantVaultId,
+    );
+    expect((storedContent as { status: EntityLifecycleStatus }).status)
+      .toBe(EntityLifecycleStatus.Pending);
   });
 
   it('should reopen family Offer and Order records through _search for portal-style read models', async () => {

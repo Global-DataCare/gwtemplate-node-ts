@@ -46,6 +46,10 @@ export type MaterializeFreeIndividualLicensesParams = {
   tenantId: string;
   ownerOrganizationId: string;
   quantity: number;
+  /** Exact commercial Offer/Order that owns these seats. */
+  orderId?: string;
+  /** Transport profile selected by the owning Order; defaults to web. */
+  type?: typeof LICENSE_TYPE_MOBILE | typeof LICENSE_TYPE_WEB;
   /** When true, quantity is the desired pool total rather than seats to add. */
   ensureTotal?: boolean;
   /** Assigns the first created seat to the individual controller. */
@@ -192,9 +196,9 @@ export async function materializeFreeIndividualLicenses(
       id,
       tenantId: params.tenantId,
       ownerOrganizationId: params.ownerOrganizationId,
-      orderId: `individual-default-free:${params.ownerOrganizationId}`,
+      orderId: params.orderId || `individual-default-free:${params.ownerOrganizationId}`,
       userClass: LICENSE_USER_CLASS_INDIVIDUAL,
-      type: LICENSE_TYPE_WEB,
+      type: params.type || LICENSE_TYPE_WEB,
       status,
       plan: 'individual-default-free',
       renewalCycle: null,

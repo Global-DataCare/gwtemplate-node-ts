@@ -111,6 +111,18 @@ description: Enforce branch, TDD, canonical FHIR and schema.org vocabulary, fixt
 
 ## Release the complete change
 
+Treat closure as one indivisible gate: one behavior or flow branch owns one
+patch release, and no new fix or feature branch may start until the current one
+has completed red-green TDD, every required no-skip test layer, changelog,
+package and lockfile patch, branch commit and push, any required immutable npm
+publication and clean-install verification, exact downstream pins, explicit
+merge commit, pushed `main`, matching remote refs and a clean worktree.
+
+When more than one reusable package changes, publish from the lowest changed
+dependency upward. The next package or deployable consumer may be changed only
+after the previous immutable version exists in the registry and its integrity
+and exported surface have been verified.
+
 1. Update the owning changelog with tested behavior. Shared changelogs remain
    product-neutral.
 2. Run focused tests, affected integration/E2E tests, full tests, typecheck,

@@ -94,6 +94,19 @@ Collect and preserve audit artifacts:
 3. `live-gw-uc5-debug-*.jsonl`
 
 ## Release Discipline
+- Branch closure is indivisible. One behavior or flow branch owns one patch
+  release. Do not open or start another fix/feature branch until the current
+  branch has completed red-green TDD, every required no-skip test layer,
+  changelog, package and lockfile patch, branch commit and push, explicit merge
+  commit, pushed `main`, matching remote refs and a clean worktree.
+- Shared-package promotions run from the lowest changed dependency upward:
+  publish and verify each immutable package, then pin that exact registry
+  version in the next consumer. Never advance a consumer with an unpublished,
+  Git, file, workspace or vendored substitute.
+- Environment promotion is ordered and cumulative:
+  `test -> local-network -> test-network -> network`. A later environment never
+  substitutes for an earlier gate, and any affected live E2E reported as
+  skipped blocks image build and deployment.
 - This repository is a deployable service, not an npm package. Keep
   `package.json#private` set to `true` and preserve the failing
   `prepublishOnly` guard; never run or document `npm publish`. Release
