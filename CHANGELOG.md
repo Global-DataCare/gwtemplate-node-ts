@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.24.8] - 2026-09-04
+
 - Accept the signed embedded wallet key as possession proof during encrypted
   pre-DCR `Token/_exchange`, while retaining verified account bearer and
   activation-licence authorization and registered-key enforcement elsewhere.
