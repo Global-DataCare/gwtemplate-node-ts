@@ -201,6 +201,7 @@ export class DeviceRegistrationManager implements IJobProcessor {
       const clinicalCreatorBinding = await this.prepareClinicalCreatorBinding({
         vaultId,
         registrationRequest: registrationRequest as DcrRegistrationRequest & Record<string, any>,
+        license,
         clientId,
         clientInstanceId: fingerprint.clientInstanceId,
       });
@@ -406,21 +407,46 @@ export class DeviceRegistrationManager implements IJobProcessor {
   private async prepareClinicalCreatorBinding(params: {
     vaultId: string;
     registrationRequest: DcrRegistrationRequest & Record<string, any>;
+    license?: DeviceLicense & Record<string, any>;
     clientId: string;
     clientInstanceId: string;
   }): Promise<(ClinicalCreatorBinding & { id: string }) | undefined> {
     const requested = params.registrationRequest[IdentityDcrMetadataFields.ClinicalCreatorBinding];
-    if (requested === undefined) return undefined;
-    if (!isClinicalCreatorBinding(requested)) {
+    if (requested !== undefined && !isClinicalCreatorBinding(requested)) {
       throw new ManagerError('DCR clinical creator binding is malformed.', IssueType.Value);
     }
-    const existing = await this.vaultRepository.get<any>(
-      params.vaultId,
-      requested.authorIdentifier,
-      getClinicalCreatorBindingsSectionId(),
-    );
-    if (!isClinicalCreatorBinding(existing)
-      || !sameStableClinicalCreatorBinding(existing, requested)) {
+    const sectionId = getClinicalCreatorBindingsSectionId();
+    let existing: ClinicalCreatorBinding | undefined;
+    if (requested !== undefined) {
+      const requestedExisting = await this.vaultRepository.get<any>(
+        params.vaultId,
+        requested.authorIdentifier,
+        sectionId,
+      );
+      if (isClinicalCreatorBinding(requestedExisting)
+        && sameStableClinicalCreatorBinding(requestedExisting, requested)) {
+        existing = requestedExisting;
+      }
+    } else if (
+      params.license?.userClass === LICENSE_USER_CLASS_EMPLOYEE
+      && String(params.license.subjectId || '').trim()
+    ) {
+      const subjectId = String(params.license.subjectId).trim().toLowerCase();
+      const issuedRole = String(params.license.issuedToRole || '').trim();
+      const matches = (await this.vaultRepository.listContainersInSection<any>(params.vaultId, sectionId))
+        .filter(isClinicalCreatorBinding)
+        .filter((binding) => binding.actorIdentifier.toLowerCase() === subjectId)
+        .filter((binding) => !issuedRole || binding.role === issuedRole);
+      if (matches.length > 1) {
+        throw new ManagerError(
+          'Employee activation resolves more than one clinical creator assignment.',
+          IssueType.Conflict,
+        );
+      }
+      existing = matches[0];
+    }
+    if (!existing) {
+      if (requested === undefined) return undefined;
       throw new ManagerError(
         'DCR clinical creator binding was not pre-authorized for this tenant.',
         IssueType.Forbidden,

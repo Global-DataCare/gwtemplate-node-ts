@@ -824,6 +824,8 @@ export class CommunicationManager implements IJobProcessor {
       [CommunicationClaim.Recipient]: this.resolveCommunicationRecipient(entry, fhirResource),
       [CommunicationClaim.Sender]: this.resolveCommunicationSender(entry, fhirResource),
       [CommunicationClaim.Sent]: sent,
+      [CommunicationClaim.Category]: this.resolveCommunicationCategory(entry, fhirResource),
+      [CommunicationClaim.Topic]: this.resolveCommunicationTopic(entry, fhirResource),
       [CommunicationClaim.NoteText]: noteText || undefined,
       meta: {
         payloadCount: attachmentCount + contentReferences.filter(
@@ -2247,6 +2249,34 @@ export class CommunicationManager implements IJobProcessor {
       || entry?.meta?.claims?.[CommunicationClaim.Sent]
       || (fhirResource as any)?.sent,
     );
+  }
+
+  private resolveCommunicationCategory(entry: any, fhirResource: FhirCommunication): string | undefined {
+    const claim = this.normalizeOptionalString(
+      entry?.meta?.claims?.[CommunicationClaim.Category]
+      || entry?.resource?.meta?.claims?.[CommunicationClaim.Category],
+    );
+    if (claim) return claim;
+    const category = Array.isArray((fhirResource as any)?.category)
+      ? (fhirResource as any).category[0]
+      : undefined;
+    return this.resolveCodeableConceptToken(category);
+  }
+
+  private resolveCommunicationTopic(entry: any, fhirResource: FhirCommunication): string | undefined {
+    const claim = this.normalizeOptionalString(
+      entry?.meta?.claims?.[CommunicationClaim.Topic]
+      || entry?.resource?.meta?.claims?.[CommunicationClaim.Topic],
+    );
+    return claim || this.resolveCodeableConceptToken((fhirResource as any)?.topic);
+  }
+
+  private resolveCodeableConceptToken(value: any): string | undefined {
+    const coding = Array.isArray(value?.coding) ? value.coding[0] : undefined;
+    const system = this.normalizeOptionalString(coding?.system);
+    const code = this.normalizeOptionalString(coding?.code);
+    if (system && code) return `${system}|${code}`;
+    return code || this.normalizeOptionalString(value?.text);
   }
 
   private buildCommunicationContentReferences(

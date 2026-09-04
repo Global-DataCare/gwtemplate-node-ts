@@ -2801,6 +2801,7 @@ describe('CommunicationManager Unit Tests', () => {
   describe('participant search and indexing', () => {
     it('stores normalized participant index attributes in channel projections', async () => {
       mockTenantsCacheManager.getTenantDid.mockResolvedValue(testServerDid as any);
+      const searchProjection = buildExampleCommunicationParticipantProjection();
 
       const fhirResource = {
         resourceType: ResourceTypesFhirR4.Communication,
@@ -2812,6 +2813,10 @@ describe('CommunicationManager Unit Tests', () => {
           { reference: '+34 600 111 222' },
         ],
         sent: '2026-06-15T10:00:00Z',
+        meta: { claims: {
+          [CommunicationClaim.Category]: searchProjection.category,
+          [CommunicationClaim.Topic]: searchProjection.topic,
+        } },
       };
 
       const job: JobRequest = {
@@ -2853,6 +2858,8 @@ describe('CommunicationManager Unit Tests', () => {
         expect.objectContaining({ name: 'Communication.recipient-token', value: 'did:web:member.example' }),
         expect.objectContaining({ name: 'Communication.recipient-token', value: 'tel:+34600111222' }),
       ]));
+      expect(storedRecord[CommunicationClaim.Category]).toBe(searchProjection.category);
+      expect(storedRecord[CommunicationClaim.Topic]).toBe(searchProjection.topic);
     });
 
     it('searches communication channel records through Parameters criteria and wildcard subject scope', async () => {

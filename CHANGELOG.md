@@ -10,8 +10,15 @@
 - Resolve IPS author organizations from the FHIR document graph and permit the
   narrow same-resource replacement exception only for the same organization
   and a strictly later `Composition.date`.
-- Consume `gdc-common-utils-ts@2.8.4` for the shared provenance policy and the
-  canonical ISCO-08 `3240` veterinary technician and assistant role.
+- Preserve canonical `Communication.category` and `Communication.topic` on
+  subject-scoped channel records so permission-request inbox searches match
+  the communication that was successfully stored.
+- Bind an employee DCR automatically to its unique pre-authorized clinical
+  creator assignment from the activation license subject and governed role;
+  callers may still send the explicit binding during compatibility rollout.
+- Consume `gdc-common-utils-ts@2.8.5` for the shared provenance policy,
+  canonical ISCO-08 `3240` veterinary technician and assistant role, and the
+  lossless Composition author, custodian and attester claims projection.
 
 ## [1.24.10] - 2026-09-04
 
