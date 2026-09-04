@@ -49,6 +49,7 @@ set -euo pipefail
 # - CHAINCODE_IMAGE (an immutable shared CCAAS runtime may be reused)
 # - SKIP_CHAINCODE_IMAGE_BUILD
 # - SKIP_CHAINCODE_ARTIFACT_TESTS
+# - SKIP_CHAINCODE_INSTALL (governance phase after participant installation)
 # - K8S_NAMESPACE_FABRIC
 # -----------------------------------------------------------------------------
 
@@ -72,6 +73,7 @@ CHAINCODE_SIGNATURE_POLICY="${CHAINCODE_SIGNATURE_POLICY:-OR('UNIDMSP.member')}"
 CHAINCODE_K8S_DEPLOYMENT_NAME="${CHAINCODE_K8S_DEPLOYMENT_NAME:-consentaccess-sc}"
 CHAINCODE_K8S_PACKAGE_CONFIGMAP="${CHAINCODE_K8S_PACKAGE_CONFIGMAP:-consentaccess-sc-package}"
 CHAINCODE_K8S_JOB_NAME="${CHAINCODE_K8S_JOB_NAME:-consentaccess-sc-lifecycle}"
+SKIP_CHAINCODE_INSTALL="${SKIP_CHAINCODE_INSTALL:-false}"
 
 ARTIFACT_REGISTRY_NAME="${ARTIFACT_REGISTRY_NAME:-fabric-chaincode}"
 CHAINCODE_IMAGE_NAME="${CHAINCODE_IMAGE_NAME:-consentaccess-sc-unid-test-network}"
@@ -359,7 +361,9 @@ spec:
             - -lc
             - |
               set -euo pipefail
-              if peer lifecycle chaincode queryinstalled | grep -Fq "${PACKAGE_ID}"; then
+              if [[ "${SKIP_CHAINCODE_INSTALL}" == "true" ]]; then
+                echo "Participant phase already installed CCAAS package: ${PACKAGE_ID}"
+              elif peer lifecycle chaincode queryinstalled | grep -Fq "${PACKAGE_ID}"; then
                 echo "Package already installed: ${PACKAGE_ID}"
               else
                 peer lifecycle chaincode install /chaincode-src/chaincode.tgz

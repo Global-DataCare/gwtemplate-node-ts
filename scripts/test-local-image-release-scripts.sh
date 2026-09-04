@@ -102,6 +102,10 @@ published_runtime_manifest="$(
 )"
 grep -Fq 'name: CHAINCODE_NAME' <<<"${published_runtime_manifest}"
 grep -Fq 'value: "${CHAINCODE_NAME}"' <<<"${published_runtime_manifest}"
+grep -Fq 'SKIP_CHAINCODE_INSTALL="${SKIP_CHAINCODE_INSTALL:-false}"' \
+  ./chaincode/scripts/deploy-consentaccess-unid-test-network.sh
+grep -Fq 'Participant phase already installed CCAAS package' \
+  ./chaincode/scripts/deploy-consentaccess-unid-test-network.sh
 grep -Fq 'helm:test:host' package.json
 test -f ./infra/fabric/local-network/docker-compose.yml
 grep -Fq 'rm -f "${DST_ICA}/tls-cert.pem"' ./infra/fabric/local-network/scripts/00-copy-dev-cas.sh
