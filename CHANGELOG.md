@@ -6,10 +6,14 @@
   Observation performer. Section creates accept a registered author, delegated
   submissions retain their submitter audit, and PUT/DELETE preserve authorship.
 - Complete the public host handoff contract with the two bounded Fabric grants,
-  Fabric CA chain, endpoints, sanitized authorization, request confirmation,
+  Fabric ICA CA chain, endpoints, sanitized authorization, request confirmation,
   host-role manifest and checksum manifest required by the executable host
   assistant, without publishing provider-specific infrastructure or authority
   material.
+- Publish English `_EN` counterparts for every public host deliverable,
+  including editable HTML and Word formats, while defining the Rulebook role as
+  a Node Operator acting as a Hosting Provider and preserving the distinct
+  data-space ICA, Fabric ICA and Fabric administrative responsibilities.
 - Accept creator-authorized `PUT ResourceType/id` entries in section-scoped
   clinical batches, including optional weak-ETag matching, while preserving
   subject and creator ownership checks independently for every batch entry.

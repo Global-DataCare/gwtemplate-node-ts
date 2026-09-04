@@ -2,8 +2,8 @@
 
 ## Para qué sirve
 
-Este recorrido permite a un auditor demostrar el funcionamiento del software
-sin acceder a una nube, a datos reales ni a secretos de producción. No es una
+Este recorrido permite demostrar el funcionamiento del software sin acceder a
+una nube, a datos reales ni a secretos de producción. No es una
 migración ni un despliegue productivo.
 
 Demuestra con datos sintéticos:

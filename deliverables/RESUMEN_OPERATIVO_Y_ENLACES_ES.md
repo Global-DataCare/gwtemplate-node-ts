@@ -24,19 +24,18 @@ Texto de transferencia para el equipo responsable:
 > La ICA genera desde su pod una activación de un solo uso ligada al dominio,
 > red, identidad legal, controller, jurisdicción y contexto aprobados. La
 > entrada se lee del ordenador mediante `kubectl exec -i`; la salida se captura
-> en ese mismo ordenador, se entrega cifrada al DevOps del host y sustituye
-> cualquier intercambio de un `did.json` provisional.
+> en ese mismo ordenador y se entrega cifrada al equipo DevOps del Nodo Operador.
 >
 > Chart Helm público:
 > https://github.com/orgs/Global-DataCare/packages/container/package/gdc-host
 >
-> El responsable del host recibe por canal seguro un paquete privado cifrado
+> El equipo DevOps del Nodo Operador recibe por canal seguro un paquete privado cifrado
 > formado por `peer-enrollment-grant.json`,
 > `gw-client-enrollment-grant.json`, `fabric-ica-ca-chain.pem`,
 > `fabric-endpoints.json`, `authorization.json`,
 > `host-apply-confirmation.json`, `onboarding.host.json` y
 > `manifest.sha256`. Verifica los hashes antes de ejecutar el rol `host`. La
-> Host VC-JWT, el PDF, el administrador del MSP, el registrador de Fabric CA y
+> Host VC-JWT, el PDF, el administrador del MSP, la identidad registradora de la ICA de Fabric y
 > el inventario completo no forman parte de esa entrega.
 
 Los dominios, IP, correos, datos, `values`, VC, grants, MSP/TLS, claves y

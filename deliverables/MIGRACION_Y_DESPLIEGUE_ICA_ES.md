@@ -5,7 +5,8 @@ entregable, aunque utiliza el mismo migrador público ya probado.
 
 ## 1. Decisión que debe quedar escrita
 
-Antes de ejecutar nada, la autoridad marca una sola opción:
+Antes de ejecutar nada, el responsable del entorno de la ICA deja por escrito
+una sola opción:
 
 - **Traslado del mismo entorno:** se conserva el DID emisor, se migran los
   registros autorizados y se transfiere el material de firma por custodia
@@ -22,7 +23,7 @@ Sin esa decisión no se cambia DNS ni se ejecuta la migración real.
 | --- | --- |
 | Autoridad de la ICA | opción anterior, DID emisor, dominios, sectores, jurisdicciones y política de hosts permitidos |
 | Custodio del origen | export Firestore y directorio `ica-audit/`, ambos cifrados y con hashes |
-| Proveedor Kubernetes | namespace, StorageClass, IngressClass, DNS/TLS, registro OCI y política de backup |
+| Operador Kubernetes | namespace, StorageClass, IngressClass, DNS/TLS, registro OCI y política de backup |
 | Operador de datos | URL PostgreSQL, API privada de Kubo/IPFS y directorio privado de evidencias |
 | Custodio criptográfico | mecanismo de inyección de la clave de firma; nunca correo, Git o ZIP |
 
@@ -75,7 +76,7 @@ La imagen OCI verificada de la ICA del espacio de datos está publicada en:
 - [paquete `dataspace-ica`](https://github.com/orgs/Global-DataCare/packages/container/package/dataspace-ica);
 - `ghcr.io/global-datacare/dataspace-ica@sha256:2e0faee426f7e1c438409a99ae2ab61f4aa21fc1ef615de3928ee1c020092053`.
 
-El proveedor comprueba y utiliza ese digest inmutable:
+El operador Kubernetes comprueba y utiliza ese digest inmutable:
 
 ```bash
 export ICA_IMAGE='ghcr.io/global-datacare/dataspace-ica@sha256:2e0faee426f7e1c438409a99ae2ab61f4aa21fc1ef615de3928ee1c020092053'
@@ -85,7 +86,7 @@ docker buildx imagetools inspect "${ICA_IMAGE}"
 
 Las plantillas Kubernetes públicas de la ICA están en
 [`deploy/k8s`](https://github.com/Global-DataCare/dataspace-ica-ts/tree/main/deploy/k8s).
-El proveedor materializa en su inventario privado:
+El operador Kubernetes materializa en su inventario privado:
 
 ```dotenv
 DB_PROVIDER=postgres
