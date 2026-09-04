@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [1.24.7] - 2026-09-04
+
+- Separate participant-local CCAAS installation from the network-governance
+  approval and commit phase so the governance MSP is never used as a local
+  peer administrator.
+
 - Complete the public host handoff contract with the two bounded Fabric grants,
   Fabric ICA CA chain, endpoints, sanitized authorization, request confirmation,
   host-role manifest and checksum manifest required by the executable host
