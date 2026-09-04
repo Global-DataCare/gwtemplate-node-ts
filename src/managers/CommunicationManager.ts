@@ -58,6 +58,12 @@ import {
   type AuthenticatedClinicalCreatorEvidence,
   type ClinicalCreatorBinding,
 } from 'gdc-common-utils-ts/utils/fhir-ips-creator-identity';
+import {
+  ClinicalResourceReplacementDecision,
+  evaluateClinicalResourceReplacement,
+  resolveClinicalDocumentAuthorOrganization,
+  type ClinicalDocumentAuthorOrganization,
+} from 'gdc-common-utils-ts/utils/clinical-resource-replacement';
 import { getClinicalCreatorBindingsSectionId } from '../utils/clinical-creator-binding';
 
 type SupportedProjectedResourceType =
@@ -818,6 +824,8 @@ export class CommunicationManager implements IJobProcessor {
       [CommunicationClaim.Recipient]: this.resolveCommunicationRecipient(entry, fhirResource),
       [CommunicationClaim.Sender]: this.resolveCommunicationSender(entry, fhirResource),
       [CommunicationClaim.Sent]: sent,
+      [CommunicationClaim.Category]: this.resolveCommunicationCategory(entry, fhirResource),
+      [CommunicationClaim.Topic]: this.resolveCommunicationTopic(entry, fhirResource),
       [CommunicationClaim.NoteText]: noteText || undefined,
       meta: {
         payloadCount: attachmentCount + contentReferences.filter(
@@ -1057,6 +1065,7 @@ export class CommunicationManager implements IJobProcessor {
     for (const resolved of this.resolveCommunicationAttachments(entry, fhirResource)) {
       const attachment = resolved.documentAttachment;
       const parsedAttachment = this.parseAttachmentJson(attachment);
+      const documentProvenance = resolveClinicalDocumentAuthorOrganization(parsedAttachment);
       const attachedBundleType = String(parsedAttachment?.type || '').toLowerCase();
       if (
         parsedAttachment?.resourceType === ResourceTypesFhirR4.Bundle
@@ -1104,6 +1113,7 @@ export class CommunicationManager implements IJobProcessor {
           fhirResource,
           tenantVaultId,
           creatorDid: clinicalAuthorDid,
+          documentProvenance,
         });
       }
     }
@@ -1203,7 +1213,6 @@ export class CommunicationManager implements IJobProcessor {
       if (!existing) return errorResponse('404', 'Clinical record was not found for this subject.');
       const authors = [
         ...String(existing[CompositionClaim.Author] || existing?.audit?.creatorDid || '').split(','),
-        existing?.audit?.submitterDid,
       ]
         .map((author) => String(author || '').trim())
         .filter(Boolean);
@@ -1276,7 +1285,6 @@ export class CommunicationManager implements IJobProcessor {
       }
       const authors = [
         ...String(existing[CompositionClaim.Author] || existing?.audit?.creatorDid || '').split(','),
-        existing?.audit?.submitterDid,
       ]
         .map((author) => String(author || '').trim())
         .filter(Boolean);
@@ -1366,6 +1374,7 @@ export class CommunicationManager implements IJobProcessor {
     fhirResource: FhirCommunication;
     tenantVaultId: string;
     creatorDid?: string;
+    documentProvenance?: ClinicalDocumentAuthorOrganization;
   }): Promise<{ recordId: string; versionId: string; created: boolean }> {
     // A source-authored URN is import provenance, not the importing BFF's
     // identity. Local author DIDs must equal the authenticated actor.
@@ -1373,13 +1382,26 @@ export class CommunicationManager implements IJobProcessor {
     const authenticatedActorDid = getAuthenticatedJobActorIdentifiers(input.job)
       .find((identifier) => identifier.startsWith('did:web:'));
     const isExternalAuthorUrn = Boolean(input.creatorDid?.startsWith('urn:'));
+    const isDocumentGraphAuthor = Boolean(
+      input.documentProvenance
+      && input.creatorDid === input.documentProvenance.authorReference
+      && (
+        input.creatorDid === input.documentProvenance.organizationReference
+        || await this.isRegisteredClinicalAuthor(input.tenantVaultId, input.creatorDid)
+      ),
+    );
     const isRegisteredDelegatedAuthor = Boolean(
       input.creatorDid
       && authenticatedActorDid
       && input.creatorDid !== authenticatedActorDid
       && await this.isRegisteredClinicalAuthor(input.tenantVaultId, input.creatorDid),
     );
-    if (!input.creatorDid || (!isExternalAuthorUrn && input.creatorDid !== authenticatedActorDid && !isRegisteredDelegatedAuthor)) {
+    if (!input.creatorDid || (
+      !isExternalAuthorUrn
+      && !isDocumentGraphAuthor
+      && input.creatorDid !== authenticatedActorDid
+      && !isRegisteredDelegatedAuthor
+    )) {
       throw new ManagerError(
         'Clinical Composition.author must identify the authenticated actor or a registered clinical author.',
         IssueType.Security,
@@ -1434,11 +1456,30 @@ export class CommunicationManager implements IJobProcessor {
     if (existing?.id === recordId) {
       const existingAuthors = [
         ...String(existing[CompositionClaim.Author] || existing?.audit?.creatorDid || '').split(','),
-        existing?.audit?.submitterDid,
       ]
         .map((author) => String(author || '').trim())
         .filter(Boolean);
-      if (!await this.isAuthenticatedClinicalAuthor(input.job, input.tenantVaultId, existingAuthors)) {
+      const isExactAuthor = await this.isAuthenticatedClinicalAuthor(
+        input.job,
+        input.tenantVaultId,
+        existingAuthors,
+      );
+      const replacementDecision = input.documentProvenance
+        ? evaluateClinicalResourceReplacement({
+          existing: {
+            resourceId: recordId,
+            authorOwnerIdentifier: String(existing?.audit?.authorOwnerIdentifier || ''),
+            documentDate: String(existing?.audit?.documentDate || ''),
+          },
+          incoming: {
+            resourceId: recordId,
+            authorOwnerIdentifier: input.documentProvenance.organizationReference,
+            documentDate: input.documentProvenance.documentDate,
+          },
+        })
+        : ClinicalResourceReplacementDecision.Deny;
+      if (!isExactAuthor
+        && replacementDecision !== ClinicalResourceReplacementDecision.AllowOrganizationSuccessor) {
         throw new ManagerError(
           'Only the authenticated author may update this clinical resource.',
           IssueType.Security,
@@ -1465,6 +1506,10 @@ export class CommunicationManager implements IJobProcessor {
       ...claims,
       ...(input.creatorDid ? { audit: {
         creatorDid: input.creatorDid,
+        ...(input.documentProvenance ? {
+          authorOwnerIdentifier: input.documentProvenance.organizationReference,
+          documentDate: input.documentProvenance.documentDate,
+        } : {}),
         ...(!isExternalAuthorUrn && authenticatedActorDid && input.creatorDid !== authenticatedActorDid
           ? { submitterDid: existing?.audit?.submitterDid || authenticatedActorDid }
           : {}),
@@ -2204,6 +2249,34 @@ export class CommunicationManager implements IJobProcessor {
       || entry?.meta?.claims?.[CommunicationClaim.Sent]
       || (fhirResource as any)?.sent,
     );
+  }
+
+  private resolveCommunicationCategory(entry: any, fhirResource: FhirCommunication): string | undefined {
+    const claim = this.normalizeOptionalString(
+      entry?.meta?.claims?.[CommunicationClaim.Category]
+      || entry?.resource?.meta?.claims?.[CommunicationClaim.Category],
+    );
+    if (claim) return claim;
+    const category = Array.isArray((fhirResource as any)?.category)
+      ? (fhirResource as any).category[0]
+      : undefined;
+    return this.resolveCodeableConceptToken(category);
+  }
+
+  private resolveCommunicationTopic(entry: any, fhirResource: FhirCommunication): string | undefined {
+    const claim = this.normalizeOptionalString(
+      entry?.meta?.claims?.[CommunicationClaim.Topic]
+      || entry?.resource?.meta?.claims?.[CommunicationClaim.Topic],
+    );
+    return claim || this.resolveCodeableConceptToken((fhirResource as any)?.topic);
+  }
+
+  private resolveCodeableConceptToken(value: any): string | undefined {
+    const coding = Array.isArray(value?.coding) ? value.coding[0] : undefined;
+    const system = this.normalizeOptionalString(coding?.system);
+    const code = this.normalizeOptionalString(coding?.code);
+    if (system && code) return `${system}|${code}`;
+    return code || this.normalizeOptionalString(value?.text);
   }
 
   private buildCommunicationContentReferences(

@@ -348,6 +348,11 @@ describe('DeviceRegistrationManager', () => {
       const bindingSpy = jest.spyOn(ManageAssetSubjectKeyBinding.prototype, 'upsertSubjectKeyBinding').mockResolvedValue({} as any);
 
       const job = cloneDeep(DCR_REGISTRATION_JOB);
+      const actorDid = EXAMPLE_CONTROLLER_DID;
+      Object.assign(job.content!.body as any, {
+        [IdentityDcrMetadataFields.ActorDid]: actorDid,
+        [IdentityDcrMetadataFields.ProfileDid]: actorDid,
+      });
       (job.content?.body as any).application_type = 'native';
       (job.content?.body as any).jwks = {
         keys: [
@@ -371,7 +376,7 @@ describe('DeviceRegistrationManager', () => {
       const activationCode = (job.content?.body as any)?.code as string;
       const vaultId = getTenantVaultId(job.sector as any, job.tenantId as string);
 
-      const employeeId = 'employee-1';
+      const employeeId = `urn:uuid:${EXAMPLE_KYC_CONTROLLER_USER_UUID}`;
       const employeeDid = EXAMPLE_CONTROLLER_DID;
       const employeeUrn = createEmployeeUrn({
         namespace: URN_NAMESPACE,
@@ -482,6 +487,19 @@ describe('DeviceRegistrationManager', () => {
         content: license,
       };
       await vaultRepository.put(vaultId, [licenseDoc], getEnvSectionId('device-licenses'));
+      const clinicalCreatorBinding = {
+        id: `urn:uuid:${EXAMPLE_KYC_CONTROLLER_UUID}`,
+        kind: FhirIpsCreatorKinds.Professional,
+        actorIdentifier: employeeId,
+        authorIdentifier: `urn:uuid:${EXAMPLE_KYC_CONTROLLER_UUID}`,
+        ownerIdentifier: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_PROVIDER_ORGANIZATION_URN,
+        role: HealthcareActorRoles.GeneralistMedicalPractitioner,
+      };
+      await vaultRepository.put(
+        vaultId,
+        [clinicalCreatorBinding],
+        getClinicalCreatorBindingsSectionId(),
+      );
       mockKmsService.protectAttributesNameAndValue.mockImplementation(async (attributes) => (
         attributes.map((attribute) => ({ ...attribute, name: 'protected-kid', value: `protected-${attribute.value}` }))
       ));
@@ -549,6 +567,17 @@ describe('DeviceRegistrationManager', () => {
           }),
         }),
       );
+      const linkedClinicalCreator = await vaultRepository.get<any>(
+        vaultId,
+        clinicalCreatorBinding.authorIdentifier,
+        getClinicalCreatorBindingsSectionId(),
+      );
+      expect(linkedClinicalCreator).toEqual(expect.objectContaining({
+        ...clinicalCreatorBinding,
+        actorDids: [actorDid],
+        dcrClientIds: expect.arrayContaining([newClientId, (job.content!.body as any).ext_device_info.device_id]),
+        keyIds: expect.arrayContaining((job.content!.body as any).jwks.keys.map((key: any) => key.kid)),
+      }));
     });
 
     it('should reject a third installation when the seat allowance is two', async () => {

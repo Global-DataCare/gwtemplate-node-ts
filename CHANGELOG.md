@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+## [1.24.11] - 2026-09-04
+
+- Preserve delegated clinical submitters as audit-only provenance: an
+  authorized employee may create a resource for a registered author but cannot
+  later update or delete it merely because they transported it.
+- Resolve IPS author organizations from the FHIR document graph and permit the
+  narrow same-resource replacement exception only for the same organization
+  and a strictly later `Composition.date`.
+- Preserve canonical `Communication.category` and `Communication.topic` on
+  subject-scoped channel records so permission-request inbox searches match
+  the communication that was successfully stored.
+- Bind an employee DCR automatically to its unique pre-authorized clinical
+  creator assignment from the activation license subject and governed role;
+  callers may still send the explicit binding during compatibility rollout.
+- Consume `gdc-common-utils-ts@2.8.5` for the shared provenance policy,
+  canonical ISCO-08 `3240` veterinary technician and assistant role, and the
+  lossless Composition author, custodian and attester claims projection.
+
 ## [1.24.10] - 2026-09-04
 
 - Require every repository skill to keep interactive npm authorization alive
