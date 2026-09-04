@@ -150,3 +150,15 @@ and exported surface have been verified.
 
 Report separately: branch, commit, pushed branch, merge commit, pushed
 `main`, package version/integrity, consumer pin, deployment and live result.
+
+## Mandatory release authorization continuity
+
+For any release chain that requires npm authorization, make at most three
+attempts and keep each command session and browser window alive for up to five
+minutes. Never end the turn or imply continued work while a window is pending.
+After all three attempts fail, an immutable `npm pack` tarball may be used only
+to prepare a downstream consumer and continue local tests; never commit a
+`file:` dependency. The registry dependency must publish and its exact npm
+version must be reinstalled and verified before the consumer may publish, merge
+to `main`, build an image, or deploy. Final order remains: push the branch,
+run `npm publish` from it, verify, merge to `main`, push and delete the branch.

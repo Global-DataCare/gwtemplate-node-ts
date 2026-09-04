@@ -1,6 +1,6 @@
 // Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 // Every portal must prove normal local UI -> BFF -> SDK -> GW in networkKind=test before Fabric, staging, or production.
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 describe('shared local-first portal release policy', () => {
@@ -16,6 +16,20 @@ describe('shared local-first portal release policy', () => {
       expect(contract).toMatch(/Fixture.*mocked.*API-only/s);
       expect(contract).toMatch(/live.*E2E.*SKIP.*release/s);
       expect(contract).toMatch(/live.*E2E.*npm publish.*container image/s);
+    }
+  });
+
+  it('keeps npm authorization continuity explicit in every repository skill', () => {
+    const skillsRoot = resolve(process.cwd(), '.codex/skills');
+    const skillFiles = readdirSync(skillsRoot, { recursive: true })
+      .map(String)
+      .filter((file) => file.endsWith('SKILL.md'));
+    expect(skillFiles.length).toBeGreaterThan(0);
+    for (const file of skillFiles) {
+      const contract = readFileSync(resolve(skillsRoot, file), 'utf8');
+      expect(contract).toMatch(/three.*attempts.*five\s+minutes/is);
+      expect(contract).toMatch(/npm pack.*tarball.*local.*test/is);
+      expect(contract).toMatch(/registry.*publish.*consumer.*merge.*deploy/is);
     }
   });
 });
