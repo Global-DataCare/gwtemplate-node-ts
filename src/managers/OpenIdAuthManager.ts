@@ -421,8 +421,6 @@ export class OpenIdAuthManager implements IJobProcessor {
       throw new ManagerError('The matching consent rule expired before the access token could be issued.', IssueType.Forbidden);
     }
     const lifetimeSeconds = tokenExpiration - now;
-    const signingAlg = (signingKey as { alg?: string }).alg || 'ML-DSA-44';
-    const jwtHeader = { alg: signingAlg, typ: 'JWT', kid: signingKey.kid };
     const jwtPayload = {
       iss: issuerDid,
       sub,
@@ -442,16 +440,16 @@ export class OpenIdAuthManager implements IJobProcessor {
       break_glass_incident_id: breakGlassAuthorization ? body.break_glass?.incidentId : undefined,
     };
 
-    const encodedHeader = Content.stringToBase64Url(JSON.stringify(jwtHeader));
-    const encodedPayload = Content.stringToBase64Url(JSON.stringify(jwtPayload));
-    const bytesToSign = Content.stringToBytesUTF8(`${encodedHeader}.${encodedPayload}`);
-    const jwsObject = await this.kmsService.signWithManagedKey(bytesToSign, issuerVaultId, signingAlg, 'comm_sig');
-    const signature = jwsObject.signatures[0]?.signature;
-    if (!signature) {
-      throw new ManagerError('Failed to sign access token.', IssueType.Exception);
-    }
-
-    const accessToken = `${encodedHeader}.${encodedPayload}.${signature}`;
+    // Sign the exact compact-JWS header and claims exposed to the caller. A
+    // signature copied from an internal byte wrapper cannot verify against the
+    // visible JWT signing input.
+    const accessToken = await this.kmsService.createCompactJws(
+      jwtPayload,
+      signingKey.kid,
+      issuerVaultId,
+      'comm_sig',
+      { typ: 'JWT' },
+    );
 
     return {
       jti: job.content?.jti || thid,

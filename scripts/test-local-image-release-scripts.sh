@@ -39,6 +39,9 @@ grep -Fq '"$SCRIPT_DIR"' ./docker_build_local.sh
 grep -Fq '"$SCRIPT_DIR"' ./cloud_deploy.sh
 grep -Fq 'resolve_pushed_digest' ./cloud_deploy.sh
 grep -Fq 'DEPLOY_DRY_RUN' ./cloud_deploy.sh
+grep -Fq 'wait_for_public_endpoint' ./cloud_deploy.sh
+grep -Fq '"${GDC_PUBLIC_URL%/}/host/ping"' ./cloud_deploy.sh
+grep -Fq '"${GDC_PUBLIC_URL%/}/api-docs/"' ./cloud_deploy.sh
 grep -Fq 'DATASPACE_ICA_ROOT=' ./scripts/run-secure-e2e-google-user.sh
 grep -Fq 'npm run api:local' ./scripts/run-secure-e2e-google-user.sh
 grep -Fq 'curl -fsS "${ICA_BASE_URL}/"' ./scripts/run-secure-e2e-google-user.sh

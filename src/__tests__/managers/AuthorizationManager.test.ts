@@ -1,4 +1,4 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 // src/__tests__/managers/AuthorizationManager.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
@@ -14,9 +14,21 @@ import { getTenantVaultId } from '../../utils/tenant';
 import { getEnvSectionId } from '../../utils/section-env';
 import {
   buildDeterministicIdTokenFixture,
+  buildDeterministicSignedJwt,
   buildDeterministicVpTokenFixture,
   DeterministicJwtTokenVerifier,
 } from '../utils/deterministic-jwt-fixtures';
+import {
+  ClassicalJoseSignatureAlgorithms,
+  CommunicationKeyPurposes,
+} from 'gdc-common-utils-ts/constants/cryptography';
+import {
+  EXAMPLE_PROFILE_PROVIDER_DID,
+  EXAMPLE_SECTOR,
+  EXAMPLE_TENANT_IDENTIFIER,
+  EXAMPLE_TENANT_SERVICE_DID,
+} from 'gdc-common-utils-ts/examples/shared';
+import { EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_SMART_SCOPE } from 'gdc-common-utils-ts/examples/inter-tenant-access-contract';
 
 // --- Mocks ---
 
@@ -123,6 +135,49 @@ describe('AppAuthorizationManager', () => {
   });
 
   describe('verifyBearerToken', () => {
+    it('accepts a tenant-signed SMART access token only when a data route opts in', async () => {
+      const algorithm = ClassicalJoseSignatureAlgorithms.Es384;
+      const vaultId = getTenantVaultId(EXAMPLE_SECTOR, EXAMPLE_TENANT_IDENTIFIER);
+      const fixture = await buildDeterministicSignedJwt({
+        seed: EXAMPLE_TENANT_IDENTIFIER,
+        purpose: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_SMART_SCOPE,
+        alg: algorithm,
+        payload: {
+          iss: EXAMPLE_TENANT_SERVICE_DID,
+          sub: EXAMPLE_PROFILE_PROVIDER_DID,
+          aud: EXAMPLE_TENANT_SERVICE_DID,
+          scope: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_SMART_SCOPE,
+          iat: now,
+          nbf: now,
+          exp: now + 300,
+        },
+      });
+      mockTokenVerifier.verify.mockResolvedValue({ valid: false, error: 'not an id token' });
+      mockKmsService.getPublicVerificationKey.mockResolvedValue(fixture.publicJwk as any);
+      mockCryptographyService.verifyJws.mockRejectedValue(new Error('ES384 is verified by JOSE'));
+
+      const result = await (manager.verifyBearerToken as any)(
+        fixture.compactToken,
+        undefined,
+        { vaultId },
+        { acceptSmartAccessToken: true },
+      );
+
+      expect(result).toEqual({
+        valid: true,
+        payload: expect.objectContaining({
+          iss: EXAMPLE_TENANT_SERVICE_DID,
+          sub: EXAMPLE_PROFILE_PROVIDER_DID,
+        }),
+      });
+      expect(mockKmsService.getPublicVerificationKey).toHaveBeenCalledWith(
+        vaultId,
+        algorithm,
+        CommunicationKeyPurposes.CommunicationSignature,
+      );
+      expect(mockCryptographyService.verifyJws).not.toHaveBeenCalled();
+    });
+
     it('should fall back to one signed controller proof bearer when id_token verification fails', async () => {
       const fixture = await buildDeterministicVpTokenFixture({
         seed: 'gw-controller-proof-bearer-seed-001',

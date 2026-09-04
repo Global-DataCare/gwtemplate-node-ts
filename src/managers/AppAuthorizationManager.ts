@@ -14,6 +14,10 @@ import { Content } from 'gdc-common-utils-ts/utils/content';
 import { getEnvSectionId } from '../utils/section-env';
 import { randomBytes } from 'node:crypto';
 import { compactVerify, decodeProtectedHeader, importJWK, type JWK } from 'jose';
+import {
+  ClassicalJoseSignatureAlgorithms,
+  CommunicationKeyPurposes,
+} from 'gdc-common-utils-ts/constants/cryptography';
 import { normalizeSameAsHash, normalizeTelephoneHash } from 'gdc-common-utils-ts/utils/same-as';
 import { normalizeIndexedEmail, normalizeIndexedPhone } from '../utils/indexed-contact';
 import { DEFAULT_LICENSE_DEVICE_ALLOWANCE } from '../constants/domain';
@@ -28,6 +32,11 @@ import {
 export type ControllerProofRegistrationContext = Readonly<{
   vaultId: string;
   collectionName?: string;
+}>;
+
+export type BearerVerificationOptions = Readonly<{
+  /** Accept a SMART token signed by the exact tenant named by registrationContext. */
+  acceptSmartAccessToken?: boolean;
 }>;
 
 type ActivationActor = Readonly<{
@@ -80,7 +89,9 @@ export class AppAuthorizationManager {
    * Current policy:
    * - accept a regular OIDC/Firebase `id_token`, or
    * - accept one compact JWT VP (`controller proof bearer`) signed by the
-   *   controller wallet key and carrying one embedded public JWK.
+   *   controller wallet key and carrying one embedded public JWK, or
+   * - on an explicitly opted-in data route, accept a tenant-signed SMART
+   *   access token whose time, audience and scope claims are valid.
    *
    * The latter intentionally keeps lifecycle/control-plane calls separate from
    * SMART access tokens while avoiding a dependency on email-login proof when
@@ -96,6 +107,7 @@ export class AppAuthorizationManager {
     projectedPublicJwk?: JWK,
     /** Tenant scope used to resolve the authoritative post-DCR signing key. */
     registrationContext?: ControllerProofRegistrationContext,
+    options?: BearerVerificationOptions,
   ): Promise<VerificationResult> {
     try {
       return await this.verifyIdToken(token);
@@ -103,6 +115,19 @@ export class AppAuthorizationManager {
       try {
         return await this.verifyControllerProofBearer(token, projectedPublicJwk, registrationContext);
       } catch (vpError: any) {
+        if (options?.acceptSmartAccessToken) {
+          try {
+            return await this.verifySmartAccessToken(token, registrationContext);
+          } catch (smartError: any) {
+            const idMessage = idTokenError instanceof Error ? idTokenError.message : String(idTokenError || 'verification failed');
+            const vpMessage = vpError instanceof Error ? vpError.message : String(vpError || 'verification failed');
+            const smartMessage = smartError instanceof Error ? smartError.message : String(smartError || 'verification failed');
+            throw new ManagerError(
+              `Bearer token is invalid: ${idMessage}; controller proof bearer verification also failed: ${vpMessage}; SMART access token verification also failed: ${smartMessage}`,
+              IssueType.Security,
+            );
+          }
+        }
         const idMessage = idTokenError instanceof Error ? idTokenError.message : String(idTokenError || 'verification failed');
         const vpMessage = vpError instanceof Error ? vpError.message : String(vpError || 'verification failed');
         throw new ManagerError(
@@ -111,6 +136,81 @@ export class AppAuthorizationManager {
         );
       }
     }
+  }
+
+  private async verifySmartAccessToken(
+    token: string,
+    registrationContext?: ControllerProofRegistrationContext,
+  ): Promise<VerificationResult> {
+    if (!registrationContext?.vaultId) {
+      throw new ManagerError('SMART access token verification requires an exact tenant vault.', IssueType.Security);
+    }
+    const compact = String(token || '').trim();
+    const [protectedHeader, encodedPayload, signature, ...extra] = compact.split('.');
+    if (!protectedHeader || !encodedPayload || !signature || extra.length > 0) {
+      throw new ManagerError('SMART access token must be a compact JWT (JWS).', IssueType.Security);
+    }
+
+    const header = decodeProtectedHeader(compact);
+    const alg = String(header.alg || '').trim();
+    const kid = String(header.kid || '').trim();
+    const classicalAlgorithms = Object.values(ClassicalJoseSignatureAlgorithms);
+    const allowedAlgorithms = new Set([...classicalAlgorithms, 'ML-DSA-44', 'ML-DSA-65', 'ML-DSA-87']);
+    if (!kid || !allowedAlgorithms.has(alg)) {
+      throw new ManagerError('SMART access token must identify a supported tenant signing key.', IssueType.Security);
+    }
+    const publicJwk = await this.kmsService.getPublicVerificationKey(
+      registrationContext.vaultId,
+      alg,
+      CommunicationKeyPurposes.CommunicationSignature,
+    );
+    if (!publicJwk || String(publicJwk.kid || '').trim() !== kid) {
+      throw new ManagerError('SMART access token signing key is not the active key for this tenant.', IssueType.Security);
+    }
+    if (classicalAlgorithms.includes(alg as typeof classicalAlgorithms[number])) {
+      try {
+        const keyLike = await importJWK(publicJwk as JWK, alg);
+        await compactVerify(compact, keyLike);
+      } catch {
+        throw new ManagerError('SMART access token signature is invalid.', IssueType.Security);
+      }
+    } else {
+      const validSignature = await this.cryptographyService.verifyJws(
+        { protected: protectedHeader, payload: encodedPayload, signature },
+        publicJwk,
+      );
+      if (!validSignature) {
+        throw new ManagerError('SMART access token signature is invalid.', IssueType.Security);
+      }
+    }
+
+    let payload: Record<string, any>;
+    try {
+      payload = JSON.parse(Content.bytesToStringUTF8(Content.base64ToBytes(encodedPayload)));
+    } catch {
+      throw new ManagerError('SMART access token payload is not valid JSON.', IssueType.Security);
+    }
+    const issuer = String(payload.iss || '').trim();
+    const subject = String(payload.sub || '').trim();
+    const audience = String(payload.aud || '').trim();
+    const scope = String(payload.scope || '').trim();
+    if (!issuer.startsWith('did:') || !subject.startsWith('did:') || audience !== issuer || !scope) {
+      throw new ManagerError('SMART access token issuer, subject, audience or scope is invalid.', IssueType.Security);
+    }
+    const now = Math.floor(Date.now() / 1000);
+    const issuedAt = Number(payload.iat);
+    const notBefore = Number(payload.nbf);
+    const expiration = Number(payload.exp);
+    if (!Number.isFinite(issuedAt) || !Number.isFinite(notBefore) || !Number.isFinite(expiration)) {
+      throw new ManagerError('SMART access token requires numeric iat, nbf and exp claims.', IssueType.Security);
+    }
+    if (notBefore > now || issuedAt > now + 60) {
+      throw new ManagerError('SMART access token is not active yet.', IssueType.Security);
+    }
+    if (expiration <= now) {
+      throw new ManagerError('SMART access token has expired.', IssueType.Security);
+    }
+    return { valid: true, payload };
   }
 
   /**

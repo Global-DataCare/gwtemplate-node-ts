@@ -24,6 +24,9 @@ describe('OpenIdAuthManager break-glass SMART integration', () => {
         {
           getPublicVerificationKey: jest.fn().mockResolvedValue({ kid: 'tenant-key', alg: 'ES384' }),
           signWithManagedKey: jest.fn().mockResolvedValue({ signatures: [{ signature: 'signature' }] }),
+          createCompactJws: jest.fn().mockImplementation(async (payload: object) => (
+            `header.${Buffer.from(JSON.stringify(payload)).toString('base64url')}.signature`
+          )),
         } as any,
         {
           tenantExists: jest.fn().mockResolvedValue(true),

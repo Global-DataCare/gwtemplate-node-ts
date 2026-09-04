@@ -1,8 +1,9 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 // src/__tests__/integration/wellKnownApi.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // Always create JSDoc, do not use strings inline in keys nor values, use types instead, and reuse the data test examples.
 import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
+import { EXAMPLE_VERIFY_RESPONSE_ORG_PUBLIC_KEY_JWK } from 'gdc-common-utils-ts/examples/ica-verify-response';
 
 import { jest } from '@jest/globals';
 import express from 'express';
@@ -238,6 +239,17 @@ describe('Well-Known DID Discovery API', () => {
 });
 
 describe('Well-Known JWKS Discovery API', () => {
+
+  it('returns the host JWK Set at the exact URL advertised by the root host DID', async () => {
+    const expectedJwks = { keys: [EXAMPLE_VERIFY_RESPONSE_ORG_PUBLIC_KEY_JWK] };
+    mockKmsService.getPublicJwks.mockResolvedValue(expectedJwks as any);
+
+    const response = await invokeExpress(app, { method: HttpRequestMethods.Get, url: '/jwks.json' });
+
+    expect(response.status).toBe(200);
+    expect(JSON.parse(response.text)).toEqual(expectedJwks);
+    expect(mockKmsService.getPublicJwks).toHaveBeenCalledWith('host');
+  });
 
   afterEach(() => {
     jest.clearAllMocks();

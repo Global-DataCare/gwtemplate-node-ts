@@ -15,6 +15,7 @@ import { GatewayResponseEntryTypes } from 'gdc-common-utils-ts/constants/gateway
 import { GatewayRequestEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
 import { HttpStatusCodes } from 'gdc-common-utils-ts/constants/http';
 import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
+import { ObservationStatuses } from 'gdc-common-utils-ts/constants/clinical-statuses';
 
 import { jest } from '@jest/globals';
 import { CommunicationManager } from '../../../managers/CommunicationManager';
@@ -54,6 +55,7 @@ import {
   EXAMPLE_CONTROLLER_DID,
   EXAMPLE_HEALTHCARE_JURISDICTION,
   EXAMPLE_IPS_COMPOSITION_IDENTIFIER,
+  EXAMPLE_OBSERVATION_IDENTIFIER,
   EXAMPLE_PROFESSIONAL_DID,
   EXAMPLE_PROVIDER_ORGANIZATION_DID,
   EXAMPLE_SUBJECT_DID,
@@ -225,23 +227,30 @@ describe('CommunicationManager Unit Tests', () => {
     it('lets the authenticated creator replace the same clinical resource through PUT', async () => {
       mockTenantsCacheManager.getTenantDid.mockResolvedValue(testServerDid as any);
       mockVaultRepository.get.mockResolvedValue({
-        id: 'observation-existing', audit: { creatorDid },
+        id: EXAMPLE_OBSERVATION_IDENTIFIER, audit: { creatorDid },
         'Observation.subject': subjectDid, 'Observation.meta.versionId': 'version-current',
       } as any);
       const response = await communicationManager.process(buildClinicalBatchJob([{
-        type: 'Observation-update-request-v1.0',
-        request: { method: 'PUT', url: 'Observation/observation-existing', ifMatch: 'W/"version-current"' },
+        request: {
+          method: HttpRequestMethods.Put,
+          url: `${ResourceTypesFhirR4.Observation}/${EXAMPLE_OBSERVATION_IDENTIFIER}`,
+          ifMatch: 'W/"version-current"',
+        },
         resource: {
-          resourceType: 'Observation', id: 'observation-existing',
-          subject: { reference: subjectDid }, status: 'final', code: { text: 'Corrected result' },
+          resourceType: ResourceTypesFhirR4.Observation,
+          id: EXAMPLE_OBSERVATION_IDENTIFIER,
+          subject: { reference: subjectDid },
+          status: ObservationStatuses.Final,
+          code: { text: 'Corrected result' },
         },
       }]));
       expect((response.body as any).data[0]).toEqual(expect.objectContaining({
-        id: 'observation-existing', response: expect.objectContaining({ status: '200' }),
+        id: EXAMPLE_OBSERVATION_IDENTIFIER,
+        response: expect.objectContaining({ status: String(HttpStatusCodes.Ok) }),
       }));
       expect(mockVaultRepository.put).toHaveBeenCalledWith(
         'animal-care_acme',
-        [expect.objectContaining({ id: 'observation-existing', audit: { creatorDid } })],
+        [expect.objectContaining({ id: EXAMPLE_OBSERVATION_IDENTIFIER, audit: { creatorDid } })],
         expect.any(String),
       );
     });
