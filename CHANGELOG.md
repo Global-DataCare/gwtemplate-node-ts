@@ -15,6 +15,12 @@
   GW's technical Occupation or relationship record, not an employment or
   caregiver contract lifecycle.
 
+## [1.24.6] - 2026-09-03
+
+- Allow the governed test-network lifecycle deployer to reuse the immutable
+  shared CCAAS host runtime by passing the selected chaincode name explicitly,
+  avoiding an unnecessary single-contract image rebuild when sources match.
+
 ## [1.24.5] - 2026-09-03
 
 - Verify tenant-signed SMART access tokens on individual and digital-twin FHIR
