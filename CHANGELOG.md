@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [1.24.10] - 2026-09-04
+
+- Require every repository skill to keep interactive npm authorization alive
+  for three five-minute attempts and allow immutable tarballs only for
+  provisional local consumer tests, never for publication, merge or deployment.
+
 ## [1.24.9] - 2026-09-04
 
 - Make individual registration Order confirmation fail closed unless the

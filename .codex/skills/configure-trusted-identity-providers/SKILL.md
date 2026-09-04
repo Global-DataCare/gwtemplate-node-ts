@@ -43,3 +43,15 @@ keep real project names, domains, addresses and custody mappings in an
 untracked operator inventory. Re-evaluate each trust list independently and
 never infer token trust from a browser origin or copy a staging list into
 production.
+
+## Mandatory release authorization continuity
+
+For any release chain that requires npm authorization, make at most three
+attempts and keep each command session and browser window alive for up to five
+minutes. Never end the turn or imply continued work while a window is pending.
+After all three attempts fail, an immutable `npm pack` tarball may be used only
+to prepare a downstream consumer and continue local tests; never commit a
+`file:` dependency. The registry dependency must publish and its exact npm
+version must be reinstalled and verified before the consumer may publish, merge
+to `main`, build an image, or deploy. Final order remains: push the branch,
+run `npm publish` from it, verify, merge to `main`, push and delete the branch.
