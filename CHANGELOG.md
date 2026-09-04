@@ -2,9 +2,6 @@
 
 ## [Unreleased]
 
-- Separate authenticated Communication sender, explicit clinical author and
-  Observation performer. Section creates accept a registered author, delegated
-  submissions retain their submitter audit, and PUT/DELETE preserve authorship.
 - Complete the public host handoff contract with the two bounded Fabric grants,
   Fabric ICA CA chain, endpoints, sanitized authorization, request confirmation,
   host-role manifest and checksum manifest required by the executable host
@@ -14,15 +11,42 @@
   including editable HTML and Word formats, while defining the Rulebook role as
   a Node Operator acting as a Hosting Provider and preserving the distinct
   data-space ICA, Fabric ICA and Fabric administrative responsibilities.
-- Accept creator-authorized `PUT ResourceType/id` entries in section-scoped
-  clinical batches, including optional weak-ETag matching, while preserving
-  subject and creator ownership checks independently for every batch entry.
-- Preauthorize UUID-backed Employee/Occupation FHIR creator bindings for roles
-  in the governed clinical catalog, matching GW VET while excluding unrelated
-  occupational records from DCR alias resolution and IPS author projection.
 - Clarify that the stable PractitionerRole/RelatedPerson assignment UUID is
   GW's technical Occupation or relationship record, not an employment or
   caregiver contract lifecycle.
+
+## [1.24.5] - 2026-09-03
+
+- Verify tenant-signed SMART access tokens on individual and digital-twin FHIR
+  data routes in strict deployments, while keeping lifecycle and DCR routes on
+  their existing authorization contracts.
+- Verify classical ECDSA SMART signatures, including legacy `ES384`, through
+  JOSE and retain the existing ML-DSA verifier for post-quantum tenant keys.
+- Issue SMART access tokens through the KMS compact-JWS contract so the
+  signature covers the exact JWT claims returned to the caller.
+- Serve the root host JWK Set at `/jwks.json`, matching the public URL
+  advertised by the root host DID document.
+- Wait through the external LoadBalancer handover window before failing public
+  post-rollout endpoint verification.
+
+## [1.24.4] - 2026-09-03
+
+- Separate authenticated Communication sender, explicit clinical author and
+  Observation performer. Section creates accept a registered author, delegated
+  submissions retain their submitter audit, and PUT/DELETE preserve authorship.
+
+## [1.24.3] - 2026-09-03
+
+- Preauthorize UUID-backed Employee/Occupation FHIR creator bindings for roles
+  in the governed clinical catalog, matching product gateways while excluding
+  unrelated occupational records from DCR alias resolution and IPS author
+  projection.
+
+## [1.24.2] - 2026-09-03
+
+- Accept creator-authorized `PUT ResourceType/id` entries in section-scoped
+  clinical batches, including optional weak-ETag matching, while preserving
+  subject and creator ownership checks independently for every batch entry.
 
 ## [1.24.1] - 2026-09-03
 

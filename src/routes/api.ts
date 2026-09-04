@@ -2,6 +2,8 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 import { GatewayInternalResourceTypes } from 'gdc-common-utils-ts/constants/gateway-response';
 import { GatewayResponseEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
+import { GatewayRouteSections } from 'gdc-common-utils-ts/constants/gateway-response';
+import { Format } from 'gdc-common-utils-ts/constants/Schemas';
 
 import * as express from 'express';
 import { IKmsService } from '../gdc-backend-utils-node/models/IKmsService';
@@ -34,6 +36,7 @@ import {
   ACTION_PURGE,
   ACTION_PURGE_DESCENDANTS,
   ACTION_STATUS,
+  SUBJECT_SECTION_DIGITAL_TWIN,
 } from '../constants/domain';
 import { getTenantAuthorizationStatus as readTenantAuthorizationStatusFromConfig } from '../utils/tenant-lifecycle';
 import { enforceSmartScopeRouteCompatibility } from '../utils/smart-scope-route-authorization';
@@ -67,6 +70,16 @@ function getVerifiedBearerPayload(verificationResult: any): Record<string, any> 
   delete (clone as any).valid;
   delete (clone as any).error;
   return clone;
+}
+
+function bearerVerificationOptionsForDataRoute(
+  section: string,
+  format: string,
+): { acceptSmartAccessToken: true } | undefined {
+  return (section === GatewayRouteSections.Individual || section === SUBJECT_SECTION_DIGITAL_TWIN)
+    && String(format || '').toLowerCase() === Format.FHIR_R4
+    ? { acceptSmartAccessToken: true }
+    : undefined;
 }
 
 function parseBooleanEnv(value: string | undefined, fallback = false): boolean {
@@ -3554,11 +3567,11 @@ export function createApiRouter(
           }
           try {
             const bearerToken = authToken?.split(' ')[1] || '';
-            const verificationResult = await appAuthManager.verifyBearerToken(
-              bearerToken,
-              undefined,
-              await controllerProofRegistrationContext(tenantId, sector),
-            );
+            const registrationContext = await controllerProofRegistrationContext(tenantId, sector);
+            const bearerOptions = bearerVerificationOptionsForDataRoute(section, req.params.format);
+            const verificationResult = bearerOptions
+              ? await appAuthManager.verifyBearerToken(bearerToken, undefined, registrationContext, bearerOptions)
+              : await appAuthManager.verifyBearerToken(bearerToken, undefined, registrationContext);
             verifiedBearerPayload = getVerifiedBearerPayload(verificationResult);
           } catch (error: any) {
             return sendDidcommEarlyError(
@@ -3868,11 +3881,12 @@ export function createApiRouter(
           }
           try {
             const bearerToken = authToken?.split(' ')[1] || '';
-            const verificationResult = await appAuthManager.verifyBearerToken(
-              bearerToken,
-              projectedControllerProofJwk(req.body),
-              await controllerProofRegistrationContext(tenantId, sector),
-            );
+            const projectedPublicJwk = projectedControllerProofJwk(req.body);
+            const registrationContext = await controllerProofRegistrationContext(tenantId, sector);
+            const bearerOptions = bearerVerificationOptionsForDataRoute(section, req.params.format);
+            const verificationResult = bearerOptions
+              ? await appAuthManager.verifyBearerToken(bearerToken, projectedPublicJwk, registrationContext, bearerOptions)
+              : await appAuthManager.verifyBearerToken(bearerToken, projectedPublicJwk, registrationContext);
             verifiedBearerPayload = getVerifiedBearerPayload(verificationResult);
           } catch (error: any) {
             return sendDidcommEarlyError(

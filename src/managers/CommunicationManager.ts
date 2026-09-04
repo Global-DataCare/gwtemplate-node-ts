@@ -1244,7 +1244,7 @@ export class CommunicationManager implements IJobProcessor {
         return {
           id: updated.recordId,
           type: responseType,
-          response: { status: '200', etag: `W/"${updated.versionId}"` },
+          response: { status: String(HttpStatusCodes.Ok), etag: `W/"${updated.versionId}"` },
           resource: { resourceType, id: updated.recordId },
         };
       } catch (error) {

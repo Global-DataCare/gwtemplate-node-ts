@@ -127,6 +127,28 @@ resolve_pushed_digest() {
   return 1
 }
 
+# A successful Kubernetes rollout can precede external LoadBalancer readiness.
+# Release evidence waits for the public endpoint instead of failing during the
+# normal handover window.
+wait_for_public_endpoint() {
+  local url="$1"
+  local attempts="${PUBLIC_ENDPOINT_ATTEMPTS:-18}"
+  local delay_seconds="${PUBLIC_ENDPOINT_DELAY_SECONDS:-5}"
+  local attempt
+
+  for attempt in $(seq 1 "$attempts"); do
+    if curl --fail --silent --show-error --max-time 20 "$url" >/dev/null; then
+      return 0
+    fi
+    if [[ "$attempt" -lt "$attempts" ]]; then
+      sleep "$delay_seconds"
+    fi
+  done
+
+  echo "ERROR: public endpoint did not become ready: $url" >&2
+  return 1
+}
+
 confirm_or_exit() {
   if [[ "${DEPLOY_CONFIRM:-false}" == "true" ]]; then
     return 0
@@ -380,8 +402,8 @@ deploy_gke() {
       HOST_LEGACY_REPRESENTATIVE_CONTROLLER="$HOST_LEGACY_REPRESENTATIVE_CONTROLLER"
   fi
   kubectl -n "$K8S_NAMESPACE_GDC" rollout status "deployment/${resource_name}" --timeout="${ROLLOUT_TIMEOUT:-180s}"
-  curl --fail --silent --show-error --max-time 20 "${GDC_PUBLIC_URL%/}/host/ping" >/dev/null
-  curl --fail --silent --show-error --max-time 20 "${GDC_PUBLIC_URL%/}/api-docs/" >/dev/null
+  wait_for_public_endpoint "${GDC_PUBLIC_URL%/}/host/ping"
+  wait_for_public_endpoint "${GDC_PUBLIC_URL%/}/api-docs/"
 
   echo "--- ✅ GKE deployment submitted ---"
   echo "Public URL: $GDC_PUBLIC_URL"

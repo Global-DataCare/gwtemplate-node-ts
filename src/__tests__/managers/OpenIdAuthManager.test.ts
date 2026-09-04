@@ -96,6 +96,12 @@ const EXAMPLE_INTER_TENANT_DIGITAL_TWIN_CONTRACT_CREDENTIAL =
     },
   }) as unknown as Record<string, unknown>;
 
+function buildMockCompactJws() {
+  return jest.fn<Promise<string>, Parameters<IKmsService['createCompactJws']>>(async (payload: object) => (
+    `eyJhbGciOiJFUzM4NCIsImtpZCI6InRlbmFudC1zaWcta2lkIiwidHlwIjoiSldUIn0.${Buffer.from(JSON.stringify(payload)).toString('base64url')}.sig`
+  ));
+}
+
 function buildAliasedIndividualSelfReadManager(): OpenIdAuthManager {
   // Test setup only: dependencies are mocked, but the real OpenIdAuthManager
   // executes VP extraction, trusted-issuer matching and Consent evaluation.
@@ -105,6 +111,7 @@ function buildAliasedIndividualSelfReadManager(): OpenIdAuthManager {
       payload: '',
       signatures: [{ protected: 'p', signature: 'sig' }],
     }),
+    createCompactJws: buildMockCompactJws(),
   } as unknown as jest.Mocked<IKmsService>;
   const tenants = {
     getDidDocument: jest.fn().mockResolvedValue({ id: EXAMPLE_HOSTING_OPERATOR_DID }),
@@ -170,6 +177,7 @@ function buildSameTenantDigitalTwinManager(
       payload: '',
       signatures: [{ protected: 'p', signature: 'sig' }],
     }),
+    createCompactJws: buildMockCompactJws(),
     unprotectConfidentialData: jest.fn().mockImplementation(async (document: any) => document.content),
   } as unknown as jest.Mocked<IKmsService>;
   const tenants = {
@@ -295,6 +303,7 @@ describe('OpenIdAuthManager', () => {
         signWithManagedKey: jest.fn().mockResolvedValue({
           payload: '', signatures: [{ protected: 'p', signature: 'sig' }],
         }),
+        createCompactJws: buildMockCompactJws(),
       } as unknown as jest.Mocked<IKmsService>,
       {
         getDidDocument: jest.fn().mockResolvedValue({ id: 'did:web:api.acme.org' }),
@@ -340,7 +349,7 @@ describe('OpenIdAuthManager', () => {
       } as any),
       signWithReconstructedKey: jest.fn(),
       createDetachedJws: jest.fn(),
-      createCompactJws: jest.fn(),
+      createCompactJws: buildMockCompactJws(),
       encodeResponse: jest.fn(),
       protectConfidentialData: jest.fn(),
       unprotectConfidentialData: jest.fn(),
@@ -431,7 +440,18 @@ describe('OpenIdAuthManager', () => {
     const accessTokenPayload = JSON.parse(Buffer.from(response.body.access_token.split('.')[1], 'base64url').toString('utf8'));
     expect(accessTokenPayload.exp).toBe(response.exp);
     expect(accessTokenPayload.exp).toBeLessThanOrEqual(Math.floor(Date.parse(consentPeriodEnd) / 1000));
-    expect(mockKmsService.signWithManagedKey).toHaveBeenCalled();
+    expect(mockKmsService.createCompactJws).toHaveBeenCalledWith(
+      expect.objectContaining({
+        iss: 'did:web:api.acme.org',
+        aud: 'did:web:api.acme.org',
+        scope: response.body.scope,
+      }),
+      'tenant-sig-kid',
+      expect.any(String),
+      'comm_sig',
+      { typ: 'JWT' },
+    );
+    expect(mockKmsService.signWithManagedKey).not.toHaveBeenCalled();
     expect(mockClearingHouse.verifyVpToken).toHaveBeenCalled();
   });
 
@@ -456,7 +476,7 @@ describe('OpenIdAuthManager', () => {
       } as any),
       signWithReconstructedKey: jest.fn(),
       createDetachedJws: jest.fn(),
-      createCompactJws: jest.fn(),
+      createCompactJws: buildMockCompactJws(),
       encodeResponse: jest.fn(),
       protectConfidentialData: jest.fn(),
       unprotectConfidentialData: jest.fn(),
@@ -554,7 +574,7 @@ describe('OpenIdAuthManager', () => {
       signWithManagedKey: jest.fn().mockResolvedValue({ payload: '', signatures: [{ protected: 'p', signature: 'sig' }] } as any),
       signWithReconstructedKey: jest.fn(),
       createDetachedJws: jest.fn(),
-      createCompactJws: jest.fn(),
+      createCompactJws: buildMockCompactJws(),
       encodeResponse: jest.fn(),
       protectConfidentialData: jest.fn(),
       unprotectConfidentialData: jest.fn(),
@@ -648,7 +668,7 @@ describe('OpenIdAuthManager', () => {
       signWithManagedKey: jest.fn(),
       signWithReconstructedKey: jest.fn(),
       createDetachedJws: jest.fn(),
-      createCompactJws: jest.fn(),
+      createCompactJws: buildMockCompactJws(),
       encodeResponse: jest.fn(),
       protectConfidentialData: jest.fn(),
       unprotectConfidentialData: jest.fn(),
@@ -730,7 +750,7 @@ describe('OpenIdAuthManager', () => {
       signWithManagedKey: jest.fn(),
       signWithReconstructedKey: jest.fn(),
       createDetachedJws: jest.fn(),
-      createCompactJws: jest.fn(),
+      createCompactJws: buildMockCompactJws(),
       encodeResponse: jest.fn(),
       protectConfidentialData: jest.fn(),
       unprotectConfidentialData: jest.fn(),
@@ -812,7 +832,7 @@ describe('OpenIdAuthManager', () => {
       signWithManagedKey: jest.fn().mockResolvedValue({ payload: '', signatures: [{ protected: 'p', signature: 'sig' }] } as any),
       signWithReconstructedKey: jest.fn(),
       createDetachedJws: jest.fn(),
-      createCompactJws: jest.fn(),
+      createCompactJws: buildMockCompactJws(),
       encodeResponse: jest.fn(),
       protectConfidentialData: jest.fn(),
       unprotectConfidentialData: jest.fn(),
@@ -899,7 +919,7 @@ describe('OpenIdAuthManager', () => {
       signWithManagedKey: jest.fn().mockResolvedValue({ payload: '', signatures: [{ protected: 'p', signature: 'sig' }] } as any),
       signWithReconstructedKey: jest.fn(),
       createDetachedJws: jest.fn(),
-      createCompactJws: jest.fn(),
+      createCompactJws: buildMockCompactJws(),
       encodeResponse: jest.fn(),
       protectConfidentialData: jest.fn(),
       unprotectConfidentialData: jest.fn(),
@@ -986,7 +1006,7 @@ describe('OpenIdAuthManager', () => {
       signWithManagedKey: jest.fn().mockResolvedValue({ payload: '', signatures: [{ protected: 'p', signature: 'sig' }] } as any),
       signWithReconstructedKey: jest.fn(),
       createDetachedJws: jest.fn(),
-      createCompactJws: jest.fn(),
+      createCompactJws: buildMockCompactJws(),
       encodeResponse: jest.fn(),
       protectConfidentialData: jest.fn(),
       unprotectConfidentialData: jest.fn(),
@@ -1075,7 +1095,7 @@ describe('OpenIdAuthManager', () => {
       signWithManagedKey: jest.fn(),
       signWithReconstructedKey: jest.fn(),
       createDetachedJws: jest.fn(),
-      createCompactJws: jest.fn(),
+      createCompactJws: buildMockCompactJws(),
       encodeResponse: jest.fn(),
       protectConfidentialData: jest.fn(),
       unprotectConfidentialData: jest.fn(),
@@ -1156,7 +1176,7 @@ describe('OpenIdAuthManager', () => {
       signWithManagedKey: jest.fn(),
       signWithReconstructedKey: jest.fn(),
       createDetachedJws: jest.fn(),
-      createCompactJws: jest.fn(),
+      createCompactJws: buildMockCompactJws(),
       encodeResponse: jest.fn(),
       protectConfidentialData: jest.fn(),
       unprotectConfidentialData: jest.fn(),
@@ -1250,7 +1270,7 @@ describe('OpenIdAuthManager', () => {
       signWithManagedKey: jest.fn().mockResolvedValue({ payload: '', signatures: [{ protected: 'p', signature: 'sig' }] } as any),
       signWithReconstructedKey: jest.fn(),
       createDetachedJws: jest.fn(),
-      createCompactJws: jest.fn(),
+      createCompactJws: buildMockCompactJws(),
       encodeResponse: jest.fn(),
       protectConfidentialData: jest.fn(),
       unprotectConfidentialData: jest.fn(),
@@ -1345,7 +1365,7 @@ describe('OpenIdAuthManager', () => {
       signWithManagedKey: jest.fn().mockResolvedValue({ payload: '', signatures: [{ protected: 'p', signature: 'sig' }] } as any),
       signWithReconstructedKey: jest.fn(),
       createDetachedJws: jest.fn(),
-      createCompactJws: jest.fn(),
+      createCompactJws: buildMockCompactJws(),
       encodeResponse: jest.fn(),
       protectConfidentialData: jest.fn(),
       unprotectConfidentialData: jest.fn(),
@@ -1528,7 +1548,7 @@ describe('OpenIdAuthManager', () => {
       signWithManagedKey: jest.fn().mockResolvedValue({ payload: '', signatures: [{ protected: 'p', signature: 'sig' }] } as any),
       signWithReconstructedKey: jest.fn(),
       createDetachedJws: jest.fn(),
-      createCompactJws: jest.fn(),
+      createCompactJws: buildMockCompactJws(),
       encodeResponse: jest.fn(),
       protectConfidentialData: jest.fn(),
       unprotectConfidentialData: jest.fn(),
@@ -1667,7 +1687,7 @@ describe('OpenIdAuthManager', () => {
       signWithManagedKey: jest.fn(),
       signWithReconstructedKey: jest.fn(),
       createDetachedJws: jest.fn(),
-      createCompactJws: jest.fn(),
+      createCompactJws: buildMockCompactJws(),
       encodeResponse: jest.fn(),
       protectConfidentialData: jest.fn(),
       unprotectConfidentialData: jest.fn(),
@@ -1773,7 +1793,7 @@ describe('OpenIdAuthManager', () => {
       signWithManagedKey: jest.fn().mockResolvedValue({ payload: '', signatures: [{ protected: 'p', signature: 'sig' }] } as any),
       signWithReconstructedKey: jest.fn(),
       createDetachedJws: jest.fn(),
-      createCompactJws: jest.fn(),
+      createCompactJws: buildMockCompactJws(),
       encodeResponse: jest.fn(),
       protectConfidentialData: jest.fn(),
       unprotectConfidentialData: jest.fn(),
@@ -1891,7 +1911,7 @@ describe('OpenIdAuthManager', () => {
       signWithManagedKey: jest.fn().mockResolvedValue({ payload: '', signatures: [{ protected: 'p', signature: 'sig' }] } as any),
       signWithReconstructedKey: jest.fn(),
       createDetachedJws: jest.fn(),
-      createCompactJws: jest.fn(),
+      createCompactJws: buildMockCompactJws(),
       encodeResponse: jest.fn(),
       protectConfidentialData: jest.fn(),
       unprotectConfidentialData: jest.fn(),
@@ -2009,7 +2029,7 @@ describe('OpenIdAuthManager', () => {
       signWithManagedKey: jest.fn().mockResolvedValue({ payload: '', signatures: [{ protected: 'p', signature: 'sig' }] } as any),
       signWithReconstructedKey: jest.fn(),
       createDetachedJws: jest.fn(),
-      createCompactJws: jest.fn(),
+      createCompactJws: buildMockCompactJws(),
       encodeResponse: jest.fn(),
       protectConfidentialData: jest.fn(),
       unprotectConfidentialData: jest.fn(),
@@ -2128,7 +2148,7 @@ describe('OpenIdAuthManager', () => {
       signWithManagedKey: jest.fn().mockResolvedValue({ payload: '', signatures: [{ protected: 'p', signature: 'sig' }] } as any),
       signWithReconstructedKey: jest.fn(),
       createDetachedJws: jest.fn(),
-      createCompactJws: jest.fn(),
+      createCompactJws: buildMockCompactJws(),
       encodeResponse: jest.fn(),
       protectConfidentialData: jest.fn(),
       unprotectConfidentialData: jest.fn(),
@@ -2245,7 +2265,7 @@ describe('OpenIdAuthManager', () => {
       signWithManagedKey: jest.fn().mockResolvedValue({ payload: '', signatures: [{ protected: 'p', signature: 'sig' }] } as any),
       signWithReconstructedKey: jest.fn(),
       createDetachedJws: jest.fn(),
-      createCompactJws: jest.fn(),
+      createCompactJws: buildMockCompactJws(),
       encodeResponse: jest.fn(),
       protectConfidentialData: jest.fn(),
       unprotectConfidentialData: jest.fn(),
@@ -2364,7 +2384,7 @@ describe('OpenIdAuthManager', () => {
       signWithManagedKey: jest.fn().mockResolvedValue({ payload: '', signatures: [{ protected: 'p', signature: 'sig' }] } as any),
       signWithReconstructedKey: jest.fn(),
       createDetachedJws: jest.fn(),
-      createCompactJws: jest.fn(),
+      createCompactJws: buildMockCompactJws(),
       encodeResponse: jest.fn(),
       protectConfidentialData: jest.fn(),
       unprotectConfidentialData: jest.fn(),
@@ -2482,7 +2502,7 @@ describe('OpenIdAuthManager', () => {
       signWithManagedKey: jest.fn().mockResolvedValue({ payload: '', signatures: [{ protected: 'p', signature: 'sig' }] } as any),
       signWithReconstructedKey: jest.fn(),
       createDetachedJws: jest.fn(),
-      createCompactJws: jest.fn(),
+      createCompactJws: buildMockCompactJws(),
       encodeResponse: jest.fn(),
       protectConfidentialData: jest.fn(),
       unprotectConfidentialData: jest.fn(),
@@ -2598,6 +2618,7 @@ describe('OpenIdAuthManager', () => {
             signature: fixture.jwt.split('.')[2],
           }],
         }),
+        createCompactJws: buildMockCompactJws(),
         unprotectConfidentialData: jest.fn(async (document: any) => document.content),
       } as unknown as jest.Mocked<IKmsService>,
       {

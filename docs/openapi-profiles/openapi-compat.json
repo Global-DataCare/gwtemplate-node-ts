@@ -7680,6 +7680,23 @@
         "x-profile": "core"
       }
     },
+    "/jwks.json": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Resolve the root host public JWK Set",
+        "responses": {
+          "200": {
+            "description": "Public host keys advertised by the root host DID"
+          },
+          "500": {
+            "description": "Host keys could not be loaded"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
     "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/tenant-status.json": {
       "get": {
         "tags": [

@@ -1,5 +1,14 @@
 // Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
+import {
+  HttpAuthorizationSchemes,
+  HttpHeaderNames,
+  HttpMediaTypes,
+  HttpStatusCodes,
+} from 'gdc-common-utils-ts/constants/http';
+import { GatewayRouteSections } from 'gdc-common-utils-ts/constants/gateway-response';
+import { Format, JobAction } from 'gdc-common-utils-ts/constants/Schemas';
+import { BundleTypes } from 'gdc-common-utils-ts/models/bundle-editor-types';
 import express from 'express';
 import request from 'supertest';
 import { createApiRouter } from '../../routes/api';
@@ -16,11 +25,15 @@ import {
   EXAMPLE_EMPLOYEE_ACTIVATION_CODE,
   EXAMPLE_EMPLOYEE_DEVICE_INSTANCE_ID_PRIMARY,
   EXAMPLE_PROFILE_PROVIDER_DID,
+  EXAMPLE_ROUTE_VERSION,
   EXAMPLE_SECTOR,
   EXAMPLE_TENANT_IDENTIFIER,
+  EXAMPLE_TENANT_ROUTE_CONTEXT,
+  EXAMPLE_COMMUNICATION_THREAD_ID,
 } from 'gdc-common-utils-ts/examples/shared';
 import { ClaimsOfferSchemaorg, ClaimsOrderSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { buildUnsignedJwt } from 'gdc-common-utils-ts/utils/jwt';
+import { getTenantVaultId } from '../../utils/tenant';
 
 /**
  * Transport security contract: encrypted post-DCR traffic resolves keys by
@@ -1175,5 +1188,63 @@ describe('SECURITY_MODE content-type gates', () => {
       },
     );
     expect(queueAdapter.addJob).toHaveBeenCalledTimes(1);
+  });
+
+  /** SMART bearer acceptance is deliberately limited to tenant FHIR data routes. */
+  it('opts an individual FHIR data route into tenant-signed SMART bearer verification', async () => {
+    process.env = {
+      ...previousEnv,
+      SECURITY_MODE: 'compat',
+      DEMO_ALLOW_INSECURE_BEARER: 'false',
+      JSON_LEGACY: 'false',
+      FHIR_LEGACY: 'true',
+      DIDCOMM_PLAIN: 'false',
+    };
+    const appAuthManager = {
+      verifyBearerToken: jest.fn(async () => ({
+        valid: true,
+        payload: { sub: EXAMPLE_PROFILE_PROVIDER_DID },
+      })),
+    };
+    const tenantsCacheManager = {
+      tenantExists: jest.fn(async () => true),
+      findTenantVaultIdByIdentifierValue: jest.fn(),
+      getDidServiceConfig: jest.fn(async () => [{
+        id: EXAMPLE_COMMUNICATION_THREAD_ID,
+        selector: { section: GatewayRouteSections.Individual, format: Format.FHIR_R4 },
+        serviceEndpoint: ResourceTypesFhirR4.Communication,
+        actions: [JobAction.BATCH],
+      }]),
+      getTenant: jest.fn(async () => ({})),
+      getCollectionName: jest.fn(async () => EXAMPLE_TENANT_IDENTIFIER),
+    };
+    const harness = buildTestApp({ appAuthManager, tenantsCacheManager });
+    const path = `/${EXAMPLE_TENANT_IDENTIFIER}/cds-${EXAMPLE_TENANT_ROUTE_CONTEXT.jurisdiction}/${EXAMPLE_ROUTE_VERSION}/${EXAMPLE_SECTOR}/${GatewayRouteSections.Individual}/${Format.FHIR_R4}/${ResourceTypesFhirR4.Communication}/${JobAction.BATCH}`;
+
+    const response = await request(harness.app)
+      .post(path)
+      .set(HttpHeaderNames.ContentType, HttpMediaTypes.FhirJson)
+      .set(
+        HttpHeaderNames.Authorization,
+        `${HttpAuthorizationSchemes.Bearer} ${EXAMPLE_DEMO_PORTAL_ID_TOKEN}`,
+      )
+      .send({
+        resourceType: ResourceTypesFhirR4.Bundle,
+        type: BundleTypes.batch,
+        id: EXAMPLE_COMMUNICATION_THREAD_ID,
+        thid: EXAMPLE_COMMUNICATION_THREAD_ID,
+        entry: [],
+      });
+
+    expect(response.status).toBe(HttpStatusCodes.Accepted);
+    expect(appAuthManager.verifyBearerToken).toHaveBeenCalledWith(
+      EXAMPLE_DEMO_PORTAL_ID_TOKEN,
+      undefined,
+      {
+        vaultId: getTenantVaultId(EXAMPLE_SECTOR, EXAMPLE_TENANT_IDENTIFIER),
+        collectionName: EXAMPLE_TENANT_IDENTIFIER,
+      },
+      { acceptSmartAccessToken: true },
+    );
   });
 });

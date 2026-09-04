@@ -785,6 +785,29 @@ export function createDiscoveryRouter(
     return res.json(didDocument);
   });
 
+  /**
+   * Publishes the root host key set at the URL advertised by its DID document.
+   *
+   * @openapi
+   * /jwks.json:
+   *   get:
+   *     tags: [Discovery]
+   *     summary: Resolve the root host public JWK Set
+   *     responses:
+   *       200:
+   *         description: Public host keys advertised by the root host DID
+   *       500:
+   *         description: Host keys could not be loaded
+   */
+  router.get('/jwks.json', async (_req, res) => {
+    try {
+      return res.json(toPublicJwkSet(await kmsService.getPublicJwks('host')));
+    } catch (error) {
+      logger.error('Failed to get root host JWKS', error as Error, { vaultId: 'host' });
+      return res.status(500).type('text').send('Internal Server Error: Could not retrieve key set.');
+    }
+  });
+
   router.get(
     [`${hostPingPrefix}/ping`, `${hostScopedWellKnownPrefix}/ping`, `${tenantWellKnownPrefix}/ping`],
     resolveTenant,
