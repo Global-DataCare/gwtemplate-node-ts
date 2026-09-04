@@ -4,8 +4,9 @@
 // returns independent per-entry outcomes for mixed clinical batch operations.
 // Authorization invariant: only the exact subject's creator or the same
 // privately linked verified identity can delete an authored clinical fact.
-// Persistence invariant: resources retain only creator DID provenance and a
-// failed entry never rolls back a successful sibling entry.
+// Persistence invariant: resources retain author provenance, optional
+// submitter audit, and document organization/date; a failed entry never rolls
+// back a successful sibling entry.
 // TDD contract: write this test red first; make it green only with complete behavior.
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/__tests__/unit/CommunicationManager.unit.test.ts
@@ -37,6 +38,7 @@ import {
   CommunicationParticipantPrefixes,
   ConsentDecisions,
   ConsentStatuses,
+  HealthcareActorRoles,
   HealthcareBasicSections,
   ResourceTypesFhirR4,
 } from 'gdc-common-utils-ts';
@@ -64,7 +66,6 @@ import {
   EXAMPLE_RELATED_PERSON_ROLE,
   EXAMPLE_CLIENT_INSTANCE_UUID,
 } from 'gdc-common-utils-ts/examples/shared';
-import { EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_PROVIDER_ORGANIZATION_URN } from 'gdc-common-utils-ts/examples/inter-tenant-access-contract';
 import { FhirIpsCreatorKinds } from 'gdc-common-utils-ts/utils/fhir-ips-creator-identity';
 import { getClinicalCreatorBindingsSectionId } from '../../../utils/ips-bundle';
 
@@ -349,6 +350,14 @@ describe('CommunicationManager Unit Tests', () => {
         ownerIdentifier: EXAMPLE_PROVIDER_ORGANIZATION_DID,
         role: 'ISCO-08|2250',
         actorDids: [EXAMPLE_PROFESSIONAL_DID],
+      } as any, {
+        id: `urn:uuid:${EXAMPLE_KYC_CONTROLLER_USER_UUID}`,
+        kind: FhirIpsCreatorKinds.Professional,
+        actorIdentifier: `urn:uuid:${EXAMPLE_CLIENT_INSTANCE_UUID}`,
+        authorIdentifier: `urn:uuid:${EXAMPLE_KYC_CONTROLLER_USER_UUID}`,
+        ownerIdentifier: EXAMPLE_PROVIDER_ORGANIZATION_DID,
+        role: HealthcareActorRoles.VeterinaryTechnicianOrAssistant,
+        actorDids: [creatorDid],
       } as any], getClinicalCreatorBindingsSectionId());
       mockVaultRepository.listContainersInSection.mockImplementation(async (vaultId: string, sectionId: string) =>
         [...storedRecords.entries()]
@@ -377,6 +386,36 @@ describe('CommunicationManager Unit Tests', () => {
         })],
         expect.any(String),
       );
+
+      const delegatedUpdate = await communicationManager.process(buildClinicalBatchJob([{
+        type: GatewayRequestEntryTypes.ObservationEdit,
+        request: {
+          method: HttpRequestMethods.Put,
+          url: `${ResourceTypesFhirR4.Observation}/observation-delegated-author`,
+        },
+        resource: {
+          resourceType: ResourceTypesFhirR4.Observation,
+          id: 'observation-delegated-author',
+          subject: { reference: subjectDid },
+          status: ObservationStatuses.Final,
+          code: { text: 'Changed by submitter' },
+        },
+      }], EXAMPLE_PROFESSIONAL_DID));
+      expect((delegatedUpdate.body as any).data[0].response.status).toBe('403');
+
+      const delegatedDelete = await communicationManager.process(buildClinicalBatchJob([{
+        type: GatewayRequestEntryTypes.ObservationDelete,
+        request: {
+          method: HttpRequestMethods.Delete,
+          url: `${ResourceTypesFhirR4.Observation}/observation-delegated-author`,
+        },
+      }], EXAMPLE_PROFESSIONAL_DID));
+      expect((delegatedDelete.body as any).data[0].response.status).toBe('403');
+      expect(await mockVaultRepository.get(
+        'animal-care_acme',
+        'observation-delegated-author',
+        getSubjectScopedSectionId(subjectDid, 'individual', 'observations'),
+      )).toBeDefined();
     });
   });
 
@@ -1035,7 +1074,7 @@ describe('CommunicationManager Unit Tests', () => {
       expect(await mockVaultRepository.get(tenantVaultId, allergyId, allergySectionId)).toBeDefined();
     });
 
-    it('allows only the authenticated stored author to update or delete clinical data sent through a BFF', async () => {
+    it('allows only the author to mutate clinical data, except for a later document from the same author organization', async () => {
       mockTenantsCacheManager.getTenantDid.mockResolvedValue(testServerDid as any);
       mockVaultRepository.vaultExists.mockResolvedValue(true as any);
       const allergyId = EXAMPLE_ALLERGY_IDENTIFIER.split(':').at(-1)!;
@@ -1144,16 +1183,28 @@ describe('CommunicationManager Unit Tests', () => {
       expect((verifiedDeletion.body as any).data[0].response.status).toBe('204');
 
       const externallyAuthoredDocument = structuredClone(clinicalDocument);
-      // An imported source URN remains provenance; it cannot become the local
-      // authenticated actor merely because a later request repeats it.
+      // A document-author Organization is resolved from the IPS graph; the
+      // importing employee remains only the submitter.
       (externallyAuthoredDocument.entry[0].resource as any).author = [{
-        reference: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_PROVIDER_ORGANIZATION_URN,
+        reference: EXAMPLE_PROVIDER_ORGANIZATION_DID,
       }];
+      (externallyAuthoredDocument.entry[0].resource as any).date = '2026-09-01T10:00:00.000Z';
+      externallyAuthoredDocument.entry.push({
+        fullUrl: EXAMPLE_PROVIDER_ORGANIZATION_DID,
+        resource: {
+          resourceType: ResourceTypesFhirR4.Organization,
+          id: EXAMPLE_KYC_CONTROLLER_UUID,
+        },
+      } as any);
       await communicationManager.process(buildJob(externallyAuthoredDocument));
       const externallyAuthoredRecord = await mockVaultRepository.get(tenantVaultId, allergyId, sectionId) as any;
-      expect(externallyAuthoredRecord?.['Composition.author']).toBe(
-        EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_PROVIDER_ORGANIZATION_URN,
-      );
+      expect(externallyAuthoredRecord?.['Composition.author']).toBe(EXAMPLE_PROVIDER_ORGANIZATION_DID);
+      expect(externallyAuthoredRecord?.audit).toEqual(expect.objectContaining({
+        creatorDid: EXAMPLE_PROVIDER_ORGANIZATION_DID,
+        submitterDid: EXAMPLE_PROFESSIONAL_DID,
+        authorOwnerIdentifier: EXAMPLE_PROVIDER_ORGANIZATION_DID,
+        documentDate: '2026-09-01T10:00:00.000Z',
+      }));
 
       const forbiddenExternalOverwrite = structuredClone(externallyAuthoredDocument);
       (forbiddenExternalOverwrite.entry[1].resource as any).onsetDateTime = EXAMPLE_ALLERGY_ONSET_DATE_TIME;
@@ -1163,6 +1214,15 @@ describe('CommunicationManager Unit Tests', () => {
         unchangedExternalRecord?.['AllergyIntolerance.onset-datetime']
         || unchangedExternalRecord?.['org.hl7.fhir.api.AllergyIntolerance.onset-datetime'],
       ).toBeUndefined();
+
+      const laterSameOrganizationDocument = structuredClone(forbiddenExternalOverwrite);
+      (laterSameOrganizationDocument.entry[0].resource as any).date = '2026-09-01T10:01:00.000Z';
+      await communicationManager.process(buildJob(laterSameOrganizationDocument));
+      const replacedByOrganization = await mockVaultRepository.get(tenantVaultId, allergyId, sectionId) as any;
+      expect(
+        replacedByOrganization?.['AllergyIntolerance.onset-datetime']
+        || replacedByOrganization?.['org.hl7.fhir.api.AllergyIntolerance.onset-datetime'],
+      ).toBe(EXAMPLE_ALLERGY_ONSET_DATE_TIME);
 
       const forbiddenExternalDeletion = await communicationManager.process(buildJob(deleteBundle));
       expect((forbiddenExternalDeletion.body as any).data[0].response.status).toBe('403');

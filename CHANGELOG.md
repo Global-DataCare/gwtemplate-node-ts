@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+## [1.24.11] - 2026-09-04
+
+- Preserve delegated clinical submitters as audit-only provenance: an
+  authorized employee may create a resource for a registered author but cannot
+  later update or delete it merely because they transported it.
+- Resolve IPS author organizations from the FHIR document graph and permit the
+  narrow same-resource replacement exception only for the same organization
+  and a strictly later `Composition.date`.
+- Consume `gdc-common-utils-ts@2.8.4` for the shared provenance policy and the
+  canonical ISCO-08 `3240` veterinary technician and assistant role.
+
 ## [1.24.10] - 2026-09-04
 
 - Require every repository skill to keep interactive npm authorization alive
