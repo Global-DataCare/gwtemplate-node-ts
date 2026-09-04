@@ -96,6 +96,12 @@ grep -Fq 'FABRIC_TOOLS_CONTAINER: `${process.env.GDC_CONTAINER_PREFIX || '\''gdc
 grep -Fq 'awk '\''$2 ~ /^dev-peer0-host/ {print $1}'\''' ./scripts/bootstrap-local-fabric-stack.mjs
 grep -Fq 'infra/fabric/local-network' ./chaincode/scripts/consentaccess-local-devnet.sh
 grep -Fq 'npm ci' ./chaincode/scripts/consentaccess-local-devnet.sh
+published_runtime_manifest="$(
+  sed -n '/        - name: consentaccess-sc/,/          ports:/p' \
+    ./chaincode/scripts/deploy-consentaccess-unid-test-network.sh
+)"
+grep -Fq 'name: CHAINCODE_NAME' <<<"${published_runtime_manifest}"
+grep -Fq 'value: "${CHAINCODE_NAME}"' <<<"${published_runtime_manifest}"
 grep -Fq 'helm:test:host' package.json
 test -f ./infra/fabric/local-network/docker-compose.yml
 grep -Fq 'rm -f "${DST_ICA}/tls-cert.pem"' ./infra/fabric/local-network/scripts/00-copy-dev-cas.sh

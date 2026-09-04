@@ -46,6 +46,9 @@ set -euo pipefail
 # - CHAINCODE_SEQUENCE
 # - CHAINCODE_IMAGE_TAG
 # - CHAINCODE_IMAGE_REPOSITORY
+# - CHAINCODE_IMAGE (an immutable shared CCAAS runtime may be reused)
+# - SKIP_CHAINCODE_IMAGE_BUILD
+# - SKIP_CHAINCODE_ARTIFACT_TESTS
 # - K8S_NAMESPACE_FABRIC
 # -----------------------------------------------------------------------------
 
@@ -268,6 +271,8 @@ spec:
               value: "${CHAINCODE_RUNTIME_ADDRESS}"
             - name: CHAINCODE_ID
               value: "${package_id}"
+            - name: CHAINCODE_NAME
+              value: "${CHAINCODE_NAME}"
             - name: CORE_PEER_TLS_ENABLED
               value: "false"
           ports:
