@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [1.24.13] - 2026-09-04
+
+- Build both the compilation and production image stages on Node.js 24 and
+  enforce that runtime line in the immutable-image release contract test.
+
 ## [1.24.12] - 2026-09-04
 
 - Project document-level Composition identifier, author, attester, custodian,
