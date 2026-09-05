@@ -286,6 +286,24 @@ describe('ConsentManager', () => {
     });
   });
 
+  it('uses only the dedicated override for the consent-access channel', async () => {
+    const previousConsentChannel = process.env.CONSENT_ACCESS_LEDGER_CHANNEL;
+    process.env.CONSENT_ACCESS_LEDGER_CHANNEL = 'consent-access-local';
+    mockVaultRepository.vaultExists.mockResolvedValue(true);
+    mockVaultRepository.put.mockResolvedValue(true);
+    mockBlockchainAdapter.registerConsentAccessBundle = jest.fn().mockResolvedValue({ accepted: 1 });
+
+    try {
+      await consentManager.process(mockJobRequest);
+      expect(mockBlockchainAdapter.registerConsentAccessBundle).toHaveBeenCalledWith(
+        expect.objectContaining({ channel: 'consent-access-local' }),
+      );
+    } finally {
+      if (previousConsentChannel === undefined) delete process.env.CONSENT_ACCESS_LEDGER_CHANNEL;
+      else process.env.CONSENT_ACCESS_LEDGER_CHANNEL = previousConsentChannel;
+    }
+  });
+
   it('should perform one blockchain write per derived atomic rule', async () => {
     mockVaultRepository.vaultExists.mockResolvedValue(true);
     mockVaultRepository.put.mockResolvedValue(true);

@@ -49,6 +49,12 @@
   override from the canonical Docker and Helm smoke environment.
 - Resolve every FHIR CID receipt through the configured clinical data channel
   instead of deriving an ungoverned channel name from request route labels.
+- Configure the canonical local demo and Jest integration profile with that
+  clinical channel and `artifact-sc`, keeping the production resolver
+  fail-closed while direct manager and in-memory route tests exercise receipts.
+- Keep Consent access-channel selection independent from the clinical-evidence
+  default, with its own `CONSENT_ACCESS_LEDGER_CHANNEL` override and the
+  existing topology-derived fallback.
 - Wait for a newly admitted Kubernetes peer to synchronize the channel
   configuration that authorizes its MSP before running authenticated channel
   reads in the Helm evidence smoke.
