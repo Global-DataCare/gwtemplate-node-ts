@@ -1,7 +1,7 @@
 # Stage 1: Builder
 # This stage installs all dependencies, including devDependencies,
 # and builds the TypeScript source code into JavaScript.
-FROM node:22-alpine AS builder
+FROM node:24-alpine AS builder
 
 # Define build argument for NPM_TOKEN
 ARG NPM_TOKEN
@@ -25,7 +25,7 @@ RUN npm run build
 
 # Stage 2: Production
 # This stage creates the final, lean image for production.
-FROM node:22-alpine
+FROM node:24-alpine
 
 WORKDIR /usr/src/gwtemplate-node-ts
 

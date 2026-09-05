@@ -1,5 +1,5 @@
-#!/usr/bin/env bash
 # Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
+#!/usr/bin/env bash
 # A clean checkout contains every authored chaincode and host governance runtime
 # required by the mandatory local-Fabric evidence.
 set -euo pipefail
@@ -301,6 +301,10 @@ if rg -n 'git\+(ssh|https)|git@github\.com|github\.com/.+\.git|github:.+#|file:v
 fi
 if [[ "$(grep -Ec '^RUN npm ci($| )' ./Dockerfile)" -ne 2 ]]; then
   echo 'ERROR: both Docker stages must install the exact lockfile with npm ci.' >&2
+  exit 1
+fi
+if [[ "$(grep -Ec '^FROM node:24-alpine($| AS )' ./Dockerfile)" -ne 2 ]]; then
+  echo 'ERROR: builder and runtime Docker stages must use the workspace Node.js 24 line.' >&2
   exit 1
 fi
 
