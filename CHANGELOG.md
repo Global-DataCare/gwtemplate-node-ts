@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+## [1.25.1] - 2026-09-05
+
+- Replace the undocumented individual-controller `:family:` DCR actor path
+  with the canonical hosted `:individual:<type>:<SHA3-384>:member:<SHA3-384>:RESPRSN`
+  contract. Bind the member hash to the email or phone verified during token
+  exchange and keep the full role system/value in the licence and creator
+  binding.
+- Issue new individual-controller seats with the exact subject UUID and hosted
+  individual DID, repair legacy seats missing that binding during DCR, and
+  authorize the controller's exact UUID-backed clinical creator assignment.
+- Update API docs with complete non-placeholder individual/controller DIDs,
+  the exact DCR fields, canonical `resource.meta.claims` response location and
+  the Order-owned activation-code boundary.
+
 ## [1.25.0] - 2026-09-05
 
 - Restore the historical per-asset `relationships` and `ownerships` contract

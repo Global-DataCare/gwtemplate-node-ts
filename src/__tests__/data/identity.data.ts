@@ -6,8 +6,11 @@ import { encodeMultibase58btc } from "gdc-common-utils-ts/utils/multibase58";
 import { uuidToBytes } from "../../utils/uuid";
 import {
   EXAMPLE_ACCOUNT_OWNER_ID,
+  EXAMPLE_HOSTED_INDIVIDUAL_CONTROLLER_DID,
+  EXAMPLE_HOSTED_INDIVIDUAL_DID,
+  EXAMPLE_INDIVIDUAL_CONTROLLER_ROLE_TYPE,
+  EXAMPLE_INDIVIDUAL_CONTROLLER_ROLE_VALUE,
   EXAMPLE_RELATED_PERSON_ROLE,
-  EXAMPLE_SUBJECT_DID,
 } from 'gdc-common-utils-ts/examples/shared';
 
 // A standard UUID for deterministic testing.
@@ -34,9 +37,9 @@ export const testExamplesIndividualUrn = {
 
 /** Reusable verified individual-controller tuple used by DCR manager contracts. */
 export const testIndividualControllerDcrIdentity = Object.freeze({
-  subjectDid: EXAMPLE_SUBJECT_DID,
+  subjectDid: EXAMPLE_HOSTED_INDIVIDUAL_DID,
   authenticatedSubject: EXAMPLE_ACCOUNT_OWNER_ID,
-  role: EXAMPLE_RELATED_PERSON_ROLE,
+  role: `${EXAMPLE_INDIVIDUAL_CONTROLLER_ROLE_TYPE}|${EXAMPLE_INDIVIDUAL_CONTROLLER_ROLE_VALUE}`,
   scope: 'dcr:register',
-  actorDid: `${EXAMPLE_SUBJECT_DID}:family:${encodeURIComponent(EXAMPLE_ACCOUNT_OWNER_ID)}:${encodeURIComponent(EXAMPLE_RELATED_PERSON_ROLE)}`,
+  actorDid: EXAMPLE_HOSTED_INDIVIDUAL_CONTROLLER_DID,
 } as const);
