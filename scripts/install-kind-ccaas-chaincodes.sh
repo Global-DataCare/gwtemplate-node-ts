@@ -161,6 +161,23 @@ wait_for_kind_chaincode_commit() {
   return 1
 }
 
+wait_for_kind_committed_definition() {
+  local channel="$1"
+  local name="$2"
+  local committed=''
+  for _ in $(seq 1 "${KIND_PEER_SYNC_ATTEMPTS:-600}"); do
+    committed="$(kind_peer_exec peer lifecycle chaincode querycommitted \
+      --channelID "${channel}" --name "${name}" --output json 2>/dev/null || true)"
+    if jq -e '(.sequence // 0) > 0' <<< "${committed:-null}" >/dev/null 2>&1; then
+      printf '%s' "${committed}"
+      return 0
+    fi
+    sleep 1
+  done
+  echo "El peer Kubernetes no sincronizó la definición inicial de ${name} en ${channel}." >&2
+  return 1
+}
+
 install_kind_ccaas_chaincodes() {
   require_kind_ccaas_context
   [[ -s "${KIND_CCAAS_MANIFEST:-}" ]] || {
@@ -192,8 +209,7 @@ install_kind_ccaas_chaincodes() {
 
     IFS="," read -r -a channels <<< "${channel_csv}"
     for channel in "${channels[@]}"; do
-      committed="$(kind_peer_exec peer lifecycle chaincode querycommitted \
-        --channelID "${channel}" --name "${name}" --output json)"
+      committed="$(wait_for_kind_committed_definition "${channel}" "${name}")"
       current_sequence="$(jq -er '.sequence' <<< "${committed}")"
       approval="$(docker_peer_exec Host2MSP peer0-host2:7051 host2.example.com \
         peer lifecycle chaincode queryapproved --channelID "${channel}" \

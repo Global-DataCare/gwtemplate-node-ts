@@ -58,6 +58,8 @@
 - Wait for a newly admitted Kubernetes peer to synchronize the channel
   configuration that authorizes its MSP before running authenticated channel
   reads in the Helm evidence smoke.
+- Poll each initial committed lifecycle definition on the newly joined
+  Kubernetes peer before calculating its CCAAS promotion sequence.
 - Promote each chaincode definition to the next Fabric lifecycle sequence when
   Host2 switches from its Docker package to the Kubernetes CCAAS package,
   preserving Host1's installed package and the governed multi-host endorsement
