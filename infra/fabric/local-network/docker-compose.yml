@@ -136,6 +136,7 @@ services:
       - CORE_PEER_ID=peer0-host1
       - CORE_PEER_ADDRESS=peer0-host1:7051
       - CORE_PEER_LISTENADDRESS=0.0.0.0:7051
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0-host1:7051
       - CORE_PEER_LOCALMSPID=Host1MSP
       - CORE_PEER_MSPCONFIGPATH=/var/hyperledger/peer/msp
       - CORE_PEER_TLS_ENABLED=true
@@ -165,6 +166,7 @@ services:
       - CORE_PEER_ID=peer0-host2
       - CORE_PEER_ADDRESS=peer0-host2:7051
       - CORE_PEER_LISTENADDRESS=0.0.0.0:7051
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0-host2:7051
       - CORE_PEER_LOCALMSPID=Host2MSP
       - CORE_PEER_MSPCONFIGPATH=/var/hyperledger/peer/msp
       - CORE_PEER_TLS_ENABLED=true

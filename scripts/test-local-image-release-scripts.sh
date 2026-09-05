@@ -117,6 +117,8 @@ test "$(grep -Fc 'user: "${LOCAL_FABRIC_CA_USER:-0:0}"' ./infra/fabric/local-net
 test "$(grep -Fc 'FABRIC_CA_SERVER_DB_DATASOURCE=/var/hyperledger/fabric-ca/fabric-ca-server.db' ./infra/fabric/local-network/docker-compose.yml)" -eq 2
 grep -Fq 'root-ca-db:/var/hyperledger/fabric-ca' ./infra/fabric/local-network/docker-compose.yml
 grep -Fq 'ica-db:/var/hyperledger/fabric-ca' ./infra/fabric/local-network/docker-compose.yml
+grep -Fq 'CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0-host1:7051' ./infra/fabric/local-network/docker-compose.yml
+grep -Fq 'CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0-host2:7051' ./infra/fabric/local-network/docker-compose.yml
 grep -Fq 'function normalize_enrolled_msp_trust()' ./infra/fabric/local-network/scripts/02-bootstrap-network.sh
 grep -Fq 'function normalize_enrolled_tls_trust()' ./infra/fabric/local-network/scripts/02-bootstrap-network.sh
 grep -Fq 'function wait_for_peer()' ./infra/fabric/local-network/scripts/02-bootstrap-network.sh

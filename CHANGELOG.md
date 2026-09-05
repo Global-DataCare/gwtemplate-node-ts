@@ -32,6 +32,8 @@
 - Run the two local-only Fabric CA containers with an explicit configurable
   user and keep their SQLite databases in Docker volumes, avoiding unsupported
   database writes through macOS-generated certificate bind mounts.
+- Advertise each local Fabric peer's gossip endpoint so Gateway Discovery can
+  select a live endorser for external-service chaincodes.
 
 ## [1.24.13] - 2026-09-04
 
