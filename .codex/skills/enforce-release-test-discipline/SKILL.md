@@ -85,6 +85,25 @@ description: Enforce branch, TDD, canonical FHIR and schema.org vocabulary, fixt
   and SMART `sub` is the authorized actor. Native FHIR Communication/Bundle
   inputs carry none of those DIDComm fields; HTTP Authorization proves the
   caller and `Communication.sender` keeps its FHIR business meaning.
+- For generated clinical content, resolve Composition provenance from the
+  protected registered creator binding. Accept only the closed `owner | creator`
+  BFF choice: owner is the individual/organization; creator is the authenticated
+  RelatedPerson/PractitionerRole and may be both author and attester. Never
+  accept an arbitrary author reference from UI input or infer it from actorDid.
+- Correction authority is separate from authorship: a registered member with
+  the same individual owner or an authorized tenant professional may create a
+  new version. Delete remains exact-author only. Preserve the new version's
+  real author/attester and the verified submitter audit.
+- Communication-carried clinical Bundles submit one sanitized primary-document
+  `data[]` batch. The smart contract must process every entry as an individual
+  asset keyed by that resource CID in one transaction; never persist `fullUrl`
+  or confidential FHIR content. Do not publish `resource.meta.claims`; only the
+  positive ledger-safe `meta.tag[]` allowlist may cross that boundary. Expose
+  the real Fabric transaction id. A memory-adapter
+  receipt is local proof only and must never be reported as on-chain evidence.
+- Keep the GW authenticated-authorship 101, Node BFF clinical-writes 101,
+  public JSDoc, test journey comments, snippets, README summaries and the
+  repository-local provenance skill mutually linked and synchronized.
 
 - High-level `101`, documentation snippets and E2E journeys use only public
   application/SDK facades and assert user-visible or contract-visible results.

@@ -129,21 +129,6 @@ export class DocumentReferenceManager implements IJobProcessor {
         await this.vaultRepository.put(tenantVaultId, [record as any], sectionId);
         if (versioning.mapping) cidMappings.push(versioning.mapping);
 
-        if (this.blockchainAdapter?.registerArtifactBundle && versioning.mapping) {
-          await this.blockchainAdapter.registerArtifactBundle({
-            assetId: versioning.mapping.cid,
-            payload: {
-              resourceType: ResourceTypesFhirR4.DocumentReference,
-              resourceId: id,
-              fullUrl: entry?.fullUrl,
-              subject,
-              claims,
-              resource: entry?.resource,
-            },
-            channel: `${job.sector}-${jurisdiction.toLowerCase()}`,
-          });
-        }
-
         const responseAction = `${normalizedAction}-response`;
         responseEntries.push({
           type: ResourceTypesFhirR4.DocumentReference,

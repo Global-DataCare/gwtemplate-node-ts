@@ -7,6 +7,8 @@ networks:
     name: ${DEVNET_NETWORK_NAME:-gdc-fabric-v3-devnet}
 
 volumes:
+  root-ca-db:
+  ica-db:
   orderer-data:
   peer0-host1-data:
   peer0-host2-data:
@@ -17,6 +19,7 @@ services:
   # ---------------------------------------------------------------------------
   root-ca:
     image: hyperledger/fabric-ca:${FABRIC_CA_IMAGE_TAG:-latest}
+    user: "${LOCAL_FABRIC_CA_USER:-0:0}"
     container_name: ${GDC_CONTAINER_PREFIX:-gdc}-root-ca
     networks: [devnet]
     ports:
@@ -28,14 +31,17 @@ services:
       - FABRIC_CA_SERVER_PORT=7054
       - FABRIC_CA_SERVER_OPERATIONS_LISTENADDRESS=0.0.0.0:17054
       - FABRIC_CA_SERVER_CSR_HOSTS=root-ca,localhost
+      - FABRIC_CA_SERVER_DB_DATASOURCE=/var/hyperledger/fabric-ca/fabric-ca-server.db
     volumes:
       - ./crypto/ca/root:/etc/hyperledger/fabric-ca-server
+      - root-ca-db:/var/hyperledger/fabric-ca
     command: >
       sh -c 'fabric-ca-server start -b ${ROOT_CA_ADMIN_USER:-admin}:${ROOT_CA_ADMIN_PASS:-adminpw} --cfg.affiliations.allowremove'
     profiles: ['ca']
 
   ica:
     image: hyperledger/fabric-ca:${FABRIC_CA_IMAGE_TAG:-latest}
+    user: "${LOCAL_FABRIC_CA_USER:-0:0}"
     container_name: ${GDC_CONTAINER_PREFIX:-gdc}-ica
     networks: [devnet]
     ports:
@@ -49,8 +55,10 @@ services:
       - FABRIC_CA_SERVER_CSR_HOSTS=ica
       - FABRIC_CA_SERVER_CA_CHAINFILE=/etc/hyperledger/fabric-ca-server/ca-tls-bundle.pem
       - FABRIC_CA_SERVER_INTERMEDIATE_TLS_CERTFILES=/etc/hyperledger/fabric-ca-server/ca-chain.pem
+      - FABRIC_CA_SERVER_DB_DATASOURCE=/var/hyperledger/fabric-ca/fabric-ca-server.db
     volumes:
       - ./crypto/ca/ica:/etc/hyperledger/fabric-ca-server
+      - ica-db:/var/hyperledger/fabric-ca
     command: >
       sh -c 'fabric-ca-server start -b ${ICA_ADMIN_USER:-admin}:${ICA_ADMIN_PASS:-adminpw} -u https://${ROOT_CA_ADMIN_USER:-admin}:${ROOT_CA_ADMIN_PASS:-adminpw}@root-ca:7054'
     depends_on: [root-ca]
@@ -128,6 +136,10 @@ services:
       - CORE_PEER_ID=peer0-host1
       - CORE_PEER_ADDRESS=peer0-host1:7051
       - CORE_PEER_LISTENADDRESS=0.0.0.0:7051
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0-host1:7051
+      - CORE_PEER_GOSSIP_BOOTSTRAP=peer0-host1:7051
+      - CORE_PEER_GOSSIP_USELEADERELECTION=true
+      - CORE_PEER_GOSSIP_ORGLEADER=false
       - CORE_PEER_LOCALMSPID=Host1MSP
       - CORE_PEER_MSPCONFIGPATH=/var/hyperledger/peer/msp
       - CORE_PEER_TLS_ENABLED=true
@@ -157,6 +169,10 @@ services:
       - CORE_PEER_ID=peer0-host2
       - CORE_PEER_ADDRESS=peer0-host2:7051
       - CORE_PEER_LISTENADDRESS=0.0.0.0:7051
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0-host2:7051
+      - CORE_PEER_GOSSIP_BOOTSTRAP=peer0-host1:7051
+      - CORE_PEER_GOSSIP_USELEADERELECTION=true
+      - CORE_PEER_GOSSIP_ORGLEADER=false
       - CORE_PEER_LOCALMSPID=Host2MSP
       - CORE_PEER_MSPCONFIGPATH=/var/hyperledger/peer/msp
       - CORE_PEER_TLS_ENABLED=true

@@ -154,16 +154,33 @@ Verify current branches, versions and published npm state before release claims.
   `actorDid`. The helper gives the copy new resource ids and sets
   `Composition.author` to that `actorDid`; it never rewrites the imported source
   document.
-- Require a locally declared `Composition.author` to equal the authenticated
-  actor DID before first persistence. An anonymous bearer or body claim never
-  becomes author evidence.
+- For generated clinical content, resolve `Composition.author` from the
+  authenticated protected creator binding with the closed `owner | creator`
+  choice. Owner is the individual subject or provider organization. Creator is
+  the registered RelatedPerson or PractitionerRole and may be both author and
+  attester when that actor created the content.
+- A member recording content created or dictated by the individual selects
+  owner: the individual is author and the RelatedPerson is attester. A member
+  creating the content selects creator: the RelatedPerson is both.
+- Never accept an author/attester reference from UI input or infer it from the
+  operational actor DID, DIDComm sender, DCR client or signing key.
+- Permit correction versions from another registered member with the same
+  individual owner and from an authorized tenant professional. Preserve the
+  actual author/attester of the correction and keep delete exact-author only.
+- Submit Communication-carried confidential versions as one sanitized
+  primary-document `data[]` batch. Process every entry as an individual asset
+  keyed by its resource CID in one transaction; never persist `fullUrl` or the
+  confidential FHIR resource. Distinguish a local memory receipt from a
+  real Fabric transaction id in tests, docs and release evidence.
 - Preserve an imported external `urn:*` author as provenance only. The local
   importer cannot update or delete that record merely by repeating the URN.
-- Apply the same stored-author check to updates as to deletes; never overwrite
-  first and attempt authorization afterwards.
+- Authorize the existing version before replacing it: update accepts the exact
+  author or the governed correction rules above; delete accepts only the exact
+  author. Never overwrite first and attempt authorization afterwards.
 - Use `Bundle.type = batch`; each entry independently selects `.create()`, `.update()` or `.delete()`. Do not turn this flow into a transaction.
 - A typed delete addresses exactly `ResourceType/id`, has no resource body and may carry `.ifMatch(versionId)`.
-- Store only the creator DID in the clinical resource as `Composition.author`. Never store email, phone or their stable hashes in that resource.
+- Store only the resolved owner or registered FHIR creator reference in
+  `Composition.author`. Never store email, phone or their stable hashes there.
 - At delete time, authorize the exact subject and creator. Resolve linked verified email/phone login channels from private identity metadata outside the resource, so phone-created and email-created data remain manageable after account linking.
 - In that protected metadata, store the actor/member UUID, a distinct
   relationship or professional-assignment UUID, its owner and governed role.
@@ -196,6 +213,9 @@ For any contract change, update together:
 - GW high-level lifecycle and SEDIA capability matrix;
 - README public-surface inventory and changelogs;
 - this skill in both repository-local copies.
+- Cross-link and synchronize GW CORE
+  `docs/01-OVERVIEW-AND-GUIDES/101-01.N-AUTHENTICATED-CLINICAL-AUTHOR.md`
+  with Node SDK `docs/101-BFF_CLINICAL_WRITES.md`.
 
 Search for stale claims before finishing, especially `researchOrganizationDid`, `secondaryUseClaimKey`, ODRL in the provider toggle, operational `Composition.subject`, one Composition per section, and portal calls to direct digitaltwin Composition batch.
 

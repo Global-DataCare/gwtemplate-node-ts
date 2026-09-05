@@ -2,8 +2,8 @@
 // Communication ingestion requires authenticated local authors and preserves external provenance.
 // Flow contract: Communication ingestion persists authorized resources and
 // returns independent per-entry outcomes for mixed clinical batch operations.
-// Authorization invariant: only the exact subject's creator or the same
-// privately linked verified identity can delete an authored clinical fact.
+// Authorization invariant: the exact author can delete; an authenticated
+// assignment with the same registered owner may correct but not delete it.
 // Persistence invariant: resources retain author provenance, optional
 // submitter audit, and document organization/date; a failed entry never rolls
 // back a successful sibling entry.
@@ -61,17 +61,19 @@ import {
   EXAMPLE_HEALTHCARE_JURISDICTION,
   EXAMPLE_IPS_COMPOSITION_IDENTIFIER,
   EXAMPLE_OBSERVATION_IDENTIFIER,
+  EXAMPLE_OBSERVATION_PANEL_IDENTIFIER,
   EXAMPLE_PROFESSIONAL_DID,
   EXAMPLE_PROVIDER_ORGANIZATION_DID,
   EXAMPLE_SUBJECT_DID,
   EXAMPLE_KYC_CONTROLLER_USER_UUID,
-  EXAMPLE_KYC_CONTROLLER_UUID,
+      EXAMPLE_KYC_CONTROLLER_UUID,
   EXAMPLE_RELATED_PERSON_ROLE,
   EXAMPLE_CLIENT_INSTANCE_UUID,
   EXAMPLE_CONTROLLER_SIGN_KEY,
 } from 'gdc-common-utils-ts/examples/shared';
 import { FhirIpsCreatorKinds } from 'gdc-common-utils-ts/utils/fhir-ips-creator-identity';
 import { getClinicalCreatorBindingsSectionId } from '../../../utils/ips-bundle';
+import type { IBlockchainAdapter } from '../../../adapters/IBlockchainAdapter';
 
 describe('CommunicationManager Unit Tests', () => {
   let communicationManager: CommunicationManager;
@@ -79,6 +81,8 @@ describe('CommunicationManager Unit Tests', () => {
   let mockVaultRepository: jest.Mocked<IVaultRepository>;
   let mockCompositionManager: { process: jest.Mock };
   let mockIndividualManager: { process: jest.Mock };
+  let mockBlockchainAdapter: jest.Mocked<IBlockchainAdapter>;
+  let ledgerTransactionId: string;
   let storedRecords: Map<string, any>;
   const testServerDid = 'did:web:test-server.com';
 
@@ -111,12 +115,21 @@ describe('CommunicationManager Unit Tests', () => {
     mockIndividualManager = {
       process: jest.fn(),
     };
+    ledgerTransactionId = randomUUID();
+    mockBlockchainAdapter = {
+      discoverDidsByHashes: jest.fn(async () => []),
+      registerCidVersionMappings: jest.fn(async (mappings) => ({
+        accepted: mappings.length,
+        txId: ledgerTransactionId,
+      })),
+    } as jest.Mocked<IBlockchainAdapter>;
     
     communicationManager = new CommunicationManager({
       tenantsCacheManager: mockTenantsCacheManager,
       vaultRepository: mockVaultRepository,
       compositionManager: mockCompositionManager as any,
       individualManager: mockIndividualManager as any,
+      blockchainAdapter: mockBlockchainAdapter,
     });
   });
 
@@ -128,11 +141,22 @@ describe('CommunicationManager Unit Tests', () => {
     const subjectDid = 'did:web:subject.example:animals:patient-1';
     const creatorDid = 'did:web:clinic-a.example:professionals:vet-1';
 
-    function buildClinicalBatchJob(innerEntries: unknown[], authorDid?: string): JobRequest {
+    function buildClinicalBatchJob(
+      innerEntries: unknown[],
+      authorDid?: string,
+      attesterReference?: string,
+      authenticatedActorDid: string = creatorDid,
+    ): JobRequest {
       const attachedBundle = {
         resourceType: ResourceTypesFhirR4.Bundle,
         type: 'batch',
-        ...(authorDid ? { meta: { claims: { 'Composition.author': authorDid } } } : {}),
+        ...(authorDid ? { meta: { claims: {
+          [CompositionClaim.Author]: authorDid,
+          ...(attesterReference ? {
+            [CompositionClaim.Attester]: attesterReference,
+            [CompositionClaim.AttesterMode]: CompositionAttesterModes.Personal,
+          } : {}),
+        } } } : {}),
         data: innerEntries,
       };
       return {
@@ -150,7 +174,7 @@ describe('CommunicationManager Unit Tests', () => {
         content: {
           jti: randomUUID(),
           thid: randomUUID(),
-          iss: creatorDid,
+          iss: authenticatedActorDid,
           aud: testServerDid,
           exp: Math.floor(Date.now() / 1000) + 300,
           type: 'org.hl7.fhir.api.Bundle',
@@ -164,7 +188,7 @@ describe('CommunicationManager Unit Tests', () => {
                 meta: {
                   claims: {
                     [CommunicationClaim.Subject]: subjectDid,
-                    [CommunicationClaim.Sender]: creatorDid,
+                    [CommunicationClaim.Sender]: authenticatedActorDid,
                     [CommunicationClaim.Topic]: HealthcareBasicSections.AllergiesAndIntolerances.attributeValue,
                     [CommunicationClaim.ContentAttachmentType]: 'application/fhir+json',
                     [CommunicationClaim.ContentAttachmentData]: Buffer
@@ -178,6 +202,60 @@ describe('CommunicationManager Unit Tests', () => {
         } as any,
       };
     }
+
+    it('anchors one evidence array for every successful resource version and returns its transaction id', async () => {
+      mockTenantsCacheManager.getTenantDid.mockResolvedValue(testServerDid as any);
+      const resourceIds = [EXAMPLE_OBSERVATION_IDENTIFIER, EXAMPLE_OBSERVATION_PANEL_IDENTIFIER]
+        .map((identifier) => identifier.split(':').at(-1)!);
+      const response = await communicationManager.process(buildClinicalBatchJob(resourceIds.map((id) => ({
+        type: GatewayRequestEntryTypes.ObservationCreate,
+        request: { method: HttpRequestMethods.Post, url: ResourceTypesFhirR4.Observation },
+        resource: {
+          resourceType: ResourceTypesFhirR4.Observation,
+          id,
+          subject: { reference: subjectDid },
+          status: ObservationStatuses.Final,
+          ...(id === resourceIds[0] ? {
+            meta: {
+              tag: [{
+                id: 'Observation[0].code',
+                system: 'http://loinc.org',
+                code: '85354-9',
+                display: 'must stay confidential',
+              }],
+            },
+          } : {}),
+        },
+      }))));
+
+      expect(mockBlockchainAdapter.registerCidVersionMappings).toHaveBeenCalledTimes(1);
+      expect(mockBlockchainAdapter.registerCidVersionMappings).toHaveBeenCalledWith(
+        expect.arrayContaining(resourceIds.map((resourceId) => expect.objectContaining({
+          resourceType: ResourceTypesFhirR4.Observation,
+          resourceId,
+          cid: expect.any(String),
+          versionId: expect.any(String),
+        }))),
+        expect.any(String),
+        'artifact-sc',
+      );
+      const submittedMappings = mockBlockchainAdapter.registerCidVersionMappings.mock.calls[0][0];
+      expect(submittedMappings.find((mapping) => mapping.resourceId === resourceIds[0])?.tags).toEqual([
+        { id: 'Observation[0].code', system: 'http://loinc.org', code: '85354-9' },
+      ]);
+      expect((response.body as any).data).toEqual(expect.arrayContaining(resourceIds.map((resourceId) =>
+        expect.objectContaining({
+          id: resourceId,
+          resource: expect.objectContaining({
+            meta: expect.objectContaining({
+              evidence: [expect.objectContaining({
+                artifactId: expect.any(String),
+                transactionId: ledgerTransactionId,
+              })],
+            }),
+          }),
+        }))));
+    });
 
     it('lets the authenticated creator delete the mistaken record without a version condition', async () => {
       // Step 1. Authoritative storage says who created the record and which version is current.
@@ -346,6 +424,8 @@ describe('CommunicationManager Unit Tests', () => {
 
     it('uses an explicit registered document author for a section-scoped create', async () => {
       mockTenantsCacheManager.getTenantDid.mockResolvedValue(testServerDid as any);
+      const firstProfessionalAuthor = `urn:uuid:${EXAMPLE_KYC_CONTROLLER_UUID}`;
+      const successorProfessionalAuthor = `urn:uuid:${EXAMPLE_KYC_CONTROLLER_USER_UUID}`;
       await mockVaultRepository.put('animal-care_acme', [{
         id: `urn:uuid:${EXAMPLE_KYC_CONTROLLER_UUID}`,
         kind: FhirIpsCreatorKinds.Professional,
@@ -378,19 +458,21 @@ describe('CommunicationManager Unit Tests', () => {
           status: 'final',
           code: { text: 'Reviewed result' },
         },
-      }], EXAMPLE_PROFESSIONAL_DID));
+      }], firstProfessionalAuthor));
 
       expect((response.body as any).data[0].response.status).toBe(String(HttpStatusCodes.Created));
       expect(mockVaultRepository.put).toHaveBeenCalledWith(
         'animal-care_acme',
         [expect.objectContaining({
           id: 'observation-delegated-author',
-          'Composition.author': EXAMPLE_PROFESSIONAL_DID,
-          audit: { creatorDid: EXAMPLE_PROFESSIONAL_DID, submitterDid: creatorDid },
+          'Composition.author': firstProfessionalAuthor,
+          audit: { creatorDid: firstProfessionalAuthor, submitterDid: creatorDid },
         })],
         expect.any(String),
       );
 
+      // A second registered professional assignment owned by the same legal
+      // organization supplies the correction and becomes its author/attester.
       const delegatedUpdate = await communicationManager.process(buildClinicalBatchJob([{
         type: GatewayRequestEntryTypes.ObservationEdit,
         request: {
@@ -404,8 +486,15 @@ describe('CommunicationManager Unit Tests', () => {
           status: ObservationStatuses.Final,
           code: { text: 'Changed by submitter' },
         },
-      }], EXAMPLE_PROFESSIONAL_DID));
-      expect((delegatedUpdate.body as any).data[0].response.status).toBe('403');
+      }], successorProfessionalAuthor, successorProfessionalAuthor));
+      expect((delegatedUpdate.body as any).data[0].response.status).toBe(String(HttpStatusCodes.Ok));
+      const corrected = await mockVaultRepository.get(
+        'animal-care_acme',
+        'observation-delegated-author',
+        getSubjectScopedSectionId(subjectDid, 'individual', 'observations'),
+      ) as any;
+      expect(corrected?.[CompositionClaim.Author]).toBe(successorProfessionalAuthor);
+      expect(corrected?.[CompositionClaim.Attester]).toBe(successorProfessionalAuthor);
 
       const delegatedDelete = await communicationManager.process(buildClinicalBatchJob([{
         type: GatewayRequestEntryTypes.ObservationDelete,
@@ -413,13 +502,154 @@ describe('CommunicationManager Unit Tests', () => {
           method: HttpRequestMethods.Delete,
           url: `${ResourceTypesFhirR4.Observation}/observation-delegated-author`,
         },
-      }], EXAMPLE_PROFESSIONAL_DID));
+      }], undefined, undefined, EXAMPLE_PROFESSIONAL_DID));
       expect((delegatedDelete.body as any).data[0].response.status).toBe('403');
       expect(await mockVaultRepository.get(
         'animal-care_acme',
         'observation-delegated-author',
         getSubjectScopedSectionId(subjectDid, 'individual', 'observations'),
       )).toBeDefined();
+    });
+
+    it('lets another registered member of the same individual correct, but not delete, personal content', async () => {
+      mockTenantsCacheManager.getTenantDid.mockResolvedValue(testServerDid as any);
+      const memberAuthor = `urn:uuid:${EXAMPLE_KYC_CONTROLLER_UUID}`;
+      const successorMemberAuthor = `urn:uuid:${EXAMPLE_CLIENT_INSTANCE_UUID}`;
+      await mockVaultRepository.put('animal-care_acme', [{
+        id: memberAuthor,
+        kind: FhirIpsCreatorKinds.IndividualMember,
+        actorIdentifier: `urn:uuid:${EXAMPLE_KYC_CONTROLLER_USER_UUID}`,
+        authorIdentifier: memberAuthor,
+        ownerIdentifier: subjectDid,
+        role: EXAMPLE_RELATED_PERSON_ROLE,
+        actorDids: [creatorDid],
+      } as any, {
+        id: successorMemberAuthor,
+        kind: FhirIpsCreatorKinds.IndividualMember,
+        actorIdentifier: successorMemberAuthor,
+        authorIdentifier: successorMemberAuthor,
+        ownerIdentifier: subjectDid,
+        role: EXAMPLE_RELATED_PERSON_ROLE,
+        actorDids: [EXAMPLE_CONTROLLER_DID],
+      } as any, {
+        id: `urn:uuid:${EXAMPLE_KYC_CONTROLLER_USER_UUID}`,
+        kind: FhirIpsCreatorKinds.Professional,
+        actorIdentifier: `urn:uuid:${EXAMPLE_KYC_CONTROLLER_USER_UUID}`,
+        authorIdentifier: `urn:uuid:${EXAMPLE_KYC_CONTROLLER_USER_UUID}`,
+        ownerIdentifier: EXAMPLE_PROVIDER_ORGANIZATION_DID,
+        role: HealthcareActorRoles.Physician,
+        actorDids: [EXAMPLE_PROFESSIONAL_DID],
+      } as any], getClinicalCreatorBindingsSectionId());
+      mockVaultRepository.listContainersInSection.mockImplementation(async (vaultId: string, sectionId: string) =>
+        [...storedRecords.entries()]
+          .filter(([key]) => key.startsWith(`${vaultId}|${sectionId}|`))
+          .map(([, value]) => value));
+
+      const subjectAuthoredId = EXAMPLE_OBSERVATION_IDENTIFIER.split(':').at(-1)!;
+      const memberAuthoredId = EXAMPLE_OBSERVATION_PANEL_IDENTIFIER.split(':').at(-1)!;
+      const createObservation = (id: string) => ({
+        type: GatewayRequestEntryTypes.ObservationCreate,
+        request: { method: HttpRequestMethods.Post, url: ResourceTypesFhirR4.Observation },
+        resource: {
+          resourceType: ResourceTypesFhirR4.Observation,
+          id,
+          subject: { reference: subjectDid },
+          status: ObservationStatuses.Final,
+          code: { text: 'Recorded observation' },
+        },
+      });
+
+      // The individual created/dictated the content; the authenticated member
+      // transports and attests the first version without becoming its author.
+      const subjectCreate = await communicationManager.process(buildClinicalBatchJob([
+        createObservation(subjectAuthoredId),
+      ], subjectDid, memberAuthor));
+      expect((subjectCreate.body as any).data[0].response.status).toBe(String(HttpStatusCodes.Created));
+      const subjectRecord = await mockVaultRepository.get(
+        'animal-care_acme',
+        subjectAuthoredId,
+        getSubjectScopedSectionId(subjectDid, 'individual', 'observations'),
+      ) as any;
+      expect(subjectRecord?.[CompositionClaim.Author]).toBe(subjectDid);
+      expect(subjectRecord?.[CompositionClaim.Attester]).toBe(memberAuthor);
+
+      // The member created the content; its registered RelatedPerson assignment
+      // is the author and may also be the attester in the enclosing Composition.
+      const memberCreate = await communicationManager.process(buildClinicalBatchJob([
+        createObservation(memberAuthoredId),
+      ], memberAuthor, memberAuthor));
+      expect((memberCreate.body as any).data[0].response.status).toBe(String(HttpStatusCodes.Created));
+      const memberRecord = await mockVaultRepository.get(
+        'animal-care_acme',
+        memberAuthoredId,
+        getSubjectScopedSectionId(subjectDid, 'individual', 'observations'),
+      ) as any;
+      expect(memberRecord?.[CompositionClaim.Author]).toBe(memberAuthor);
+      expect(memberRecord?.[CompositionClaim.Attester]).toBe(memberAuthor);
+
+      const updateObservation = (id: string) => ({
+        type: GatewayRequestEntryTypes.ObservationEdit,
+        request: { method: HttpRequestMethods.Put, url: `${ResourceTypesFhirR4.Observation}/${id}` },
+        resource: {
+          resourceType: ResourceTypesFhirR4.Observation,
+          id,
+          subject: { reference: subjectDid },
+          status: ObservationStatuses.Final,
+          code: { text: 'Updated observation' },
+        },
+      });
+      // A different registered member of the same individual may correct the
+      // next version. The individual remains author and the correcting member
+      // becomes the attester for that version.
+      const subjectUpdate = await communicationManager.process(buildClinicalBatchJob([
+        updateObservation(subjectAuthoredId),
+      ], subjectDid, successorMemberAuthor, EXAMPLE_CONTROLLER_DID));
+      expect((subjectUpdate.body as any).data[0].response.status).toBe(String(HttpStatusCodes.Ok));
+      const correctedSubjectRecord = await mockVaultRepository.get(
+        'animal-care_acme',
+        subjectAuthoredId,
+        getSubjectScopedSectionId(subjectDid, 'individual', 'observations'),
+      ) as any;
+      expect(correctedSubjectRecord?.[CompositionClaim.Author]).toBe(subjectDid);
+      expect(correctedSubjectRecord?.[CompositionClaim.Attester]).toBe(successorMemberAuthor);
+      expect(correctedSubjectRecord?.audit).toEqual(expect.objectContaining({
+        creatorDid: subjectDid,
+        submitterDid: EXAMPLE_CONTROLLER_DID,
+      }));
+
+      const memberUpdate = await communicationManager.process(buildClinicalBatchJob([
+        updateObservation(memberAuthoredId),
+      ], memberAuthor, successorMemberAuthor, EXAMPLE_CONTROLLER_DID));
+      expect((memberUpdate.body as any).data[0].response.status).toBe(String(HttpStatusCodes.Ok));
+
+      // A registered professional in this provider may clinically correct a
+      // personal version. The new version names the professional assignment as
+      // its author and attester; it does not impersonate the individual/member.
+      const professionalAuthor = `urn:uuid:${EXAMPLE_KYC_CONTROLLER_USER_UUID}`;
+      const professionalUpdate = await communicationManager.process(buildClinicalBatchJob([
+        updateObservation(memberAuthoredId),
+      ], professionalAuthor, professionalAuthor, EXAMPLE_PROFESSIONAL_DID));
+      expect((professionalUpdate.body as any).data[0].response.status).toBe(String(HttpStatusCodes.Ok));
+      const professionallyCorrectedRecord = await mockVaultRepository.get(
+        'animal-care_acme',
+        memberAuthoredId,
+        getSubjectScopedSectionId(subjectDid, 'individual', 'observations'),
+      ) as any;
+      expect(professionallyCorrectedRecord?.[CompositionClaim.Author]).toBe(professionalAuthor);
+      expect(professionallyCorrectedRecord?.[CompositionClaim.Attester]).toBe(professionalAuthor);
+      expect(professionallyCorrectedRecord?.audit).toEqual(expect.objectContaining({
+        creatorDid: professionalAuthor,
+        submitterDid: EXAMPLE_PROFESSIONAL_DID,
+      }));
+
+      const successorDelete = await communicationManager.process(buildClinicalBatchJob([{
+        type: GatewayRequestEntryTypes.ObservationDelete,
+        request: {
+          method: HttpRequestMethods.Delete,
+          url: `${ResourceTypesFhirR4.Observation}/${memberAuthoredId}`,
+        },
+      }], undefined, undefined, EXAMPLE_CONTROLLER_DID));
+      expect((successorDelete.body as any).data[0].response.status).toBe('403');
     });
   });
 

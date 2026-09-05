@@ -164,6 +164,7 @@ export function buildManagers(options: {
     vaultRepository,
     compositionManager,
     individualManager,
+    blockchainAdapter,
   });
   const subscriptionManager = new SubscriptionManager({ vaultRepository, kmsService, tenantsCacheManager: tenantManager });
   const deviceRegistrationManager = new DeviceRegistrationManager(config.apiBaseUrl, vaultRepository, kmsService, tenantManager);

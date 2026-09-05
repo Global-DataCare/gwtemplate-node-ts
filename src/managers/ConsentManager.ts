@@ -274,7 +274,7 @@ function resolveConsentAccessChannelJurisdiction(jurisdiction: string): string {
 
 function resolveConsentAccessChannelName(sector: string, jurisdiction: string): string {
   const explicitChannel = String(
-    process.env.LEDGER_DATA_CHANNEL_DEFAULT
+    process.env.CONSENT_ACCESS_LEDGER_CHANNEL
     || process.env.HLF_DATA_CHANNEL_NAME
     || process.env.HLF_CHANNEL_NAME
     || '',

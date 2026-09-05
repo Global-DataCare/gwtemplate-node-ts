@@ -35,6 +35,40 @@ export class BlockchainAdapterFabric implements IBlockchainAdapter {
     return hashes.map(() => undefined);
   }
 
+  public async registerCidVersionMappings(
+    mappings: Array<{
+      cid: string;
+      versionId: string;
+      resourceType?: string;
+      resourceId?: string;
+      tags?: Array<{
+        id: string;
+        system?: string;
+        code?: string;
+        version?: string;
+        userSelected?: boolean;
+      }>;
+    }>,
+    channel: string,
+    chaincode: string,
+  ): Promise<{ accepted: number; txId?: string }> {
+    const config = loadFabricBlockchainConfig();
+    const manager = new ManageAssetArtifact({ chaincodeName: chaincode, channelName: channel });
+    const data = mappings.map(({ cid, versionId, resourceType, tags }) => ({
+      type: resourceType || 'Basic',
+      id: cid,
+      resource: {
+        resourceType: resourceType || 'Basic',
+        meta: {
+          versionId,
+          ...(tags?.length ? { tag: tags } : {}),
+        },
+      },
+    }));
+    const submitted = await manager.upsertArtifactsWithTransactionId(config.mspId, { data });
+    return { accepted: data.length, txId: submitted.transactionId };
+  }
+
   public async registerConsentAccessBundle(params: {
     assetId: string;
     payload: Record<string, unknown>;
@@ -69,12 +103,15 @@ export class BlockchainAdapterFabric implements IBlockchainAdapter {
       channelName: params.channel,
     });
 
-    await manager.upsertArtifact(
+    const submitted = await manager.upsertArtifactWithTransactionId(
       config.mspId,
       params.assetId,
       params.payload,
     );
 
-    return { accepted: 1 };
+    return {
+      accepted: 1,
+      txId: submitted.transactionId,
+    };
   }
 }

@@ -2,6 +2,72 @@
 
 ## [Unreleased]
 
+## [1.24.14] - 2026-09-04
+
+- Define the closed `owner | creator` clinical source-author contract for
+  personal and professional records. A registered RelatedPerson or
+  PractitionerRole may be both author and attester when that actor created the
+  content; dictated or organization-owned content retains its owner author.
+- Accept a registered binding owner as the initial source author while keeping
+  delete authority bound to the stored author. Permit a new correction version
+  from another registered member of the same individual or an authorized
+  professional, while retaining the actual author/attester of that new version.
+- Preserve batch-level author and attester flat claims on each confidential
+  resource and Composition projection, then rebuild the same native author,
+  attester and supporting role graph in subject summary Bundles.
+- Submit each Communication-carried Bundle as one sanitized `data[]` batch to
+  `artifact-sc`; process every entry as an individual asset whose `assetId` is
+  its resource CID, exclude `fullUrl` and confidential FHIR content, and return
+  the one real Fabric transaction id beside every affected resource version.
+  Preserve only positively allowlisted coded `meta.tag[]` research metadata;
+  strip displays, free text and unknown tag fields again inside the chaincode.
+  Package and approve the same `artifact-sc` runtime on the configured clinical
+  data channel as well as its identity channels.
+  Patch the embedded `artifact-sc` package to `1.0.1` for this batch contract.
+- Remove the blanket `Composition.author = actorDid` rule from canonical
+  guidance and keep DIDComm sender and signing keys as transport/audit evidence.
+- Cross-link the GW and Node BFF 101 guides and synchronize snippets, README,
+  test journey comments and repository skills.
+- Consume `gdc-common-utils-ts@2.8.7` for the same provenance contract.
+- Run the two local-only Fabric CA containers with an explicit configurable
+  user and keep their SQLite databases in Docker volumes, avoiding unsupported
+  database writes through macOS-generated certificate bind mounts.
+- Advertise each local Fabric peer's gossip endpoint so Gateway Discovery can
+  select a live endorser for external-service chaincodes, and enable the
+  standard bootstrap and leader-election settings that disseminate its state.
+- Include the local CA database volumes in the deterministic devnet reset.
+- Commit the same installed `artifact-sc` package on the local clinical data
+  channel as well as the identity channel.
+- Wait until Fabric Service Discovery advertises the committed CCAAS endorser
+  before starting the local GW smoke, eliminating the post-commit discovery
+  race without weakening the real Gateway boundary proof.
+- Let Fabric Gateway derive transaction endorsers from the committed chaincode
+  policy; do not force the caller MSP as a client-side override, which can
+  exclude an otherwise valid external-service chaincode endorser.
+- Point local FHIR version receipts at the deployed clinical data channel and
+  `artifact-sc`, removing the stale `health-care-es` / `fhir-versioning`
+  override from the canonical Docker and Helm smoke environment.
+- Resolve every FHIR CID receipt through the configured clinical data channel
+  instead of deriving an ungoverned channel name from request route labels.
+- Configure the canonical local demo and Jest integration profile with that
+  clinical channel and `artifact-sc`, keeping the production resolver
+  fail-closed while direct manager and in-memory route tests exercise receipts.
+- Keep Consent access-channel selection independent from the clinical-evidence
+  default, with its own `CONSENT_ACCESS_LEDGER_CHANNEL` override and the
+  existing topology-derived fallback.
+- Wait for a newly admitted Kubernetes peer to synchronize the channel
+  configuration that authorizes its MSP before running authenticated channel
+  reads in the Helm evidence smoke.
+- Poll each initial committed lifecycle definition on the newly joined
+  Kubernetes peer before calculating its CCAAS promotion sequence.
+- Promote each chaincode definition to the next Fabric lifecycle sequence when
+  Host2 switches from its Docker package to the Kubernetes CCAAS package,
+  preserving Host1's installed package and the governed multi-host endorsement
+  policy instead of attempting to redefine a committed sequence. Keep empty
+  commit-poll responses valid JSON so synchronization retries terminate as
+  soon as the promoted definition reaches the Kubernetes peer, and make
+  repeated evidence runs reuse already installed package IDs on both peers.
+
 ## [1.24.13] - 2026-09-04
 
 - Build both the compilation and production image stages on Node.js 24 and

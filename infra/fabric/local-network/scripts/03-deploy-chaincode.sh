@@ -15,6 +15,7 @@ CHAINCODE_SEQUENCE="${CHAINCODE_SEQUENCE:-1}"
 CHAINCODE_LABEL="${CHAINCODE_LABEL:-${CHAINCODE_NAME}_${CHAINCODE_VERSION}}"
 CHAINCODE_PATH="${CHAINCODE_PATH:-${GWTEMPLATE_DIR}/chaincode/basic}"
 CHAINCODE_LANG="${CHAINCODE_LANG:-node}"
+SKIP_CHAINCODE_INSTALL="${SKIP_CHAINCODE_INSTALL:-false}"
 CHAINCODE_STAGING_ROOT="${ROOT}/external-chaincodes"
 # A one-peer local devnet must not inherit a channel policy that requires an
 # endorsement from an absent organization. Multi-host callers can override or
@@ -72,14 +73,6 @@ if [[ ! -f "channel-artifacts/${CHANNEL_NAME}.block" ]]; then
 fi
 
 PACKAGE_FILE="/workspace/channel-artifacts/${CHAINCODE_LABEL}.tgz"
-STAGED_CHAINCODE_PATH="$(stage_chaincode_path "${CHAINCODE_PATH}")"
-
-echo "Packaging chaincode ${CHAINCODE_NAME} from ${CHAINCODE_PATH}..."
-exec_tools \
-  peer lifecycle chaincode package "${PACKAGE_FILE}" \
-  --path "/workspace/${STAGED_CHAINCODE_PATH}" \
-  --lang "${CHAINCODE_LANG}" \
-  --label "${CHAINCODE_LABEL}"
 
 install_on_peer() {
   local msp="$1"
@@ -102,12 +95,24 @@ HOST2_ADMIN_MSP="/workspace/organizations/peerOrganizations/${HOST2_DOMAIN}/user
 HOST1_PEER_TLS="/workspace/organizations/peerOrganizations/${HOST1_DOMAIN}/peers/peer0.${HOST1_DOMAIN}/tls/ca.crt"
 HOST2_PEER_TLS="/workspace/organizations/peerOrganizations/${HOST2_DOMAIN}/peers/peer0.${HOST2_DOMAIN}/tls/ca.crt"
 
-echo "Installing on Host1 peer..."
-install_on_peer "${HOST1_MSP_ID}" "peer0-host1:7051" "${HOST1_ADMIN_MSP}" "${HOST1_PEER_TLS}"
+if [[ "${SKIP_CHAINCODE_INSTALL}" != "true" ]]; then
+  STAGED_CHAINCODE_PATH="$(stage_chaincode_path "${CHAINCODE_PATH}")"
+  echo "Packaging chaincode ${CHAINCODE_NAME} from ${CHAINCODE_PATH}..."
+  exec_tools \
+    peer lifecycle chaincode package "${PACKAGE_FILE}" \
+    --path "/workspace/${STAGED_CHAINCODE_PATH}" \
+    --lang "${CHAINCODE_LANG}" \
+    --label "${CHAINCODE_LABEL}"
 
-if [[ "${SINGLE_HOST}" != "true" ]]; then
-  echo "Installing on Host2 peer..."
-  install_on_peer "${HOST2_MSP_ID}" "peer0-host2:7051" "${HOST2_ADMIN_MSP}" "${HOST2_PEER_TLS}"
+  echo "Installing on Host1 peer..."
+  install_on_peer "${HOST1_MSP_ID}" "peer0-host1:7051" "${HOST1_ADMIN_MSP}" "${HOST1_PEER_TLS}"
+
+  if [[ "${SINGLE_HOST}" != "true" ]]; then
+    echo "Installing on Host2 peer..."
+    install_on_peer "${HOST2_MSP_ID}" "peer0-host2:7051" "${HOST2_ADMIN_MSP}" "${HOST2_PEER_TLS}"
+  fi
+else
+  echo "Reusing installed package ${CHAINCODE_LABEL} for channel ${CHANNEL_NAME}..."
 fi
 
 PACKAGE_ID="$(

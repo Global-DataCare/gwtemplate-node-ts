@@ -113,6 +113,20 @@ grep -Fq 'ca-tls-bundle.pem' ./infra/fabric/local-network/scripts/00-copy-dev-ca
 grep -Fq 'ca-tls-bundle.pem' ./infra/fabric/local-network/scripts/00-copy-dataspace-ca.sh
 grep -Fq 'FABRIC_CA_SERVER_CA_CHAINFILE=/etc/hyperledger/fabric-ca-server/ca-tls-bundle.pem' \
   ./infra/fabric/local-network/docker-compose.yml
+test "$(grep -Fc 'user: "${LOCAL_FABRIC_CA_USER:-0:0}"' ./infra/fabric/local-network/docker-compose.yml)" -eq 2
+test "$(grep -Fc 'FABRIC_CA_SERVER_DB_DATASOURCE=/var/hyperledger/fabric-ca/fabric-ca-server.db' ./infra/fabric/local-network/docker-compose.yml)" -eq 2
+grep -Fq 'root-ca-db:/var/hyperledger/fabric-ca' ./infra/fabric/local-network/docker-compose.yml
+grep -Fq 'ica-db:/var/hyperledger/fabric-ca' ./infra/fabric/local-network/docker-compose.yml
+grep -Fq 'CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0-host1:7051' ./infra/fabric/local-network/docker-compose.yml
+grep -Fq 'CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0-host2:7051' ./infra/fabric/local-network/docker-compose.yml
+grep -Fq 'CORE_PEER_GOSSIP_BOOTSTRAP=peer0-host1:7051' ./infra/fabric/local-network/docker-compose.yml
+test "$(grep -Fc 'CORE_PEER_GOSSIP_USELEADERELECTION=true' ./infra/fabric/local-network/docker-compose.yml)" -eq 2
+grep -Fq '_root-ca-db"' ./scripts/bootstrap-local-fabric-stack.mjs
+grep -Fq '_ica-db"' ./scripts/bootstrap-local-fabric-stack.mjs
+grep -Fq 'SKIP_CHAINCODE_INSTALL="${SKIP_CHAINCODE_INSTALL:-false}"' ./infra/fabric/local-network/scripts/03-deploy-chaincode.sh
+grep -Fq 'deploy_chaincode "artifact-sc" "${GWTEMPLATE_DIR}/chaincode/artifact-sc-javascript" "${DATA_CHANNEL_NAME}" true' ./infra/fabric/local-network/scripts/05-deploy-identity-chaincodes.sh
+grep -Fq 'discover --userKey=' ./chaincode/scripts/consentaccess-local-devnet.sh
+grep -Fq 'wait_for_gateway_discovery' ./chaincode/scripts/consentaccess-local-devnet.sh
 grep -Fq 'function normalize_enrolled_msp_trust()' ./infra/fabric/local-network/scripts/02-bootstrap-network.sh
 grep -Fq 'function normalize_enrolled_tls_trust()' ./infra/fabric/local-network/scripts/02-bootstrap-network.sh
 grep -Fq 'function wait_for_peer()' ./infra/fabric/local-network/scripts/02-bootstrap-network.sh
@@ -147,13 +161,23 @@ grep -Fq 'touch -t 198001010000' ./scripts/install-kind-ccaas-chaincodes.sh
 grep -Fq 'tar --format ustar --uid 0 --gid 0' ./scripts/install-kind-ccaas-chaincodes.sh
 grep -Fq 'gzip -n' ./scripts/install-kind-ccaas-chaincodes.sh
 grep -Fq '.source.Type.LocalPackage.package_id == $package_id' ./scripts/install-kind-ccaas-chaincodes.sh
-grep -Fq '.version == $version and .sequence == 1 and .approvals[$msp] == true' \
+grep -Fq '.version == $version and .sequence == $sequence and .approvals[$msp] == true' \
+  ./scripts/install-kind-ccaas-chaincodes.sh
+grep -Fq 'target_sequence=$((current_sequence + 1))' \
   ./scripts/install-kind-ccaas-chaincodes.sh
 grep -Fq 'gw.fabricPeerEndpoint="${KIND_PEER_SERVICE}:7051"' ./scripts/smoke-helm-local-network.sh
 grep -Fq 'name: orderer-tcp-bridge' ./scripts/smoke-helm-local-network.sh
 grep -Fq 'name: orderer' ./scripts/smoke-helm-local-network.sh
 grep -Fq 'peer.bootstrap=' ./scripts/smoke-helm-local-network.sh
 grep -Fq 'KIND_PEER_SYNC_ATTEMPTS="${KIND_PEER_SYNC_ATTEMPTS:-600}"' ./scripts/smoke-helm-local-network.sh
+peer_join_verification="$(
+  sed -n '/kind_peer_channels=/,/install_kind_ccaas_chaincodes/p' \
+    ./scripts/smoke-helm-local-network.sh
+)"
+peer_sync_line="$(grep -n 'wait_for_kind_peer_sync "${channel}"' <<<"${peer_join_verification}" | head -n 1 | cut -d: -f1)"
+peer_getinfo_line="$(grep -n 'peer channel getinfo -c "${channel}"' <<<"${peer_join_verification}" | head -n 1 | cut -d: -f1)"
+test -n "${peer_sync_line}" -a -n "${peer_getinfo_line}"
+test "${peer_sync_line}" -lt "${peer_getinfo_line}"
 grep -Fq 'wait_for_kind_peer_sync' ./scripts/smoke-helm-local-network.sh
 grep -Fq -- '--set gw.enabled=false' ./scripts/smoke-helm-local-network.sh
 grep -Fq -- '--reuse-values' ./scripts/smoke-helm-local-network.sh
@@ -239,6 +263,10 @@ grep -Fq 'Host2MSP' ./scripts/collect-open-source-production-readiness-evidence.
 grep -Fq 'identity-eu' ./scripts/build-open-source-evidence-manifest.mjs
 grep -Fq 'identity-global' ./scripts/build-open-source-evidence-manifest.mjs
 grep -Fq 'FABRIC_PEER_ENDPOINT_VALUE="${FABRIC_PEER_ENDPOINT_VALUE:-localhost:7051}"' \
+  ./scripts/prepare-consentaccess-local-fabric-env.sh
+grep -Fq 'LEDGER_DATA_CHANNEL_DEFAULT=${CHANNEL_NAME}' \
+  ./scripts/prepare-consentaccess-local-fabric-env.sh
+grep -Fq 'FHIR_VERSION_LEDGER_CHAINCODE=artifact-sc' \
   ./scripts/prepare-consentaccess-local-fabric-env.sh
 grep -Fq 'HOST_LEGACY_REPRESENTATIVE_CONTROLLER=${LEGACY_REPRESENTATIVE_CONTROLLER_VALUE}' \
   ./scripts/prepare-consentaccess-local-fabric-env.sh

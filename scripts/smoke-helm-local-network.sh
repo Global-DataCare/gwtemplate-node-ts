@@ -469,6 +469,7 @@ kind_peer_channels="$(kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" exec
   peer channel list)"
 for channel in identity-local health-care-local; do
   grep -qx "${channel}" <<< "${kind_peer_channels}"
+  wait_for_kind_peer_sync "${channel}"
   kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" exec peer-join-tools -- env \
     CORE_PEER_LOCALMSPID="${KIND_PEER_MSP_ID}" \
     CORE_PEER_MSPCONFIGPATH=/tmp/admin-msp \
@@ -477,7 +478,6 @@ for channel in identity-local health-care-local; do
     CORE_PEER_TLS_ROOTCERT_FILE=/tmp/peer-tls-root.pem \
     CORE_PEER_TLS_SERVERHOSTOVERRIDE="${KIND_PEER_SERVICE}" \
     peer channel getinfo -c "${channel}" | grep -Eq 'height[^0-9]*[1-9][0-9]*'
-  wait_for_kind_peer_sync "${channel}"
 done
 kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" get pod \
   -l app.kubernetes.io/component=peer -o jsonpath='{.items[0].spec.containers[0].env}' \

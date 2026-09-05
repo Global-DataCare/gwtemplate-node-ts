@@ -5,7 +5,9 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "${ROOT}"
 
 GWTEMPLATE_DIR="${GWTEMPLATE_DIR:-$(cd "${ROOT}/../../.." && pwd)}"
-CHANNEL_NAME="${CHANNEL_NAME:-${HLF_IDENTITY_CHANNEL_NAME:-identity-local}}"
+IDENTITY_CHANNEL_NAME="${HLF_IDENTITY_CHANNEL_NAME:-identity-local}"
+DATA_CHANNEL_NAME="${HLF_DATA_CHANNEL_NAME:-${HLF_CHANNEL_NAME:-health-care-local}}"
+CHANNEL_NAME="${CHANNEL_NAME:-${IDENTITY_CHANNEL_NAME}}"
 
 CHAINCODE_VERSION="${CHAINCODE_VERSION:-1.0}"
 CHAINCODE_SEQUENCE="${CHAINCODE_SEQUENCE:-1}"
@@ -20,15 +22,18 @@ fi
 function deploy_chaincode() {
   local name="$1"
   local path="$2"
+  local channel="${3:-${CHANNEL_NAME}}"
+  local skip_install="${4:-false}"
   local label="${name}_${CHAINCODE_VERSION}"
 
-  echo "---> Deploying ${name} from ${path}"
-  CHANNEL_NAME="${CHANNEL_NAME}" \
+  echo "---> Deploying ${name} from ${path} on ${channel}"
+  CHANNEL_NAME="${channel}" \
   CHAINCODE_NAME="${name}" \
   CHAINCODE_PATH="${path}" \
   CHAINCODE_LABEL="${label}" \
   CHAINCODE_VERSION="${CHAINCODE_VERSION}" \
   CHAINCODE_SEQUENCE="${CHAINCODE_SEQUENCE}" \
+  SKIP_CHAINCODE_INSTALL="${skip_install}" \
   bash "${DEPLOY_SCRIPT}"
 }
 
@@ -38,6 +43,7 @@ deploy_chaincode "employee-sc" "${GWTEMPLATE_DIR}/chaincode/employee-sc-javascri
 deploy_chaincode "evidence-sc" "${GWTEMPLATE_DIR}/chaincode/evidence-sc-javascript"
 deploy_chaincode "credential-sc" "${GWTEMPLATE_DIR}/chaincode/credential-sc-javascript"
 deploy_chaincode "artifact-sc" "${GWTEMPLATE_DIR}/chaincode/artifact-sc-javascript"
+deploy_chaincode "artifact-sc" "${GWTEMPLATE_DIR}/chaincode/artifact-sc-javascript" "${DATA_CHANNEL_NAME}" true
 deploy_chaincode "artifactevent-sc" "${GWTEMPLATE_DIR}/chaincode/artifactevent-sc-javascript"
 deploy_chaincode "subjectkeybinding-sc" "${GWTEMPLATE_DIR}/chaincode/subjectkeybinding-sc-javascript"
 echo "Identity chaincodes deployed on ${CHANNEL_NAME}"

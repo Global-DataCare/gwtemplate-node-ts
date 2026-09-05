@@ -9,6 +9,8 @@
 #    to use a peer from another MSP as its gossip bootstrap.
 # 6. concurrent local stacks cannot hijack the CCAAS container name or the
 #    orderer port used by the kind bridge.
+# 7. artifact-sc is approved on both identity and clinical data channels so a
+#    clinical CID batch never targets a chaincode absent from its channel.
 # Authorization invariant: the committed policy permits either governed host MSP to endorse.
 # Persistence invariant: Host2 peer membership and CCAAS readiness survive restart.
 set -euo pipefail
@@ -55,6 +57,22 @@ grep -Fq 'HLF_PRIVATE_KEY=$(to_env_one_line_pem "${KIND_GW_KEY}")' "${SMOKE}"
 ! grep -Fq 'local-evidence-host-credential' "${SMOKE}"
 grep -Fq 'CORE_PEER_LOCALMSPID="${KIND_PEER_MSP_ID}"' "${CCAAS}"
 grep -Fq "OR('Host1MSP.member','Host2MSP.member')" "${CCAAS}"
+grep -Fq 'current_sequence=' "${CCAAS}"
+grep -Fq 'target_sequence=$((current_sequence + 1))' "${CCAAS}"
+grep -Fq 'host1_package_id=' "${CCAAS}"
+grep -Fq 'docker_peer_exec' "${CCAAS}"
+grep -Fq 'ensure_kind_package_installed' "${CCAAS}"
+grep -Fq 'ensure_docker_host2_package_installed' "${CCAAS}"
+grep -Fq 'wait_for_kind_committed_definition' "${CCAAS}"
+grep -Fq 'committed="$(wait_for_kind_committed_definition "${channel}" "${name}")"' "${CCAAS}"
+grep -Fq -- '--sequence "${target_sequence}"' "${CCAAS}"
+grep -Fq '${committed:-null}' "${CCAAS}"
+if grep -Fq '${committed:-{}}' "${CCAAS}"; then
+  echo 'empty lifecycle output must remain valid JSON during commit polling' >&2
+  exit 1
+fi
+grep -Fq "'artifact-sc|identity-local,health-care-local'" "${CCAAS}"
+grep -Fq 'IFS="," read -r -a channels' "${CCAAS}"
 grep -Fq 'SKIP_FABRIC_PREP=true' "${RUNNER}"
 grep -Fq 'create-local-audit-authorization.mjs' "${RUNNER}"
 grep -Fq 'HOST_AUTHORIZATION_JSON=' "${RUNNER}"
