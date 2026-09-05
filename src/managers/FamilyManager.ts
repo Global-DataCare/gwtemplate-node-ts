@@ -2,6 +2,13 @@
 // File: src/managers/FamilyManager.ts
 import { GatewayRequestEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
 import { HttpStatusCodes } from 'gdc-common-utils-ts/constants/http';
+import { HealthcareActorRoleCodes } from 'gdc-common-utils-ts/constants/healthcare';
+import { HL7_CODING_SYSTEM_V3_ROLE_CODE } from 'gdc-common-utils-ts/constants/hl7-roles';
+import { SecureIdTypesIndividual } from 'gdc-common-utils-ts/constants/identity-identifiers';
+import {
+  buildIndividualDidWeb,
+  buildSecureIdValueIndividual,
+} from 'gdc-common-utils-ts/utils/did';
 import { createHash } from 'crypto';
 
 import { v4 as uuidv4 } from 'uuid';
@@ -42,7 +49,6 @@ import { issueActivationCodeFromPool, materializeFreeIndividualLicenses } from '
 import { buildPaymentCommunication, readOfferPaymentContext } from '../utils/order-communication';
 import { buildGatewayInvoiceBundle } from '../utils/invoice-bundle';
 import { verifyOrderPaymentConfirmation } from '../utils/payment-confirmation';
-import { getPersonOccupationClaim } from '../utils/occupation';
 import { buildClaimsFromIndividualRegistrationPdfAttachment } from '../utils/individual-registration-pdf-attachment';
 import { buildClaimsFromIndividualOrganizationKyc } from '../utils/individual-organization-kyc';
 import { buildIndividualOnboardingPdfDraftResponse } from '../utils/individual-onboarding-pdf-draft';
@@ -588,17 +594,32 @@ export class FamilyManager {
         finalizedContent.claims[ClaimsOrganizationSchemaorg.ownerTelephone] as string | undefined
         || finalizedContent.claims[ClaimsPersonSchemaorg.telephone] as string | undefined;
       const controllerContact = controllerEmail || controllerPhoneForActivation;
-      const controllerRole = getPersonOccupationClaim(finalizedContent.claims as Record<string, any> | undefined) || 'FAMILY_CONTROLLER';
+      const controllerRole = `${HL7_CODING_SYSTEM_V3_ROLE_CODE}|${HealthcareActorRoleCodes.Controller}`;
       if (controllerContact) {
         try {
+          const providerDidWeb = String(
+            finalizedContent.claims[ClaimsOfferSchemaorg.offeredBy] || '',
+          ).trim();
+          const authorizedSubjectDid = buildIndividualDidWeb({
+            providerDidWeb,
+            secureIdTypeIndividual: SecureIdTypesIndividual.Uuid,
+            secureIdValueIndividual: buildSecureIdValueIndividual({
+              secureIdTypeIndividual: SecureIdTypesIndividual.Uuid,
+              privateIdValueIndividual: secureDoc.id,
+            }),
+          });
           const { activationCode } = await issueActivationCodeFromPool({
             vaultRepository: this.vaultRepository,
             kmsService: this.kmsService,
             tenantVaultId,
             userClass: LICENSE_USER_CLASS_INDIVIDUAL,
             type: LICENSE_TYPE_MOBILE,
-            email: controllerContact,
+            email: controllerEmail,
+            phone: controllerEmail ? undefined : controllerPhoneForActivation,
             role: controllerRole,
+            ownerOrganizationId: secureDoc.id,
+            subjectId: secureDoc.id,
+            subjectDid: authorizedSubjectDid,
           });
           finalizedContent.claims[ClaimsIndividualProductSchemaorg.serialNumber] = activationCode;
           finalizedContent.claims[ClaimsIndividualProductSchemaorg.category] = LICENSE_CATEGORY_INDIVIDUAL;

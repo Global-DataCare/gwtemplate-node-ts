@@ -22,7 +22,7 @@ export function createApiDocsSetupOptions(
   const globalContextScript = `
     (() => {
       const KEY_PREFIX = 'gw-api-docs:';
-      const PANEL_VERSION = '2026-05-25-individual-did-v5';
+      const PANEL_VERSION = '2026-09-05-individual-member-did-v6';
       const DESKTOP_PANEL_WIDTH = 360;
       const fields = [
         { key: 'testId', label: 'test id', placeholder: '01' },
@@ -32,10 +32,11 @@ export function createApiDocsSetupOptions(
         { key: 'hostSector', label: 'network type', placeholder: 'test' },
         { key: 'portalNamespace', label: 'portal namespace', placeholder: 'globaldatacare.es' },
         { key: 'individualUuid', label: 'individualUuid', placeholder: 'a87e5b15-aea4-4475-9c7c-40aa88354b6f' },
-        { key: 'individualDid', label: 'individualDid', placeholder: 'did:web:globaldatacare.es:<sector>:individual:multibase:<derived>' },
+        { key: 'individualProviderDid', label: 'individualProviderDid', placeholder: 'did:web:host.example.org:health-care:organization:taxid:VATES-B00112233' },
+        { key: 'individualDid', label: 'individualDid', placeholder: 'did:web:host.example.org:health-care:organization:taxid:VATES-B00112233:individual:UUID:zG9H82pae9SCXvec3D4YKqhX8bj8F1mRgzxMEdwXXonT7BWsvsUiP2u52sWQTeESpoMee' },
         { key: 'individualControllerEmail', label: 'individualControllerEmail', placeholder: 'guardian@example.org' },
-        { key: 'individualControllerRole', label: 'individualControllerRole', placeholder: 'v3-RoleCode|RESPRSN' },
-        { key: 'individualControllerDid', label: 'individualControllerDid', placeholder: 'did:web:globaldatacare.es:<sector>:individual:multibase:<derived>:family:<derived>:v3-RoleCode|RESPRSN' },
+        { key: 'individualControllerRole', label: 'individualControllerRole', placeholder: 'http://terminology.hl7.org/CodeSystem/v3-RoleCode|RESPRSN' },
+        { key: 'individualControllerDid', label: 'individualControllerDid', placeholder: 'did:web:host.example.org:health-care:organization:taxid:VATES-B00112233:individual:UUID:zG9H82pae9SCXvec3D4YKqhX8bj8F1mRgzxMEdwXXonT7BWsvsUiP2u52sWQTeESpoMee:member:zG9DrMLpQW8eoCc9Ay9AFxuMGiswgJePpbUMz9svJCZ8tKjUd4xoExgCPA5jmHc6hPATJ:RESPRSN' },
         { key: 'physicianEmail', label: 'physicianEmail', placeholder: 'doctor1@acme.org' },
         { key: 'physicianRole', label: 'physicianRole', placeholder: 'ISCO-08|2211' },
         { key: 'sectionsAllowed', label: 'sectionsAllowed', placeholder: 'LOINC|48765-2' },
@@ -101,14 +102,15 @@ export function createApiDocsSetupOptions(
           || current.includes(':employee:')
           || current.includes('did:web:hospital.example.com');
       }
-      function isLegacyIndividualControllerDid(value) {
-        const current = String(value || '').trim();
-        if (!current) return true;
-        return current.includes('guardian@example.org')
-          || current.includes('did:web:api.acme.org:family:')
-          || current.includes('<derived>')
-          || current.includes('did:web:hospital.example.com');
-      }
+          function isLegacyIndividualControllerDid(value) {
+            const current = String(value || '').trim();
+            if (!current) return true;
+            return current.includes('guardian@example.org')
+              || current.includes('did:web:api.acme.org:family:')
+              || current.includes(':family:')
+              || current.includes('<derived>')
+              || current.includes('did:web:hospital.example.com');
+          }
       const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 
       function hexToBytes(hex) {
@@ -154,14 +156,30 @@ export function createApiDocsSetupOptions(
         return 'z' + encodeBase58([0x12, 0x20, ...digestBytes]);
       }
 
-      function uuidToMultibase58btc(uuidValue) {
+      async function sha3Multibase58btc(bytes) {
+        if (!bytes || !globalThis.crypto || !globalThis.crypto.subtle) return '';
+        try {
+          const digestBuffer = await globalThis.crypto.subtle.digest('SHA3-384', new Uint8Array(bytes));
+          return 'z' + encodeBase58([0x15, 0x30, ...Array.from(new Uint8Array(digestBuffer))]);
+        } catch {
+          return '';
+        }
+      }
+
+      async function sha3TextMultibase58btc(inputValue) {
+        const normalized = String(inputValue || '').trim().toLowerCase();
+        if (!normalized) return '';
+        return sha3Multibase58btc(Array.from(new TextEncoder().encode(normalized)));
+      }
+
+      async function uuidToSha3Multibase58btc(uuidValue) {
         const normalized = String(uuidValue || '').trim().toLowerCase();
         if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(normalized)) {
           return '';
         }
         const bytes = hexToBytes(normalized.replace(/-/g, ''));
         if (!bytes) return '';
-        return 'z' + encodeBase58(bytes);
+        return sha3Multibase58btc(bytes);
       }
 
       function buildPhysicianOrgDid() {
@@ -179,20 +197,20 @@ export function createApiDocsSetupOptions(
 
       function buildIndividualControllerDid(subjectDid, controllerId, roleCode) {
         if (!subjectDid || !controllerId || !roleCode) return '';
-        return subjectDid + ':family:' + controllerId + ':' + roleCode;
+        const roleValue = String(roleCode).split('|').at(-1);
+        return roleValue ? subjectDid + ':member:' + controllerId + ':' + roleValue : '';
       }
 
       function buildIndividualDid(individualIdOverride) {
-        const portalNamespace = getValue('portalNamespace');
-        const sector = getValue('sector');
+        const providerDidWeb = getValue('individualProviderDid');
         const individualId = individualIdOverride || getDerivedValue('individualId');
-        if (!portalNamespace || !sector || !individualId) return '';
-        return 'did:web:' + portalNamespace + ':' + sector + ':individual:multibase:' + individualId;
+        if (!providerDidWeb || !individualId) return '';
+        return providerDidWeb + ':individual:UUID:' + individualId;
       }
 
       function getCurrentIndividualId() {
         const explicitDid = getValue('individualDid');
-        const match = String(explicitDid || '').match(/:multibase:([^:/?#]+)$/);
+        const match = String(explicitDid || '').match(/:individual:[A-Z0-9]+:([^:/?#]+)$/);
         if (match && match[1]) return match[1];
         return getDerivedValue('individualId') || '';
       }
@@ -227,7 +245,7 @@ export function createApiDocsSetupOptions(
         const canonicalId = getCanonicalTenantId();
         syncDerivedField('tenantId', canonicalId);
         syncDerivedField('taxId', canonicalId);
-        const derivedIndividualId = uuidToMultibase58btc(getValue('individualUuid'));
+        const derivedIndividualId = await uuidToSha3Multibase58btc(getValue('individualUuid'));
         syncDerivedField('individualId', derivedIndividualId);
         const physicianOrgDid = buildPhysicianOrgDid();
         const individualDid = buildIndividualDid(derivedIndividualId);
@@ -235,7 +253,7 @@ export function createApiDocsSetupOptions(
         syncDerivedField('physicianOrg', physicianOrgDid);
         const physicianMemberId = await sha256Multibase58btc(getValue('physicianEmail'));
         syncDerivedField('physicianDid', buildMemberDid(physicianOrgDid, physicianMemberId, getValue('physicianRole')));
-        const individualControllerId = await sha256Multibase58btc(getValue('individualControllerEmail'));
+        const individualControllerId = await sha3TextMultibase58btc(getValue('individualControllerEmail'));
         syncDerivedField('individualControllerDid', buildIndividualControllerDid(individualDid, individualControllerId, getValue('individualControllerRole')));
       }
 
@@ -487,11 +505,14 @@ export function createApiDocsSetupOptions(
         if (!getValue('individualUuid')) {
           setValue('individualUuid', 'a87e5b15-aea4-4475-9c7c-40aa88354b6f');
         }
+        if (!getValue('individualProviderDid')) {
+          setValue('individualProviderDid', 'did:web:host.example.org:health-care:organization:taxid:VATES-B00112233');
+        }
         if (!getValue('individualControllerEmail')) {
-          setValue('individualControllerEmail', 'guardian@example.org');
+          setValue('individualControllerEmail', 'controller@example.org');
         }
         if (!getValue('individualControllerRole')) {
-          setValue('individualControllerRole', 'v3-RoleCode|RESPRSN');
+          setValue('individualControllerRole', 'http://terminology.hl7.org/CodeSystem/v3-RoleCode|RESPRSN');
         }
         if (!getValue('physicianEmail')) {
           setValue('physicianEmail', 'doctor1@acme.org');
@@ -985,8 +1006,9 @@ export function createApiDocsSetupOptions(
         const sector = getCtx('sector');
         const hostSector = getCtx('hostSector');
         const portalNamespace = getCtx('portalNamespace');
+        const individualProviderDid = getCtx('individualProviderDid');
         const individualDidInput = getCtx('individualDid');
-        const individualIdMatch = String(individualDidInput || '').match(/:multibase:([^:/?#]+)$/);
+        const individualIdMatch = String(individualDidInput || '').match(/:individual:[A-Z0-9]+:([^:/?#]+)$/);
         const individualId = (individualIdMatch && individualIdMatch[1]) || getCtx('individualId');
         const individualControllerEmail = getCtx('individualControllerEmail');
         const individualControllerRole = getCtx('individualControllerRole');
@@ -999,8 +1021,8 @@ export function createApiDocsSetupOptions(
             ? `did:web:${portalNamespace}:${sector}:organization:taxid:${tenantId}`
             : '');
         const physicianDid = getCtx('physicianDid');
-        const individualDid = individualDidInput || (portalNamespace && sector && individualId
-          ? `did:web:${portalNamespace}:${sector}:individual:multibase:${individualId}`
+        const individualDid = individualDidInput || (individualProviderDid && individualId
+          ? `${individualProviderDid}:individual:UUID:${individualId}`
           : '');
         const offerId = getCtx('offerId');
         const activationCode = getCtx('activationCode');

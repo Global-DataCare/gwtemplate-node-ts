@@ -57,6 +57,9 @@ describe('ApiDocsManager Global Flow Context', () => {
     expect(script).toContain('buildPhysicianOrgDid');
     expect(script).toContain('buildMemberDid');
     expect(script).toContain('buildIndividualControllerDid');
+    expect(script).toContain("subtle.digest('SHA3-384'");
+    expect(script).toContain("':member:'");
+    expect(script).not.toContain("return subjectDid + ':family:'");
     expect(script).toContain('sha256Multibase58btc');
     expect(script).toContain('buildIndividualDid');
     expect(script).toContain('getCurrentIndividualId');
@@ -68,7 +71,7 @@ describe('ApiDocsManager Global Flow Context', () => {
     expect(script).toContain('syncGlobalContextPanelState');
     expect(script).toContain('gw-api-global-context-toggle');
     expect(script).toContain('gw-api-global-context-launcher');
-    expect(script).toContain('uuidToMultibase58btc');
+    expect(script).toContain('uuidToSha3Multibase58btc');
     expect(script).toContain('globaldatacare.es');
     expect(script).toContain('acme-id');
     expect(script).toContain('doctor1@acme.org');

@@ -28,11 +28,13 @@ import {
 import {
   EXAMPLE_CONTROLLER_DID,
   EXAMPLE_EMAIL_PROFESSIONAL,
+  EXAMPLE_EMAIL_CONTROLLER_INDIVIDUAL,
   EXAMPLE_EMPLOYEE_DEVICE_CLIENT_ID_PRIMARY,
   EXAMPLE_EMPLOYEE_DEVICE_INSTANCE_ID_TERTIARY,
   EXAMPLE_LEGAL_ORGANIZATION_TAX_ID,
   EXAMPLE_KYC_CONTROLLER_USER_UUID,
   EXAMPLE_KYC_CONTROLLER_UUID,
+  EXAMPLE_PRIVATE_INDIVIDUAL_UUID,
   EXAMPLE_TENANT_ROUTE_CONTEXT,
   ExampleHttpStatusText,
 } from 'gdc-common-utils-ts/examples/shared';
@@ -234,12 +236,19 @@ describe('DeviceRegistrationManager', () => {
       }));
     });
 
-    it('binds an individual-controller DCR to the verified account and licensed subject', async () => {
+    it('binds an individual-controller DCR and repairs a legacy seat missing its subject DID', async () => {
       const job = cloneDeep(DCR_REGISTRATION_JOB);
       const activationCode = String((job.content?.body as any)?.[IdentityAuthRequestFields.Code]);
       Object.assign(job.content!.body as any, {
         [IdentityDcrMetadataFields.ActorDid]: testIndividualControllerDcrIdentity.actorDid,
         [IdentityDcrMetadataFields.ProfileDid]: testIndividualControllerDcrIdentity.actorDid,
+        [IdentityDcrMetadataFields.ClinicalCreatorBinding]: {
+          kind: FhirIpsCreatorKinds.IndividualMember,
+          actorIdentifier: `urn:uuid:${EXAMPLE_KYC_CONTROLLER_USER_UUID}`,
+          authorIdentifier: `urn:uuid:${EXAMPLE_KYC_CONTROLLER_UUID}`,
+          ownerIdentifier: `urn:uuid:${EXAMPLE_PRIVATE_INDIVIDUAL_UUID}`,
+          role: testIndividualControllerDcrIdentity.role,
+        },
       });
       job.content!.meta = {
         bearer: { jwt: { payload: {
@@ -257,9 +266,11 @@ describe('DeviceRegistrationManager', () => {
         userClass: DeviceUserClasses.Individual,
         type: DeviceAppTypes.Mobile,
         status: LicenseStatuses.Active,
+        subjectId: undefined,
+        ownerOrganizationId: EXAMPLE_PRIVATE_INDIVIDUAL_UUID,
+        issuedToEmail: EXAMPLE_EMAIL_CONTROLLER_INDIVIDUAL,
         issuedToRole: testIndividualControllerDcrIdentity.role,
-        authorizedSubjectDid: testIndividualControllerDcrIdentity.subjectDid,
-      } as DeviceLicense & Record<string, any>;
+      } as unknown as DeviceLicense & Record<string, any>;
       await vaultRepository.put(vaultId, [{
         id: license.id,
         status: license.status,
@@ -284,6 +295,28 @@ describe('DeviceRegistrationManager', () => {
         authorizedSubjectDid: testIndividualControllerDcrIdentity.subjectDid,
         authenticatedSubject: testIndividualControllerDcrIdentity.authenticatedSubject,
         licenseId: license.id,
+      }));
+      const repairedLicenseDocument = await vaultRepository.get<ConfidentialStorageDoc>(
+        vaultId,
+        license.id,
+        getEnvSectionId('device-licenses'),
+      );
+      const repairedLicense = await mockKmsService.unprotectConfidentialData<any>(
+        repairedLicenseDocument!,
+        vaultId,
+      );
+      expect(repairedLicense).toEqual(expect.objectContaining({
+        subjectId: EXAMPLE_PRIVATE_INDIVIDUAL_UUID,
+        authorizedSubjectDid: testIndividualControllerDcrIdentity.subjectDid,
+      }));
+      const creatorBinding = await vaultRepository.get<any>(
+        vaultId,
+        `urn:uuid:${EXAMPLE_KYC_CONTROLLER_UUID}`,
+        getClinicalCreatorBindingsSectionId(),
+      );
+      expect(creatorBinding).toEqual(expect.objectContaining({
+        kind: FhirIpsCreatorKinds.IndividualMember,
+        actorDids: [testIndividualControllerDcrIdentity.actorDid],
       }));
     });
 

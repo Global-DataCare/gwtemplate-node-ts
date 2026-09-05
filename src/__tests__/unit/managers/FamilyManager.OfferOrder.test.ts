@@ -48,6 +48,8 @@ import { EntityLifecycleStatus } from '../../../gdc-backend-utils-node/models/en
 import {
   EXAMPLE_LICENSE_INVOICE_ID,
   EXAMPLE_LICENSE_PAYMENT_METHOD_STRIPE,
+  EXAMPLE_INDIVIDUAL_CONTROLLER_ROLE_TYPE,
+  EXAMPLE_INDIVIDUAL_CONTROLLER_ROLE_VALUE,
   EXAMPLE_REGISTERED_SUBJECT_ALTERNATE_NAME,
 } from 'gdc-common-utils-ts/examples/shared';
 
@@ -273,6 +275,21 @@ describe('FamilyManager - Offer/Order Flow', () => {
       getEnvSectionId('communications'),
     );
     expect(communications.length).toBeGreaterThan(0);
+
+    const licenses = await vaultRepository.getContainersInSection<ConfidentialStorageDoc>(
+      tenantVaultId,
+      getEnvSectionId('device-licenses'),
+    );
+    const controllerLicense = licenses.find((document) =>
+      String((document.content as any)?.activationCode || '')
+        === String(entry.resource.meta.claims[ClaimsIndividualProductSchemaorg.serialNumber] || ''));
+    expect(controllerLicense?.content).toEqual(expect.objectContaining({
+      subjectId: firstEntry.resource.id,
+      issuedToRole: `${EXAMPLE_INDIVIDUAL_CONTROLLER_ROLE_TYPE}|${EXAMPLE_INDIVIDUAL_CONTROLLER_ROLE_VALUE}`,
+      authorizedSubjectDid: expect.stringMatching(
+        /:individual:UUID:z[1-9A-HJ-NP-Za-km-z]+$/,
+      ),
+    }));
   });
 
   it('does not activate a family Order when its controller activation code cannot be issued', async () => {

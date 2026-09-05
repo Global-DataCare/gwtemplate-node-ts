@@ -53,7 +53,13 @@ import { ManageAssetOrganization } from '../../blockchain/fabric/v3/manageAssetO
 import { ManageAssetArtifact } from '../../blockchain/fabric/v3/manageAssetArtifact';
 import { ManageAssetArtifactEvent } from '../../blockchain/fabric/v3/manageAssetArtifactEvent';
 import { ClearingHouseService } from '../../services/ClearingHouseService';
-import { EXAMPLE_EMAIL_PROFESSIONAL } from 'gdc-common-utils-ts/examples/shared';
+import {
+  EXAMPLE_EMAIL_CONTROLLER_INDIVIDUAL,
+  EXAMPLE_EMAIL_PROFESSIONAL,
+  EXAMPLE_KYC_CONTROLLER_USER_UUID,
+  EXAMPLE_KYC_CONTROLLER_UUID,
+  EXAMPLE_PRIVATE_INDIVIDUAL_UUID,
+} from 'gdc-common-utils-ts/examples/shared';
 import { normalizeSameAsHash } from 'gdc-common-utils-ts/utils/same-as';
 import type { AppAuthorizationManager } from '../../managers/AppAuthorizationManager';
 import {
@@ -68,6 +74,10 @@ import { testTenant1AlternateName } from '../data/organization.data';
 import { HealthcareActorRoles } from 'gdc-common-utils-ts/constants/healthcare';
 import { createEmployeeUrn } from '../../utils/urn';
 import { URN_NAMESPACE, URN_NETWORK, URN_ORGANIZATION_ID_TYPE, URN_VERSION } from '../data/urn.data';
+import { IdentityDcrMetadataFields } from 'gdc-common-utils-ts/constants/identity-auth';
+import { FhirIpsCreatorKinds } from 'gdc-common-utils-ts/utils/fhir-ips-creator-identity';
+import { testIndividualControllerDcrIdentity } from '../data/identity.data';
+import { getClinicalCreatorBindingsSectionId } from '../../utils/clinical-creator-binding';
 import {
   EXAMPLE_CONTROLLER_DID,
   EXAMPLE_LEGAL_ORGANIZATION_TAX_ID,
@@ -499,5 +509,86 @@ describe('Device DCR replacement route story', () => {
     expect(registerKeySpy).toHaveBeenCalledTimes(2);
     expect(keySubmitSpy).toHaveBeenCalledWith('Host1MSP', 'UpdateKeyStatus', expect.any(String), 'revoked', expect.any(String));
     expect(bindingSpy).toHaveBeenCalled();
+  });
+
+  it('completes individual-controller DCR through the route and persists its exact member binding', async () => {
+    const activationCode = String((DCR_REGISTRATION_JOB.content?.body as any)?.code);
+    verifyInitialAccessToken.mockResolvedValue({
+      sub: testIndividualControllerDcrIdentity.authenticatedSubject,
+      act_code: activationCode,
+      scope: testIndividualControllerDcrIdentity.scope,
+    } as any);
+    const license = {
+      id: 'individual-controller-license-1',
+      tenantId: testTenant1AlternateName,
+      orderId: 'individual-controller-order-1',
+      activationCode,
+      userClass: 'individual',
+      type: 'mobile',
+      status: 'issued',
+      plan: 'default',
+      renewalCycle: '12m',
+      reactivationEnabled: false,
+      exp: Math.floor(Date.now() / 1000) + 3600,
+      ownerOrganizationId: EXAMPLE_PRIVATE_INDIVIDUAL_UUID,
+      issuedToEmail: EXAMPLE_EMAIL_CONTROLLER_INDIVIDUAL,
+      issuedToRole: testIndividualControllerDcrIdentity.role,
+    } as DeviceLicense;
+    await vaultRepository.put(tenantVaultId, [{
+      id: license.id,
+      status: license.status,
+      sequence: 0,
+      content: license,
+    } as ConfidentialStorageDoc], getEnvSectionId('device-licenses'));
+
+    const dcrRequest = {
+      ...DEVICE_REGISTRATION_REQUEST,
+      thid: 'individual-controller-dcr-route-thid',
+      body: {
+        ...DEVICE_REGISTRATION_REQUEST.body,
+        code: activationCode,
+        [IdentityDcrMetadataFields.ActorDid]: testIndividualControllerDcrIdentity.actorDid,
+        [IdentityDcrMetadataFields.ProfileDid]: testIndividualControllerDcrIdentity.actorDid,
+        [IdentityDcrMetadataFields.ClinicalCreatorBinding]: {
+          kind: FhirIpsCreatorKinds.IndividualMember,
+          actorIdentifier: `urn:uuid:${EXAMPLE_KYC_CONTROLLER_USER_UUID}`,
+          authorIdentifier: `urn:uuid:${EXAMPLE_KYC_CONTROLLER_UUID}`,
+          ownerIdentifier: `urn:uuid:${EXAMPLE_PRIVATE_INDIVIDUAL_UUID}`,
+          role: testIndividualControllerDcrIdentity.role,
+        },
+      },
+    };
+    jest.spyOn(cryptographyService, 'verifyDetachedJws').mockResolvedValue(true);
+    jest.spyOn(kmsService, 'decodeRequest').mockResolvedValue({ content: dcrRequest } as any);
+
+    const submit = await invokeExpress(app, {
+      method: HttpRequestMethods.Post,
+      url: '/acme-id/cds-es/v1/health-care/identity/openid/Device/_dcr',
+      headers: {
+        'content-type': 'application/x-www-form-urlencoded',
+        authorization: 'Bearer individual-controller-initial-access-token',
+      },
+      body: { request: JSON.stringify(dcrRequest) },
+    });
+    expect(submit.status).toBe(202);
+    await queueAdapter.waitForEmptyQueue();
+
+    const poll = await invokeExpress(app, {
+      method: HttpRequestMethods.Post,
+      url: new URL(submit.headers.location, 'http://localhost').pathname,
+      headers: { 'content-type': 'application/json' },
+      body: { thid: 'individual-controller-dcr-route-thid' },
+    });
+    expect(poll.status).toBe(200);
+    expect(poll.text).toMatch(/^response=.+/);
+
+    const storedBinding = await vaultRepository.get<any>(
+      tenantVaultId,
+      `urn:uuid:${EXAMPLE_KYC_CONTROLLER_UUID}`,
+      getClinicalCreatorBindingsSectionId(),
+    );
+    expect(storedBinding).toEqual(expect.objectContaining({
+      actorDids: [testIndividualControllerDcrIdentity.actorDid],
+    }));
   });
 });

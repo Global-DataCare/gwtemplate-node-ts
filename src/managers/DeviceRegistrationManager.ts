@@ -54,7 +54,17 @@ import {
 } from '../utils/urn';
 import { buildOrganizationRoleLicenseId } from 'gdc-common-utils-ts/utils/organization-role-license';
 import { hasRoleCode } from 'gdc-common-utils-ts/utils/activation-policy';
-import type { ClinicalCreatorBinding } from 'gdc-common-utils-ts/utils/fhir-ips-creator-identity';
+import { SecureIdTypesIndividual } from 'gdc-common-utils-ts/constants/identity-identifiers';
+import {
+  buildSecureIdValueMember,
+  buildSecureIdValueIndividual,
+  parseIndividualMemberDidWeb,
+} from 'gdc-common-utils-ts/utils/did';
+import {
+  FhirIpsCreatorKinds,
+  type ClinicalCreatorBinding,
+} from 'gdc-common-utils-ts/utils/fhir-ips-creator-identity';
+import { normalizeUuid } from 'gdc-common-utils-ts/utils/normalize-uuid';
 import { getClinicalCreatorBindingsSectionId } from '../utils/clinical-creator-binding';
 import { resolveRoleLicenseOrganizationOfficialId } from '../utils/ledger-organization-registration-helpers';
 
@@ -445,6 +455,31 @@ export class DeviceRegistrationManager implements IJobProcessor {
       }
       existing = matches[0];
     }
+    if (!existing
+      && requested !== undefined
+      && params.license?.userClass === LICENSE_USER_CLASS_INDIVIDUAL) {
+      const licensedSubjectId = String(
+        params.license.subjectId || params.license.ownerOrganizationId || '',
+      ).trim();
+      const licensedSubjectUuid = normalizeUuid(licensedSubjectId);
+      const ownerUuid = normalizeUuid(requested.ownerIdentifier);
+      const actorUuid = normalizeUuid(requested.actorIdentifier);
+      const authorUuid = normalizeUuid(requested.authorIdentifier);
+      if (requested.kind !== FhirIpsCreatorKinds.IndividualMember
+        || !licensedSubjectUuid
+        || ownerUuid !== licensedSubjectUuid
+        || !actorUuid
+        || !authorUuid
+        || actorUuid === authorUuid
+        || !hasRoleCode(requested.role)
+        || !hasRoleCode(params.license.issuedToRole)) {
+        throw new ManagerError(
+          'Individual-controller clinical creator binding requires an individual-member, distinct actor/author UUIDs, the licensed individual owner UUID and role RESPRSN.',
+          IssueType.Forbidden,
+        );
+      }
+      existing = requested;
+    }
     if (!existing) {
       if (requested === undefined) return undefined;
       throw new ManagerError(
@@ -498,36 +533,73 @@ export class DeviceRegistrationManager implements IJobProcessor {
     }
     const actorDid = String(params.registrationRequest[IdentityDcrMetadataFields.ActorDid] || '').trim();
     const profileDid = String(params.registrationRequest[IdentityDcrMetadataFields.ProfileDid] || '').trim();
-    const authorizedSubjectDid = String(params.license.authorizedSubjectDid || '').trim();
-    if (!actorDid || profileDid !== actorDid || !authorizedSubjectDid) {
+    let authorizedSubjectDid = String(params.license.authorizedSubjectDid || '').trim();
+    if (!actorDid || profileDid !== actorDid) {
       throw new ManagerError(
         'Individual-controller DCR is missing its exact actor, profile or authorized subject binding.',
         IssueType.Forbidden,
       );
     }
-    const familyPrefix = `${authorizedSubjectDid}:family:`;
-    if (!actorDid.startsWith(familyPrefix)) {
+    let parsedActor: ReturnType<typeof parseIndividualMemberDidWeb>;
+    try {
+      parsedActor = parseIndividualMemberDidWeb(actorDid);
+    } catch {
+      throw new ManagerError('Individual-controller actor is not a valid individual member DID.', IssueType.Forbidden);
+    }
+    if (!authorizedSubjectDid) {
+      const subjectId = String(params.license.subjectId || params.license.ownerOrganizationId || '').trim();
+      let expectedSubjectSuffix = '';
+      try {
+        expectedSubjectSuffix = `:individual:${SecureIdTypesIndividual.Uuid}:${buildSecureIdValueIndividual({
+          secureIdTypeIndividual: SecureIdTypesIndividual.Uuid,
+          privateIdValueIndividual: subjectId,
+        })}`;
+      } catch {
+        throw new ManagerError(
+          'Individual-controller license is missing a valid subject binding.',
+          IssueType.Forbidden,
+        );
+      }
+      if (!parsedActor.individualDidWeb.endsWith(expectedSubjectSuffix)) {
+        throw new ManagerError('Individual-controller actor does not belong to the licensed subject.', IssueType.Forbidden);
+      }
+      authorizedSubjectDid = parsedActor.individualDidWeb;
+      params.license.subjectId = subjectId;
+      params.license.authorizedSubjectDid = authorizedSubjectDid;
+    }
+    if (parsedActor.individualDidWeb !== authorizedSubjectDid) {
       throw new ManagerError('Individual-controller actor does not belong to the licensed subject.', IssueType.Forbidden);
     }
-    const encodedRemainder = actorDid.slice(familyPrefix.length);
-    const separator = encodedRemainder.indexOf(':');
-    const actorIdentifier = decodeURIComponent(separator >= 0 ? encodedRemainder.slice(0, separator) : encodedRemainder);
-    const actorRole = decodeURIComponent(separator >= 0 ? encodedRemainder.slice(separator + 1) : '');
+    const expectedMemberIds = [
+      params.license.issuedToEmail
+        ? buildSecureIdValueMember({
+            secureIdTypeMember: SecureIdTypesIndividual.Email,
+            privateIdValueMember: String(params.license.issuedToEmail),
+          })
+        : undefined,
+      params.license.issuedToPhone
+        ? buildSecureIdValueMember({
+            secureIdTypeMember: SecureIdTypesIndividual.Phone,
+            privateIdValueMember: String(params.license.issuedToPhone),
+          })
+        : undefined,
+    ].filter((value): value is string => Boolean(value));
     const issuedRoleCode = String(params.license.issuedToRole || '').split(/[|:]/).pop()?.toLowerCase();
-    const actorRoleCode = actorRole.split(/[|:]/).pop()?.toLowerCase();
-    if (actorIdentifier !== authenticatedSubject
+    const actorRoleCode = parsedActor.roleValue.toLowerCase();
+    if (expectedMemberIds.length === 0
+      || !expectedMemberIds.includes(parsedActor.memberId)
       || !issuedRoleCode
       || issuedRoleCode !== actorRoleCode
-      || !hasRoleCode(actorRole)
+      || !hasRoleCode(parsedActor.roleValue)
       || !hasRoleCode(params.license.issuedToRole)) {
-      if (!hasRoleCode(actorRole) || !hasRoleCode(params.license.issuedToRole)) {
+      if (!hasRoleCode(parsedActor.roleValue) || !hasRoleCode(params.license.issuedToRole)) {
         throw new ManagerError(
           'Individual-controller DCR requires the licensed controller role RESPRSN.',
           IssueType.Forbidden,
         );
       }
       throw new ManagerError(
-        'Individual-controller actor does not match the activated account or licensed role.',
+        'Individual-controller actor does not match the activated contact or licensed role.',
         IssueType.Forbidden,
       );
     }
