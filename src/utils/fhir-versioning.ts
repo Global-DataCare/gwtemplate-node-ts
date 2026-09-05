@@ -6,6 +6,7 @@ import { utf8ToBytes } from '@noble/hashes/utils.js';
 import { encodeMultibase58btc } from 'gdc-common-utils-ts/utils/multibase58';
 import type { LedgerSafeMetaTag } from '../services/ai/metaTagSanitizer';
 import { extractLedgerSafeResearchTags } from './fhir-ingestion';
+import { resolveDataChannel } from './ledger';
 
 export type FhirCidVersionMapping = {
   resourceType?: string;
@@ -125,11 +126,11 @@ export async function registerFhirCidMappings(params: {
   jurisdiction: string;
   mappings: FhirCidVersionMapping[];
 }): Promise<void> {
-  const { blockchainAdapter, sector, jurisdiction, mappings } = params;
+  const { blockchainAdapter, mappings } = params;
   if (!blockchainAdapter?.registerCidVersionMappings) return;
   if (!mappings || mappings.length === 0) return;
 
-  const channel = `${sector}-${String(jurisdiction || '').trim().toLowerCase()}`;
+  const channel = resolveDataChannel();
   const chaincode = process.env.FHIR_VERSION_LEDGER_CHAINCODE || 'artifact-sc';
   await blockchainAdapter.registerCidVersionMappings(mappings, channel, chaincode);
 }

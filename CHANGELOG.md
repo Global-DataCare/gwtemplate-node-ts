@@ -44,6 +44,11 @@
 - Let Fabric Gateway derive transaction endorsers from the committed chaincode
   policy; do not force the caller MSP as a client-side override, which can
   exclude an otherwise valid external-service chaincode endorser.
+- Point local FHIR version receipts at the deployed clinical data channel and
+  `artifact-sc`, removing the stale `health-care-es` / `fhir-versioning`
+  override from the canonical Docker and Helm smoke environment.
+- Resolve every FHIR CID receipt through the configured clinical data channel
+  instead of deriving an ungoverned channel name from request route labels.
 
 ## [1.24.13] - 2026-09-04
 

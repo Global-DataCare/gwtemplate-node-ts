@@ -254,6 +254,10 @@ grep -Fq 'identity-eu' ./scripts/build-open-source-evidence-manifest.mjs
 grep -Fq 'identity-global' ./scripts/build-open-source-evidence-manifest.mjs
 grep -Fq 'FABRIC_PEER_ENDPOINT_VALUE="${FABRIC_PEER_ENDPOINT_VALUE:-localhost:7051}"' \
   ./scripts/prepare-consentaccess-local-fabric-env.sh
+grep -Fq 'LEDGER_DATA_CHANNEL_DEFAULT=${CHANNEL_NAME}' \
+  ./scripts/prepare-consentaccess-local-fabric-env.sh
+grep -Fq 'FHIR_VERSION_LEDGER_CHAINCODE=artifact-sc' \
+  ./scripts/prepare-consentaccess-local-fabric-env.sh
 grep -Fq 'HOST_LEGACY_REPRESENTATIVE_CONTROLLER=${LEGACY_REPRESENTATIVE_CONTROLLER_VALUE}' \
   ./scripts/prepare-consentaccess-local-fabric-env.sh
 grep -Fq 'TENANT_SERVICE_ROUTES_JSON=${TENANT_SERVICE_ROUTES_JSON_VALUE}' \

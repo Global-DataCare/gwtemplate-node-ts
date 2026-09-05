@@ -66,18 +66,25 @@ describe('fhir-versioning utils', () => {
   });
 
   it('registers mappings only when adapter supports it', async () => {
+    const previousDataChannel = process.env.LEDGER_DATA_CHANNEL_DEFAULT;
+    process.env.LEDGER_DATA_CHANNEL_DEFAULT = 'clinical-evidence-local';
     const register = jest.fn(async () => ({ accepted: 1, txId: 'tx-1' }));
-    await registerFhirCidMappings({
-      blockchainAdapter: { registerCidVersionMappings: register },
-      sector: 'health-care',
-      jurisdiction: 'ES',
-      mappings: [{ cid: 'zabc', versionId: 'zabc' }],
-    });
+    try {
+      await registerFhirCidMappings({
+        blockchainAdapter: { registerCidVersionMappings: register },
+        sector: 'health-care',
+        jurisdiction: 'ES',
+        mappings: [{ cid: 'zabc', versionId: 'zabc' }],
+      });
 
-    expect(register).toHaveBeenCalledTimes(1);
-    const firstCall = (register.mock.calls as any[])[0];
-    expect(firstCall[1]).toBe('health-care-es');
-    expect(firstCall[2]).toBe('artifact-sc');
+      expect(register).toHaveBeenCalledTimes(1);
+      const firstCall = (register.mock.calls as any[])[0];
+      expect(firstCall[1]).toBe('clinical-evidence-local');
+      expect(firstCall[2]).toBe('artifact-sc');
+    } finally {
+      if (previousDataChannel === undefined) delete process.env.LEDGER_DATA_CHANNEL_DEFAULT;
+      else process.env.LEDGER_DATA_CHANNEL_DEFAULT = previousDataChannel;
+    }
   });
 
   it('canonicalizes recursively', () => {

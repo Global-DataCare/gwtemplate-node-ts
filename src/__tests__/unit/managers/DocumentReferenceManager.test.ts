@@ -6,13 +6,15 @@
 // File: src/__tests__/unit/managers/DocumentReferenceManager.test.ts
 import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 
-import { describe, expect, it, jest, beforeEach } from '@jest/globals';
+import { describe, expect, it, jest, beforeEach, afterAll } from '@jest/globals';
 import { DocumentReferenceManager } from '../../../managers/DocumentReferenceManager';
 import { IVaultRepository } from '../../../database/repositories/vault/vault.repository';
 import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-job';
 import { getIndividualSectionId } from '../../../utils/individual-sections';
 
 describe('DocumentReferenceManager', () => {
+  const previousDataChannel = process.env.LEDGER_DATA_CHANNEL_DEFAULT;
+  const clinicalDataChannel = 'health-care-local';
   const mockVaultRepository = {
     vaultExists: jest.fn(),
     put: jest.fn(),
@@ -26,9 +28,15 @@ describe('DocumentReferenceManager', () => {
   const manager = new DocumentReferenceManager(mockVaultRepository, mockBlockchainAdapter);
 
   beforeEach(() => {
+    process.env.LEDGER_DATA_CHANNEL_DEFAULT = clinicalDataChannel;
     jest.clearAllMocks();
     mockVaultRepository.vaultExists.mockResolvedValue(true as any);
     mockVaultRepository.put.mockResolvedValue(true as any);
+  });
+
+  afterAll(() => {
+    if (previousDataChannel === undefined) delete process.env.LEDGER_DATA_CHANNEL_DEFAULT;
+    else process.env.LEDGER_DATA_CHANNEL_DEFAULT = previousDataChannel;
   });
 
   const createJob = (claims: Record<string, any>): JobRequest => ({
@@ -117,7 +125,7 @@ describe('DocumentReferenceManager', () => {
     expect(mockBlockchainAdapter.registerCidVersionMappings).toHaveBeenCalledTimes(1);
     expect(mockBlockchainAdapter.registerArtifactBundle).not.toHaveBeenCalled();
     const [mappings, channel, chaincode] = mockBlockchainAdapter.registerCidVersionMappings.mock.calls[0];
-    expect(channel).toBe('health-care-es');
+    expect(channel).toBe(clinicalDataChannel);
     expect(chaincode).toBe('artifact-sc');
     expect(mappings[0].resourceType).toBe('DocumentReference');
     expect(mappings[0].versionId.startsWith('z')).toBe(true);
