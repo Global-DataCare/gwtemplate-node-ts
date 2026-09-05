@@ -67,9 +67,12 @@ Treat the image as environment-neutral:
 - governed integration/staging profiles: `NETWORK_MODE=test-network`
 - production: `NETWORK_MODE=network`
 
-These values and their Fabric channels come from the selected runtime profile.
-Never bake a profile into the image. Before and after rollout, inspect the
-effective `ConfigMap`/`Secret` references and confirm the expected mode.
+Only the network mode comes from the selected runtime profile. Managers derive
+their governed Fabric channel and select their canonical smart contract
+internally from trusted domain context; profiles and environment variables must
+never name or override them. Never bake a profile into the image. Before and
+after rollout, inspect the effective `ConfigMap`/`Secret` references and confirm
+the expected mode, and poison legacy routing variables in contract tests.
 
 ## Role and provider boundaries
 

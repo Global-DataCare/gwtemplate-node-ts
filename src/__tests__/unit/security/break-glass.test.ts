@@ -50,7 +50,7 @@ describe('break-glass sector and profession policy', () => {
 describe('break-glass audit and controller notice', () => {
   it('persists one 24-hour emergency Consent and issues renewable 15-minute token authorizations', async () => {
     const previousDataChannel = process.env.LEDGER_DATA_CHANNEL_DEFAULT;
-    process.env.LEDGER_DATA_CHANNEL_DEFAULT = 'clinical-evidence-eu';
+    process.env.LEDGER_DATA_CHANNEL_DEFAULT = 'must-not-control-manager-routing';
     const registerArtifactBundle = jest.fn().mockResolvedValue({ accepted: 1, txId: 'tx' });
     const notify = jest.fn().mockResolvedValue({ notificationId: 'notice-123' });
     const records = new Map<string, any>();
@@ -124,7 +124,7 @@ describe('break-glass audit and controller notice', () => {
     });
     expect(registerArtifactBundle).toHaveBeenCalledTimes(3);
     expect(registerArtifactBundle.mock.calls.every(([params]) => !('chaincode' in params))).toBe(true);
-    expect(registerArtifactBundle.mock.calls.every(([params]) => params.channel === 'clinical-evidence-eu')).toBe(true);
+    expect(registerArtifactBundle.mock.calls.every(([params]) => params.channel === 'health-care-eu')).toBe(true);
     const firstPayload = registerArtifactBundle.mock.calls[0][0].payload;
     expect(firstPayload).toMatchObject({
       type: 'BreakGlassEmergencyConsent',

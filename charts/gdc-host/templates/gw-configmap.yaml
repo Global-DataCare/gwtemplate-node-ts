@@ -35,7 +35,6 @@ data:
   LEDGER_MSP_ID: {{ .Values.peer.mspId | quote }}
   LEDGER_IDENTITY_CHANNEL_DEFAULT: {{ .Values.host.identityChannel | quote }}
   LEDGER_ORGANIZATION_IDENTITY_CHANNEL_DEFAULT: {{ .Values.host.organizationIdentityChannel | quote }}
-  LEDGER_DATA_CHANNEL_DEFAULT: {{ .Values.host.dataChannel | quote }}
   {{- $defaultChannels := list .Values.host.identityChannel .Values.host.organizationIdentityChannel .Values.host.dataChannel }}
   {{- $peerChannels := default $defaultChannels .Values.peer.channels }}
   HLF_BOOTSTRAP_CHANNELS: {{ join "," $peerChannels | quote }}

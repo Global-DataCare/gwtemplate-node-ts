@@ -444,7 +444,6 @@ GW runtime values expected afterwards:
   NETWORK_MODE=test-network
   LEDGER_MSP_ID=${ORG_MSP_ID}
   LEDGER_FABRIC_MSP_ID=${ORG_MSP_ID}
-  CONSENT_ACCESS_LEDGER_CHAINCODE=${CHAINCODE_NAME}
   sector=health-care
   jurisdiction=eu
 EOF

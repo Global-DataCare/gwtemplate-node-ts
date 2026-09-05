@@ -67,7 +67,11 @@ describe('fhir-versioning utils', () => {
 
   it('registers mappings only when adapter supports it', async () => {
     const previousDataChannel = process.env.LEDGER_DATA_CHANNEL_DEFAULT;
-    process.env.LEDGER_DATA_CHANNEL_DEFAULT = 'clinical-evidence-local';
+    const previousVersionChaincode = process.env.FHIR_VERSION_LEDGER_CHAINCODE;
+    const previousNetworkMode = process.env.NETWORK_MODE;
+    process.env.LEDGER_DATA_CHANNEL_DEFAULT = 'must-not-control-manager-routing';
+    process.env.FHIR_VERSION_LEDGER_CHAINCODE = 'must-not-control-manager-routing';
+    process.env.NETWORK_MODE = 'test';
     const register = jest.fn(async () => ({ accepted: 1, txId: 'tx-1' }));
     try {
       await registerFhirCidMappings({
@@ -79,11 +83,15 @@ describe('fhir-versioning utils', () => {
 
       expect(register).toHaveBeenCalledTimes(1);
       const firstCall = (register.mock.calls as any[])[0];
-      expect(firstCall[1]).toBe('clinical-evidence-local');
+      expect(firstCall[1]).toBe('health-care-eu');
       expect(firstCall[2]).toBe('artifact-sc');
     } finally {
       if (previousDataChannel === undefined) delete process.env.LEDGER_DATA_CHANNEL_DEFAULT;
       else process.env.LEDGER_DATA_CHANNEL_DEFAULT = previousDataChannel;
+      if (previousVersionChaincode === undefined) delete process.env.FHIR_VERSION_LEDGER_CHAINCODE;
+      else process.env.FHIR_VERSION_LEDGER_CHAINCODE = previousVersionChaincode;
+      if (previousNetworkMode === undefined) delete process.env.NETWORK_MODE;
+      else process.env.NETWORK_MODE = previousNetworkMode;
     }
   });
 

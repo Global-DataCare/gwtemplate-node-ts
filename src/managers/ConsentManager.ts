@@ -32,7 +32,7 @@ import {
   buildConsentRulePrimaryDocument,
   deriveConsentRuleBlockchainStatus as deriveConsentAccessBlockchainStatus,
 } from '../utils/consent-access-blockchain';
-import { getJurisdictionGroup } from '../utils/jurisdiction';
+import { ConsentAccessChaincode, resolveClinicalDataChannel } from '../utils/ledger';
 import type { ITenantsManager } from './ITenantsManager';
 
 export interface ConsentManagerDeps {
@@ -223,6 +223,9 @@ function buildConsentBlockchainEntry(
  *
  * This makes every rule independently verifiable and independently updatable on
  * chain even when several rules were derived from one input consent bundle.
+ * The manager derives the governed route from trusted domain context and owns
+ * the canonical contract selection; callers and deployment configuration do
+ * not select either name.
  */
 async function registerConsentAccessRules(params: {
   blockchainAdapter?: IBlockchainAdapter;
@@ -234,8 +237,7 @@ async function registerConsentAccessRules(params: {
   if (!blockchainAdapter?.registerConsentAccessBundle) return;
   if (entries.length === 0) return;
 
-  const channel = resolveConsentAccessChannelName(sector, jurisdiction);
-  const chaincode = process.env.CONSENT_ACCESS_LEDGER_CHAINCODE || 'consentaccess-sc';
+  const channel = resolveClinicalDataChannel(sector, jurisdiction);
   for (const sourceEntry of entries) {
     const entryClaims = ((sourceEntry.resource as Record<string, unknown> | undefined)?.meta as { claims?: Record<string, unknown> } | undefined)?.claims || {};
     const payload = buildConsentRulePrimaryDocument([sourceEntry]);
@@ -252,37 +254,8 @@ async function registerConsentAccessRules(params: {
         assetId,
         payload: { status, data: [ruleEntry] },
         channel,
-        chaincode,
+        chaincode: ConsentAccessChaincode,
       });
     }
   }
-}
-
-/**
- * Maps the request jurisdiction to the Fabric channel suffix used by
- * `consentaccess-sc`.
- *
- * The legal jurisdiction carried by the request can be a country code such as
- * `ES`, while the local or shared Fabric topology is organized by broader
- * jurisdiction groups such as `eu`. Reusing the same mapping helper as the rest
- * of GW CORE keeps consent-access writes aligned with the channels that actually
- * exist in the network.
- */
-function resolveConsentAccessChannelJurisdiction(jurisdiction: string): string {
-  return getJurisdictionGroup(String(jurisdiction || '').trim());
-}
-
-function resolveConsentAccessChannelName(sector: string, jurisdiction: string): string {
-  const explicitChannel = String(
-    process.env.CONSENT_ACCESS_LEDGER_CHANNEL
-    || process.env.HLF_DATA_CHANNEL_NAME
-    || process.env.HLF_CHANNEL_NAME
-    || '',
-  ).trim();
-  if (explicitChannel) return explicitChannel;
-
-  const networkMode = String(process.env.NETWORK_MODE || '').trim().toLowerCase();
-  if (networkMode === 'local-network') return `${sector}-local`;
-
-  return `${sector}-${resolveConsentAccessChannelJurisdiction(jurisdiction)}`;
 }

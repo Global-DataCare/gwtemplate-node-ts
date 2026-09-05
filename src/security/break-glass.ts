@@ -9,7 +9,7 @@ import type { IVaultRepository } from '../database/repositories/vault/vault.repo
 import { getIndividualSectionId } from '../utils/individual-sections';
 import { getTenantVaultId } from '../utils/tenant';
 import { canonicalize } from '../utils/json-canon';
-import { resolveDataChannel } from '../utils/ledger';
+import { resolveClinicalDataChannel } from '../utils/ledger';
 import {
   evaluateBreakGlassPolicy,
   matchesBreakGlassSubjectKind,
@@ -146,7 +146,7 @@ export class BreakGlassService implements BreakGlassAuthorizer {
     const issuedAtDate = this.clock();
     const lifetimeSeconds = Math.max(1, Math.min(decision.maxLifetimeSeconds, input.requestedLifetimeSeconds));
     const issuedAt = issuedAtDate.toISOString();
-    const channel = resolveDataChannel();
+    const channel = resolveClinicalDataChannel(input.routeSector, input.jurisdiction);
     const tenantVaultId = getTenantVaultId(input.routeSector, input.tenantId);
     const consentSectionId = getIndividualSectionId(input.subjectDid, 'emergency_consents');
     const consentStorageId = digest([

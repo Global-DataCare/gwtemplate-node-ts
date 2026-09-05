@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+## [1.24.15] - 2026-09-04
+
+- Make clinical-evidence and consent-access managers derive their governed
+  ledger channel from trusted sector/jurisdiction context and select their
+  canonical smart contract internally. Ignore legacy deployment channel and
+  chaincode overrides, with poisoned-variable contract tests preventing a
+  regression.
+- Remove channel and smart-contract settings from the local demo and Jest
+  profiles. Clarify in skills, JSDoc, test journeys, README and the high-level
+  clinical-author guide that BFFs never select ledger plumbing.
+
 ## [1.24.14] - 2026-09-04
 
 - Define the closed `owner | creator` clinical source-author contract for

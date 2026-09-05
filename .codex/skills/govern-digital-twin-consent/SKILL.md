@@ -172,6 +172,11 @@ Verify current branches, versions and published npm state before release claims.
   keyed by its resource CID in one transaction; never persist `fullUrl` or the
   confidential FHIR resource. Distinguish a local memory receipt from a
   real Fabric transaction id in tests, docs and release evidence.
+- Keep clinical-evidence and consent-access ledger routing inside their GW
+  managers. Derive the governed channel from trusted normalized domain context
+  and select the canonical smart contract in code; never make a request, SDK,
+  BFF or environment variable choose either name. Poison legacy routing
+  variables in contract tests so an accidental override fails visibly.
 - Preserve an imported external `urn:*` author as provenance only. The local
   importer cannot update or delete that record merely by repeating the URN.
 - Authorize the existing version before replacing it: update accepts the exact

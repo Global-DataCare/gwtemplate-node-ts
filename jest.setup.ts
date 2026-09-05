@@ -33,8 +33,6 @@ process.env.NODE_ENV ??= 'test';
 process.env.DB_PROVIDER ??= 'mem';
 process.env.STORAGE_PROVIDER ??= 'mem';
 process.env.QUEUE_PROVIDER ??= 'mem';
-process.env.LEDGER_DATA_CHANNEL_DEFAULT ??= 'health-care-local';
-process.env.FHIR_VERSION_LEDGER_CHAINCODE ??= 'artifact-sc';
 process.env.MAINSECTOR ??= 'health';
 process.env.SUBSECTORSALLOWED ??= 'research,care,index';
 

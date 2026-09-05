@@ -63,9 +63,7 @@ export function shouldUseFabricLedger(
     return provider === 'fabric' || provider === 'multi';
   }
 
-  const ledgerEnabled = String(env.LEDGER_ENABLED || '').trim().toLowerCase() === 'true';
-  const explicitConsentChaincode = String(env.CONSENT_ACCESS_LEDGER_CHAINCODE || '').trim();
-  return ledgerEnabled || explicitConsentChaincode.length > 0;
+  return String(env.LEDGER_ENABLED || '').trim().toLowerCase() === 'true';
 }
 
 export class CredentialLedgerResolver implements ICredentialLedgerAdapter {

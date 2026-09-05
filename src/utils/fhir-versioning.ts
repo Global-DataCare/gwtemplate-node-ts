@@ -6,7 +6,7 @@ import { utf8ToBytes } from '@noble/hashes/utils.js';
 import { encodeMultibase58btc } from 'gdc-common-utils-ts/utils/multibase58';
 import type { LedgerSafeMetaTag } from '../services/ai/metaTagSanitizer';
 import { extractLedgerSafeResearchTags } from './fhir-ingestion';
-import { resolveDataChannel } from './ledger';
+import { ClinicalEvidenceChaincode, resolveClinicalDataChannel } from './ledger';
 
 export type FhirCidVersionMapping = {
   resourceType?: string;
@@ -114,6 +114,11 @@ export function applyFhirCidVersioningToEntry(params: {
   };
 }
 
+/**
+ * Registers canonical resource-version evidence through manager-owned routing.
+ * Sector and jurisdiction are trusted domain context, not caller-selected
+ * channel or smart-contract identifiers.
+ */
 export async function registerFhirCidMappings(params: {
   blockchainAdapter?: {
     registerCidVersionMappings?: (
@@ -126,11 +131,13 @@ export async function registerFhirCidMappings(params: {
   jurisdiction: string;
   mappings: FhirCidVersionMapping[];
 }): Promise<void> {
-  const { blockchainAdapter, mappings } = params;
+  const { blockchainAdapter, sector, jurisdiction, mappings } = params;
   if (!blockchainAdapter?.registerCidVersionMappings) return;
   if (!mappings || mappings.length === 0) return;
 
-  const channel = resolveDataChannel();
-  const chaincode = process.env.FHIR_VERSION_LEDGER_CHAINCODE || 'artifact-sc';
-  await blockchainAdapter.registerCidVersionMappings(mappings, channel, chaincode);
+  await blockchainAdapter.registerCidVersionMappings(
+    mappings,
+    resolveClinicalDataChannel(sector, jurisdiction),
+    ClinicalEvidenceChaincode,
+  );
 }

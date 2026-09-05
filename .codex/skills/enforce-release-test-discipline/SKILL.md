@@ -101,6 +101,11 @@ description: Enforce branch, TDD, canonical FHIR and schema.org vocabulary, fixt
   positive ledger-safe `meta.tag[]` allowlist may cross that boundary. Expose
   the real Fabric transaction id. A memory-adapter
   receipt is local proof only and must never be reported as on-chain evidence.
+- Ledger channel and smart-contract selection is manager-owned policy. Managers
+  derive the channel from trusted normalized domain context and select the
+  canonical contract internally. Never accept either name from a request, BFF,
+  SDK or deployment environment variable. Contract tests must poison legacy
+  channel/chaincode variables and still prove the canonical selection.
 - Keep the GW authenticated-authorship 101, Node BFF clinical-writes 101,
   public JSDoc, test journey comments, snippets, README summaries and the
   repository-local provenance skill mutually linked and synchronized.

@@ -85,12 +85,13 @@ E2E gates before `npm publish` or any container image build.
   signing `kid` remain transport/audit evidence. Same-individual members and
   authorized tenant professionals may create correction versions; delete stays
   exact-author only. Communication-carried resource CIDs are submitted in one
-  sanitized `data[]` batch; the smart contract writes each CID as its own asset
+  sanitized `data[]` batch; the governed evidence service writes each CID as its own asset
   in the same Fabric transaction. `fullUrl` and clinical content never enter
   that ledger payload; optional research tags use a positive code-only
   allowlist, while displays and free text stay in the consented confidential
   projection. The response distinguishes a local receipt from a real
-  Fabric transaction id. See
+  Fabric transaction id. GW resolves the governed ledger route internally; the
+  BFF and deployment configuration never select a channel or smart contract. See
   [Authenticated clinical author](docs/01-OVERVIEW-AND-GUIDES/101-01.N-AUTHENTICATED-CLINICAL-AUTHOR.md)
   and the linked Node BFF guide.
 
