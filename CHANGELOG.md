@@ -38,6 +38,9 @@
 - Include the local CA database volumes in the deterministic devnet reset.
 - Commit the same installed `artifact-sc` package on the local clinical data
   channel as well as the identity channel.
+- Wait until Fabric Service Discovery advertises the committed CCAAS endorser
+  before starting the local GW smoke, eliminating the post-commit discovery
+  race without weakening the real Gateway boundary proof.
 
 ## [1.24.13] - 2026-09-04
 

@@ -292,6 +292,37 @@ function commit_chaincode_definition() {
   fi
 }
 
+function wait_for_gateway_discovery() {
+  local attempts="${GATEWAY_DISCOVERY_ATTEMPTS:-60}"
+  local attempt=1
+  local discovery_output=""
+
+  info "Waiting for Gateway Discovery to advertise ${CHAINCODE_NAME}"
+  while [[ "${attempt}" -le "${attempts}" ]]; do
+    discovery_output="$(
+      exec_tools sh -lc \
+        "discover --userKey=\"\$(find '${HOST1_ADMIN_MSP}/keystore' -type f | head -n 1)\" \
+--userCert='${HOST1_ADMIN_MSP}/signcerts/cert.pem' \
+--MSP='${HOST1_MSP_ID}' \
+--peerTLSCA='${HOST1_PEER_TLS}' \
+endorsers --server=peer0-host1:7051 \
+--channel='${CHANNEL_NAME}' \
+--chaincode='${CHAINCODE_NAME}'" 2>&1
+    )" || true
+
+    if grep -Fq '"Endpoint":' <<<"${discovery_output}"; then
+      info "Gateway Discovery advertises an endorser for ${CHAINCODE_NAME}"
+      return 0
+    fi
+
+    attempt=$((attempt + 1))
+    sleep 1
+  done
+
+  printf '%s\n' "${discovery_output}" >&2
+  fail "Gateway Discovery did not advertise an endorser for ${CHAINCODE_NAME} after ${attempts} attempts"
+}
+
 function print_summary() {
   local package_id="$1"
 
@@ -336,4 +367,5 @@ PACKAGE_ID="$(resolve_package_id)"
 restart_external_service "${PACKAGE_ID}"
 approve_chaincode_definition "${PACKAGE_ID}"
 commit_chaincode_definition
+wait_for_gateway_discovery
 print_summary "${PACKAGE_ID}"

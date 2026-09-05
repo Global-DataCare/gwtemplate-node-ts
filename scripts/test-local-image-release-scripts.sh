@@ -125,6 +125,8 @@ grep -Fq '_root-ca-db"' ./scripts/bootstrap-local-fabric-stack.mjs
 grep -Fq '_ica-db"' ./scripts/bootstrap-local-fabric-stack.mjs
 grep -Fq 'SKIP_CHAINCODE_INSTALL="${SKIP_CHAINCODE_INSTALL:-false}"' ./infra/fabric/local-network/scripts/03-deploy-chaincode.sh
 grep -Fq 'deploy_chaincode "artifact-sc" "${GWTEMPLATE_DIR}/chaincode/artifact-sc-javascript" "${DATA_CHANNEL_NAME}" true' ./infra/fabric/local-network/scripts/05-deploy-identity-chaincodes.sh
+grep -Fq 'discover --userKey=' ./chaincode/scripts/consentaccess-local-devnet.sh
+grep -Fq 'wait_for_gateway_discovery' ./chaincode/scripts/consentaccess-local-devnet.sh
 grep -Fq 'function normalize_enrolled_msp_trust()' ./infra/fabric/local-network/scripts/02-bootstrap-network.sh
 grep -Fq 'function normalize_enrolled_tls_trust()' ./infra/fabric/local-network/scripts/02-bootstrap-network.sh
 grep -Fq 'function wait_for_peer()' ./infra/fabric/local-network/scripts/02-bootstrap-network.sh
