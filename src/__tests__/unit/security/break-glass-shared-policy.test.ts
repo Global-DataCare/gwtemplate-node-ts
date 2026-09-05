@@ -6,7 +6,6 @@ import {
   EXAMPLE_BREAK_GLASS_INCIDENT_ID,
   EXAMPLE_BREAK_GLASS_ISSUED_AT,
   EXAMPLE_BREAK_GLASS_JUSTIFICATION,
-  EXAMPLE_BREAK_GLASS_LEDGER_DATA_CHANNEL,
   EXAMPLE_BREAK_GLASS_NOTIFICATION_ID,
   EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_PROVIDER_ORGANIZATION_URN,
   EXAMPLE_JURISDICTION,
@@ -21,7 +20,7 @@ import { BreakGlassService } from '../../../security/break-glass';
 describe('BreakGlassService shared policy boundary', () => {
   it('uses an injected domain matcher without teaching GW CORE a card identifier format', async () => {
     const previousDataChannel = process.env.LEDGER_DATA_CHANNEL_DEFAULT;
-    process.env.LEDGER_DATA_CHANNEL_DEFAULT = EXAMPLE_BREAK_GLASS_LEDGER_DATA_CHANNEL;
+    process.env.LEDGER_DATA_CHANNEL_DEFAULT = 'must-not-control-manager-routing';
     try {
       const subjectDid = EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_PROVIDER_ORGANIZATION_URN;
       const domainMatcher: BreakGlassSubjectKindMatcher = (candidate, kind) =>

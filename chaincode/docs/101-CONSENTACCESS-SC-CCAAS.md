@@ -414,8 +414,8 @@ For `.env.local-fabric` the canonical rule is:
 
 - disable generic host organization ledger registration:
   - `LEDGER_ENABLED=false`
-- keep consent-access Fabric writes enabled through:
-  - `CONSENT_ACCESS_LEDGER_CHAINCODE=consentaccess-sc`
+- keep the active `local-network` provider mapped to Fabric; the manager owns
+  the consent contract and governed channel selection internally
 - `LEDGER_PROVIDER_MAP=test=mem,local-network=fabric,test-network=fabric,network=fabric`
 
 Why this matters:
@@ -788,11 +788,13 @@ export LEDGER_ENABLED=true
 export LEDGER_PROVIDER_DEFAULT=fabric
 export LEDGER_MSP_ID=Host1MSP
 export LEDGER_FABRIC_MSP_ID=Host1MSP
-export CONSENT_ACCESS_LEDGER_CHAINCODE=consentaccess-sc
-export FHIR_VERSION_LEDGER_CHAINCODE=fhir-versioning
 export HOST_JURISDICTION=au-nsw
 export JURISDICTION=au-nsw
 ```
+
+Do not configure ledger channel or smart-contract names for GW managers. They
+derive the governed route from trusted domain context and select the canonical
+contract internally.
 
 ### 7. Smoke Test
 

@@ -1,14 +1,47 @@
 // TDD contract: write this test red first; make it green only with the complete real behavior.
 /**
- * Flow contract: natural persons route to the global human plane while legal
- * organizations and organization-scoped employee records route to an explicit
- * regional identity plane and fail closed when none is configured.
+ * Flow contract: managers derive governed ledger routes from trusted domain
+ * context; callers and deployment overrides cannot select clinical channels
+ * or contracts. Natural persons and legal organizations retain their distinct
+ * identity planes.
  */
 import {
+  ClinicalEvidenceChaincode,
+  ConsentAccessChaincode,
+  resolveClinicalDataChannel,
   resolveIdentityChannel,
   resolveOrganizationIdentityChannel,
   resolveSubjectIdentityChannel,
 } from '../../../utils/ledger';
+
+describe('manager-owned clinical ledger routing', () => {
+  const originalNetworkMode = process.env.NETWORK_MODE;
+
+  afterEach(() => {
+    if (originalNetworkMode === undefined) delete process.env.NETWORK_MODE;
+    else process.env.NETWORK_MODE = originalNetworkMode;
+  });
+
+  it('maps country jurisdiction to the governed shared region', () => {
+    process.env.NETWORK_MODE = 'test';
+    expect(resolveClinicalDataChannel('health-care', 'ES')).toBe('health-care-eu');
+  });
+
+  it('uses the canonical local topology without a configured channel name', () => {
+    process.env.NETWORK_MODE = 'local-network';
+    expect(resolveClinicalDataChannel('health-care', 'ES')).toBe('health-care-local');
+  });
+
+  it('owns the clinical and consent smart-contract selections', () => {
+    expect(ClinicalEvidenceChaincode).toBe('artifact-sc');
+    expect(ConsentAccessChaincode).toBe('consentaccess-sc');
+  });
+
+  it('fails closed without trusted domain context', () => {
+    expect(() => resolveClinicalDataChannel('', 'ES')).toThrow('Trusted sector and jurisdiction');
+    expect(() => resolveClinicalDataChannel('health-care', '')).toThrow('Trusted sector and jurisdiction');
+  });
+});
 
 describe('resolveIdentityChannel', () => {
   const originalNetworkMode = process.env.NETWORK_MODE;

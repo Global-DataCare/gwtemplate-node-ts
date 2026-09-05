@@ -346,10 +346,9 @@ Recommended GW CORE env:
   LEDGER_PROVIDER_DEFAULT=fabric
   LEDGER_MSP_ID=${HOST1_MSP_ID}
   LEDGER_FABRIC_MSP_ID=${HOST1_MSP_ID}
-  CONSENT_ACCESS_LEDGER_CHAINCODE=${CHAINCODE_NAME}
 
 Remember:
-  ConsentManager writes to channel "\${sector}-\${jurisdiction}".
+  ConsentManager resolves its governed channel and canonical contract internally.
   Your consent smoke test must use sector/jurisdiction that resolve to ${CHANNEL_NAME}.
   If you rerun this script after changing chaincode packaging inputs, a new
   package id is expected. That is normal for CCAAS lifecycle installs.

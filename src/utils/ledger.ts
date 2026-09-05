@@ -7,11 +7,27 @@ import {
 } from '../blockchain/fabric/v3/ledger-channel-name';
 import { getJurisdictionGroup } from './jurisdiction';
 
-/** Resolves the configured clinical/data ledger channel without inventing one from route labels. */
-export function resolveDataChannel(): string {
-  const channel = String(process.env.LEDGER_DATA_CHANNEL_DEFAULT || '').trim();
-  if (!channel) throw new Error('LEDGER_DATA_CHANNEL_DEFAULT is required for ledger data writes.');
-  return channel;
+/** Canonical manager-owned contract for one-transaction clinical evidence batches. */
+export const ClinicalEvidenceChaincode = 'artifact-sc';
+/** Canonical manager-owned contract for independently governed consent rules. */
+export const ConsentAccessChaincode = 'consentaccess-sc';
+
+/**
+ * Resolves the governed clinical channel from trusted job context.
+ *
+ * Manager code must call this resolver and the canonical chaincode constants.
+ * The authenticated job supplies governed domain context, never a channel or
+ * contract name; deployment environment variables cannot override either.
+ */
+export function resolveClinicalDataChannel(sector?: string, jurisdiction?: string): string {
+  const normalizedSector = String(sector || '').trim();
+  const normalizedJurisdiction = String(jurisdiction || '').trim();
+  if (!normalizedSector || !normalizedJurisdiction) {
+    throw new Error('Trusted sector and jurisdiction context is required for clinical ledger routing.');
+  }
+  const networkMode = String(process.env.NETWORK_MODE || '').trim().toLowerCase();
+  if (networkMode === 'local-network') return `${normalizedSector}-local`;
+  return `${normalizedSector}-${getJurisdictionGroup(normalizedJurisdiction)}`;
 }
 
 export function resolveIdentityChannel(jurisdiction?: string): string {

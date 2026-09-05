@@ -46,6 +46,7 @@ import {
   fhirResourceToCid,
   type FhirCidVersionMapping,
 } from '../utils/fhir-versioning';
+import { ClinicalEvidenceChaincode, resolveClinicalDataChannel } from '../utils/ledger';
 import { canonicalizeFhirClaims, getClaimValue, normalizeContextualizedClaims } from '../utils/claims';
 import { persistConsentRuleAndAttachment } from '../utils/consent-storage';
 import { SUBJECT_SECTION_DIGITAL_TWIN, SUBJECT_SECTION_INDIVIDUAL } from '../constants/domain';
@@ -1229,6 +1230,11 @@ export class CommunicationManager implements IJobProcessor {
     return { responses: batchResponses, ...(receipt ? { receipt } : {}) };
   }
 
+  /**
+   * Anchors one sanitized evidence batch using manager-owned ledger routing.
+   * The authenticated job contributes trusted domain context only; neither it
+   * nor deployment configuration can select a channel or smart contract.
+   */
   private async registerClinicalEvidenceBundle(
     job: JobRequest,
     evidence: FhirCidVersionMapping[],
@@ -1236,8 +1242,8 @@ export class CommunicationManager implements IJobProcessor {
     if (evidence.length === 0 || !this.blockchainAdapter?.registerCidVersionMappings) return undefined;
     const submitted = await this.blockchainAdapter.registerCidVersionMappings(
       evidence,
-      `${job.sector}-${String(job.jurisdiction || '').trim().toLowerCase()}`,
-      process.env.FHIR_VERSION_LEDGER_CHAINCODE || 'artifact-sc',
+      resolveClinicalDataChannel(job.sector, job.jurisdiction),
+      ClinicalEvidenceChaincode,
     );
     if (submitted.accepted !== evidence.length) {
       throw new Error(`Clinical evidence anchoring accepted ${submitted.accepted}/${evidence.length} resources.`);

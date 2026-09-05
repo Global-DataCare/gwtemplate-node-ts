@@ -286,9 +286,15 @@ describe('ConsentManager', () => {
     });
   });
 
-  it('uses only the dedicated override for the consent-access channel', async () => {
+  it('ignores deployment overrides and resolves the governed consent route internally', async () => {
     const previousConsentChannel = process.env.CONSENT_ACCESS_LEDGER_CHANNEL;
-    process.env.CONSENT_ACCESS_LEDGER_CHANNEL = 'consent-access-local';
+    const previousDataChannel = process.env.HLF_DATA_CHANNEL_NAME;
+    const previousChaincode = process.env.CONSENT_ACCESS_LEDGER_CHAINCODE;
+    const previousNetworkMode = process.env.NETWORK_MODE;
+    process.env.CONSENT_ACCESS_LEDGER_CHANNEL = 'must-not-control-manager-routing';
+    process.env.HLF_DATA_CHANNEL_NAME = 'must-not-control-manager-routing';
+    process.env.CONSENT_ACCESS_LEDGER_CHAINCODE = 'must-not-control-manager-routing';
+    process.env.NETWORK_MODE = 'test';
     mockVaultRepository.vaultExists.mockResolvedValue(true);
     mockVaultRepository.put.mockResolvedValue(true);
     mockBlockchainAdapter.registerConsentAccessBundle = jest.fn().mockResolvedValue({ accepted: 1 });
@@ -296,11 +302,20 @@ describe('ConsentManager', () => {
     try {
       await consentManager.process(mockJobRequest);
       expect(mockBlockchainAdapter.registerConsentAccessBundle).toHaveBeenCalledWith(
-        expect.objectContaining({ channel: 'consent-access-local' }),
+        expect.objectContaining({
+          channel: `${mockSector}-${getJurisdictionGroup(mockJurisdiction)}`,
+          chaincode: 'consentaccess-sc',
+        }),
       );
     } finally {
       if (previousConsentChannel === undefined) delete process.env.CONSENT_ACCESS_LEDGER_CHANNEL;
       else process.env.CONSENT_ACCESS_LEDGER_CHANNEL = previousConsentChannel;
+      if (previousDataChannel === undefined) delete process.env.HLF_DATA_CHANNEL_NAME;
+      else process.env.HLF_DATA_CHANNEL_NAME = previousDataChannel;
+      if (previousChaincode === undefined) delete process.env.CONSENT_ACCESS_LEDGER_CHAINCODE;
+      else process.env.CONSENT_ACCESS_LEDGER_CHAINCODE = previousChaincode;
+      if (previousNetworkMode === undefined) delete process.env.NETWORK_MODE;
+      else process.env.NETWORK_MODE = previousNetworkMode;
     }
   });
 

@@ -204,57 +204,72 @@ describe('CommunicationManager Unit Tests', () => {
     }
 
     it('anchors one evidence array for every successful resource version and returns its transaction id', async () => {
+      const previousDataChannel = process.env.LEDGER_DATA_CHANNEL_DEFAULT;
+      const previousChaincode = process.env.FHIR_VERSION_LEDGER_CHAINCODE;
+      const previousNetworkMode = process.env.NETWORK_MODE;
+      process.env.LEDGER_DATA_CHANNEL_DEFAULT = 'must-not-control-manager-routing';
+      process.env.FHIR_VERSION_LEDGER_CHAINCODE = 'must-not-control-manager-routing';
+      process.env.NETWORK_MODE = 'test';
       mockTenantsCacheManager.getTenantDid.mockResolvedValue(testServerDid as any);
       const resourceIds = [EXAMPLE_OBSERVATION_IDENTIFIER, EXAMPLE_OBSERVATION_PANEL_IDENTIFIER]
         .map((identifier) => identifier.split(':').at(-1)!);
-      const response = await communicationManager.process(buildClinicalBatchJob(resourceIds.map((id) => ({
-        type: GatewayRequestEntryTypes.ObservationCreate,
-        request: { method: HttpRequestMethods.Post, url: ResourceTypesFhirR4.Observation },
-        resource: {
-          resourceType: ResourceTypesFhirR4.Observation,
-          id,
-          subject: { reference: subjectDid },
-          status: ObservationStatuses.Final,
-          ...(id === resourceIds[0] ? {
-            meta: {
-              tag: [{
-                id: 'Observation[0].code',
-                system: 'http://loinc.org',
-                code: '85354-9',
-                display: 'must stay confidential',
-              }],
-            },
-          } : {}),
-        },
-      }))));
-
-      expect(mockBlockchainAdapter.registerCidVersionMappings).toHaveBeenCalledTimes(1);
-      expect(mockBlockchainAdapter.registerCidVersionMappings).toHaveBeenCalledWith(
-        expect.arrayContaining(resourceIds.map((resourceId) => expect.objectContaining({
-          resourceType: ResourceTypesFhirR4.Observation,
-          resourceId,
-          cid: expect.any(String),
-          versionId: expect.any(String),
-        }))),
-        expect.any(String),
-        'artifact-sc',
-      );
-      const submittedMappings = mockBlockchainAdapter.registerCidVersionMappings.mock.calls[0][0];
-      expect(submittedMappings.find((mapping) => mapping.resourceId === resourceIds[0])?.tags).toEqual([
-        { id: 'Observation[0].code', system: 'http://loinc.org', code: '85354-9' },
-      ]);
-      expect((response.body as any).data).toEqual(expect.arrayContaining(resourceIds.map((resourceId) =>
-        expect.objectContaining({
-          id: resourceId,
-          resource: expect.objectContaining({
-            meta: expect.objectContaining({
-              evidence: [expect.objectContaining({
-                artifactId: expect.any(String),
-                transactionId: ledgerTransactionId,
-              })],
-            }),
-          }),
+      try {
+        const response = await communicationManager.process(buildClinicalBatchJob(resourceIds.map((id) => ({
+          type: GatewayRequestEntryTypes.ObservationCreate,
+          request: { method: HttpRequestMethods.Post, url: ResourceTypesFhirR4.Observation },
+          resource: {
+            resourceType: ResourceTypesFhirR4.Observation,
+            id,
+            subject: { reference: subjectDid },
+            status: ObservationStatuses.Final,
+            ...(id === resourceIds[0] ? {
+              meta: {
+                tag: [{
+                  id: 'Observation[0].code',
+                  system: 'http://loinc.org',
+                  code: '85354-9',
+                  display: 'must stay confidential',
+                }],
+              },
+            } : {}),
+          },
         }))));
+
+        expect(mockBlockchainAdapter.registerCidVersionMappings).toHaveBeenCalledTimes(1);
+        expect(mockBlockchainAdapter.registerCidVersionMappings).toHaveBeenCalledWith(
+          expect.arrayContaining(resourceIds.map((resourceId) => expect.objectContaining({
+            resourceType: ResourceTypesFhirR4.Observation,
+            resourceId,
+            cid: expect.any(String),
+            versionId: expect.any(String),
+          }))),
+          'animal-care-global',
+          'artifact-sc',
+        );
+        const submittedMappings = mockBlockchainAdapter.registerCidVersionMappings.mock.calls[0][0];
+        expect(submittedMappings.find((mapping) => mapping.resourceId === resourceIds[0])?.tags).toEqual([
+          { id: 'Observation[0].code', system: 'http://loinc.org', code: '85354-9' },
+        ]);
+        expect((response.body as any).data).toEqual(expect.arrayContaining(resourceIds.map((resourceId) =>
+          expect.objectContaining({
+            id: resourceId,
+            resource: expect.objectContaining({
+              meta: expect.objectContaining({
+                evidence: [expect.objectContaining({
+                  artifactId: expect.any(String),
+                  transactionId: ledgerTransactionId,
+                })],
+              }),
+            }),
+          }))));
+      } finally {
+        if (previousDataChannel === undefined) delete process.env.LEDGER_DATA_CHANNEL_DEFAULT;
+        else process.env.LEDGER_DATA_CHANNEL_DEFAULT = previousDataChannel;
+        if (previousChaincode === undefined) delete process.env.FHIR_VERSION_LEDGER_CHAINCODE;
+        else process.env.FHIR_VERSION_LEDGER_CHAINCODE = previousChaincode;
+        if (previousNetworkMode === undefined) delete process.env.NETWORK_MODE;
+        else process.env.NETWORK_MODE = previousNetworkMode;
+      }
     });
 
     it('lets the authenticated creator delete the mistaken record without a version condition', async () => {

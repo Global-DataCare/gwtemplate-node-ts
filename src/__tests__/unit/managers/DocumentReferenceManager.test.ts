@@ -14,7 +14,9 @@ import { getIndividualSectionId } from '../../../utils/individual-sections';
 
 describe('DocumentReferenceManager', () => {
   const previousDataChannel = process.env.LEDGER_DATA_CHANNEL_DEFAULT;
-  const clinicalDataChannel = 'health-care-local';
+  const previousVersionChaincode = process.env.FHIR_VERSION_LEDGER_CHAINCODE;
+  const previousNetworkMode = process.env.NETWORK_MODE;
+  const clinicalDataChannel = 'health-care-eu';
   const mockVaultRepository = {
     vaultExists: jest.fn(),
     put: jest.fn(),
@@ -28,7 +30,9 @@ describe('DocumentReferenceManager', () => {
   const manager = new DocumentReferenceManager(mockVaultRepository, mockBlockchainAdapter);
 
   beforeEach(() => {
-    process.env.LEDGER_DATA_CHANNEL_DEFAULT = clinicalDataChannel;
+    process.env.LEDGER_DATA_CHANNEL_DEFAULT = 'must-not-control-manager-routing';
+    process.env.FHIR_VERSION_LEDGER_CHAINCODE = 'must-not-control-manager-routing';
+    process.env.NETWORK_MODE = 'test';
     jest.clearAllMocks();
     mockVaultRepository.vaultExists.mockResolvedValue(true as any);
     mockVaultRepository.put.mockResolvedValue(true as any);
@@ -37,6 +41,10 @@ describe('DocumentReferenceManager', () => {
   afterAll(() => {
     if (previousDataChannel === undefined) delete process.env.LEDGER_DATA_CHANNEL_DEFAULT;
     else process.env.LEDGER_DATA_CHANNEL_DEFAULT = previousDataChannel;
+    if (previousVersionChaincode === undefined) delete process.env.FHIR_VERSION_LEDGER_CHAINCODE;
+    else process.env.FHIR_VERSION_LEDGER_CHAINCODE = previousVersionChaincode;
+    if (previousNetworkMode === undefined) delete process.env.NETWORK_MODE;
+    else process.env.NETWORK_MODE = previousNetworkMode;
   });
 
   const createJob = (claims: Record<string, any>): JobRequest => ({
