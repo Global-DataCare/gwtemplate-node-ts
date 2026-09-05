@@ -31,6 +31,16 @@ import {
   getDigitalTwinSubjectAliasSectionId,
 } from '../../utils/digital-twin-research-projection';
 import { applyDigitalTwinSecondaryUseDecision } from '../../utils/digital-twin-secondary-use';
+import {
+  CompositionAttesterModes,
+  CompositionClaim,
+  ConfidentialDocumentIndex,
+} from 'gdc-common-utils-ts';
+import {
+  EXAMPLE_IPS_COMPOSITION_IDENTIFIER,
+  EXAMPLE_KYC_CONTROLLER_USER_UUID,
+  EXAMPLE_KYC_CONTROLLER_UUID,
+} from 'gdc-common-utils-ts/examples/shared';
 
 describe('MedicationStatement API (integration)', () => {
   afterEach(() => {
@@ -104,6 +114,7 @@ describe('MedicationStatement API (integration)', () => {
                 resourceType: ResourceTypesFhirR4.Composition,
                 id: `ips-composition-${suffix}`,
                 status: 'final',
+                identifier: { value: EXAMPLE_IPS_COMPOSITION_IDENTIFIER },
                 date: sent,
                 text: {
                   status: 'generated',
@@ -118,6 +129,16 @@ describe('MedicationStatement API (integration)', () => {
                 },
                 subject: { reference: subjectDid },
                 author: [{ reference: demoCommunicationMedicationIpsDefaults.externalAuthorUrn }],
+                attester: [
+                  {
+                    mode: CompositionAttesterModes.Professional,
+                    party: { reference: `urn:uuid:${EXAMPLE_KYC_CONTROLLER_UUID}` },
+                  },
+                  {
+                    mode: CompositionAttesterModes.Official,
+                    party: { reference: `urn:uuid:${EXAMPLE_KYC_CONTROLLER_USER_UUID}` },
+                  },
+                ],
                 section: [
                   {
                     code: {
@@ -333,6 +354,20 @@ describe('MedicationStatement API (integration)', () => {
         allergies: 1,
         observations: 1,
       });
+      const [firstMedication] = await vaultRepository.getContainersInSection(
+        tenantVaultId,
+        canonicalSectionIds.medications,
+      );
+      expect(firstMedication[CompositionClaim.Identifier]).toBe(EXAMPLE_IPS_COMPOSITION_IDENTIFIER);
+      expect(firstMedication[CompositionClaim.Attester]).toBe([
+        `urn:uuid:${EXAMPLE_KYC_CONTROLLER_UUID}`,
+        `urn:uuid:${EXAMPLE_KYC_CONTROLLER_USER_UUID}`,
+      ].join(','));
+      expect(firstMedication.indexed.attributes).toEqual(expect.arrayContaining([
+        expect.objectContaining({ name: ConfidentialDocumentIndex.Sector, value: 'health-care' }),
+        expect.objectContaining({ name: CompositionClaim.Attester, value: `urn:uuid:${EXAMPLE_KYC_CONTROLLER_UUID}` }),
+        expect.objectContaining({ name: CompositionClaim.Attester, value: `urn:uuid:${EXAMPLE_KYC_CONTROLLER_USER_UUID}` }),
+      ]));
 
       const allSectionsAfterFirst = await vaultRepository.getAllSections(tenantVaultId);
       const knownSubjectScopedSections = new Set(Object.values(canonicalSectionIds));

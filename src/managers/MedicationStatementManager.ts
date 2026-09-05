@@ -22,6 +22,7 @@ import { isDigitalTwinSecondaryUseEnabled } from '../utils/digital-twin-secondar
 import { buildSearchResponseEntries } from '../utils/didcomm-response';
 import { GatewayResponseEntryTypes } from '../shared/gateway-response-types';
 import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
+import { buildConfidentialDocumentIndexedAttributes } from 'gdc-common-utils-ts/utils/confidential-document-provenance';
 
 type FhirBundleEntryLike = {
   type?: string;
@@ -69,25 +70,6 @@ export class MedicationStatementManager implements IJobProcessor {
       return this.tenantsCacheManager.tenantExists(tenantVaultId);
     }
     return this.vaultRepository.vaultExists(tenantVaultId);
-  }
-
-  private buildIndexedAttributesFromClaims(
-    claims: Record<string, any>,
-  ): Array<{ name: string; value: string; unique?: boolean }> {
-    const attributes: Array<{ name: string; value: string; unique?: boolean }> = [];
-    for (const [key, value] of Object.entries(claims)) {
-      if (key === '@context' || key === '@type' || value === undefined || value === null || Array.isArray(value)) {
-        continue;
-      }
-      const normalized = String(value).trim();
-      if (!normalized) continue;
-      attributes.push({
-        name: key,
-        value: normalized,
-        unique: key.endsWith('.identifier') || key.endsWith('.identifier.value'),
-      });
-    }
-    return attributes;
   }
 
   private async searchDigitalTwinMedications(
@@ -189,7 +171,10 @@ export class MedicationStatementManager implements IJobProcessor {
             getClaimValue<string>(claims, 'MedicationStatement.identifier') ||
             getClaimValue<string>(claims, 'MedicationStatement.identifier.value');
           const id = String(entry?.resource?.id || determineResourceId(identifierClaim, process.env.NODE_ENV));
-          const indexedAttributes = this.buildIndexedAttributesFromClaims(claims);
+          const indexedAttributes = buildConfidentialDocumentIndexedAttributes({
+            claims,
+            sector: job.sector,
+          });
           const record = {
             id,
             ...claims,
@@ -224,7 +209,12 @@ export class MedicationStatementManager implements IJobProcessor {
             await this.vaultRepository.put(tenantVaultId, [{
               id: researchId,
               ...researchClaims,
-              indexed: { attributes: this.buildIndexedAttributesFromClaims(researchClaims) },
+              indexed: {
+                attributes: buildConfidentialDocumentIndexedAttributes({
+                  claims: researchClaims,
+                  sector: job.sector,
+                }),
+              },
             } as any], digitalTwinSectionId);
           }
 

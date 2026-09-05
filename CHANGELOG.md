@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+## [1.24.12] - 2026-09-04
+
+- Project document-level Composition identifier, author, attester, custodian,
+  date, type and title claims into every confidential clinical resource.
+- Index sector, repeated multi-value provenance attributes, submitter DID and
+  verified signing key while retaining source author identity separately.
+- Keep resource content versions stable when only document-container metadata
+  changes, while preserving author and clinical-section replacement semantics.
+- Consume `gdc-common-utils-ts@2.8.6` for the canonical confidential-document
+  provenance index builder.
+
 ## [1.24.11] - 2026-09-04
 
 - Preserve delegated clinical submitters as audit-only provenance: an

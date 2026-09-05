@@ -26,6 +26,8 @@ import {
 } from 'gdc-common-utils-ts/utils/communication-participant-search';
 import { SearchBundleTypes } from 'gdc-common-utils-ts/utils/fhir-search';
 import { normalizeClaimsFromFhirResource } from 'gdc-common-utils-ts/utils/interoperable-resource-operation';
+import { compositionFhirR4ToFlat } from 'gdc-common-utils-ts/convert/convert-composition';
+import { buildConfidentialDocumentIndexedAttributes } from 'gdc-common-utils-ts/utils/confidential-document-provenance';
 import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
 import { BundleJsonApi, BundleEntryResponse, ErrorEntry } from 'gdc-common-utils-ts/models/bundle';
 import { determineResourceId } from '../utils/resource';
@@ -1066,6 +1068,12 @@ export class CommunicationManager implements IJobProcessor {
       const attachment = resolved.documentAttachment;
       const parsedAttachment = this.parseAttachmentJson(attachment);
       const documentProvenance = resolveClinicalDocumentAuthorOrganization(parsedAttachment);
+      const compositionResource = this.asDocumentBundle(parsedAttachment)?.entry
+        ?.map((bundleEntry: any) => bundleEntry?.resource)
+        .find((resource: any) => resource?.resourceType === ResourceTypesFhirR4.Composition);
+      const documentClaims = compositionResource
+        ? compositionFhirR4ToFlat(compositionResource)
+        : undefined;
       const attachedBundleType = String(parsedAttachment?.type || '').toLowerCase();
       if (
         parsedAttachment?.resourceType === ResourceTypesFhirR4.Bundle
@@ -1114,6 +1122,7 @@ export class CommunicationManager implements IJobProcessor {
           tenantVaultId,
           creatorDid: clinicalAuthorDid,
           documentProvenance,
+          documentClaims,
         });
       }
     }
@@ -1375,6 +1384,7 @@ export class CommunicationManager implements IJobProcessor {
     tenantVaultId: string;
     creatorDid?: string;
     documentProvenance?: ClinicalDocumentAuthorOrganization;
+    documentClaims?: Record<string, unknown>;
   }): Promise<{ recordId: string; versionId: string; created: boolean }> {
     // A source-authored URN is import provenance, not the importing BFF's
     // identity. Local author DIDs must equal the authenticated actor.
@@ -1413,6 +1423,7 @@ export class CommunicationManager implements IJobProcessor {
       input.communicationSubject,
       input.fhirResource,
       input.creatorDid,
+      input.documentClaims,
     );
     if (input.explicitSection && !getClaimValue<string>(claims, CompositionClaim.Section)) {
       claims[CompositionClaim.Section] = input.explicitSection;
@@ -1427,7 +1438,7 @@ export class CommunicationManager implements IJobProcessor {
 
     const identifier = this.getFirstClaimValue(claims, config.identifierClaimKeys) || `urn:uuid:${uuidv4()}`;
     const fallbackId = determineResourceId(identifier, process.env.NODE_ENV);
-    const versionId = claimsToContentCid(claims).cid;
+    const versionId = claimsToContentCid(this.clinicalContentVersionClaims(claims)).cid;
     applyFhirCidVersioningToEntry({
       entry: { resource: input.resource },
       claims,
@@ -1501,20 +1512,29 @@ export class CommunicationManager implements IJobProcessor {
       return { recordId, versionId, created: true };
     }
 
+    const signingKeyId = clinicalCreatorEvidence(input.job).keyId;
+    const audit = input.creatorDid ? {
+      creatorDid: input.creatorDid,
+      ...(input.documentProvenance ? {
+        authorOwnerIdentifier: input.documentProvenance.organizationReference,
+        documentDate: input.documentProvenance.documentDate,
+      } : {}),
+      ...(authenticatedActorDid && input.creatorDid !== authenticatedActorDid
+        ? { submitterDid: existing?.audit?.submitterDid || authenticatedActorDid }
+        : {}),
+      ...(signingKeyId ? { signingKeyId } : {}),
+    } : undefined;
     const record: Record<string, any> = {
       id: recordId,
       ...claims,
-      ...(input.creatorDid ? { audit: {
-        creatorDid: input.creatorDid,
-        ...(input.documentProvenance ? {
-          authorOwnerIdentifier: input.documentProvenance.organizationReference,
-          documentDate: input.documentProvenance.documentDate,
-        } : {}),
-        ...(!isExternalAuthorUrn && authenticatedActorDid && input.creatorDid !== authenticatedActorDid
-          ? { submitterDid: existing?.audit?.submitterDid || authenticatedActorDid }
-          : {}),
-      } } : {}),
-      indexed: { attributes: this.buildIndexedAttributesFromClaims(claims) },
+      ...(audit ? { audit } : {}),
+      indexed: {
+        attributes: buildConfidentialDocumentIndexedAttributes({
+          claims,
+          sector: String(input.job.sector || ''),
+          audit,
+        }),
+      },
     };
     await this.vaultRepository.put(input.tenantVaultId, [record as any], sectionId);
     if (
@@ -1535,7 +1555,7 @@ export class CommunicationManager implements IJobProcessor {
         resourceType: input.resourceType,
         twinSubjectId,
       });
-      const researchVersionId = claimsToContentCid(researchClaims).cid;
+      const researchVersionId = claimsToContentCid(this.clinicalContentVersionClaims(researchClaims)).cid;
       researchClaims[`${input.resourceType}.meta.versionId`] = researchVersionId;
       researchClaims[`org.hl7.fhir.r4.${input.resourceType}.meta.versionId`] = researchVersionId;
       const researchRecordId = String(
@@ -1548,11 +1568,23 @@ export class CommunicationManager implements IJobProcessor {
         SUBJECT_SECTION_DIGITAL_TWIN,
         config.collectionId,
       );
+      const researchAudit = input.creatorDid ? {
+        creatorDid: input.creatorDid,
+        sourceRecordId: recordId,
+        ...(audit?.submitterDid ? { submitterDid: audit.submitterDid } : {}),
+        ...(audit?.signingKeyId ? { signingKeyId: audit.signingKeyId } : {}),
+      } : undefined;
       await this.vaultRepository.put(input.tenantVaultId, [{
         id: researchRecordId,
         ...researchClaims,
-        ...(input.creatorDid ? { audit: { creatorDid: input.creatorDid, sourceRecordId: recordId } } : {}),
-        indexed: { attributes: this.buildIndexedAttributesFromClaims(researchClaims) },
+        ...(researchAudit ? { audit: researchAudit } : {}),
+        indexed: {
+          attributes: buildConfidentialDocumentIndexedAttributes({
+            claims: researchClaims,
+            sector: String(input.job.sector || ''),
+            audit: researchAudit,
+          }),
+        },
       } as any], digitalTwinSectionId);
     }
     return { recordId, versionId, created: true };
@@ -1747,6 +1779,7 @@ export class CommunicationManager implements IJobProcessor {
     communicationSubject: string | undefined,
     fhirResource: FhirCommunication,
     authorDid?: string,
+    documentClaims?: Record<string, unknown>,
   ): Record<string, any> {
     const baseClaims = normalizeContextualizedClaims(
       normalizeClaimsFromFhirResource(resource as any, {
@@ -1755,6 +1788,22 @@ export class CommunicationManager implements IJobProcessor {
     );
     baseClaims['@context'] = baseClaims['@context'] || 'org.hl7.fhir.api';
     if (authorDid) baseClaims[CompositionClaim.Author] = authorDid;
+    for (const claimName of [
+      CompositionClaim.Identifier,
+      CompositionClaim.Author,
+      CompositionClaim.Attester,
+      CompositionClaim.AttesterMode,
+      CompositionClaim.AttesterTime,
+      CompositionClaim.Custodian,
+      CompositionClaim.Date,
+      CompositionClaim.Type,
+      CompositionClaim.Title,
+    ]) {
+      const value = documentClaims?.[claimName];
+      if (value !== undefined && value !== null && String(value).trim()) {
+        baseClaims[claimName] = value;
+      }
+    }
 
     const resourceSubjectRef = String(
       resource?.subject?.reference
@@ -1807,7 +1856,25 @@ export class CommunicationManager implements IJobProcessor {
     }
 
     const normalizedClaims = normalizeContextualizedClaims(baseClaims);
-    if (authorDid) normalizedClaims[CompositionClaim.Author] = authorDid;
+    for (const claimName of [
+      CompositionClaim.Identifier,
+      CompositionClaim.Author,
+      CompositionClaim.Attester,
+      CompositionClaim.AttesterMode,
+      CompositionClaim.AttesterTime,
+      CompositionClaim.Custodian,
+      CompositionClaim.Date,
+      CompositionClaim.Type,
+      CompositionClaim.Title,
+    ]) {
+      const value = documentClaims?.[claimName];
+      if (value !== undefined && value !== null && String(value).trim()) {
+        normalizedClaims[claimName] = value;
+      }
+    }
+    if (authorDid && !normalizedClaims[CompositionClaim.Author]) {
+      normalizedClaims[CompositionClaim.Author] = authorDid;
+    }
     return normalizedClaims;
   }
 
@@ -1828,6 +1895,21 @@ export class CommunicationManager implements IJobProcessor {
       });
     }
     return attributes;
+  }
+
+  private clinicalContentVersionClaims(claims: Record<string, any>): Record<string, any> {
+    const documentOnlyClaims = [
+      CompositionClaim.Identifier,
+      CompositionClaim.Attester,
+      CompositionClaim.AttesterMode,
+      CompositionClaim.AttesterTime,
+      CompositionClaim.Custodian,
+      CompositionClaim.Date,
+      CompositionClaim.Type,
+      CompositionClaim.Title,
+    ];
+    return Object.fromEntries(Object.entries(claims).filter(([name]) =>
+      !documentOnlyClaims.some((claimName) => name === claimName || name.endsWith(`.${claimName}`))));
   }
 
   private extractSearchBody(job: JobRequest): Record<string, unknown> {

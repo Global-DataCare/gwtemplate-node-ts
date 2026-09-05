@@ -5,12 +5,11 @@ import type {
   IpsOrFhirImportInput,
   RouteContext,
   SubmitAndPollResult,
-  ServerProfileRecord,
   ClinicalCreatorIpsExport,
+  ServerProfileSessionManager,
 } from 'gdc-sdk-node-ts';
 import {
   cloneImportedClinicalDocumentForDemo,
-  exportServerProfileClinicalCreatorIps,
 } from 'gdc-sdk-node-ts';
 
 /** Implemented by the individual-controller, individual-member and professional facades. */
@@ -63,9 +62,11 @@ export function updateEditableImportedIpsForDemo(
   });
 }
 
-/** Export the stable FHIR author without exposing login or device aliases. */
+/** Export canonical FHIR author and attester without exposing the protected profile. */
 export function exportClinicalCreator(
-  profile: ServerProfileRecord,
-): ClinicalCreatorIpsExport {
-  return exportServerProfileClinicalCreatorIps(profile);
+  profileManager: ServerProfileSessionManager,
+  ownerId: string,
+  profileId: string,
+): Promise<ClinicalCreatorIpsExport> {
+  return profileManager.exportClinicalCreatorIps({ ownerId, profileId });
 }
