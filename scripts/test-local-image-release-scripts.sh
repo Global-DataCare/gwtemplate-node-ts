@@ -113,6 +113,7 @@ grep -Fq 'ca-tls-bundle.pem' ./infra/fabric/local-network/scripts/00-copy-dev-ca
 grep -Fq 'ca-tls-bundle.pem' ./infra/fabric/local-network/scripts/00-copy-dataspace-ca.sh
 grep -Fq 'FABRIC_CA_SERVER_CA_CHAINFILE=/etc/hyperledger/fabric-ca-server/ca-tls-bundle.pem' \
   ./infra/fabric/local-network/docker-compose.yml
+test "$(grep -Fc 'user: "${LOCAL_FABRIC_CA_USER:-0:0}"' ./infra/fabric/local-network/docker-compose.yml)" -eq 2
 grep -Fq 'function normalize_enrolled_msp_trust()' ./infra/fabric/local-network/scripts/02-bootstrap-network.sh
 grep -Fq 'function normalize_enrolled_tls_trust()' ./infra/fabric/local-network/scripts/02-bootstrap-network.sh
 grep -Fq 'function wait_for_peer()' ./infra/fabric/local-network/scripts/02-bootstrap-network.sh

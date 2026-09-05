@@ -29,6 +29,8 @@
 - Cross-link the GW and Node BFF 101 guides and synchronize snippets, README,
   test journey comments and repository skills.
 - Consume `gdc-common-utils-ts@2.8.7` for the same provenance contract.
+- Run the two local-only Fabric CA containers with an explicit configurable
+  user so they can create their SQLite databases in the generated bind mounts.
 
 ## [1.24.13] - 2026-09-04
 

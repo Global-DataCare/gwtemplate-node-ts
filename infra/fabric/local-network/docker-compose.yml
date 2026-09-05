@@ -17,6 +17,7 @@ services:
   # ---------------------------------------------------------------------------
   root-ca:
     image: hyperledger/fabric-ca:${FABRIC_CA_IMAGE_TAG:-latest}
+    user: "${LOCAL_FABRIC_CA_USER:-0:0}"
     container_name: ${GDC_CONTAINER_PREFIX:-gdc}-root-ca
     networks: [devnet]
     ports:
@@ -36,6 +37,7 @@ services:
 
   ica:
     image: hyperledger/fabric-ca:${FABRIC_CA_IMAGE_TAG:-latest}
+    user: "${LOCAL_FABRIC_CA_USER:-0:0}"
     container_name: ${GDC_CONTAINER_PREFIX:-gdc}-ica
     networks: [devnet]
     ports:
