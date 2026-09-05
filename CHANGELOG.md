@@ -41,6 +41,9 @@
 - Wait until Fabric Service Discovery advertises the committed CCAAS endorser
   before starting the local GW smoke, eliminating the post-commit discovery
   race without weakening the real Gateway boundary proof.
+- Let Fabric Gateway derive transaction endorsers from the committed chaincode
+  policy; do not force the caller MSP as a client-side override, which can
+  exclude an otherwise valid external-service chaincode endorser.
 
 ## [1.24.13] - 2026-09-04
 

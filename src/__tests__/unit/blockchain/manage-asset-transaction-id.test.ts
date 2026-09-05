@@ -1,8 +1,9 @@
 // Flow contract: 1) the gateway creates one proposal for the requested batch;
 // 2) the endorsed Fabric transaction exposes its id before submit; 3) GW returns
 // that exact id with the decoded chaincode result. Authorization invariant: the
-// caller MSP remains the sole endorsing organization. Persistence invariant:
-// exposing the receipt must not cause a second submit.
+// Gateway derives the endorsers from the committed chaincode policy instead of
+// a client-side organization override. Persistence invariant: exposing the
+// receipt must not cause a second submit.
 import { describe, expect, jest, test } from '@jest/globals';
 import { ManageAsset } from '../../../blockchain/fabric/v3/manageAsset';
 import {
@@ -35,7 +36,6 @@ describe('ManageAsset Fabric transaction receipt', () => {
     });
     expect(newProposal).toHaveBeenCalledWith('UpsertArtifacts', {
       arguments: [JSON.stringify({ data: [] })],
-      endorsingOrganizations: [EXAMPLE_OBSERVATION_IDENTIFIER],
     });
     expect(getTransactionId).toHaveBeenCalledTimes(1);
     expect(submit).toHaveBeenCalledTimes(1);

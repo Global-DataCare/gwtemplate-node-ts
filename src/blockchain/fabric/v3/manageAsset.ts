@@ -86,7 +86,6 @@ export class ManageAsset {
     const result = await this.withContract(mspId, async ({ contract }) => {
       const proposal = contract.newProposal(fnName, {
         arguments: args,
-        endorsingOrganizations: [mspId],
       });
       const transaction = await proposal.endorse();
       transactionId = transaction.getTransactionId();
