@@ -49,6 +49,9 @@
   override from the canonical Docker and Helm smoke environment.
 - Resolve every FHIR CID receipt through the configured clinical data channel
   instead of deriving an ungoverned channel name from request route labels.
+- Wait for a newly admitted Kubernetes peer to synchronize the channel
+  configuration that authorizes its MSP before running authenticated channel
+  reads in the Helm evidence smoke.
 
 ## [1.24.13] - 2026-09-04
 

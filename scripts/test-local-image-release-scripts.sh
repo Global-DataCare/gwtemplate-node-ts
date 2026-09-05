@@ -168,6 +168,14 @@ grep -Fq 'name: orderer-tcp-bridge' ./scripts/smoke-helm-local-network.sh
 grep -Fq 'name: orderer' ./scripts/smoke-helm-local-network.sh
 grep -Fq 'peer.bootstrap=' ./scripts/smoke-helm-local-network.sh
 grep -Fq 'KIND_PEER_SYNC_ATTEMPTS="${KIND_PEER_SYNC_ATTEMPTS:-600}"' ./scripts/smoke-helm-local-network.sh
+peer_join_verification="$(
+  sed -n '/kind_peer_channels=/,/install_kind_ccaas_chaincodes/p' \
+    ./scripts/smoke-helm-local-network.sh
+)"
+peer_sync_line="$(grep -n 'wait_for_kind_peer_sync "${channel}"' <<<"${peer_join_verification}" | head -n 1 | cut -d: -f1)"
+peer_getinfo_line="$(grep -n 'peer channel getinfo -c "${channel}"' <<<"${peer_join_verification}" | head -n 1 | cut -d: -f1)"
+test -n "${peer_sync_line}" -a -n "${peer_getinfo_line}"
+test "${peer_sync_line}" -lt "${peer_getinfo_line}"
 grep -Fq 'wait_for_kind_peer_sync' ./scripts/smoke-helm-local-network.sh
 grep -Fq -- '--set gw.enabled=false' ./scripts/smoke-helm-local-network.sh
 grep -Fq -- '--reuse-values' ./scripts/smoke-helm-local-network.sh
