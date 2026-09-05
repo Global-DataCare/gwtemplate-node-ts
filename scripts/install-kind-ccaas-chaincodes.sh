@@ -126,7 +126,7 @@ wait_for_kind_chaincode_commit() {
   for _ in $(seq 1 "${KIND_PEER_SYNC_ATTEMPTS:-600}"); do
     committed="$(kind_peer_exec peer lifecycle chaincode querycommitted \
       --channelID "${channel}" --name "${name}" --output json 2>/dev/null || true)"
-    if [[ "$(jq -r '.sequence // 0' <<< "${committed:-{}}")" == "${target_sequence}" ]]; then
+    if [[ "$(jq -r '.sequence // 0' <<< "${committed:-null}")" == "${target_sequence}" ]]; then
       printf '%s' "${committed}"
       return 0
     fi

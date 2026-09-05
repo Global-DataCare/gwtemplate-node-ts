@@ -62,6 +62,11 @@ grep -Fq 'target_sequence=$((current_sequence + 1))' "${CCAAS}"
 grep -Fq 'host1_package_id=' "${CCAAS}"
 grep -Fq 'docker_peer_exec' "${CCAAS}"
 grep -Fq -- '--sequence "${target_sequence}"' "${CCAAS}"
+grep -Fq '${committed:-null}' "${CCAAS}"
+if grep -Fq '${committed:-{}}' "${CCAAS}"; then
+  echo 'empty lifecycle output must remain valid JSON during commit polling' >&2
+  exit 1
+fi
 grep -Fq "'artifact-sc|identity-local,health-care-local'" "${CCAAS}"
 grep -Fq 'IFS="," read -r -a channels' "${CCAAS}"
 grep -Fq 'SKIP_FABRIC_PREP=true' "${RUNNER}"
