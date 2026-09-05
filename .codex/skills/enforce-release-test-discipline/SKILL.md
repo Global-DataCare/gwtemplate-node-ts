@@ -86,10 +86,12 @@ description: Enforce branch, TDD, canonical FHIR and schema.org vocabulary, fixt
   inputs carry none of those DIDComm fields; HTTP Authorization proves the
   caller and `Communication.sender` keeps its FHIR business meaning.
 - For generated clinical content, resolve Composition provenance from the
-  protected registered creator binding. Accept only the closed `owner | creator`
-  BFF choice: owner is the individual/organization; creator is the authenticated
-  RelatedPerson/PractitionerRole and may be both author and attester. Never
-  accept an arbitrary author reference from UI input or infer it from actorDid.
+  protected registered creator binding. The closed `owner | creator` BFF choice
+  is compatibility only: member/controller content may use one registered
+  RelatedPerson as both author and attester; professional content keeps the
+  jurisdictional CDS legal-organization URN as author and its registered
+  PractitionerRole as attester. Never accept an arbitrary author reference
+  from UI input or infer it from actorDid.
 - Correction authority is separate from authorship: a registered member with
   the same individual owner or an authorized tenant professional may create a
   new version. Delete remains exact-author only. Preserve the new version's

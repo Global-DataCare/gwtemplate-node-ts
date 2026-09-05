@@ -81,10 +81,11 @@ E2E gates before `npm publish` or any container image build.
   the content and `Composition.attester` identifies each registered assignment
   that explicitly attested it. Neither role implies who transported the
   document: `Communication.sender` and the verified submitter remain separate.
-  A protected BFF profile chooses only `owner` or
-  `creator`: a RelatedPerson or PractitionerRole may be both author and
-  attester when that member/professional created the content. `actorDid` and
-  signing `kid` remain transport/audit evidence. Same-individual members and
+  A protected BFF profile supplies the exact binding. A member/controller may
+  use one RelatedPerson urn:uuid as both author and attester; professional
+  content uses the jurisdictional CDS legal-organization URN as author and its
+  PractitionerRole urn:uuid as attester. The legacy `owner | creator` input is
+  compatibility only. `actorDid` and signing `kid` remain transport/audit evidence. Same-individual members and
   authorized tenant professionals may create correction versions; delete stays
   exact-author only. Communication-carried resource CIDs are submitted in one
   sanitized `data[]` batch; the governed evidence service writes each CID as its own asset

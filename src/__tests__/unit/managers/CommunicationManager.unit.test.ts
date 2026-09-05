@@ -64,6 +64,7 @@ import {
   EXAMPLE_OBSERVATION_PANEL_IDENTIFIER,
   EXAMPLE_PROFESSIONAL_DID,
   EXAMPLE_PROVIDER_ORGANIZATION_DID,
+  EXAMPLE_PROVIDER_ORGANIZATION_AUTHORIZATION_URN_CDS,
   EXAMPLE_SUBJECT_DID,
   EXAMPLE_KYC_CONTROLLER_USER_UUID,
       EXAMPLE_KYC_CONTROLLER_UUID,
@@ -118,7 +119,7 @@ describe('CommunicationManager Unit Tests', () => {
     ledgerTransactionId = randomUUID();
     mockBlockchainAdapter = {
       discoverDidsByHashes: jest.fn(async () => []),
-      registerCidVersionMappings: jest.fn(async (mappings) => ({
+      registerCidVersionMappings: jest.fn(async (mappings: any[]) => ({
         accepted: mappings.length,
         txId: ledgerTransactionId,
       })),
@@ -246,7 +247,7 @@ describe('CommunicationManager Unit Tests', () => {
           'animal-care-global',
           'artifact-sc',
         );
-        const submittedMappings = mockBlockchainAdapter.registerCidVersionMappings.mock.calls[0][0];
+        const submittedMappings = (mockBlockchainAdapter.registerCidVersionMappings as jest.Mock).mock.calls[0][0] as any[];
         for (const mapping of submittedMappings) {
           expect(mapping.relationships?.author).toHaveLength(1);
           expect(mapping.relationships?.sender).toEqual(mapping.relationships?.submitter);
@@ -254,7 +255,7 @@ describe('CommunicationManager Unit Tests', () => {
           expect(JSON.stringify({ relationships: mapping.relationships, ownerships: mapping.ownerships }))
             .not.toContain('did:web:');
         }
-        expect(submittedMappings.find((mapping) => mapping.resourceId === resourceIds[0])?.tags).toEqual([
+        expect(submittedMappings.find((mapping: any) => mapping.resourceId === resourceIds[0])?.tags).toEqual([
           { id: 'Observation[0].code', system: 'http://loinc.org', code: '85354-9' },
         ]);
         expect((response.body as any).data).toEqual(expect.arrayContaining(resourceIds.map((resourceId) =>
@@ -444,7 +445,7 @@ describe('CommunicationManager Unit Tests', () => {
       expect(mockVaultRepository.delete).not.toHaveBeenCalled();
     });
 
-    it('uses an explicit registered document author for a section-scoped create', async () => {
+    it('derives source author and attester from the authenticated section writer binding', async () => {
       mockTenantsCacheManager.getTenantDid.mockResolvedValue(testServerDid as any);
       const firstProfessionalAuthor = `urn:uuid:${EXAMPLE_KYC_CONTROLLER_UUID}`;
       const successorProfessionalAuthor = `urn:uuid:${EXAMPLE_KYC_CONTROLLER_USER_UUID}`;
@@ -453,7 +454,7 @@ describe('CommunicationManager Unit Tests', () => {
         kind: FhirIpsCreatorKinds.Professional,
         actorIdentifier: `urn:uuid:${EXAMPLE_KYC_CONTROLLER_USER_UUID}`,
         authorIdentifier: `urn:uuid:${EXAMPLE_KYC_CONTROLLER_UUID}`,
-        ownerIdentifier: EXAMPLE_PROVIDER_ORGANIZATION_DID,
+        ownerIdentifier: EXAMPLE_PROVIDER_ORGANIZATION_AUTHORIZATION_URN_CDS,
         role: 'ISCO-08|2250',
         actorDids: [EXAMPLE_PROFESSIONAL_DID],
       } as any, {
@@ -461,7 +462,7 @@ describe('CommunicationManager Unit Tests', () => {
         kind: FhirIpsCreatorKinds.Professional,
         actorIdentifier: `urn:uuid:${EXAMPLE_CLIENT_INSTANCE_UUID}`,
         authorIdentifier: `urn:uuid:${EXAMPLE_KYC_CONTROLLER_USER_UUID}`,
-        ownerIdentifier: EXAMPLE_PROVIDER_ORGANIZATION_DID,
+        ownerIdentifier: EXAMPLE_PROVIDER_ORGANIZATION_AUTHORIZATION_URN_CDS,
         role: HealthcareActorRoles.VeterinaryTechnicianOrAssistant,
         actorDids: [creatorDid],
       } as any], getClinicalCreatorBindingsSectionId());
@@ -480,23 +481,24 @@ describe('CommunicationManager Unit Tests', () => {
           status: 'final',
           code: { text: 'Reviewed result' },
         },
-      }], firstProfessionalAuthor));
+      }], EXAMPLE_PROVIDER_ORGANIZATION_AUTHORIZATION_URN_CDS, successorProfessionalAuthor));
 
       expect((response.body as any).data[0].response.status).toBe(String(HttpStatusCodes.Created));
       expect(mockVaultRepository.put).toHaveBeenCalledWith(
         'animal-care_acme',
         [expect.objectContaining({
           id: 'observation-delegated-author',
-          'Composition.author': firstProfessionalAuthor,
-          audit: { creatorDid: firstProfessionalAuthor, submitterDid: creatorDid },
+          'Composition.author': EXAMPLE_PROVIDER_ORGANIZATION_AUTHORIZATION_URN_CDS,
+          [CompositionClaim.Attester]: successorProfessionalAuthor,
+          audit: expect.objectContaining({ creatorDid }),
         })],
         expect.any(String),
       );
 
       // A second registered professional assignment owned by the same legal
-      // organization supplies the correction and becomes its author/attester.
+      // organization attests the correction; the organization remains author.
       const delegatedUpdate = await communicationManager.process(buildClinicalBatchJob([{
-        type: GatewayRequestEntryTypes.ObservationEdit,
+        type: GatewayRequestEntryTypes.AllergyIntoleranceEdit,
         request: {
           method: HttpRequestMethods.Put,
           url: `${ResourceTypesFhirR4.Observation}/observation-delegated-author`,
@@ -508,29 +510,76 @@ describe('CommunicationManager Unit Tests', () => {
           status: ObservationStatuses.Final,
           code: { text: 'Changed by submitter' },
         },
-      }], successorProfessionalAuthor, successorProfessionalAuthor));
+      }], EXAMPLE_PROVIDER_ORGANIZATION_AUTHORIZATION_URN_CDS, successorProfessionalAuthor));
       expect((delegatedUpdate.body as any).data[0].response.status).toBe(String(HttpStatusCodes.Ok));
       const corrected = await mockVaultRepository.get(
         'animal-care_acme',
         'observation-delegated-author',
         getSubjectScopedSectionId(subjectDid, 'individual', 'observations'),
       ) as any;
-      expect(corrected?.[CompositionClaim.Author]).toBe(successorProfessionalAuthor);
+      expect(corrected?.[CompositionClaim.Author]).toBe(EXAMPLE_PROVIDER_ORGANIZATION_AUTHORIZATION_URN_CDS);
       expect(corrected?.[CompositionClaim.Attester]).toBe(successorProfessionalAuthor);
+      expect(corrected?.audit?.creatorDid).toBe(creatorDid);
 
       const delegatedDelete = await communicationManager.process(buildClinicalBatchJob([{
-        type: GatewayRequestEntryTypes.ObservationDelete,
+        type: GatewayRequestEntryTypes.AllergyIntoleranceDelete,
         request: {
           method: HttpRequestMethods.Delete,
           url: `${ResourceTypesFhirR4.Observation}/observation-delegated-author`,
         },
-      }], undefined, undefined, EXAMPLE_PROFESSIONAL_DID));
+      }], EXAMPLE_PROVIDER_ORGANIZATION_AUTHORIZATION_URN_CDS, firstProfessionalAuthor, EXAMPLE_PROFESSIONAL_DID));
       expect((delegatedDelete.body as any).data[0].response.status).toBe('403');
       expect(await mockVaultRepository.get(
         'animal-care_acme',
         'observation-delegated-author',
         getSubjectScopedSectionId(subjectDid, 'individual', 'observations'),
       )).toBeDefined();
+    });
+
+    it('returns 403 and persists no clinical resource for an unbound section attester', async () => {
+      // Flow contract: the operational employee DID authenticates transport,
+      // but only its exact registered PractitionerRole urn:uuid may attest the
+      // section. A forged assignment is a per-entry security outcome, not 500.
+      mockTenantsCacheManager.getTenantDid.mockResolvedValue(testServerDid as any);
+      await mockVaultRepository.put('animal-care_acme', [{
+        id: `urn:uuid:${EXAMPLE_KYC_CONTROLLER_UUID}`,
+        kind: FhirIpsCreatorKinds.Professional,
+        actorIdentifier: `urn:uuid:${EXAMPLE_KYC_CONTROLLER_USER_UUID}`,
+        authorIdentifier: `urn:uuid:${EXAMPLE_KYC_CONTROLLER_UUID}`,
+        ownerIdentifier: EXAMPLE_PROVIDER_ORGANIZATION_AUTHORIZATION_URN_CDS,
+        role: HealthcareActorRoles.VeterinaryTechnicianOrAssistant,
+        actorDids: [creatorDid],
+      } as any], getClinicalCreatorBindingsSectionId());
+      mockVaultRepository.listContainersInSection.mockImplementation(async (vaultId: string, sectionId: string) =>
+        [...storedRecords.entries()]
+          .filter(([key]) => key.startsWith(`${vaultId}|${sectionId}|`))
+          .map(([, value]) => value));
+
+      const response = await communicationManager.process(buildClinicalBatchJob([{
+        type: GatewayRequestEntryTypes.ObservationCreate,
+        request: { method: HttpRequestMethods.Post, url: ResourceTypesFhirR4.Observation },
+        resource: {
+          resourceType: ResourceTypesFhirR4.Observation,
+          id: 'observation-forged-attester',
+          subject: { reference: subjectDid },
+          status: ObservationStatuses.Final,
+        },
+      }], EXAMPLE_PROVIDER_ORGANIZATION_AUTHORIZATION_URN_CDS,
+      `urn:uuid:${EXAMPLE_CLIENT_INSTANCE_UUID}`));
+
+      expect((response.body as any).data[0]).toEqual(expect.objectContaining({
+        response: expect.objectContaining({
+          status: String(HttpStatusCodes.Forbidden),
+          outcome: expect.objectContaining({
+            issue: [expect.objectContaining({ code: 'forbidden' })],
+          }),
+        }),
+      }));
+      expect(await mockVaultRepository.get(
+        'animal-care_acme',
+        'observation-forged-attester',
+        getSubjectScopedSectionId(subjectDid, 'individual', 'observations'),
+      )).toBeUndefined();
     });
 
     it('lets another registered member of the same individual correct, but not delete, personal content', async () => {
@@ -558,7 +607,7 @@ describe('CommunicationManager Unit Tests', () => {
         kind: FhirIpsCreatorKinds.Professional,
         actorIdentifier: `urn:uuid:${EXAMPLE_KYC_CONTROLLER_USER_UUID}`,
         authorIdentifier: `urn:uuid:${EXAMPLE_KYC_CONTROLLER_USER_UUID}`,
-        ownerIdentifier: EXAMPLE_PROVIDER_ORGANIZATION_DID,
+        ownerIdentifier: EXAMPLE_PROVIDER_ORGANIZATION_AUTHORIZATION_URN_CDS,
         role: HealthcareActorRoles.Physician,
         actorDids: [EXAMPLE_PROFESSIONAL_DID],
       } as any], getClinicalCreatorBindingsSectionId());
@@ -595,8 +644,8 @@ describe('CommunicationManager Unit Tests', () => {
       expect(subjectRecord?.[CompositionClaim.Author]).toBe(subjectDid);
       expect(subjectRecord?.[CompositionClaim.Attester]).toBe(memberAuthor);
 
-      // The member created the content; its registered RelatedPerson assignment
-      // is the author and may also be the attester in the enclosing Composition.
+      // A controller/member-created version uses its registered RelatedPerson
+      // urn:uuid as both author and attester; actorDid remains audit identity.
       const memberCreate = await communicationManager.process(buildClinicalBatchJob([
         createObservation(memberAuthoredId),
       ], memberAuthor, memberAuthor));
@@ -608,9 +657,10 @@ describe('CommunicationManager Unit Tests', () => {
       ) as any;
       expect(memberRecord?.[CompositionClaim.Author]).toBe(memberAuthor);
       expect(memberRecord?.[CompositionClaim.Attester]).toBe(memberAuthor);
+      expect(memberRecord?.audit?.creatorDid).toBe(creatorDid);
 
       const updateObservation = (id: string) => ({
-        type: GatewayRequestEntryTypes.ObservationEdit,
+        type: GatewayRequestEntryTypes.AllergyIntoleranceEdit,
         request: { method: HttpRequestMethods.Put, url: `${ResourceTypesFhirR4.Observation}/${id}` },
         resource: {
           resourceType: ResourceTypesFhirR4.Observation,
@@ -621,56 +671,55 @@ describe('CommunicationManager Unit Tests', () => {
         },
       });
       // A different registered member of the same individual may correct the
-      // next version. The individual remains author and the correcting member
-      // becomes the attester for that version.
+      // next version. That correcting RelatedPerson is both author and
+      // attester for the version it creates.
       const subjectUpdate = await communicationManager.process(buildClinicalBatchJob([
         updateObservation(subjectAuthoredId),
-      ], subjectDid, successorMemberAuthor, EXAMPLE_CONTROLLER_DID));
+      ], successorMemberAuthor, successorMemberAuthor, EXAMPLE_CONTROLLER_DID));
       expect((subjectUpdate.body as any).data[0].response.status).toBe(String(HttpStatusCodes.Ok));
       const correctedSubjectRecord = await mockVaultRepository.get(
         'animal-care_acme',
         subjectAuthoredId,
         getSubjectScopedSectionId(subjectDid, 'individual', 'observations'),
       ) as any;
-      expect(correctedSubjectRecord?.[CompositionClaim.Author]).toBe(subjectDid);
+      expect(correctedSubjectRecord?.[CompositionClaim.Author]).toBe(successorMemberAuthor);
       expect(correctedSubjectRecord?.[CompositionClaim.Attester]).toBe(successorMemberAuthor);
       expect(correctedSubjectRecord?.audit).toEqual(expect.objectContaining({
-        creatorDid: subjectDid,
+        creatorDid: EXAMPLE_CONTROLLER_DID,
         submitterDid: EXAMPLE_CONTROLLER_DID,
       }));
 
       const memberUpdate = await communicationManager.process(buildClinicalBatchJob([
         updateObservation(memberAuthoredId),
-      ], memberAuthor, successorMemberAuthor, EXAMPLE_CONTROLLER_DID));
+      ], successorMemberAuthor, successorMemberAuthor, EXAMPLE_CONTROLLER_DID));
       expect((memberUpdate.body as any).data[0].response.status).toBe(String(HttpStatusCodes.Ok));
 
       // A registered professional in this provider may clinically correct a
-      // personal version. The new version names the professional assignment as
-      // its author and attester; it does not impersonate the individual/member.
+      // personal version. Its provider organization supplies the new document
+      // version and the professional assignment is its attester.
       const professionalAuthor = `urn:uuid:${EXAMPLE_KYC_CONTROLLER_USER_UUID}`;
       const professionalUpdate = await communicationManager.process(buildClinicalBatchJob([
         updateObservation(memberAuthoredId),
-      ], professionalAuthor, professionalAuthor, EXAMPLE_PROFESSIONAL_DID));
+      ], EXAMPLE_PROVIDER_ORGANIZATION_AUTHORIZATION_URN_CDS, professionalAuthor, EXAMPLE_PROFESSIONAL_DID));
       expect((professionalUpdate.body as any).data[0].response.status).toBe(String(HttpStatusCodes.Ok));
       const professionallyCorrectedRecord = await mockVaultRepository.get(
         'animal-care_acme',
         memberAuthoredId,
         getSubjectScopedSectionId(subjectDid, 'individual', 'observations'),
       ) as any;
-      expect(professionallyCorrectedRecord?.[CompositionClaim.Author]).toBe(professionalAuthor);
+      expect(professionallyCorrectedRecord?.[CompositionClaim.Author]).toBe(EXAMPLE_PROVIDER_ORGANIZATION_AUTHORIZATION_URN_CDS);
       expect(professionallyCorrectedRecord?.[CompositionClaim.Attester]).toBe(professionalAuthor);
       expect(professionallyCorrectedRecord?.audit).toEqual(expect.objectContaining({
-        creatorDid: professionalAuthor,
-        submitterDid: EXAMPLE_PROFESSIONAL_DID,
+        creatorDid: EXAMPLE_PROFESSIONAL_DID,
       }));
 
       const successorDelete = await communicationManager.process(buildClinicalBatchJob([{
-        type: GatewayRequestEntryTypes.ObservationDelete,
+          type: GatewayRequestEntryTypes.AllergyIntoleranceDelete,
         request: {
           method: HttpRequestMethods.Delete,
           url: `${ResourceTypesFhirR4.Observation}/${memberAuthoredId}`,
         },
-      }], undefined, undefined, EXAMPLE_CONTROLLER_DID));
+      }], successorMemberAuthor, successorMemberAuthor, EXAMPLE_CONTROLLER_DID));
       expect((successorDelete.body as any).data[0].response.status).toBe('403');
     });
   });
@@ -1140,7 +1189,16 @@ describe('CommunicationManager Unit Tests', () => {
         issuer: string,
         thid: string,
         bearerPayload?: Record<string, any>,
-      ): JobRequest => ({
+      ): JobRequest => {
+        if (attachedBundle.type === BundleTypes.batch) {
+          attachedBundle.meta = { ...(attachedBundle.meta || {}), claims: {
+            ...(attachedBundle.meta?.claims || {}),
+            [CompositionClaim.Author]: subjectDid,
+            [CompositionClaim.Attester]: `urn:uuid:${EXAMPLE_KYC_CONTROLLER_UUID}`,
+            [CompositionClaim.AttesterMode]: CompositionAttesterModes.Personal,
+          } };
+        }
+        return ({
         id: randomUUID(),
         status: JobStatus.DRAFT,
         sequence: 0,
@@ -1180,7 +1238,8 @@ describe('CommunicationManager Unit Tests', () => {
           },
           ...(bearerPayload ? { meta: { bearer: { jwt: { payload: bearerPayload } } } } : {}),
         } as IDecodedDidcommPayload,
-      });
+        });
+      };
 
       // Step 1. The individual controller authors one clinical resource.
       await communicationManager.process(buildJob({
@@ -1202,7 +1261,9 @@ describe('CommunicationManager Unit Tests', () => {
 
       const allergySectionId = getSubjectScopedSectionId(subjectDid, 'individual', 'allergies');
       const stored = await mockVaultRepository.get(tenantVaultId, allergyId, allergySectionId) as any;
-      expect(stored?.['Composition.author']).toBe(controllerDid);
+      expect(stored?.['Composition.author']).toBe(subjectDid);
+      expect(stored?.[CompositionClaim.Attester]).toBe(`urn:uuid:${EXAMPLE_KYC_CONTROLLER_UUID}`);
+      expect(stored?.audit?.creatorDid).toBe(controllerDid);
       expect(Object.keys(stored || {}).some((key) => /email|phone|contact/i.test(key))).toBe(false);
       expect(JSON.stringify(stored)).not.toContain(controllerPhone);
       expect(JSON.stringify(stored)).not.toContain(controllerEmail);
@@ -1456,7 +1517,7 @@ describe('CommunicationManager Unit Tests', () => {
       const externallyAuthoredRecord = await mockVaultRepository.get(tenantVaultId, allergyId, sectionId) as any;
       expect(externallyAuthoredRecord?.['Composition.author']).toBe(EXAMPLE_PROVIDER_ORGANIZATION_DID);
       expect(externallyAuthoredRecord?.audit).toEqual(expect.objectContaining({
-        creatorDid: EXAMPLE_PROVIDER_ORGANIZATION_DID,
+        creatorDid: EXAMPLE_PROFESSIONAL_DID,
         submitterDid: EXAMPLE_PROFESSIONAL_DID,
         authorOwnerIdentifier: EXAMPLE_PROVIDER_ORGANIZATION_DID,
         documentDate: '2026-09-01T10:00:00.000Z',
@@ -1842,7 +1903,7 @@ describe('CommunicationManager Unit Tests', () => {
 
       await communicationManager.process(job);
 
-      const ledgerMappings = mockBlockchainAdapter.registerCidVersionMappings.mock.calls.at(-1)?.[0] || [];
+      const ledgerMappings = ((mockBlockchainAdapter.registerCidVersionMappings as jest.Mock).mock.calls.at(-1)?.[0] || []) as any[];
       expect(ledgerMappings).toHaveLength(3);
       for (const mapping of ledgerMappings) {
         expect(mapping.relationships?.author).toHaveLength(1);
@@ -1868,7 +1929,7 @@ describe('CommunicationManager Unit Tests', () => {
       expect(medicationPut).toBeDefined();
       const medicationRecord = (medicationPut?.[1] as any[])[0];
       expect(medicationRecord.id).toBe('medication-001');
-      expect(medicationRecord.audit?.creatorDid).toBe(EXAMPLE_PROVIDER_ORGANIZATION_DID);
+      expect(medicationRecord.audit?.creatorDid).toBe(decoded.iss);
       expect(medicationRecord.audit?.submitterDid).toBe(decoded.iss);
       expect(medicationRecord.audit?.signingKeyId).toBe(EXAMPLE_CONTROLLER_SIGN_KEY.kid);
       expect(medicationRecord[CompositionClaim.Identifier]).toBe(EXAMPLE_IPS_COMPOSITION_IDENTIFIER);

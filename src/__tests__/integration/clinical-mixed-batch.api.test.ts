@@ -276,7 +276,7 @@ describe('clinical mixed batch API (integration)', () => {
       expect(correctedRecord?.[CompositionClaim.Author]).toBe(subjectDid);
       expect(correctedRecord?.[CompositionClaim.Attester]).toBe(successorMemberAuthor);
       expect(correctedRecord?.audit).toEqual(expect.objectContaining({
-        creatorDid: subjectDid,
+        creatorDid: EXAMPLE_CONTROLLER_DID,
         submitterDid: EXAMPLE_CONTROLLER_DID,
       }));
 

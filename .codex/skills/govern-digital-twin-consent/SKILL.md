@@ -150,15 +150,16 @@ Verify current branches, versions and published npm state before release claims.
   the host that accommodates that tenant, never the host DID or a portal alias.
   The subject remains the individual DID.
 - To edit an imported IPS in a demo, first call
-  `cloneImportedClinicalDocumentForDemo(...)` with that same session
-  `actorDid`. The helper gives the copy new resource ids and sets
-  `Composition.author` to that `actorDid`; it never rewrites the imported source
-  document.
-- For generated clinical content, resolve `Composition.author` from the
-  authenticated protected creator binding with the closed `owner | creator`
-  choice. Owner is the individual subject or provider organization. Creator is
-  the registered RelatedPerson or PractitionerRole and may be both author and
-  attester when that actor created the content.
+  `cloneImportedClinicalDocumentForDemo(...)` with the protected
+  `clinicalCreator` export. The helper gives the copy new resource ids and uses
+  stable FHIR author/attester references; session `actorDid` remains sender and
+  it never rewrites the imported source document.
+- For generated clinical content, resolve provenance from the authenticated
+  protected creator binding. The closed `owner | creator` choice is
+  compatibility only. A member/controller may use one registered RelatedPerson
+  as both author and attester; a professional uses the jurisdictional CDS
+  legal-organization URN as author and its registered PractitionerRole as
+  attester.
 - A member recording content created or dictated by the individual selects
   owner: the individual is author and the RelatedPerson is attester. A member
   creating the content selects creator: the RelatedPerson is both.
