@@ -3,7 +3,7 @@
  * 1. A BFF selects owner-authored or registered-creator-authored content.
  * 2. GW receives ordinary FHIR author/attester references plus independent audit evidence.
  * 3. Same-owner members and authorized professionals may correct a version.
- * 4. The SC writes each CID as its own asset in one data[] transaction and GW returns that transaction id.
+ * 4. The SC writes each CID plus opaque provenance links as its own asset in one data[] transaction and GW returns that transaction id.
  * Authorization invariant: UI references, DIDComm sender and signing kid cannot select provenance.
  * Persistence invariant: old versions remain; delete stays author-only; member/professional
  * creator assignments may be both author and attester.
@@ -21,6 +21,7 @@ const snippet = readFileSync(
 const readme = readFileSync('README.md', 'utf8');
 const releaseSkill = readFileSync('.codex/skills/enforce-release-test-discipline/SKILL.md', 'utf8');
 const provenanceSkill = readFileSync('.codex/skills/govern-digital-twin-consent/SKILL.md', 'utf8');
+const ledgerSchema = readFileSync('docs-v2/28-clinical-employee-ledger-schema.md', 'utf8');
 
 describe('authenticated clinical source-author documentation', () => {
   it('documents both personal and professional owner-or-creator cases', () => {
@@ -34,7 +35,9 @@ describe('authenticated clinical source-author documentation', () => {
     expect(guide).toMatch(/professional assignment[\s\S]*correct personal content/i);
     expect(guide).toMatch(/data\[\][\s\S]*evidence entry[\s\S]*transaction id/i);
     expect(guide).toMatch(/CID[\s\S]*individual `assetId`/i);
-    expect(guide).toMatch(/`fullUrl`[\s\S]*do not enter the ledger/i);
+    expect(guide).toMatch(/relationships[\s\S]*ownerships[\s\S]*SHA3-384 multihashes/i);
+    expect(guide).toMatch(/UUID[\s\S]*16 bytes[\s\S]*employee/i);
+    expect(guide).toMatch(/`fullUrl`[\s\S]*raw identities[\s\S]*do\s+not enter the ledger/i);
   });
 
   it('keeps snippets, README and repository skills linked to the same contract', () => {
@@ -44,6 +47,11 @@ describe('authenticated clinical source-author documentation', () => {
     expect(readme).toMatch(/Composition[\s\S]*author[\s\S]*attester/i);
     expect(readme).toContain('101-01.N-AUTHENTICATED-CLINICAL-AUTHOR.md');
     expect(releaseSkill).toContain('owner | creator');
+    expect(releaseSkill).toContain('relationships`/`ownerships');
     expect(provenanceSkill).toContain('owner | creator');
+    expect(ledgerSchema).toMatch(/employee-sc[\s\S]*subjectkeybinding-sc[\s\S]*cryptographickey-sc/i);
+    expect(ledgerSchema).toMatch(/UUID[\s\S]*16 bytes[\s\S]*SHA3-384[\s\S]*multihash/i);
+    expect(ledgerSchema).toMatch(/role[\s\S]*validFrom[\s\S]*validUntil[\s\S]*history/i);
+    expect(ledgerSchema).toMatch(/roleLicenseId[\s\S]*keyId[\s\S]*kid/i);
   });
 });

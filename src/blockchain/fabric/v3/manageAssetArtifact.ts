@@ -27,7 +27,11 @@ export class ManageAssetArtifact extends ManageAsset {
     return this.submitWithTransactionId(mspId, 'UpsertArtifact', artifactId, JSON.stringify(payload));
   }
 
-  /** Upserts every CID-keyed artifact in one primary-document data[] transaction. */
+  /**
+   * Upserts every CID-keyed artifact in one primary-document data[] transaction.
+   * Each item may carry only sanitized tags and opaque relationship/ownership
+   * hashes alongside its CID; channel and contract remain manager-owned.
+   */
   public async upsertArtifactsWithTransactionId(
     mspId: string,
     payload: object,

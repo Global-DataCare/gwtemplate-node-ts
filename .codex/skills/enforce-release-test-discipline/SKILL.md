@@ -98,7 +98,13 @@ description: Enforce branch, TDD, canonical FHIR and schema.org vocabulary, fixt
   `data[]` batch. The smart contract must process every entry as an individual
   asset keyed by that resource CID in one transaction; never persist `fullUrl`
   or confidential FHIR content. Do not publish `resource.meta.claims`; only the
-  positive ledger-safe `meta.tag[]` allowlist may cross that boundary. Expose
+  positive ledger-safe `meta.tag[]` allowlist and SHA3-384 multihashes in
+  historical `relationships`/`ownerships` may cross that
+  boundary. Keep author, attester, custodian, sender, verified submitter,
+  signing-key and subject-ownership links distinct; never send their raw DID,
+  URN, URL, key id or contact value. UUID-backed references must hash the
+  canonical 16 UUID bytes so bare, `urn:uuid`, FHIR-relative and
+  `:instance:<uuid>` forms converge on the same employee/assignment link. Expose
   the real Fabric transaction id. A memory-adapter
   receipt is local proof only and must never be reported as on-chain evidence.
 - Ledger channel and smart-contract selection is manager-owned policy. Managers

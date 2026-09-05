@@ -78,8 +78,10 @@ E2E gates before `npm publish` or any container image build.
   HTTP Authorization proves the caller and `Communication.sender` remains a
   FHIR business participant reference.
 - In a clinical document Bundle, `Composition.author` identifies who created
-  the content and `Composition.attester` identifies the registered assignment
-  that attested/submitted it. A protected BFF profile chooses only `owner` or
+  the content and `Composition.attester` identifies each registered assignment
+  that explicitly attested it. Neither role implies who transported the
+  document: `Communication.sender` and the verified submitter remain separate.
+  A protected BFF profile chooses only `owner` or
   `creator`: a RelatedPerson or PractitionerRole may be both author and
   attester when that member/professional created the content. `actorDid` and
   signing `kid` remain transport/audit evidence. Same-individual members and
@@ -87,9 +89,11 @@ E2E gates before `npm publish` or any container image build.
   exact-author only. Communication-carried resource CIDs are submitted in one
   sanitized `data[]` batch; the governed evidence service writes each CID as its own asset
   in the same Fabric transaction. `fullUrl` and clinical content never enter
-  that ledger payload; optional research tags use a positive code-only
-  allowlist, while displays and free text stay in the consented confidential
-  projection. The response distinguishes a local receipt from a real
+  that ledger payload. The same transaction stores only opaque SHA3-384
+  multihashes for author, attester, custodian, sender, submitter, signing key
+  and subject ownership relationships. Optional research tags use a positive
+  code-only allowlist, while raw identities, claims, displays and free text stay
+  in the consented confidential projection. The response distinguishes a local receipt from a real
   Fabric transaction id. GW resolves the governed ledger route internally; the
   BFF and deployment configuration never select a channel or smart contract. See
   [Authenticated clinical author](docs/01-OVERVIEW-AND-GUIDES/101-01.N-AUTHENTICATED-CLINICAL-AUTHOR.md)

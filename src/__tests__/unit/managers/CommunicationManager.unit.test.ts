@@ -247,6 +247,13 @@ describe('CommunicationManager Unit Tests', () => {
           'artifact-sc',
         );
         const submittedMappings = mockBlockchainAdapter.registerCidVersionMappings.mock.calls[0][0];
+        for (const mapping of submittedMappings) {
+          expect(mapping.relationships?.author).toHaveLength(1);
+          expect(mapping.relationships?.sender).toEqual(mapping.relationships?.submitter);
+          expect(mapping.ownerships).toHaveLength(1);
+          expect(JSON.stringify({ relationships: mapping.relationships, ownerships: mapping.ownerships }))
+            .not.toContain('did:web:');
+        }
         expect(submittedMappings.find((mapping) => mapping.resourceId === resourceIds[0])?.tags).toEqual([
           { id: 'Observation[0].code', system: 'http://loinc.org', code: '85354-9' },
         ]);
@@ -1834,6 +1841,22 @@ describe('CommunicationManager Unit Tests', () => {
       };
 
       await communicationManager.process(job);
+
+      const ledgerMappings = mockBlockchainAdapter.registerCidVersionMappings.mock.calls.at(-1)?.[0] || [];
+      expect(ledgerMappings).toHaveLength(3);
+      for (const mapping of ledgerMappings) {
+        expect(mapping.relationships?.author).toHaveLength(1);
+        expect(mapping.relationships?.custodian).toEqual(mapping.relationships?.author);
+        expect(mapping.relationships?.attester).toHaveLength(2);
+        expect(mapping.relationships?.sender).toEqual(mapping.relationships?.submitter);
+        expect(mapping.relationships?.signingKey).toHaveLength(1);
+        expect(mapping.ownerships).toHaveLength(1);
+        expect(JSON.stringify({ relationships: mapping.relationships, ownerships: mapping.ownerships }))
+          .not.toContain('did:web:');
+        expect(JSON.stringify({ relationships: mapping.relationships, ownerships: mapping.ownerships }))
+          .not.toContain('urn:uuid:');
+        expect(JSON.stringify(mapping.relationships)).not.toContain(EXAMPLE_CONTROLLER_SIGN_KEY.kid);
+      }
 
       const tenantVaultId = 'health-care_acme';
       const medicationsSectionId = getSubjectScopedSectionId(subjectDid, 'individual', 'medications');

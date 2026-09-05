@@ -27,6 +27,8 @@ function buildStoredArtifactAsset(ctx, artifactId, payload, previousAsset) {
     artifactType: payload.artifactType || previousAsset?.artifactType || undefined,
     declaredBy: payload.declaredBy || previousAsset?.declaredBy || undefined,
     declaredByType: payload.declaredByType || previousAsset?.declaredByType || undefined,
+    relationships: payload.relationships || previousAsset?.relationships || undefined,
+    ownerships: payload.ownerships || previousAsset?.ownerships || undefined,
     status,
     createdAt: previousAsset?.createdAt || now,
     updatedAt: now,

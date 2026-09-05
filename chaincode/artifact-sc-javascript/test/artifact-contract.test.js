@@ -1,4 +1,5 @@
-// Flow contract: one primary-document data[] is processed atomically into one
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
+// One primary-document data[] is processed atomically into one
 // CID-keyed asset per entry; the chaincode strips claims and display text and
 // never stores fullUrl or a clinical FHIR resource.
 // TDD contract: write this test red first; make it green only with the complete real behavior.
@@ -20,6 +21,12 @@ const ArtifactContract = contractModule.ArtifactContract;
 const { createContractContext } = require("../../test-support/contract-test-context");
 
 const ARTIFACT_ID = "artifact_sha256_abc";
+const AUTHOR_HASH = "zG9EU4AWxfuVgFj41YxQMzyo4Y9neV8zDtN9ZvevfwRaPxYvgFMAvjXsjty9TzEyZAA9r";
+const ATTESTER_HASH_A = "zG9G9MsjjKK3cqYznAg72qrQNQ4gr3EycS8eDSbVya9ymkUfp4wbagzcmJVPqLqarka3b";
+const ATTESTER_HASH_B = "zG9HKYPu8qh5USBq9XsKuAWXiva5mUJq5VyDGiYGrcg47vqQcYwYxewQXpWi615DECCUo";
+const SENDER_HASH = "zG9LkpGXgpJx42X9w4BYP3FFM9AD8Lunh56NUQcbgfnddnFvU3JUc1iWJ1eNDW6AVE7c2";
+const SUBJECT_OWNER_HASH = "zG9LFngYGXvtM2WgPEvyNKfw2v9DcDm2fxLJN8wv8FHLZkKcCDhu56efu5AE8ZKqd5xXm";
+const RAW_IDENTITY_REFERENCE = "did:web:identity.example";
 
 function createContract() {
   return new ArtifactContract();
@@ -87,6 +94,61 @@ describe("ArtifactContract", () => {
     expect(history[0].timestamp).to.equal(99);
     const historyAlias = await contract.GetArtifactHistory(upsertCtx, ARTIFACT_ID);
     expect(historyAlias).to.have.length(1);
+  });
+
+  it("preserves hashed relationships and ownerships for every resource in one compatible batch", async () => {
+    const ctx = createContractContext({ txSeconds: 44, txId: "TX-A-BATCH" });
+    const data = [
+      {
+        type: "Observation",
+        id: "bafy-observation-version",
+        resource: {
+          resourceType: "Observation",
+          meta: { versionId: "bafy-observation-version" },
+        },
+        relationships: {
+          author: [AUTHOR_HASH],
+          attester: [ATTESTER_HASH_A, ATTESTER_HASH_B],
+          sender: [SENDER_HASH],
+        },
+        ownerships: [SUBJECT_OWNER_HASH],
+      },
+    ];
+
+    const result = await contract.UpsertArtifacts(ctx, JSON.stringify({ data }));
+
+    expect(result.data[0].resource.relationships).to.deep.equal(data[0].relationships);
+    expect(result.data[0].resource.ownerships).to.deep.equal(data[0].ownerships);
+    const stored = JSON.parse(ctx.readText(data[0].id));
+    expect(stored.relationships).to.deep.equal(data[0].relationships);
+    expect(stored.ownerships).to.deep.equal(data[0].ownerships);
+
+    const csvCtx = createContractContext({ txSeconds: 45, txId: "TX-A-BATCH-CSV" });
+    const csvResult = await contract.UpsertArtifacts(csvCtx, JSON.stringify({
+      data: [{
+        ...data[0],
+        id: "bafybatchcsv",
+        resource: { ...data[0].resource, meta: { versionId: "bafybatchcsv" } },
+        relationships: { author: `${AUTHOR_HASH}, ${AUTHOR_HASH},` },
+        ownerships: [],
+      }],
+    }));
+    expect(csvResult.data[0].resource.relationships).to.deep.equal({ author: [AUTHOR_HASH] });
+    expect(csvResult.data[0].resource.ownerships).to.equal(undefined);
+
+    for (const relationships of [null, "not-an-object", [AUTHOR_HASH]]) {
+      await expect(contract.UpsertArtifacts(ctx, JSON.stringify({
+        data: [{ ...data[0], relationships }],
+      }))).to.be.rejectedWith("data[0].relationships must be an object");
+    }
+    await expect(contract.UpsertArtifacts(ctx, JSON.stringify({
+      data: [{ ...data[0], relationships: { author: [RAW_IDENTITY_REFERENCE] } }],
+    }))).to.be.rejectedWith("data[0].relationships.author must contain only opaque multibase or CID values");
+    const emptyRelationships = await contract.UpsertArtifacts(
+      createContractContext({ txSeconds: 46, txId: "TX-A-BATCH-EMPTY" }),
+      JSON.stringify({ data: [{ ...data[0], id: "bafybatchempty", resource: { ...data[0].resource, meta: { versionId: "bafybatchempty" } }, relationships: { author: [] } }] }),
+    );
+    expect(emptyRelationships.data[0].resource.relationships).to.equal(undefined);
   });
 
   it("processes every data entry as an individual CID-keyed asset in one batch", async () => {
