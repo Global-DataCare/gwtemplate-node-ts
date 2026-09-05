@@ -8,6 +8,11 @@ import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-j
 import { getSubjectScopedSectionId } from '../../../utils/individual-sections';
 import { getEnvSectionId } from '../../../utils/section-env';
 import { extractBundleSearchResources } from 'gdc-common-utils-ts/utils/organization-employee-lifecycle';
+import { CompositionClaim, ConfidentialDocumentIndex } from 'gdc-common-utils-ts';
+import {
+  EXAMPLE_PROVIDER_ORGANIZATION_DID,
+  EXAMPLE_SUBJECT_DID,
+} from 'gdc-common-utils-ts/examples/shared';
 
 describe('MedicationStatementManager', () => {
   const storedRecords = new Map<string, any>();
@@ -70,6 +75,10 @@ describe('MedicationStatementManager', () => {
               'MedicationStatement.medication': 'Medication/medication-161',
               'MedicationStatement.adherence': 'http://hl7.org/fhir/CodeSystem/medication-statement-adherence|taking-as-directed',
               'MedicationStatement.status': 'active',
+              [CompositionClaim.Author]: [
+                EXAMPLE_PROVIDER_ORGANIZATION_DID,
+                EXAMPLE_SUBJECT_DID,
+              ].join(','),
             } } },
         }],
       },
@@ -101,6 +110,9 @@ describe('MedicationStatementManager', () => {
       expect.objectContaining({ name: 'org.hl7.fhir.api.MedicationStatement.code', value: 'http://www.nlm.nih.gov/research/umls/rxnorm|161' }),
       expect.objectContaining({ name: 'org.hl7.fhir.api.MedicationStatement.medication', value: 'Medication/medication-161' }),
       expect.objectContaining({ name: 'org.hl7.fhir.api.MedicationStatement.adherence', value: 'http://hl7.org/fhir/CodeSystem/medication-statement-adherence|taking-as-directed' }),
+      expect.objectContaining({ name: ConfidentialDocumentIndex.Sector, value: job.sector }),
+      expect.objectContaining({ name: CompositionClaim.Author, value: EXAMPLE_PROVIDER_ORGANIZATION_DID }),
+      expect.objectContaining({ name: CompositionClaim.Author, value: EXAMPLE_SUBJECT_DID }),
     ]));
   });
 

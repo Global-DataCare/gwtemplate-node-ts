@@ -36,6 +36,9 @@ import {
   BundleEditor,
   BundleOperations,
   CommunicationParticipantPrefixes,
+  CompositionAttesterModes,
+  CompositionClaim,
+  ConfidentialDocumentIndex,
   ConsentDecisions,
   ConsentStatuses,
   HealthcareActorRoles,
@@ -65,6 +68,7 @@ import {
   EXAMPLE_KYC_CONTROLLER_UUID,
   EXAMPLE_RELATED_PERSON_ROLE,
   EXAMPLE_CLIENT_INSTANCE_UUID,
+  EXAMPLE_CONTROLLER_SIGN_KEY,
 } from 'gdc-common-utils-ts/examples/shared';
 import { FhirIpsCreatorKinds } from 'gdc-common-utils-ts/utils/fhir-ips-creator-identity';
 import { getClinicalCreatorBindingsSectionId } from '../../../utils/ips-bundle';
@@ -1453,8 +1457,32 @@ describe('CommunicationManager Unit Tests', () => {
               resourceType: ResourceTypesFhirR4.Composition,
               id: 'ips-composition-001',
               status: 'final',
+              identifier: { value: EXAMPLE_IPS_COMPOSITION_IDENTIFIER },
               subject: { reference: subjectDid },
               type: { coding: [{ system: 'http://loinc.org', code: '60591-5' }] },
+              date: '2026-05-22T09:00:00Z',
+              author: [{ reference: EXAMPLE_PROVIDER_ORGANIZATION_DID }],
+              custodian: { reference: EXAMPLE_PROVIDER_ORGANIZATION_DID },
+              attester: [
+                {
+                  mode: CompositionAttesterModes.Professional,
+                  time: '2026-05-22T09:00:00Z',
+                  party: { reference: `urn:uuid:${EXAMPLE_KYC_CONTROLLER_UUID}` },
+                },
+                {
+                  mode: CompositionAttesterModes.Official,
+                  time: '2026-05-22T09:01:00Z',
+                  party: { reference: `urn:uuid:${EXAMPLE_KYC_CONTROLLER_USER_UUID}` },
+                },
+              ],
+            },
+          },
+          {
+            fullUrl: EXAMPLE_PROVIDER_ORGANIZATION_DID,
+            resource: {
+              resourceType: ResourceTypesFhirR4.Organization,
+              id: 'provider-organization',
+              identifier: [{ value: EXAMPLE_PROVIDER_ORGANIZATION_DID }],
             },
           },
           {
@@ -1507,6 +1535,10 @@ describe('CommunicationManager Unit Tests', () => {
         aud: 'did:web:receiver.example',
         exp: Math.floor(Date.now() / 1000) + 300,
         type: 'org.hl7.fhir.r4.Bundle',
+        meta: { jws: { protected: {
+          kid: EXAMPLE_CONTROLLER_SIGN_KEY.kid,
+          alg: EXAMPLE_CONTROLLER_SIGN_KEY.alg,
+        } } },
         body: {
           resourceType: ResourceTypesFhirR4.Bundle,
           type: 'batch',
@@ -1568,7 +1600,16 @@ describe('CommunicationManager Unit Tests', () => {
       expect(medicationPut).toBeDefined();
       const medicationRecord = (medicationPut?.[1] as any[])[0];
       expect(medicationRecord.id).toBe('medication-001');
-      expect(medicationRecord.audit?.creatorDid).toBe(decoded.iss);
+      expect(medicationRecord.audit?.creatorDid).toBe(EXAMPLE_PROVIDER_ORGANIZATION_DID);
+      expect(medicationRecord.audit?.submitterDid).toBe(decoded.iss);
+      expect(medicationRecord.audit?.signingKeyId).toBe(EXAMPLE_CONTROLLER_SIGN_KEY.kid);
+      expect(medicationRecord[CompositionClaim.Identifier]).toBe(EXAMPLE_IPS_COMPOSITION_IDENTIFIER);
+      expect(medicationRecord[CompositionClaim.Author]).toBe(EXAMPLE_PROVIDER_ORGANIZATION_DID);
+      expect(medicationRecord[CompositionClaim.Custodian]).toBe(EXAMPLE_PROVIDER_ORGANIZATION_DID);
+      expect(medicationRecord[CompositionClaim.Attester]).toBe([
+        `urn:uuid:${EXAMPLE_KYC_CONTROLLER_UUID}`,
+        `urn:uuid:${EXAMPLE_KYC_CONTROLLER_USER_UUID}`,
+      ].join(','));
       expect(
         medicationRecord['MedicationStatement.subject']
         || medicationRecord['org.hl7.fhir.api.MedicationStatement.subject'],
@@ -1597,6 +1638,13 @@ describe('CommunicationManager Unit Tests', () => {
           expect.objectContaining({ name: 'org.hl7.fhir.api.MedicationStatement.code-text', value: 'Paracetamol 500mg' }),
           expect.objectContaining({ name: 'org.hl7.fhir.api.MedicationStatement.language', value: 'es' }),
           expect.objectContaining({ name: 'org.hl7.fhir.api.MedicationStatement.user-selected', value: 'true' }),
+          expect.objectContaining({ name: ConfidentialDocumentIndex.Sector, value: job.sector }),
+          expect.objectContaining({ name: CompositionClaim.Identifier, value: EXAMPLE_IPS_COMPOSITION_IDENTIFIER }),
+          expect.objectContaining({ name: CompositionClaim.Author, value: EXAMPLE_PROVIDER_ORGANIZATION_DID }),
+          expect.objectContaining({ name: CompositionClaim.Custodian, value: EXAMPLE_PROVIDER_ORGANIZATION_DID }),
+          expect.objectContaining({ name: CompositionClaim.Attester, value: `urn:uuid:${EXAMPLE_KYC_CONTROLLER_UUID}` }),
+          expect.objectContaining({ name: CompositionClaim.Attester, value: `urn:uuid:${EXAMPLE_KYC_CONTROLLER_USER_UUID}` }),
+          expect.objectContaining({ name: ConfidentialDocumentIndex.SigningKeyId, value: EXAMPLE_CONTROLLER_SIGN_KEY.kid }),
         ]),
       );
 
