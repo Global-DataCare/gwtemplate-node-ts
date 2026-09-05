@@ -9,9 +9,9 @@ The so-called "SEDIA runner" is not Helm, nor a tool supplied or approved by SED
 The two verified `linux/amd64` images are publicly available on GitHub Container Registry:
 
 - [GW CORE](https://github.com/orgs/Global-DataCare/packages/container/package/gw-core):
-`ghcr.io/global-datacare/gw-core@sha256:724ba328915d9907d7254c7eeded845d70dc1ae05881bccff630e871fbc7389f`.
+`ghcr.io/global-datacare/gw-core@sha256:e08eb3482e8e6df812269ba72c14d7831c2cdc331fe7bc6836a606b4e2e96a71`.
 - [Runtime CCAAS](https://github.com/orgs/Global-DataCare/packages/container/package/host-runtime):
-`ghcr.io/global-datacare/host-runtime@sha256:67e5c0fb93efbdc79812a3579ea0b9b0d8e230fca8d430c72e81666a7389f7ac`.
+`ghcr.io/global-datacare/host-runtime@sha256:0742ce44f2c56b8a559ed872620c779adaac64c6e1b476d3fda1762f0d2fe510`.
 
 The first one runs GW CORE. The second contains the nine chaincode servers and selects each contract using `CHAINCODE_NAME`. It does not replace CCAAS packages: their package IDs depend on the exact Services in the release and are generated after setting the Helm name and namespace.
 
@@ -111,8 +111,8 @@ This gate requires that all four collections arrive in PostgreSQL, that each aud
 To verify or reuse already published artifacts without rebuilding them:
 
 ```bash
-export GW_PUBLIC_IMAGE="ghcr.io/global-datacare/gw-core@sha256:724ba328915d9907d7254c7eeded845d70dc1ae05881bccff630e871fbc7389f"
-export CCAAS_PUBLIC_IMAGE="ghcr.io/global-datacare/host-runtime@sha256:67e5c0fb93efbdc79812a3579ea0b9b0d8e230fca8d430c72e81666a7389f7ac"
+export GW_PUBLIC_IMAGE="ghcr.io/global-datacare/gw-core@sha256:e08eb3482e8e6df812269ba72c14d7831c2cdc331fe7bc6836a606b4e2e96a71"
+export CCAAS_PUBLIC_IMAGE="ghcr.io/global-datacare/host-runtime@sha256:0742ce44f2c56b8a559ed872620c779adaac64c6e1b476d3fda1762f0d2fe510"
 docker buildx imagetools inspect "${GW_PUBLIC_IMAGE}"
 docker buildx imagetools inspect "${CCAAS_PUBLIC_IMAGE}"
 docker pull "${GW_PUBLIC_IMAGE}"

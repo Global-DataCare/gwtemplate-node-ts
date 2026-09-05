@@ -21,9 +21,9 @@
  <h2>Verified public OCI images</h2>
   <ul>
     <li>GW CORE: <a href="https://github.com/orgs/Global-DataCare/packages/container/package/gw-core">https://github.com/orgs/Global-DataCare/packages/container/package/gw-core</a>:
-      <code>ghcr.io/global-datacare/gw-core@sha256:724ba328915d9907d7254c7eeded845d70dc1ae05881bccff630e871fbc7389f</code>.</li>
+      <code>ghcr.io/global-datacare/gw-core@sha256:e08eb3482e8e6df812269ba72c14d7831c2cdc331fe7bc6836a606b4e2e96a71</code>.</li>
     <li>CCAAS Runtime: <a href="https://github.com/orgs/Global-DataCare/packages/container/package/host-runtime">https://github.com/orgs/Global-DataCare/packages/container/package/host-runtime</a>:
-      <code>ghcr.io/global-datacare/host-runtime@sha256:67e5c0fb93efbdc79812a3579ea0b9b0d8e230fca8d430c72e81666a7389f7ac</code>.</li>
+      <code>ghcr.io/global-datacare/host-runtime@sha256:0742ce44f2c56b8a559ed872620c779adaac64c6e1b476d3fda1762f0d2fe510</code>.</li>
   </ul>
   <p>GW CORE and CCAAS are different OCI artifacts. The CCAAS runtime contains
   all nine chaincode servers, but the package IDs are generated for the
@@ -248,8 +248,8 @@ helm show chart oci://ghcr.io/global-datacare/gdc-host --version 0.3.2</pre>
   <p>The OCI chart is the same artifact validated in local-network. Values,
   Secrets, enrollment grants, MSP/TLS material and package IDs are generated
   again for each environment.</p>
-  <pre>export GW_PUBLIC_IMAGE="ghcr.io/global-datacare/gw-core@sha256:724ba328915d9907d7254c7eeded845d70dc1ae05881bccff630e871fbc7389f"
-export CCAAS_PUBLIC_IMAGE="ghcr.io/global-datacare/host-runtime@sha256:67e5c0fb93efbdc79812a3579ea0b9b0d8e230fca8d430c72e81666a7389f7ac"
+  <pre>export GW_PUBLIC_IMAGE="ghcr.io/global-datacare/gw-core@sha256:e08eb3482e8e6df812269ba72c14d7831c2cdc331fe7bc6836a606b4e2e96a71"
+export CCAAS_PUBLIC_IMAGE="ghcr.io/global-datacare/host-runtime@sha256:0742ce44f2c56b8a559ed872620c779adaac64c6e1b476d3fda1762f0d2fe510"
 docker buildx imagetools inspect "${GW_PUBLIC_IMAGE}"
 docker buildx imagetools inspect "${CCAAS_PUBLIC_IMAGE}"
 docker pull "${GW_PUBLIC_IMAGE}"

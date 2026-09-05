@@ -26,6 +26,9 @@
   employee assignment, licence/key binding and cryptographic-key records,
   including the exact UUID-to-multihash algorithm and the currently implemented
   employment-history limits.
+- Publish and pin immutable GW CORE 1.25.0 and CCAAS host-runtime images; the
+  latter contains `artifact-sc` 1.1.0 while the preceding digest remains
+  available only for rollback.
 
 ## [1.24.15] - 2026-09-04
 
