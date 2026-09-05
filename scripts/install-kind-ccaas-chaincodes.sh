@@ -118,6 +118,31 @@ docker_peer_exec() {
     "$@"
 }
 
+ensure_kind_package_installed() {
+  local remote_archive="$1"
+  local package_id="$2"
+  if kind_peer_exec peer lifecycle chaincode queryinstalled | grep -Fq "${package_id}"; then
+    return 0
+  fi
+  kind_peer_exec peer lifecycle chaincode install "${remote_archive}"
+  kind_peer_exec peer lifecycle chaincode queryinstalled | grep -Fq "${package_id}"
+}
+
+ensure_docker_host2_package_installed() {
+  local archive="$1"
+  local docker_archive="$2"
+  local package_id="$3"
+  if docker_peer_exec Host2MSP peer0-host2:7051 host2.example.com \
+    peer lifecycle chaincode queryinstalled | grep -Fq "${package_id}"; then
+    return 0
+  fi
+  docker cp "${archive}" "${FABRIC_TOOLS_CONTAINER}:${docker_archive}"
+  docker_peer_exec Host2MSP peer0-host2:7051 host2.example.com \
+    peer lifecycle chaincode install "${docker_archive}"
+  docker_peer_exec Host2MSP peer0-host2:7051 host2.example.com \
+    peer lifecycle chaincode queryinstalled | grep -Fq "${package_id}"
+}
+
 wait_for_kind_chaincode_commit() {
   local channel="$1"
   local name="$2"
@@ -160,15 +185,10 @@ install_kind_ccaas_chaincodes() {
     kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" cp \
       "${archive}" "peer-join-tools:${remote_archive}"
 
-    kind_peer_exec peer lifecycle chaincode install "${remote_archive}"
-    kind_peer_exec peer lifecycle chaincode queryinstalled | grep -Fq "${package_id}"
+    ensure_kind_package_installed "${remote_archive}" "${package_id}"
 
     docker_archive="/tmp/${name}-kind-caas.tgz"
-    docker cp "${archive}" "${FABRIC_TOOLS_CONTAINER}:${docker_archive}"
-    docker_peer_exec Host2MSP peer0-host2:7051 host2.example.com \
-      peer lifecycle chaincode install "${docker_archive}"
-    docker_peer_exec Host2MSP peer0-host2:7051 host2.example.com \
-      peer lifecycle chaincode queryinstalled | grep -Fq "${package_id}"
+    ensure_docker_host2_package_installed "${archive}" "${docker_archive}" "${package_id}"
 
     IFS="," read -r -a channels <<< "${channel_csv}"
     for channel in "${channels[@]}"; do

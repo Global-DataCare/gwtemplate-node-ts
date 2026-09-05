@@ -61,6 +61,8 @@ grep -Fq 'current_sequence=' "${CCAAS}"
 grep -Fq 'target_sequence=$((current_sequence + 1))' "${CCAAS}"
 grep -Fq 'host1_package_id=' "${CCAAS}"
 grep -Fq 'docker_peer_exec' "${CCAAS}"
+grep -Fq 'ensure_kind_package_installed' "${CCAAS}"
+grep -Fq 'ensure_docker_host2_package_installed' "${CCAAS}"
 grep -Fq -- '--sequence "${target_sequence}"' "${CCAAS}"
 grep -Fq '${committed:-null}' "${CCAAS}"
 if grep -Fq '${committed:-{}}' "${CCAAS}"; then

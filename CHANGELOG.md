@@ -57,7 +57,8 @@
   preserving Host1's installed package and the governed multi-host endorsement
   policy instead of attempting to redefine a committed sequence. Keep empty
   commit-poll responses valid JSON so synchronization retries terminate as
-  soon as the promoted definition reaches the Kubernetes peer.
+  soon as the promoted definition reaches the Kubernetes peer, and make
+  repeated evidence runs reuse already installed package IDs on both peers.
 
 ## [1.24.13] - 2026-09-04
 
