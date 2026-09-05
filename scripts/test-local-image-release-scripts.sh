@@ -161,7 +161,9 @@ grep -Fq 'touch -t 198001010000' ./scripts/install-kind-ccaas-chaincodes.sh
 grep -Fq 'tar --format ustar --uid 0 --gid 0' ./scripts/install-kind-ccaas-chaincodes.sh
 grep -Fq 'gzip -n' ./scripts/install-kind-ccaas-chaincodes.sh
 grep -Fq '.source.Type.LocalPackage.package_id == $package_id' ./scripts/install-kind-ccaas-chaincodes.sh
-grep -Fq '.version == $version and .sequence == 1 and .approvals[$msp] == true' \
+grep -Fq '.version == $version and .sequence == $sequence and .approvals[$msp] == true' \
+  ./scripts/install-kind-ccaas-chaincodes.sh
+grep -Fq 'target_sequence=$((current_sequence + 1))' \
   ./scripts/install-kind-ccaas-chaincodes.sh
 grep -Fq 'gw.fabricPeerEndpoint="${KIND_PEER_SERVICE}:7051"' ./scripts/smoke-helm-local-network.sh
 grep -Fq 'name: orderer-tcp-bridge' ./scripts/smoke-helm-local-network.sh
