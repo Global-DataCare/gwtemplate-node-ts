@@ -6,7 +6,12 @@ import { HttpStatusCodes } from 'gdc-common-utils-ts/constants/http';
 import { getHealthcareRoleByClaim } from 'gdc-common-utils-ts/constants/healthcare';
 
 import { v4 as uuidv4 } from 'uuid';
-import { FhirIpsCreatorKinds, normalizeUuid, OrganizationEmployeeSearchResponseEntryTypes } from 'gdc-common-utils-ts';
+import {
+  buildOrganizationAuthorizationUrnCds,
+  FhirIpsCreatorKinds,
+  normalizeUuid,
+  OrganizationEmployeeSearchResponseEntryTypes,
+} from 'gdc-common-utils-ts';
 import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
 import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
 import { IssueLevel, IssueType } from 'gdc-common-utils-ts/models/issue';
@@ -144,7 +149,6 @@ export class EmployeeManager {
           environment,
           job.sector,
           job.jurisdiction,
-          job.content.aud as string,
         );
         responseEntries.push(resultEntry);
       } catch (error: any) {
@@ -293,7 +297,6 @@ export class EmployeeManager {
     environment?: string,
     sector?: string,
     jurisdiction?: string,
-    ownerIdentifier?: string,
   ): Promise<BundleEntry> {
     const requestEntry = entry as BundleEntryRequest;
     const { request, type } = requestEntry;
@@ -316,7 +319,7 @@ export class EmployeeManager {
         if (!claims) {
           throw new ManagerError('Entry requires resource.meta.claims.', IssueType.Required);
         }
-        return this.createEmployee(tenantVaultId, employeeCollectionName, tenantId, tenantUrn, employeeId, claims, type, meta, contentType, ownerIdentifier);
+        return this.createEmployee(tenantVaultId, employeeCollectionName, tenantId, tenantUrn, employeeId, claims, type, meta, contentType);
       case 'DELETE':
         return this.disableEmployee(employeeCollectionName, tenantVaultId, employeeId, type);
       default:
@@ -346,7 +349,6 @@ export class EmployeeManager {
     entryType: string,
     jobMeta: IDecodedDidcommPayload['meta'],
     contentType?: string,
-    ownerIdentifier?: string,
   ): Promise<BundleEntry> {
     let signerJwk: PublicJwk | undefined;
     let encrypterJwk: PublicJwk | undefined;
@@ -524,7 +526,12 @@ export class EmployeeManager {
       tenantVaultId,
       employeeId,
       occupationId: occupationDoc.id,
-      ownerIdentifier,
+      ownerIdentifier: buildOrganizationAuthorizationUrnCds({
+        jurisdiction: parsedTenantUrn.jurisdiction,
+        version: parsedTenantUrn.version,
+        identifierType: parsedTenantUrn.idType,
+        identifierValue: parsedTenantUrn.idValue,
+      }),
       role: roleCode,
       email,
     });

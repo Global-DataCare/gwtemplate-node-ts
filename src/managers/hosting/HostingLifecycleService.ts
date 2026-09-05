@@ -504,7 +504,6 @@ export class HostingLifecycleService {
   private async inspectTenantDescendants(vaultId: string): Promise<TenantDescendantLifecycleSummary> {
     const employeeSectionId = getEnvSectionId('employees');
     const baseIndividualSectionId = getEnvSectionId(SUBJECT_SECTION_INDIVIDUAL);
-    const subjectSectionPrefix = getEnvSectionId(`${SUBJECT_SECTION_INDIVIDUAL}_`);
     const tenantCollectionName = await this.tenantsCacheManager.getCollectionName(vaultId);
     const collectionNames = [...new Set([vaultId, tenantCollectionName].filter(Boolean) as string[])];
     const summary: TenantDescendantLifecycleSummary = {
@@ -520,8 +519,10 @@ export class HostingLifecycleService {
       for (const sectionId of sectionIds) {
         const isEmployeeSection = sectionId === employeeSectionId;
         const isBaseIndividualSection = sectionId === baseIndividualSectionId;
-        const isSubjectLifecycleSection = sectionId.startsWith(subjectSectionPrefix);
-        if (!isEmployeeSection && !isBaseIndividualSection && !isSubjectLifecycleSection) {
+        // Subject-scoped sections contain clinical/index resources, not extra
+        // individual registrations. Counting those records makes one subject
+        // look like dozens of active descendants after IPS ingestion.
+        if (!isEmployeeSection && !isBaseIndividualSection) {
           continue;
         }
 

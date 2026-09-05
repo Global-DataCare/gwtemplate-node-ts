@@ -70,6 +70,8 @@ describe('EmployeeManager', () => {
   const TENANT_SECTOR = EXAMPLE_SECTOR;
   const TENANT_VAULT_ID = `${TENANT_SECTOR}_${TENANT_ALTERNATE_NAME}`;
   const TENANT_URN = `urn:antifraud:soschain-test:${EXAMPLE_JURISDICTION.toLowerCase()}:v1:${TENANT_SECTOR}:entity:tax:123456789`;
+  const TENANT_CDS_AUTHORIZATION_URN =
+    `urn:cds-${EXAMPLE_JURISDICTION.toLowerCase()}:v1:organization:tax:123456789`;
   const HOST_COLLECTION_NAME = 'host-collection';
   const HOST_DID = 'did:web:host.example.com';
 
@@ -236,13 +238,11 @@ describe('EmployeeManager', () => {
     it('preauthorizes governed employee and occupation UUIDs as one stable professional creator', async () => {
       const employeeUuid = '31b2c3d4-e5f6-7890-1234-567890abcdef';
       const occupationUuid = '41b2c3d4-e5f6-7890-1234-567890abcdef';
-      const providerDid = 'did:web:provider.example.com';
       const claims = {
         ...testClaimsTenant1Receptionist1,
         [ClaimsPersonSchemaorg.hasOccupation]: HealthcareActorRoles.Veterinarian,
       };
       const job = testBaseJobForEmployeeClaims(claims, TENANT_ALTERNATE_NAME, TENANT_SECTOR);
-      (job.content as any).aud = providerDid;
       ((job.content as any).body.data[0] as any).resource = { id: employeeUuid };
       (uuidv4 as jest.Mock).mockReturnValue(occupationUuid);
       mockVaultRepository.put.mockResolvedValue(true);
@@ -258,7 +258,7 @@ describe('EmployeeManager', () => {
           kind: FhirIpsCreatorKinds.Professional,
           actorIdentifier: `urn:uuid:${employeeUuid}`,
           authorIdentifier: `urn:uuid:${occupationUuid}`,
-          ownerIdentifier: providerDid,
+          ownerIdentifier: TENANT_CDS_AUTHORIZATION_URN,
           role: HealthcareActorRoles.Veterinarian,
           verifiedContactIdentifiers: [buildStableActorIdentifier({
             contactKind: 'email',

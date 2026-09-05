@@ -774,6 +774,19 @@ export class CommunicationManager implements IJobProcessor {
       [CompositionClaim.Type]: typeCode,
       'Composition.source': 'Communication',
     }, Format.FHIR_API);
+    if (claimsSection) {
+      try {
+        await this.requireAuthenticatedSectionProvenance(job, tenantVaultId, claims);
+      } catch (error) {
+        // The attached resource processor reports the binding failure as its
+        // own 403 OperationOutcome. Do not persist a forged Composition first
+        // and do not collapse the whole Communication entry into a generic 500.
+        if (error instanceof ManagerError && error.status === String(HttpStatusCodes.Forbidden)) {
+          return undefined;
+        }
+        throw error;
+      }
+    }
     const compositionVersioning = applyFhirCidVersioningToEntry({
       entry: payloadComposition ? { resource: payloadComposition } : { resource: { resourceType: ResourceTypesFhirR4.Composition, id: fallbackId } },
       claims,
@@ -1368,9 +1381,12 @@ export class CommunicationManager implements IJobProcessor {
       ]
         .map((author) => String(author || '').trim())
         .filter(Boolean);
-      if (!await this.isAuthenticatedClinicalAuthorOrSameOwner(
+      const attesters = String(existing[CompositionClaim.Attester] || '')
+        .split(',').map((value) => value.trim()).filter(Boolean);
+      if (!await this.isAuthenticatedClinicalAttesterOrSameOwner(
         input.job,
         input.tenantVaultId,
+        attesters,
         authors,
       )) {
         return errorResponse('403', 'Only the authenticated author or a registered creator with the same owner may update this clinical record.');
@@ -1454,7 +1470,14 @@ export class CommunicationManager implements IJobProcessor {
       ]
         .map((author) => String(author || '').trim())
         .filter(Boolean);
-      if (!await this.isAuthenticatedClinicalAuthor(input.job, input.tenantVaultId, authors)) {
+      const attesters = String(existing[CompositionClaim.Attester] || '')
+        .split(',').map((value) => value.trim()).filter(Boolean);
+      if (!await this.isAuthenticatedClinicalAttester(
+        input.job,
+        input.tenantVaultId,
+        attesters,
+        authors,
+      )) {
         return errorResponse('403', 'Only the authenticated creator may delete this clinical record.');
       }
       const storedSubject = this.resolveProjectedResourceSubject(
@@ -1590,6 +1613,9 @@ export class CommunicationManager implements IJobProcessor {
       input.creatorDid,
       input.documentClaims,
     );
+    if (input.explicitSection) {
+      await this.requireAuthenticatedSectionProvenance(input.job, input.tenantVaultId, claims);
+    }
     if (input.explicitSection && !getClaimValue<string>(claims, CompositionClaim.Section)) {
       claims[CompositionClaim.Section] = input.explicitSection;
     }
@@ -1649,9 +1675,12 @@ export class CommunicationManager implements IJobProcessor {
       ]
         .map((author) => String(author || '').trim())
         .filter(Boolean);
-      const isExactAuthorOrSameOwner = await this.isAuthenticatedClinicalAuthorOrSameOwner(
+      const existingAttesters = String(existing[CompositionClaim.Attester] || '')
+        .split(',').map((value) => value.trim()).filter(Boolean);
+      const isExactAuthorOrSameOwner = await this.isAuthenticatedClinicalAttesterOrSameOwner(
         input.job,
         input.tenantVaultId,
+        existingAttesters,
         existingAuthors,
       );
       const replacementDecision = input.documentProvenance
@@ -1695,7 +1724,7 @@ export class CommunicationManager implements IJobProcessor {
     const recordedAuthor = this.getFirstClaimValue(claims, [CompositionClaim.Author])
       || input.creatorDid;
     const audit = recordedAuthor ? {
-      creatorDid: recordedAuthor,
+      creatorDid: authenticatedActorDid || recordedAuthor,
       ...(input.documentProvenance ? {
         authorOwnerIdentifier: input.documentProvenance.organizationReference,
         documentDate: input.documentProvenance.documentDate,
@@ -1750,7 +1779,7 @@ export class CommunicationManager implements IJobProcessor {
         config.collectionId,
       );
       const researchAudit = input.creatorDid ? {
-        creatorDid: input.creatorDid,
+        creatorDid: authenticatedActorDid || input.creatorDid,
         sourceRecordId: recordId,
         ...(audit?.submitterDid ? { submitterDid: audit.submitterDid } : {}),
         ...(audit?.signingKeyId ? { signingKeyId: audit.signingKeyId } : {}),
@@ -1819,7 +1848,7 @@ export class CommunicationManager implements IJobProcessor {
   ): Promise<void> {
     const authenticatedDid = getAuthenticatedJobActorIdentifiers(job)
       .find((identifier) => identifier.startsWith('did:web:'));
-    if (!authorDid || authorDid !== authenticatedDid) return;
+    if (!authenticatedDid) return;
     const verifiedContacts = getAuthenticatedJobActorIdentifiers(job)
       .filter((identifier) => !identifier.startsWith('did:web:'));
     const sectionId = getClinicalCreatorBindingsSectionId();
@@ -1828,10 +1857,15 @@ export class CommunicationManager implements IJobProcessor {
     const evidence = clinicalCreatorEvidence(job);
     const stableBinding = resolveClinicalCreatorBinding(bindings, evidence);
     if (stableBinding) {
+      const authorBelongsToBinding = !authorDid
+        || authorDid === authenticatedDid
+        || authorDid === stableBinding.ownerIdentifier
+        || authorDid === stableBinding.authorIdentifier;
+      if (!authorBelongsToBinding) return;
       await this.vaultRepository.put(tenantVaultId, [{
         ...stableBinding,
         id: stableBinding.authorIdentifier,
-        actorDids: Array.from(new Set([...(stableBinding.actorDids || []), authorDid])),
+        actorDids: Array.from(new Set([...(stableBinding.actorDids || []), authenticatedDid])),
         verifiedContactIdentifiers: Array.from(new Set([
           ...(stableBinding.verifiedContactIdentifiers || []),
           ...verifiedContacts,
@@ -1847,7 +1881,7 @@ export class CommunicationManager implements IJobProcessor {
       } as any], sectionId);
       return;
     }
-    if (verifiedContacts.length === 0) return;
+    if (!authorDid || authorDid !== authenticatedDid || verifiedContacts.length === 0) return;
     const id = createHash('sha256').update(authorDid, 'utf8').digest('hex');
     const existing = await this.vaultRepository.get<{ id: string; verifiedContacts?: string[] }>(
       tenantVaultId,
@@ -1890,6 +1924,95 @@ export class CommunicationManager implements IJobProcessor {
       if (binding?.verifiedContacts?.some((identifier) => verifiedContacts.includes(identifier))) return true;
     }
     return false;
+  }
+
+  /** Resolves the exact role/relationship assignment bound during enrollment. */
+  private async resolveAuthenticatedClinicalCreatorBinding(
+    job: JobRequest,
+    tenantVaultId: string,
+  ): Promise<ClinicalCreatorBinding | undefined> {
+    const records = await this.vaultRepository.listContainersInSection(
+      tenantVaultId,
+      getClinicalCreatorBindingsSectionId(),
+    );
+    return resolveClinicalCreatorBinding(
+      (records as unknown[]).filter(isClinicalCreatorBinding),
+      clinicalCreatorEvidence(job),
+    );
+  }
+
+  /**
+   * Validates local section provenance without rewriting FHIR semantics. A
+   * `urn:uuid` attester is valid when it is the exact PractitionerRole or
+   * RelatedPerson assignment stored in the authenticated profile binding.
+   */
+  private async requireAuthenticatedSectionProvenance(
+    job: JobRequest,
+    tenantVaultId: string,
+    claims: Record<string, any>,
+  ): Promise<void> {
+    const binding = await this.resolveAuthenticatedClinicalCreatorBinding(job, tenantVaultId);
+    if (!binding) return;
+    const author = this.getFirstClaimValue(claims, [CompositionClaim.Author]);
+    const allowedAuthors = binding.kind === FhirIpsCreatorKinds.IndividualMember
+      ? [binding.ownerIdentifier, binding.authorIdentifier]
+      : [binding.ownerIdentifier];
+    if (!author || !allowedAuthors.includes(author)) {
+      throw new ManagerError(
+        'Clinical section author is not allowed by the authenticated creator binding.',
+        IssueType.Security,
+      );
+    }
+    const attesters = String(getClaimValue<string>(claims, CompositionClaim.Attester) || '')
+      .split(',').map((value) => value.trim()).filter(Boolean);
+    if (attesters.some((attester) =>
+      attester !== author
+      && attester !== binding.authorIdentifier
+      && !binding.actorDids?.includes(attester))) {
+      throw new ManagerError(
+        'Clinical section attester must equal its author or the assignment in the authenticated creator binding.',
+        IssueType.Security,
+      );
+    }
+  }
+
+  /**
+   * Authorizes the authenticated actor against the stored attester assignment.
+   * Author fallback exists only for records written before attesters were
+   * persisted independently.
+   */
+  private async isAuthenticatedClinicalAttester(
+    job: JobRequest,
+    tenantVaultId: string,
+    attesterIdentifiers: string[],
+    legacyAuthorIdentifiers: string[] = [],
+  ): Promise<boolean> {
+    const authenticatedIdentifiers = getAuthenticatedJobActorIdentifiers(job);
+    if (attesterIdentifiers.some((identifier) => authenticatedIdentifiers.includes(identifier))) return true;
+    const binding = await this.resolveAuthenticatedClinicalCreatorBinding(job, tenantVaultId);
+    if (binding && attesterIdentifiers.some((identifier) =>
+      identifier === binding.authorIdentifier
+      || identifier === binding.ownerIdentifier
+      || binding.actorDids?.includes(identifier))) {
+      return true;
+    }
+    return attesterIdentifiers.length === 0
+      && this.isAuthenticatedClinicalAuthor(job, tenantVaultId, legacyAuthorIdentifiers);
+  }
+
+  private async isAuthenticatedClinicalAttesterOrSameOwner(
+    job: JobRequest,
+    tenantVaultId: string,
+    attesterIdentifiers: string[],
+    authorIdentifiers: string[],
+  ): Promise<boolean> {
+    if (await this.isAuthenticatedClinicalAttester(
+      job,
+      tenantVaultId,
+      attesterIdentifiers,
+      authorIdentifiers,
+    )) return true;
+    return this.isAuthenticatedClinicalAuthorOrSameOwner(job, tenantVaultId, authorIdentifiers);
   }
 
   private async isAuthenticatedClinicalAuthorOrSameOwner(

@@ -43,6 +43,8 @@ export function updateEditableImportedIpsForDemo(
     importedIps: Record<string, unknown>;
     individualDid: string;
     actorSession: Pick<ActorSession, 'actorDid'>;
+    /** Complete protected-profile projection; never supplied by browser JSON. */
+    clinicalCreator: ClinicalCreatorIpsExport;
     providerDid: string;
   }>,
 ): Promise<SubmitAndPollResult> {
@@ -51,7 +53,9 @@ export function updateEditableImportedIpsForDemo(
 
   const editableCopy = cloneImportedClinicalDocumentForDemo({
     bundle: input.importedIps,
-    authenticatedActorDid: actorDid,
+    // Professional: CDS legal-organization URN author + PractitionerRole
+    // attester. Member/controller: RelatedPerson urn:uuid for both fields.
+    clinicalCreator: input.clinicalCreator,
   });
 
   return sdk.updateClinicalSummary(route, {
@@ -71,7 +75,7 @@ export function exportClinicalCreator(
   profileId: string,
   sourceAuthor: ClinicalSourceAuthorSelection = ClinicalSourceAuthorSelections.Owner,
 ): Promise<ClinicalCreatorIpsExport> {
-  // The BFF chooses only owner or authenticated registered creator. It never
-  // accepts a FHIR author reference, actorDid or signing kid from browser JSON.
+  // The compatibility selection never accepts a reference. High-level helpers
+  // derive the final professional/member boundary from this protected export.
   return profileManager.exportClinicalCreatorIps({ ownerId, profileId, sourceAuthor });
 }

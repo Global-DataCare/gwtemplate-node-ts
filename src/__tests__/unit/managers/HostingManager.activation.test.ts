@@ -1390,6 +1390,31 @@ describe('HostingManager activation flow', () => {
     expect(await vaultRepository.get(tenantVaultId, 'retained-communication', sectionId)).toBeDefined();
   });
 
+  it('should not count subject-scoped clinical resources as individual lifecycle descendants', async () => {
+    // Journey: clinical resources remain in the subject index after the one
+    // individual registration is purged; tenant cleanup counts registrations,
+    // never every Observation/Composition persisted for that subject.
+    const activationJob = buildActivationJob();
+    await hostingManager.process(activationJob);
+    const claims = activationJob.content!.body!.data[0]!.meta!.claims;
+    const tenantVaultId = tenantUtils.getTenantVaultId(
+      claims[ClaimsServiceSchemaorg.category] as Sector,
+      claims[ClaimsOrganizationSchemaorg.alternateName],
+    );
+    const sectionId = getEnvSectionId(`${SUBJECT_SECTION_INDIVIDUAL}_subject_observations`);
+    await vaultRepository.put(tenantVaultId, [{
+      id: 'weight-observation',
+      status: EntityLifecycleStatus.Active,
+      sequence: 0,
+      type: ResourceTypesFhirR4.Observation,
+      content: { resourceType: ResourceTypesFhirR4.Observation },
+    } as ConfidentialStorageDoc], sectionId);
+
+    const status = await hostingManager.process(buildLifecycleJob('_status'));
+    expect(status.body.data[0].resource.lifecycle.descendants.activeIndividuals).toBe(0);
+    expect(status.body.data[0].resource.lifecycle.descendants.unpurgedIndividuals).toBe(0);
+  });
+
   it('should reject tenant disable when controller proof bearer memberOf.taxID does not match the target tenant', async () => {
     const activationJob = buildActivationJob();
     await hostingManager.process(activationJob);

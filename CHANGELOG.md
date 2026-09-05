@@ -2,6 +2,27 @@
 
 ## [Unreleased]
 
+## [1.25.2] - 2026-09-05
+
+- Scope tenant descendant lifecycle counts to actual individual registration
+  records. Subject-scoped IPS/index resources no longer masquerade as dozens
+  of active individuals and block clean tenant disable after E2E cleanup.
+
+- Use the jurisdictional, versioned CDS legal-organization URN as the stable
+  professional clinical-binding owner and FHIR document author; operational
+  employee `did:web` values remain sender/audit aliases and PractitionerRole
+  `urn:uuid` remains the attester.
+- Accept a registered individual member/controller RelatedPerson `urn:uuid` as
+  both author and attester for content it creates, while retaining the distinct
+  individual-authored/dictated case.
+- Return a per-entry `403 OperationOutcome` and persist neither Composition nor
+  clinical resource when a section supplies an unbound author/attester, instead
+  of collapsing the Communication into a generic 500.
+- Add an aggregated IPS journey covering external provider data,
+  administrative professional attestation, controller and caregiver body-weight
+  facts, and the resolvable Organization/Practitioner/PractitionerRole/
+  RelatedPerson graph.
+
 ## [1.25.1] - 2026-09-05
 
 - Replace the undocumented individual-controller `:family:` DCR actor path
