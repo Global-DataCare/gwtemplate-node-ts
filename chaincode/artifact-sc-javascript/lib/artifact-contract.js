@@ -24,6 +24,16 @@ function parseFhirEvidenceBatch(payload) {
     throw new Error("payload.data must be a non-empty array");
   }
 
+  const parseOpaqueLinks = (value, path) => {
+    if (value === undefined) return undefined;
+    const items = Array.isArray(value) ? value : String(value).split(",");
+    const normalized = Array.from(new Set(items.map((item) => String(item || "").trim()).filter(Boolean)));
+    if (normalized.some((item) => !/^(?:z[1-9A-HJ-NP-Za-km-z]+|b[a-z2-7]+)$/.test(item))) {
+      throw new Error(`${path} must contain only opaque multibase or CID values`);
+    }
+    return normalized.length ? normalized : undefined;
+  };
+
   return payload.data.map((entry, index) => {
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
       throw new Error(`data[${index}] must be an object`);
@@ -59,12 +69,27 @@ function parseFhirEvidenceBatch(payload) {
           ...(typeof tag.userSelected === "boolean" ? { userSelected: tag.userSelected } : {}),
         }))
       : undefined;
+    let relationships;
+    if (entry.relationships !== undefined) {
+      if (!entry.relationships || typeof entry.relationships !== "object" || Array.isArray(entry.relationships)) {
+        throw new Error(`data[${index}].relationships must be an object`);
+      }
+      relationships = {};
+      for (const [kind, value] of Object.entries(entry.relationships)) {
+        const links = parseOpaqueLinks(value, `data[${index}].relationships.${kind}`);
+        if (links) relationships[kind] = links;
+      }
+      if (!Object.keys(relationships).length) relationships = undefined;
+    }
+    const ownerships = parseOpaqueLinks(entry.ownerships, `data[${index}].ownerships`);
 
     return {
       id: versionId,
       resourceType,
       versionId,
       tags,
+      relationships,
+      ownerships,
     };
   });
 }
@@ -90,6 +115,8 @@ class ArtifactContract extends Contract {
         artifactType: "fhir-resource-version",
         declaredBy: payload.declaredBy,
         declaredByType: payload.declaredByType,
+        relationships: item.relationships,
+        ownerships: item.ownerships,
         meta: {
           attributes: {
             resourceType: item.resourceType,

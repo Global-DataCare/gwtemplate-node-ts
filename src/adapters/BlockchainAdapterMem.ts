@@ -1,6 +1,7 @@
 // src/adapters/BlockchainAdapterMem.ts
 
 import { IBlockchainAdapter } from './IBlockchainAdapter';
+import type { FhirCidVersionMapping } from '../utils/fhir-versioning';
 
 /**
  * An in-memory mock implementation of the IBlockchainAdapter for testing and local development.
@@ -31,13 +32,7 @@ export class BlockchainAdapterMem implements IBlockchainAdapter {
   }
 
   public async registerCidVersionMappings(
-    mappings: Array<{
-      cid: string;
-      versionId: string;
-      resourceType?: string;
-      resourceId?: string;
-      tags?: Array<{ id: string; system?: string; code?: string; version?: string; userSelected?: boolean }>;
-    }>,
+    mappings: FhirCidVersionMapping[],
     channel: string,
     chaincode: string,
   ): Promise<{ accepted: number; txId?: string }> {

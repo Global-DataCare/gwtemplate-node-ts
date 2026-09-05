@@ -43,6 +43,7 @@ import { createHash } from 'crypto';
 import { encodeMultibase58btc } from 'gdc-common-utils-ts/utils/multibase58';
 import {
   applyFhirCidVersioningToEntry,
+  buildFhirLedgerProvenance,
   fhirResourceToCid,
   type FhirCidVersionMapping,
 } from '../utils/fhir-versioning';
@@ -195,6 +196,11 @@ type ClinicalLedgerReceipt = Readonly<{
   transactionId?: string;
   evidence: readonly FhirCidVersionMapping[];
 }>;
+
+type ClinicalBatchEntryResult = (BundleEntryResponse | ErrorEntry) & {
+  /** Internal handoff removed before the public batch response is returned. */
+  ledgerEvidence?: FhirCidVersionMapping;
+};
 
 const COMMUNICATION_RESOURCE_TYPE = 'Communication' as const;
 const COMMUNICATION_ENTRY_TYPE = 'CommMsgExtended' as const;
@@ -783,6 +789,13 @@ export class CommunicationManager implements IJobProcessor {
       cid: contentVersionId,
       versionId: contentVersionId,
       ...(compositionVersioning.mapping?.tags?.length ? { tags: compositionVersioning.mapping.tags } : {}),
+      ...buildFhirLedgerProvenance({
+        claims,
+        sender: this.resolveCommunicationSender(entry, fhirResource)
+          || getAuthenticatedJobActorIdentifiers(job)[0],
+        submitter: getAuthenticatedJobActorIdentifiers(job)[0],
+        signingKeyId: clinicalCreatorEvidence(job).keyId,
+      }),
     };
 
     const individualSectionId = getSubjectScopedSectionId(subject, SUBJECT_SECTION_INDIVIDUAL, 'composition');
@@ -1115,6 +1128,7 @@ export class CommunicationManager implements IJobProcessor {
     const evidence = [...initialEvidence];
 
     const communicationSubject = this.resolveCommunicationSubject(entry, fhirResource);
+    const communicationSender = this.resolveCommunicationSender(entry, fhirResource);
     const clinicalAuthorDid = this.resolveClinicalResourceAuthor(job, entry, fhirResource);
     await this.persistClinicalAuthorIdentityBinding(job, tenantVaultId, clinicalAuthorDid);
     const explicitSection = String(
@@ -1161,25 +1175,16 @@ export class CommunicationManager implements IJobProcessor {
               entry: attachedEntry,
               creatorDid: clinicalAuthorDid,
               communicationSubject,
+              communicationSender,
               explicitSection,
               fhirResource,
               tenantVaultId,
               documentClaims,
             });
             batchResponses.push(response);
-            const responseResource = (response as any)?.resource;
-            const responseVersionId = this.normalizeOptionalString(responseResource?.meta?.versionId);
-            if (responseVersionId && responseResource?.resourceType && responseResource?.id) {
-              evidence.push({
-                resourceType: String(responseResource.resourceType),
-                resourceId: String(responseResource.id),
-                cid: responseVersionId,
-                versionId: responseVersionId,
-                ...(Array.isArray(responseResource?.meta?.tag) && responseResource.meta.tag.length
-                  ? { tags: responseResource.meta.tag }
-                  : {}),
-              });
-            }
+            const ledgerEvidence = (response as any)?.ledgerEvidence as FhirCidVersionMapping | undefined;
+            if (ledgerEvidence) evidence.push(ledgerEvidence);
+            delete (response as any).ledgerEvidence;
           }
           continue;
         }
@@ -1197,6 +1202,7 @@ export class CommunicationManager implements IJobProcessor {
           resource,
           resourceType,
           communicationSubject,
+          communicationSender,
           explicitSection,
           fhirResource,
           tenantVaultId,
@@ -1259,11 +1265,12 @@ export class CommunicationManager implements IJobProcessor {
     entry: any;
     creatorDid?: string;
     communicationSubject?: string;
+    communicationSender?: string;
     explicitSection: string;
     fhirResource: FhirCommunication;
     tenantVaultId: string;
     documentClaims?: Record<string, unknown>;
-  }): Promise<BundleEntryResponse | ErrorEntry> {
+  }): Promise<ClinicalBatchEntryResult> {
     const request = input.entry?.request;
     const resource = input.entry?.resource;
     const requestMethod = String(request?.method || '').trim().toUpperCase();
@@ -1312,6 +1319,7 @@ export class CommunicationManager implements IJobProcessor {
           resource,
           resourceType,
           communicationSubject: input.communicationSubject,
+          communicationSender: input.communicationSender,
           explicitSection: input.explicitSection,
           fhirResource: input.fhirResource,
           tenantVaultId: input.tenantVaultId,
@@ -1330,6 +1338,7 @@ export class CommunicationManager implements IJobProcessor {
               ...(created.evidence.tags?.length ? { tag: created.evidence.tags } : {}),
             },
           },
+          ledgerEvidence: created.evidence,
         };
       } catch (error) {
         const status = error instanceof ManagerError ? error.status : '400';
@@ -1392,6 +1401,7 @@ export class CommunicationManager implements IJobProcessor {
           resource,
           resourceType,
           communicationSubject: input.communicationSubject,
+          communicationSender: input.communicationSender,
           explicitSection: input.explicitSection,
           fhirResource: input.fhirResource,
           tenantVaultId: input.tenantVaultId,
@@ -1410,6 +1420,7 @@ export class CommunicationManager implements IJobProcessor {
               ...(updated.evidence.tags?.length ? { tag: updated.evidence.tags } : {}),
             },
           },
+          ledgerEvidence: updated.evidence,
         };
       } catch (error) {
         const status = error instanceof ManagerError ? error.status : '400';
@@ -1525,6 +1536,7 @@ export class CommunicationManager implements IJobProcessor {
     resource: Record<string, any>;
     resourceType: SupportedProjectedResourceType;
     communicationSubject?: string;
+    communicationSender?: string;
     explicitSection: string;
     fhirResource: FhirCommunication;
     tenantVaultId: string;
@@ -1612,6 +1624,13 @@ export class CommunicationManager implements IJobProcessor {
       cid: versionId,
       versionId,
       ...(ledgerSafeTags?.length ? { tags: ledgerSafeTags } : {}),
+      ...buildFhirLedgerProvenance({
+        claims,
+        sender: input.communicationSender || authenticatedActorDid,
+        submitter: authenticatedActorDid,
+        signingKeyId: clinicalCreatorEvidence(input.job).keyId,
+        subject: subjectRef,
+      }),
     };
     const existing = await this.vaultRepository.get<{ id: string } & Record<string, any>>(
       input.tenantVaultId,

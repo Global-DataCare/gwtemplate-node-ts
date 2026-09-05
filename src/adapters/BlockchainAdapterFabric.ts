@@ -3,6 +3,7 @@
 
 import { ManageAssetConsentAccess } from '../blockchain/fabric/v3/manageAssetConsentAccess';
 import { ManageAssetArtifact } from '../blockchain/fabric/v3/manageAssetArtifact';
+import type { FhirCidVersionMapping } from '../utils/fhir-versioning';
 import type { IBlockchainAdapter } from './IBlockchainAdapter';
 
 type FabricBlockchainConfig = {
@@ -36,25 +37,13 @@ export class BlockchainAdapterFabric implements IBlockchainAdapter {
   }
 
   public async registerCidVersionMappings(
-    mappings: Array<{
-      cid: string;
-      versionId: string;
-      resourceType?: string;
-      resourceId?: string;
-      tags?: Array<{
-        id: string;
-        system?: string;
-        code?: string;
-        version?: string;
-        userSelected?: boolean;
-      }>;
-    }>,
+    mappings: FhirCidVersionMapping[],
     channel: string,
     chaincode: string,
   ): Promise<{ accepted: number; txId?: string }> {
     const config = loadFabricBlockchainConfig();
     const manager = new ManageAssetArtifact({ chaincodeName: chaincode, channelName: channel });
-    const data = mappings.map(({ cid, versionId, resourceType, tags }) => ({
+    const data = mappings.map(({ cid, versionId, resourceType, tags, relationships, ownerships }) => ({
       type: resourceType || 'Basic',
       id: cid,
       resource: {
@@ -64,6 +53,8 @@ export class BlockchainAdapterFabric implements IBlockchainAdapter {
           ...(tags?.length ? { tag: tags } : {}),
         },
       },
+      ...(relationships && Object.keys(relationships).length ? { relationships } : {}),
+      ...(ownerships?.length ? { ownerships } : {}),
     }));
     const submitted = await manager.upsertArtifactsWithTransactionId(config.mspId, { data });
     return { accepted: data.length, txId: submitted.transactionId };

@@ -23,6 +23,8 @@ export interface IBlockchainAdapter {
    * `resource.id` remains UUID; `versionId` can carry a CID/multihash for traceability.
    *
    * Implementations can persist these mappings on-chain for audit/discovery.
+   * Provenance crosses this boundary only as opaque relationship/ownership
+   * hashes; raw FHIR references and claims remain confidential.
    */
   registerCidVersionMappings?(
     mappings: Array<{
@@ -37,6 +39,11 @@ export interface IBlockchainAdapter {
         version?: string;
         userSelected?: boolean;
       }>;
+      relationships?: Partial<Record<
+        'author' | 'attester' | 'custodian' | 'sender' | 'submitter' | 'signingKey',
+        string[]
+      >>;
+      ownerships?: string[];
     }>,
     channel: string,
     chaincode: string,

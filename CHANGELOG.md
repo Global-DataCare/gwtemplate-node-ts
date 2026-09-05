@@ -2,6 +2,34 @@
 
 ## [Unreleased]
 
+## [1.25.0] - 2026-09-05
+
+- Restore the historical per-asset `relationships` and `ownerships` contract
+  for Communication-carried clinical resources. GW derives distinct author,
+  attester, custodian, sender, verified submitter, signing-key and subject-owner
+  links from protected provenance and sends only SHA3-384 multihashes; raw
+  DIDs, URNs, URLs, key ids and claims remain confidential. UUID-backed
+  identities hash their canonical 16 UUID bytes so equivalent bare,
+  `urn:uuid`, FHIR-relative and employee-instance references converge.
+- Preserve all provenance links for every resource in the atomic `data[]`
+  Fabric transaction, including multi-valued attesters, while keeping the new
+  fields optional for callers using the 1.0 contract.
+- Release the embedded `artifact-sc` contract as `1.1.0`; reject raw identities
+  at the chaincode boundary, persist only opaque links and keep the resource CID
+  as the individual asset id. Channel and smart-contract selection remains
+  internal manager policy.
+- Prove both section batches and document Bundles: an organization may remain
+  author, one or more registered roles may attest, and the employee transporting
+  and signing the document remains independently auditable without becoming an
+  attester.
+- Specify the normalized employee audit graph across the clinical artifact,
+  employee assignment, licence/key binding and cryptographic-key records,
+  including the exact UUID-to-multihash algorithm and the currently implemented
+  employment-history limits.
+- Publish and pin immutable GW CORE 1.25.0 and CCAAS host-runtime images; the
+  latter contains `artifact-sc` 1.1.0 while the preceding digest remains
+  available only for rollback.
+
 ## [1.24.15] - 2026-09-04
 
 - Make clinical-evidence and consent-access managers derive their governed

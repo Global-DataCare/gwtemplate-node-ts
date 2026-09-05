@@ -4,9 +4,11 @@
 import { sha3_384 } from '@noble/hashes/sha3.js';
 import { utf8ToBytes } from '@noble/hashes/utils.js';
 import { encodeMultibase58btc } from 'gdc-common-utils-ts/utils/multibase58';
+import { CompositionClaim } from 'gdc-common-utils-ts/models/interoperable-claims/composition-claims';
 import type { LedgerSafeMetaTag } from '../services/ai/metaTagSanitizer';
 import { extractLedgerSafeResearchTags } from './fhir-ingestion';
 import { ClinicalEvidenceChaincode, resolveClinicalDataChannel } from './ledger';
+import { uuidToBytes } from './uuid';
 
 export type FhirCidVersionMapping = {
   resourceType?: string;
@@ -14,10 +16,29 @@ export type FhirCidVersionMapping = {
   cid: string;
   versionId: string;
   tags?: LedgerSafeMetaTag[];
+  relationships?: FhirLedgerRelationships;
+  ownerships?: string[];
 };
+
+export type FhirLedgerRelationshipKind =
+  | 'author'
+  | 'attester'
+  | 'custodian'
+  | 'sender'
+  | 'submitter'
+  | 'signingKey';
+
+export type FhirLedgerRelationships = Partial<Record<FhirLedgerRelationshipKind, string[]>>;
+
+export type FhirLedgerProvenance = Readonly<{
+  relationships: FhirLedgerRelationships;
+  ownerships: string[];
+}>;
 
 const MULTIHASH_SHA3_384_CODE = 0x15;
 const MULTIHASH_SHA3_384_LEN = 48;
+const UUID_TEXT_PATTERN = '[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[1-5][0-9a-fA-F]{3}-?[89abAB][0-9a-fA-F]{3}-?[0-9a-fA-F]{12}';
+const UUID_REFERENCE_PATTERN = new RegExp(`(?:^urn:uuid:|^|/|:instance:)(${UUID_TEXT_PATTERN})$`, 'i');
 
 function concatBytes(...parts: Uint8Array[]): Uint8Array {
   const total = parts.reduce((acc, p) => acc + p.length, 0);
@@ -40,6 +61,77 @@ function encodeVarint(value: number): Uint8Array {
   }
   out.push(n);
   return Uint8Array.from(out);
+}
+
+function sha3Multihash(value: string | Uint8Array): string {
+  const digest = sha3_384(typeof value === 'string' ? utf8ToBytes(value) : value);
+  const multihash = concatBytes(
+    encodeVarint(MULTIHASH_SHA3_384_CODE),
+    encodeVarint(MULTIHASH_SHA3_384_LEN),
+    digest,
+  );
+  return encodeMultibase58btc(multihash);
+}
+
+/**
+ * Builds the opaque ledger identifier used by clinical provenance links.
+ *
+ * UUID-backed organization, employee, PractitionerRole and subject references
+ * all hash the UUID's canonical 16 bytes, so `urn:uuid:...`, `Type/...` and a
+ * role-bearing employee URN ending in `:instance:<uuid>` converge on the same
+ * SHA3-384 multihash. References without a UUID hash their canonical UTF-8
+ * form and therefore remain private but deterministic.
+ */
+export function buildClinicalLedgerReferenceId(reference: string): string {
+  const canonicalReference = String(reference || '').trim();
+  const uuid = UUID_REFERENCE_PATTERN.exec(canonicalReference)?.[1];
+  return sha3Multihash(uuid ? uuidToBytes(uuid) : canonicalReference);
+}
+
+function splitReferenceList(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => splitReferenceList(item));
+  }
+  return String(value ?? '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function hashReferenceList(value: unknown): string[] {
+  return Array.from(new Set(splitReferenceList(value)))
+    .map(buildClinicalLedgerReferenceId);
+}
+
+/**
+ * Converts protected FHIR provenance into opaque ledger links. The resulting
+ * values can be compared by chaincode without disclosing DIDs, URNs, URLs,
+ * subjects or device key identifiers.
+ */
+export function buildFhirLedgerProvenance(input: Readonly<{
+  claims: Readonly<Record<string, unknown>>;
+  sender?: string;
+  submitter?: string;
+  signingKeyId?: string;
+  subject?: string;
+}>): FhirLedgerProvenance {
+  const relationshipInputs: ReadonlyArray<readonly [FhirLedgerRelationshipKind, unknown]> = [
+    ['author', input.claims[CompositionClaim.Author]],
+    ['attester', input.claims[CompositionClaim.Attester]],
+    ['custodian', input.claims[CompositionClaim.Custodian]],
+    ['sender', input.sender],
+    ['submitter', input.submitter],
+    ['signingKey', input.signingKeyId],
+  ];
+  const relationships: FhirLedgerRelationships = {};
+  for (const [kind, raw] of relationshipInputs) {
+    const hashes = hashReferenceList(raw);
+    if (hashes.length) relationships[kind] = hashes;
+  }
+  return {
+    relationships,
+    ownerships: hashReferenceList(input.subject || input.claims[CompositionClaim.Subject]),
+  };
 }
 
 function canonicalizeValue(value: unknown, depth = 0): unknown {
@@ -65,9 +157,7 @@ export function canonicalizeFhirResource(resource: Record<string, unknown>): str
 
 export function fhirResourceToCid(resource: Record<string, unknown>): { cid: string; versionId: string } {
   const canonicalJson = canonicalizeFhirResource(resource);
-  const digest = sha3_384(utf8ToBytes(canonicalJson));
-  const multihash = concatBytes(Uint8Array.from([MULTIHASH_SHA3_384_CODE, MULTIHASH_SHA3_384_LEN]), digest);
-  const versionId = encodeMultibase58btc(multihash);
+  const versionId = sha3Multihash(canonicalJson);
   return { cid: versionId, versionId };
 }
 

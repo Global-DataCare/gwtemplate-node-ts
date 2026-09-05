@@ -70,9 +70,9 @@ del repositorio.
 ## Imágenes OCI públicas verificadas
 
 - [GW CORE](https://github.com/orgs/Global-DataCare/packages/container/package/gw-core):
-  `ghcr.io/global-datacare/gw-core@sha256:724ba328915d9907d7254c7eeded845d70dc1ae05881bccff630e871fbc7389f`
+  `ghcr.io/global-datacare/gw-core@sha256:e08eb3482e8e6df812269ba72c14d7831c2cdc331fe7bc6836a606b4e2e96a71`
 - [Runtime CCAAS](https://github.com/orgs/Global-DataCare/packages/container/package/host-runtime):
-  `ghcr.io/global-datacare/host-runtime@sha256:67e5c0fb93efbdc79812a3579ea0b9b0d8e230fca8d430c72e81666a7389f7ac`
+  `ghcr.io/global-datacare/host-runtime@sha256:0742ce44f2c56b8a559ed872620c779adaac64c6e1b476d3fda1762f0d2fe510`
 
 GW CORE y CCAAS son artefactos independientes. El segundo contiene los nueve
 servidores de chaincode, pero sus package IDs se generan para el nombre,

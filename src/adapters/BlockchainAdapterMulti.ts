@@ -2,6 +2,7 @@
 // Copyright 2026 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import type { IBlockchainAdapter } from './IBlockchainAdapter';
+import type { FhirCidVersionMapping } from '../utils/fhir-versioning';
 
 /**
  * Combines a read/discovery adapter with an optional Fabric-backed write adapter.
@@ -26,13 +27,7 @@ export class BlockchainAdapterMulti implements IBlockchainAdapter {
   }
 
   public async registerCidVersionMappings(
-    mappings: Array<{
-      cid: string;
-      versionId: string;
-      resourceType?: string;
-      resourceId?: string;
-      tags?: Array<{ id: string; system?: string; code?: string; version?: string; userSelected?: boolean }>;
-    }>,
+    mappings: FhirCidVersionMapping[],
     channel: string,
     chaincode: string,
   ): Promise<{ accepted: number; txId?: string }> {
