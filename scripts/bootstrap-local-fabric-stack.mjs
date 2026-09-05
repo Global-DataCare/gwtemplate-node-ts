@@ -68,7 +68,7 @@ async function main() {
         'docker compose down -v --remove-orphans || true',
         'for service in orderer peer0-host1 peer0-host2 fabric-tools fabric-ca-client ica root-ca; do docker rm -f "${GDC_CONTAINER_PREFIX:-gdc}-$service" >/dev/null 2>&1 || true; done; docker rm -f consentaccess-sc >/dev/null 2>&1 || true',
         'for attempt in $(seq 1 30); do remaining=false; for service in orderer peer0-host1 peer0-host2 fabric-tools fabric-ca-client ica root-ca; do docker container inspect "${GDC_CONTAINER_PREFIX:-gdc}-$service" >/dev/null 2>&1 && remaining=true; done; [ "$remaining" = false ] && break; [ "$attempt" != 30 ] || exit 1; sleep 1; done',
-        'docker volume rm -f "${COMPOSE_PROJECT_NAME:-gdc-fabric-v3-devnet}_orderer-data" "${COMPOSE_PROJECT_NAME:-gdc-fabric-v3-devnet}_peer0-host1-data" "${COMPOSE_PROJECT_NAME:-gdc-fabric-v3-devnet}_peer0-host2-data" >/dev/null 2>&1 || true',
+        'docker volume rm -f "${COMPOSE_PROJECT_NAME:-gdc-fabric-v3-devnet}_root-ca-db" "${COMPOSE_PROJECT_NAME:-gdc-fabric-v3-devnet}_ica-db" "${COMPOSE_PROJECT_NAME:-gdc-fabric-v3-devnet}_orderer-data" "${COMPOSE_PROJECT_NAME:-gdc-fabric-v3-devnet}_peer0-host1-data" "${COMPOSE_PROJECT_NAME:-gdc-fabric-v3-devnet}_peer0-host2-data" >/dev/null 2>&1 || true',
       ].join('; '),
     ],
   });

@@ -33,7 +33,11 @@
   user and keep their SQLite databases in Docker volumes, avoiding unsupported
   database writes through macOS-generated certificate bind mounts.
 - Advertise each local Fabric peer's gossip endpoint so Gateway Discovery can
-  select a live endorser for external-service chaincodes.
+  select a live endorser for external-service chaincodes, and enable the
+  standard bootstrap and leader-election settings that disseminate its state.
+- Include the local CA database volumes in the deterministic devnet reset.
+- Commit the same installed `artifact-sc` package on the local clinical data
+  channel as well as the identity channel.
 
 ## [1.24.13] - 2026-09-04
 

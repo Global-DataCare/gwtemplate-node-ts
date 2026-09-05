@@ -119,6 +119,12 @@ grep -Fq 'root-ca-db:/var/hyperledger/fabric-ca' ./infra/fabric/local-network/do
 grep -Fq 'ica-db:/var/hyperledger/fabric-ca' ./infra/fabric/local-network/docker-compose.yml
 grep -Fq 'CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0-host1:7051' ./infra/fabric/local-network/docker-compose.yml
 grep -Fq 'CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0-host2:7051' ./infra/fabric/local-network/docker-compose.yml
+grep -Fq 'CORE_PEER_GOSSIP_BOOTSTRAP=peer0-host1:7051' ./infra/fabric/local-network/docker-compose.yml
+test "$(grep -Fc 'CORE_PEER_GOSSIP_USELEADERELECTION=true' ./infra/fabric/local-network/docker-compose.yml)" -eq 2
+grep -Fq '_root-ca-db"' ./scripts/bootstrap-local-fabric-stack.mjs
+grep -Fq '_ica-db"' ./scripts/bootstrap-local-fabric-stack.mjs
+grep -Fq 'SKIP_CHAINCODE_INSTALL="${SKIP_CHAINCODE_INSTALL:-false}"' ./infra/fabric/local-network/scripts/03-deploy-chaincode.sh
+grep -Fq 'deploy_chaincode "artifact-sc" "${GWTEMPLATE_DIR}/chaincode/artifact-sc-javascript" "${DATA_CHANNEL_NAME}" true' ./infra/fabric/local-network/scripts/05-deploy-identity-chaincodes.sh
 grep -Fq 'function normalize_enrolled_msp_trust()' ./infra/fabric/local-network/scripts/02-bootstrap-network.sh
 grep -Fq 'function normalize_enrolled_tls_trust()' ./infra/fabric/local-network/scripts/02-bootstrap-network.sh
 grep -Fq 'function wait_for_peer()' ./infra/fabric/local-network/scripts/02-bootstrap-network.sh
