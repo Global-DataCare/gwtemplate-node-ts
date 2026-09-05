@@ -17,6 +17,7 @@ import { canonicalizeFhirClaims } from './claims';
 import { SupportedFhirIngestionFormat } from './fhir-ingestion';
 import { randomUUID } from 'crypto';
 import { Format } from 'gdc-common-utils-ts/constants/Schemas';
+import { CompositionClaim } from 'gdc-common-utils-ts/models/interoperable-claims/composition-claims';
 import {
   FhirIpsCreatorKinds,
   buildFhirIpsCreatorAuthor,
@@ -81,6 +82,7 @@ export async function buildConsolidatedIpsBundleDocument(
   const sectionRefs = new Map<string, Set<string>>();
   const bundleEntries = new Map<string, { fullUrl?: string; resource: Record<string, any> }>();
   const authorRefs = new Set<string>();
+  const attesters = new Map<string, { mode?: string; time?: string }>();
   const compositionDates: string[] = [];
   const includedSectionTokens = new Set<string>();
 
@@ -100,8 +102,26 @@ export async function buildConsolidatedIpsBundleDocument(
       ensureSection(sectionRefs, sectionToken);
     }
 
-    const authorReference = normalizeReference(getClaimValue<string>(compositionRecord, 'Composition.author'));
-    if (authorReference) authorRefs.add(authorReference);
+    for (const authorReference of String(
+      getClaimValue<string>(compositionRecord, CompositionClaim.Author) || '',
+    ).split(',').map(normalizeReference).filter((reference): reference is string => Boolean(reference))) {
+      authorRefs.add(authorReference);
+    }
+    const attesterReferences = String(
+      getClaimValue<string>(compositionRecord, CompositionClaim.Attester) || '',
+    ).split(',').map(normalizeReference).filter((reference): reference is string => Boolean(reference));
+    const attesterModes = String(
+      getClaimValue<string>(compositionRecord, CompositionClaim.AttesterMode) || '',
+    ).split(',').map((value) => value.trim());
+    const attesterTimes = String(
+      getClaimValue<string>(compositionRecord, CompositionClaim.AttesterTime) || '',
+    ).split(',').map((value) => value.trim());
+    attesterReferences.forEach((reference, index) => {
+      attesters.set(reference, {
+        ...(attesterModes[index] ? { mode: attesterModes[index] } : {}),
+        ...(attesterTimes[index] ? { time: attesterTimes[index] } : {}),
+      });
+    });
     const compositionDate = normalizeReference(getClaimValue<string>(compositionRecord, 'Composition.date'));
     if (compositionDate) compositionDates.push(compositionDate);
   }
@@ -150,18 +170,14 @@ export async function buildConsolidatedIpsBundleDocument(
   const compositionIdentifier = `urn:uuid:${compositionId}`;
   const compositionSectionTokens = Array.from(sectionRefs.keys());
   const exportedAuthorRefs = new Set<string>();
-  if (authorRefs.size > 0) {
+  const exportedAttesters = new Map<string, { mode?: string; time?: string }>();
+  if (authorRefs.size > 0 || attesters.size > 0) {
     const storedBindings = await params.vaultRepository.listContainersInSection(
       params.tenantVaultId,
       getClinicalCreatorBindingsSectionId(),
     );
     const bindings = (storedBindings as unknown[]).filter(isClinicalCreatorBinding);
-    for (const operationalAuthor of authorRefs) {
-      const binding = resolveClinicalCreatorBinding(bindings, { actorDid: operationalAuthor });
-      if (!binding) {
-        exportedAuthorRefs.add(operationalAuthor);
-        continue;
-      }
+    const addBindingEntries = (binding: ClinicalCreatorBinding): void => {
       const creator = binding.kind === FhirIpsCreatorKinds.Professional
         ? buildFhirIpsCreatorAuthor({
             kind: binding.kind,
@@ -184,10 +200,30 @@ export async function buildConsolidatedIpsBundleDocument(
               authorIdentifier: binding.authorIdentifier,
               subjectReference: binding.ownerIdentifier,
             });
-      exportedAuthorRefs.add(creator.authorReference);
       for (const entry of creator.entries) {
         bundleEntries.set(entry.fullUrl, { fullUrl: entry.fullUrl, resource: { ...entry.resource } });
       }
+    };
+    const findBinding = (reference: string): ClinicalCreatorBinding | undefined =>
+      bindings.find((binding) => binding.authorIdentifier === reference
+        || binding.actorDids?.includes(reference));
+
+    for (const operationalAuthor of authorRefs) {
+      const binding = findBinding(operationalAuthor)
+        || resolveClinicalCreatorBinding(bindings, { actorDid: operationalAuthor });
+      if (!binding) {
+        exportedAuthorRefs.add(operationalAuthor);
+        continue;
+      }
+      const isLegacyOperationalAuthor = binding.actorDids?.includes(operationalAuthor);
+      exportedAuthorRefs.add(isLegacyOperationalAuthor ? binding.authorIdentifier : operationalAuthor);
+      addBindingEntries(binding);
+    }
+    for (const [attesterReference, details] of attesters) {
+      const binding = findBinding(attesterReference);
+      const canonicalReference = binding?.authorIdentifier || attesterReference;
+      exportedAttesters.set(canonicalReference, details);
+      if (binding) addBindingEntries(binding);
     }
   }
   const compositionClaims: Record<string, any> = {
@@ -199,7 +235,13 @@ export async function buildConsolidatedIpsBundleDocument(
     'Composition.section': compositionSectionTokens.join(','),
   };
   if (exportedAuthorRefs.size > 0) {
-    compositionClaims['Composition.author'] = Array.from(exportedAuthorRefs).join(',');
+    compositionClaims[CompositionClaim.Author] = Array.from(exportedAuthorRefs).join(',');
+  }
+  if (exportedAttesters.size > 0) {
+    const values = Array.from(exportedAttesters.entries());
+    compositionClaims[CompositionClaim.Attester] = values.map(([reference]) => reference).join(',');
+    compositionClaims[CompositionClaim.AttesterMode] = values.map(([, value]) => value.mode || '').join(',');
+    compositionClaims[CompositionClaim.AttesterTime] = values.map(([, value]) => value.time || '').join(',');
   }
   const compositionResource: Record<string, any> = {
     resourceType: ResourceTypesFhirR4.Composition,
@@ -227,6 +269,13 @@ export async function buildConsolidatedIpsBundleDocument(
     })),
     ...(exportedAuthorRefs.size > 0 ? {
       author: Array.from(exportedAuthorRefs).map((reference) => ({ reference })),
+    } : {}),
+    ...(exportedAttesters.size > 0 ? {
+      attester: Array.from(exportedAttesters.entries()).map(([reference, value]) => ({
+        ...(value.mode ? { mode: value.mode } : {}),
+        ...(value.time ? { time: value.time } : {}),
+        party: { reference },
+      })),
     } : {}),
   };
 

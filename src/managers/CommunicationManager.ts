@@ -41,7 +41,11 @@ import { getSubjectScopedSectionId } from '../utils/individual-sections';
 import { getEnvSectionId } from '../utils/section-env';
 import { createHash } from 'crypto';
 import { encodeMultibase58btc } from 'gdc-common-utils-ts/utils/multibase58';
-import { applyFhirCidVersioningToEntry, fhirResourceToCid } from '../utils/fhir-versioning';
+import {
+  applyFhirCidVersioningToEntry,
+  fhirResourceToCid,
+  type FhirCidVersionMapping,
+} from '../utils/fhir-versioning';
 import { canonicalizeFhirClaims, getClaimValue, normalizeContextualizedClaims } from '../utils/claims';
 import { persistConsentRuleAndAttachment } from '../utils/consent-storage';
 import { SUBJECT_SECTION_DIGITAL_TWIN, SUBJECT_SECTION_INDIVIDUAL } from '../constants/domain';
@@ -56,6 +60,7 @@ import { getAuthenticatedJobActorIdentifiers } from '../utils/authenticated-job-
 import { ClaimConsent, ConsentStatuses } from 'gdc-common-utils-ts/models/consent-rule';
 import { canonicalizeBundleEntryMetadata } from '../utils/canonical-entry-metadata';
 import {
+  FhirIpsCreatorKinds,
   resolveClinicalCreatorBinding,
   type AuthenticatedClinicalCreatorEvidence,
   type ClinicalCreatorBinding,
@@ -67,6 +72,8 @@ import {
   type ClinicalDocumentAuthorOrganization,
 } from 'gdc-common-utils-ts/utils/clinical-resource-replacement';
 import { getClinicalCreatorBindingsSectionId } from '../utils/clinical-creator-binding';
+import type { IBlockchainAdapter } from '../adapters/IBlockchainAdapter';
+import { extractLedgerSafeResearchTags } from '../utils/fhir-ingestion';
 
 type SupportedProjectedResourceType =
   | 'MedicationStatement'
@@ -180,7 +187,13 @@ interface CommunicationManagerOptions {
   vaultRepository: IVaultRepository;
   compositionManager?: IJobProcessor;
   individualManager?: IJobProcessor;
+  blockchainAdapter?: IBlockchainAdapter;
 }
+
+type ClinicalLedgerReceipt = Readonly<{
+  transactionId?: string;
+  evidence: readonly FhirCidVersionMapping[];
+}>;
 
 const COMMUNICATION_RESOURCE_TYPE = 'Communication' as const;
 const COMMUNICATION_ENTRY_TYPE = 'CommMsgExtended' as const;
@@ -221,12 +234,20 @@ export class CommunicationManager implements IJobProcessor {
   private readonly vaultRepository: IVaultRepository;
   private readonly compositionManager?: IJobProcessor;
   private readonly individualManager?: IJobProcessor;
+  private readonly blockchainAdapter?: IBlockchainAdapter;
 
-  constructor({ tenantsCacheManager, vaultRepository, compositionManager, individualManager }: CommunicationManagerOptions) {
+  constructor({
+    tenantsCacheManager,
+    vaultRepository,
+    compositionManager,
+    individualManager,
+    blockchainAdapter,
+  }: CommunicationManagerOptions) {
     this.tenantsCacheManager = tenantsCacheManager;
     this.vaultRepository = vaultRepository;
     this.compositionManager = compositionManager;
     this.individualManager = individualManager;
+    this.blockchainAdapter = blockchainAdapter;
   }
 
   /**
@@ -277,12 +298,18 @@ export class CommunicationManager implements IJobProcessor {
           fhirResource,
         );
         await this.persistCommunicationChannelRecord(job, entry as any, fhirResource, commMsg);
-        await this.persistCompositionProjectionFromCommunication(job, entry as any, fhirResource, serverDid);
-        await this.persistDocumentReferenceProjectionFromCommunication(job, entry as any, fhirResource);
-        const clinicalBatchResponses = await this.persistProjectedResourcesFromCommunication(
+        const compositionEvidence = await this.persistCompositionProjectionFromCommunication(
           job,
           entry as any,
           fhirResource,
+          serverDid,
+        );
+        await this.persistDocumentReferenceProjectionFromCommunication(job, entry as any, fhirResource);
+        const clinicalProjection = await this.persistProjectedResourcesFromCommunication(
+          job,
+          entry as any,
+          fhirResource,
+          compositionEvidence ? [compositionEvidence] : [],
         );
 
         const embeddedSearchResponseEntries = await this.executeEmbeddedSearchRequest(
@@ -295,8 +322,8 @@ export class CommunicationManager implements IJobProcessor {
           continue;
         }
 
-        if (clinicalBatchResponses.length > 0) {
-          bundleEntries.push(...clinicalBatchResponses);
+        if (clinicalProjection.responses.length > 0) {
+          bundleEntries.push(...clinicalProjection.responses);
           continue;
         }
 
@@ -305,6 +332,16 @@ export class CommunicationManager implements IJobProcessor {
           (entry as any)?.resource?.id;
         const resourceId = determineResourceId(identifierClaim, process.env.NODE_ENV);
         
+        if (clinicalProjection.receipt) {
+          (commMsg as any).meta = {
+            ...((commMsg as any).meta || {}),
+            evidence: clinicalProjection.receipt.evidence.map((evidence) => ({
+            ...evidence,
+              artifactId: evidence.cid,
+              transactionId: clinicalProjection.receipt!.transactionId,
+            })),
+          };
+        }
         bundleEntries.push({
           response: { status: String(HttpStatusCodes.Ok) },
           id: resourceId,
@@ -650,10 +687,10 @@ export class CommunicationManager implements IJobProcessor {
     entry: any,
     fhirResource: FhirCommunication,
     serverDid: string,
-  ): Promise<void> {
+  ): Promise<FhirCidVersionMapping | undefined> {
     const tenantVaultId = getTenantVaultId(job.sector as string, job.tenantId as string);
     const tenantExists = await this.tenantsCacheManager.tenantExists(tenantVaultId);
-    if (!tenantExists) return;
+    if (!tenantExists) return undefined;
 
     const rawSubject =
       (entry?.resource?.meta?.claims?.[CommunicationClaim.Subject] as string | undefined)
@@ -661,7 +698,7 @@ export class CommunicationManager implements IJobProcessor {
       || (fhirResource?.subject as any)?.reference
       || '';
     const subject = String(rawSubject || '').replace(/^Patient\//i, '').trim();
-    if (!subject) return;
+    if (!subject) return undefined;
 
     const claimsSection = String(
       (entry?.resource?.meta?.claims?.[CommunicationClaim.Topic] as string | undefined)
@@ -678,9 +715,19 @@ export class CommunicationManager implements IJobProcessor {
       || '',
     ).trim();
     const payloadComposition = this.extractCompositionResourceFromCommunication(entry, fhirResource);
-    const embeddedClaims = payloadComposition?.meta?.claims && typeof payloadComposition.meta.claims === 'object'
-      ? normalizeContextualizedClaims(payloadComposition.meta.claims as Record<string, any>)
-      : undefined;
+    const attachmentClaims = this.resolveCommunicationAttachments(entry, fhirResource)
+      .map((resolved) => this.parseAttachmentJson(resolved.documentAttachment))
+      .map((attachment) => attachment?.meta?.claims && typeof attachment.meta.claims === 'object'
+        ? normalizeContextualizedClaims(attachment.meta.claims as Record<string, any>)
+        : undefined)
+      .find(Boolean);
+    const embeddedClaims = normalizeContextualizedClaims({
+      ...(attachmentClaims || {}),
+      ...(payloadComposition ? compositionFhirR4ToFlat(payloadComposition) : {}),
+      ...(payloadComposition?.meta?.claims && typeof payloadComposition.meta.claims === 'object'
+        ? payloadComposition.meta.claims as Record<string, any>
+        : {}),
+    });
     const payloadSections = this.extractCompositionSectionsFromCommunication(entry, fhirResource);
     const payloadSection = payloadSections[0];
     const payloadType = this.extractCompositionTypeFromCommunication(entry, fhirResource);
@@ -689,7 +736,7 @@ export class CommunicationManager implements IJobProcessor {
       ...payloadSections,
       payloadSection,
     ].map((value) => String(value || '').trim()).filter(Boolean)));
-    if (sectionCodes.length === 0) return;
+    if (sectionCodes.length === 0) return undefined;
     const typeCode = claimsType || payloadType || HealthcareBasicSections.PatientSummaryDocument.attributeValue;
 
     const sent = String(
@@ -720,7 +767,7 @@ export class CommunicationManager implements IJobProcessor {
       [CompositionClaim.Type]: typeCode,
       'Composition.source': 'Communication',
     }, Format.FHIR_API);
-    applyFhirCidVersioningToEntry({
+    const compositionVersioning = applyFhirCidVersioningToEntry({
       entry: payloadComposition ? { resource: payloadComposition } : { resource: { resourceType: ResourceTypesFhirR4.Composition, id: fallbackId } },
       claims,
       resourceType: ResourceTypesFhirR4.Composition,
@@ -728,6 +775,14 @@ export class CommunicationManager implements IJobProcessor {
     });
     const contentVersionId = claimsToContentCid(claims).cid;
     claims['Composition.meta.versionId'] = contentVersionId;
+    const recordId = this.buildStableProjectionRecordId('composition-from-communication', compositionIdentifier);
+    const compositionEvidence: FhirCidVersionMapping = {
+      resourceType: ResourceTypesFhirR4.Composition,
+      resourceId: recordId,
+      cid: contentVersionId,
+      versionId: contentVersionId,
+      ...(compositionVersioning.mapping?.tags?.length ? { tags: compositionVersioning.mapping.tags } : {}),
+    };
 
     const individualSectionId = getSubjectScopedSectionId(subject, SUBJECT_SECTION_INDIVIDUAL, 'composition');
     const versionId = this.normalizeOptionalString(
@@ -738,16 +793,15 @@ export class CommunicationManager implements IJobProcessor {
       const exists = await this.hasSectionRecordWithClaims(tenantVaultId, individualSectionId, [
         { name: 'Composition.meta.versionId', value: versionId },
       ]);
-      if (exists) return;
+      if (exists) return compositionEvidence;
     }
-    const recordId = this.buildStableProjectionRecordId('composition-from-communication', compositionIdentifier);
     const record = { id: recordId, ...claims } as any;
     await this.vaultRepository.put(tenantVaultId, [record], individualSectionId);
     if (!await isDigitalTwinSecondaryUseEnabled({
       vaultRepository: this.vaultRepository,
       tenantVaultId,
       sourceSubject: subject,
-    })) return;
+    })) return compositionEvidence;
     const twinSubjectId = await getOrCreateDigitalTwinSubjectId({
       vaultRepository: this.vaultRepository,
       tenantVaultId,
@@ -767,6 +821,7 @@ export class CommunicationManager implements IJobProcessor {
     );
     const digitalTwinSectionId = getSubjectScopedSectionId(twinSubjectId, SUBJECT_SECTION_DIGITAL_TWIN, 'composition');
     await this.vaultRepository.put(tenantVaultId, [{ id: researchRecordId, ...researchClaims } as any], digitalTwinSectionId);
+    return compositionEvidence;
   }
 
   private async persistCommunicationChannelRecord(
@@ -1046,12 +1101,17 @@ export class CommunicationManager implements IJobProcessor {
     job: JobRequest,
     entry: any,
     fhirResource: FhirCommunication,
-  ): Promise<Array<BundleEntryResponse | ErrorEntry>> {
+    initialEvidence: FhirCidVersionMapping[] = [],
+  ): Promise<{
+    responses: Array<BundleEntryResponse | ErrorEntry>;
+    receipt?: ClinicalLedgerReceipt;
+  }> {
     const tenantVaultId = getTenantVaultId(job.sector as string, job.tenantId as string);
     const tenantExists = await this.tenantsCacheManager.tenantExists(tenantVaultId);
-    if (!tenantExists) return [];
+    if (!tenantExists) return { responses: [] };
 
     const batchResponses: Array<BundleEntryResponse | ErrorEntry> = [];
+    const evidence = [...initialEvidence];
 
     const communicationSubject = this.resolveCommunicationSubject(entry, fhirResource);
     const clinicalAuthorDid = this.resolveClinicalResourceAuthor(job, entry, fhirResource);
@@ -1071,9 +1131,13 @@ export class CommunicationManager implements IJobProcessor {
       const compositionResource = this.asDocumentBundle(parsedAttachment)?.entry
         ?.map((bundleEntry: any) => bundleEntry?.resource)
         .find((resource: any) => resource?.resourceType === ResourceTypesFhirR4.Composition);
+      const attachmentClaims = parsedAttachment?.meta?.claims
+        && typeof parsedAttachment.meta.claims === 'object'
+        ? normalizeContextualizedClaims(parsedAttachment.meta.claims as Record<string, any>)
+        : undefined;
       const documentClaims = compositionResource
         ? compositionFhirR4ToFlat(compositionResource)
-        : undefined;
+        : attachmentClaims;
       const attachedBundleType = String(parsedAttachment?.type || '').toLowerCase();
       if (
         parsedAttachment?.resourceType === ResourceTypesFhirR4.Bundle
@@ -1091,7 +1155,7 @@ export class CommunicationManager implements IJobProcessor {
           && attachedEntries.every((attachedEntry: any) => attachedEntry?.request && typeof attachedEntry.request === 'object');
         if (isRequestBatch) {
           for (const attachedEntry of attachedEntries) {
-            batchResponses.push(await this.processProjectedClinicalBatchEntry({
+            const response = await this.processProjectedClinicalBatchEntry({
               job,
               entry: attachedEntry,
               creatorDid: clinicalAuthorDid,
@@ -1099,7 +1163,22 @@ export class CommunicationManager implements IJobProcessor {
               explicitSection,
               fhirResource,
               tenantVaultId,
-            }));
+              documentClaims,
+            });
+            batchResponses.push(response);
+            const responseResource = (response as any)?.resource;
+            const responseVersionId = this.normalizeOptionalString(responseResource?.meta?.versionId);
+            if (responseVersionId && responseResource?.resourceType && responseResource?.id) {
+              evidence.push({
+                resourceType: String(responseResource.resourceType),
+                resourceId: String(responseResource.id),
+                cid: responseVersionId,
+                versionId: responseVersionId,
+                ...(Array.isArray(responseResource?.meta?.tag) && responseResource.meta.tag.length
+                  ? { tags: responseResource.meta.tag }
+                  : {}),
+              });
+            }
           }
           continue;
         }
@@ -1112,7 +1191,7 @@ export class CommunicationManager implements IJobProcessor {
         const resourceType = this.getSupportedProjectedResourceType(resource?.resourceType);
         if (!resource || !resourceType) continue;
 
-        await this.persistProjectedClinicalResource({
+        const persisted = await this.persistProjectedClinicalResource({
           job,
           resource,
           resourceType,
@@ -1124,9 +1203,49 @@ export class CommunicationManager implements IJobProcessor {
           documentProvenance,
           documentClaims,
         });
+        evidence.push(persisted.evidence);
       }
     }
-    return batchResponses;
+    const uniqueEvidence = Array.from(new Map(
+      evidence.map((item) => [`${item.resourceType}|${item.resourceId}|${item.versionId}`, item]),
+    ).values());
+    const receipt = await this.registerClinicalEvidenceBundle(job, uniqueEvidence);
+    if (receipt) {
+      for (const response of batchResponses) {
+        const responseResource = (response as any)?.resource;
+        const matchingEvidence = receipt.evidence.find((item) =>
+          item.resourceType === responseResource?.resourceType && item.resourceId === responseResource?.id);
+        if (!matchingEvidence) continue;
+        responseResource.meta = {
+          ...(responseResource.meta || {}),
+          evidence: [{
+            ...matchingEvidence,
+            artifactId: matchingEvidence.cid,
+            transactionId: receipt.transactionId,
+          }],
+        };
+      }
+    }
+    return { responses: batchResponses, ...(receipt ? { receipt } : {}) };
+  }
+
+  private async registerClinicalEvidenceBundle(
+    job: JobRequest,
+    evidence: FhirCidVersionMapping[],
+  ): Promise<ClinicalLedgerReceipt | undefined> {
+    if (evidence.length === 0 || !this.blockchainAdapter?.registerCidVersionMappings) return undefined;
+    const submitted = await this.blockchainAdapter.registerCidVersionMappings(
+      evidence,
+      `${job.sector}-${String(job.jurisdiction || '').trim().toLowerCase()}`,
+      process.env.FHIR_VERSION_LEDGER_CHAINCODE || 'artifact-sc',
+    );
+    if (submitted.accepted !== evidence.length) {
+      throw new Error(`Clinical evidence anchoring accepted ${submitted.accepted}/${evidence.length} resources.`);
+    }
+    return {
+      ...(submitted.txId ? { transactionId: submitted.txId } : {}),
+      evidence,
+    };
   }
 
   private async processProjectedClinicalBatchEntry(input: {
@@ -1137,6 +1256,7 @@ export class CommunicationManager implements IJobProcessor {
     explicitSection: string;
     fhirResource: FhirCommunication;
     tenantVaultId: string;
+    documentClaims?: Record<string, unknown>;
   }): Promise<BundleEntryResponse | ErrorEntry> {
     const request = input.entry?.request;
     const resource = input.entry?.resource;
@@ -1190,12 +1310,20 @@ export class CommunicationManager implements IJobProcessor {
           fhirResource: input.fhirResource,
           tenantVaultId: input.tenantVaultId,
           creatorDid: input.creatorDid || actorDid,
+          documentClaims: input.documentClaims,
         });
         return {
           id: created.recordId,
           type: responseType,
           response: { status: created.created ? '201' : '200', etag: `W/"${created.versionId}"` },
-          resource: { resourceType, id: created.recordId },
+          resource: {
+            resourceType,
+            id: created.recordId,
+            meta: {
+              versionId: created.versionId,
+              ...(created.evidence.tags?.length ? { tag: created.evidence.tags } : {}),
+            },
+          },
         };
       } catch (error) {
         const status = error instanceof ManagerError ? error.status : '400';
@@ -1225,8 +1353,12 @@ export class CommunicationManager implements IJobProcessor {
       ]
         .map((author) => String(author || '').trim())
         .filter(Boolean);
-      if (!await this.isAuthenticatedClinicalAuthor(input.job, input.tenantVaultId, authors)) {
-        return errorResponse('403', 'Only the authenticated creator may update this clinical record.');
+      if (!await this.isAuthenticatedClinicalAuthorOrSameOwner(
+        input.job,
+        input.tenantVaultId,
+        authors,
+      )) {
+        return errorResponse('403', 'Only the authenticated author or a registered creator with the same owner may update this clinical record.');
       }
       const storedSubject = this.resolveProjectedResourceSubject(
         existing,
@@ -1258,12 +1390,20 @@ export class CommunicationManager implements IJobProcessor {
           fhirResource: input.fhirResource,
           tenantVaultId: input.tenantVaultId,
           creatorDid: authors[0],
+          documentClaims: input.documentClaims || existing,
         });
         return {
           id: updated.recordId,
           type: responseType,
           response: { status: String(HttpStatusCodes.Ok), etag: `W/"${updated.versionId}"` },
-          resource: { resourceType, id: updated.recordId },
+          resource: {
+            resourceType,
+            id: updated.recordId,
+            meta: {
+              versionId: updated.versionId,
+              ...(updated.evidence.tags?.length ? { tag: updated.evidence.tags } : {}),
+            },
+          },
         };
       } catch (error) {
         const status = error instanceof ManagerError ? error.status : '400';
@@ -1385,10 +1525,17 @@ export class CommunicationManager implements IJobProcessor {
     creatorDid?: string;
     documentProvenance?: ClinicalDocumentAuthorOrganization;
     documentClaims?: Record<string, unknown>;
-  }): Promise<{ recordId: string; versionId: string; created: boolean }> {
+  }): Promise<{
+    recordId: string;
+    versionId: string;
+    created: boolean;
+    evidence: FhirCidVersionMapping;
+  }> {
     // A source-authored URN is import provenance, not the importing BFF's
-    // identity. Local author DIDs must equal the authenticated actor.
+    // identity. Generated content may name the registered owner or creator;
+    // transport identity remains separate and must resolve an authorized path.
     const config = PROJECTED_RESOURCE_CONFIG[input.resourceType];
+    const ledgerSafeTags = extractLedgerSafeResearchTags({ resource: input.resource });
     const authenticatedActorDid = getAuthenticatedJobActorIdentifiers(input.job)
       .find((identifier) => identifier.startsWith('did:web:'));
     const isExternalAuthorUrn = Boolean(input.creatorDid?.startsWith('urn:'));
@@ -1453,6 +1600,13 @@ export class CommunicationManager implements IJobProcessor {
       config.collectionId,
     );
     const recordId = String(input.resource?.id || versionId || fallbackId);
+    const evidence: FhirCidVersionMapping = {
+      resourceType: input.resourceType,
+      resourceId: recordId,
+      cid: versionId,
+      versionId,
+      ...(ledgerSafeTags?.length ? { tags: ledgerSafeTags } : {}),
+    };
     const existing = await this.vaultRepository.get<{ id: string } & Record<string, any>>(
       input.tenantVaultId,
       recordId,
@@ -1462,7 +1616,7 @@ export class CommunicationManager implements IJobProcessor {
       { name: `${input.resourceType}.meta.versionId`, value: versionId },
     ]);
     if (alreadyIndexed) {
-      return { recordId, versionId, created: false };
+      return { recordId, versionId, created: false, evidence };
     }
     if (existing?.id === recordId) {
       const existingAuthors = [
@@ -1470,7 +1624,7 @@ export class CommunicationManager implements IJobProcessor {
       ]
         .map((author) => String(author || '').trim())
         .filter(Boolean);
-      const isExactAuthor = await this.isAuthenticatedClinicalAuthor(
+      const isExactAuthorOrSameOwner = await this.isAuthenticatedClinicalAuthorOrSameOwner(
         input.job,
         input.tenantVaultId,
         existingAuthors,
@@ -1489,10 +1643,10 @@ export class CommunicationManager implements IJobProcessor {
           },
         })
         : ClinicalResourceReplacementDecision.Deny;
-      if (!isExactAuthor
+      if (!isExactAuthorOrSameOwner
         && replacementDecision !== ClinicalResourceReplacementDecision.AllowOrganizationSuccessor) {
         throw new ManagerError(
-          'Only the authenticated author may update this clinical resource.',
+          'Only the authenticated author or a registered creator with the same owner may update this clinical resource.',
           IssueType.Security,
         );
       }
@@ -1509,18 +1663,20 @@ export class CommunicationManager implements IJobProcessor {
         sector: String(input.job.sector || ''),
         claims,
       });
-      return { recordId, versionId, created: true };
+      return { recordId, versionId, created: true, evidence };
     }
 
     const signingKeyId = clinicalCreatorEvidence(input.job).keyId;
-    const audit = input.creatorDid ? {
-      creatorDid: input.creatorDid,
+    const recordedAuthor = this.getFirstClaimValue(claims, [CompositionClaim.Author])
+      || input.creatorDid;
+    const audit = recordedAuthor ? {
+      creatorDid: recordedAuthor,
       ...(input.documentProvenance ? {
         authorOwnerIdentifier: input.documentProvenance.organizationReference,
         documentDate: input.documentProvenance.documentDate,
       } : {}),
-      ...(authenticatedActorDid && input.creatorDid !== authenticatedActorDid
-        ? { submitterDid: existing?.audit?.submitterDid || authenticatedActorDid }
+      ...(authenticatedActorDid && recordedAuthor !== authenticatedActorDid
+        ? { submitterDid: authenticatedActorDid }
         : {}),
       ...(signingKeyId ? { signingKeyId } : {}),
     } : undefined;
@@ -1587,7 +1743,7 @@ export class CommunicationManager implements IJobProcessor {
         },
       } as any], digitalTwinSectionId);
     }
-    return { recordId, versionId, created: true };
+    return { recordId, versionId, created: true, evidence };
   }
 
   /**
@@ -1711,6 +1867,32 @@ export class CommunicationManager implements IJobProcessor {
     return false;
   }
 
+  private async isAuthenticatedClinicalAuthorOrSameOwner(
+    job: JobRequest,
+    tenantVaultId: string,
+    authorIdentifiers: string[],
+  ): Promise<boolean> {
+    if (await this.isAuthenticatedClinicalAuthor(job, tenantVaultId, authorIdentifiers)) return true;
+    const records = await this.vaultRepository.listContainersInSection(
+      tenantVaultId,
+      getClinicalCreatorBindingsSectionId(),
+    );
+    const bindings = (records as unknown[]).filter(isClinicalCreatorBinding);
+    const authenticatedBinding = resolveClinicalCreatorBinding(bindings, clinicalCreatorEvidence(job));
+    if (!authenticatedBinding) return false;
+    // A professional binding stored in this tenant has already passed the
+    // tenant's governed role/capability onboarding. It may correct personal
+    // clinical content, but this helper is deliberately never used for DELETE.
+    if (authenticatedBinding.kind === FhirIpsCreatorKinds.Professional) return true;
+
+    return authorIdentifiers.some((authorIdentifier) => {
+      if (authorIdentifier === authenticatedBinding.ownerIdentifier) return true;
+      const sourceBinding = bindings.find((binding) =>
+        binding.authorIdentifier === authorIdentifier || binding.actorDids?.includes(authorIdentifier));
+      return sourceBinding?.ownerIdentifier === authenticatedBinding.ownerIdentifier;
+    });
+  }
+
   private async isRegisteredClinicalAuthor(tenantVaultId: string, authorDid: string): Promise<boolean> {
     const records = await this.vaultRepository.listContainersInSection(
       tenantVaultId,
@@ -1718,7 +1900,9 @@ export class CommunicationManager implements IJobProcessor {
     );
     return (records as unknown[])
       .filter(isClinicalCreatorBinding)
-      .some((binding) => binding.authorIdentifier === authorDid || binding.actorDids?.includes(authorDid));
+      .some((binding) => binding.authorIdentifier === authorDid
+        || binding.ownerIdentifier === authorDid
+        || binding.actorDids?.includes(authorDid));
   }
 
   private getSupportedProjectedResourceType(resourceType: unknown): SupportedProjectedResourceType | undefined {
@@ -2541,7 +2725,7 @@ export class CommunicationManager implements IJobProcessor {
   private extractCompositionResourceFromCommunication(
     entry: any,
     fhirResource: FhirCommunication,
-  ): Record<string, any> | undefined {
+  ): (Record<string, any> & { resourceType: string }) | undefined {
     for (const resolved of this.resolveCommunicationAttachments(entry, fhirResource)) {
       const attachment = resolved.documentAttachment;
       if (!attachment || typeof attachment !== 'object') continue;
@@ -2551,7 +2735,7 @@ export class CommunicationManager implements IJobProcessor {
       const composition = documentBundle.entry
         .map((bundleEntry: any) => bundleEntry?.resource as Record<string, any> | undefined)
         .find((resource: Record<string, any> | undefined) => resource?.resourceType === 'Composition');
-      if (composition) return composition;
+      if (composition) return composition as Record<string, any> & { resourceType: string };
     }
     return undefined;
   }

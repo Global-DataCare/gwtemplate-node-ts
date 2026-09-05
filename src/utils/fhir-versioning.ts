@@ -4,13 +4,15 @@
 import { sha3_384 } from '@noble/hashes/sha3.js';
 import { utf8ToBytes } from '@noble/hashes/utils.js';
 import { encodeMultibase58btc } from 'gdc-common-utils-ts/utils/multibase58';
+import type { LedgerSafeMetaTag } from '../services/ai/metaTagSanitizer';
+import { extractLedgerSafeResearchTags } from './fhir-ingestion';
 
 export type FhirCidVersionMapping = {
   resourceType?: string;
   resourceId?: string;
-  fullUrl?: string;
   cid: string;
   versionId: string;
+  tags?: LedgerSafeMetaTag[];
 };
 
 const MULTIHASH_SHA3_384_CODE = 0x15;
@@ -104,9 +106,9 @@ export function applyFhirCidVersioningToEntry(params: {
     mapping: {
       resourceType,
       resourceId: String(resource.id || resourceId),
-      fullUrl: entry?.fullUrl ? String(entry.fullUrl) : undefined,
       cid,
       versionId,
+      tags: extractLedgerSafeResearchTags(entry),
     },
   };
 }
@@ -128,6 +130,6 @@ export async function registerFhirCidMappings(params: {
   if (!mappings || mappings.length === 0) return;
 
   const channel = `${sector}-${String(jurisdiction || '').trim().toLowerCase()}`;
-  const chaincode = process.env.FHIR_VERSION_LEDGER_CHAINCODE || 'fhir-versioning';
+  const chaincode = process.env.FHIR_VERSION_LEDGER_CHAINCODE || 'artifact-sc';
   await blockchainAdapter.registerCidVersionMappings(mappings, channel, chaincode);
 }

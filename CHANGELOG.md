@@ -2,6 +2,34 @@
 
 ## [Unreleased]
 
+## [1.24.14] - 2026-09-04
+
+- Define the closed `owner | creator` clinical source-author contract for
+  personal and professional records. A registered RelatedPerson or
+  PractitionerRole may be both author and attester when that actor created the
+  content; dictated or organization-owned content retains its owner author.
+- Accept a registered binding owner as the initial source author while keeping
+  delete authority bound to the stored author. Permit a new correction version
+  from another registered member of the same individual or an authorized
+  professional, while retaining the actual author/attester of that new version.
+- Preserve batch-level author and attester flat claims on each confidential
+  resource and Composition projection, then rebuild the same native author,
+  attester and supporting role graph in subject summary Bundles.
+- Submit each Communication-carried Bundle as one sanitized `data[]` batch to
+  `artifact-sc`; process every entry as an individual asset whose `assetId` is
+  its resource CID, exclude `fullUrl` and confidential FHIR content, and return
+  the one real Fabric transaction id beside every affected resource version.
+  Preserve only positively allowlisted coded `meta.tag[]` research metadata;
+  strip displays, free text and unknown tag fields again inside the chaincode.
+  Package and approve the same `artifact-sc` runtime on the configured clinical
+  data channel as well as its identity channels.
+  Patch the embedded `artifact-sc` package to `1.0.1` for this batch contract.
+- Remove the blanket `Composition.author = actorDid` rule from canonical
+  guidance and keep DIDComm sender and signing keys as transport/audit evidence.
+- Cross-link the GW and Node BFF 101 guides and synchronize snippets, README,
+  test journey comments and repository skills.
+- Consume `gdc-common-utils-ts@2.8.7` for the same provenance contract.
+
 ## [1.24.13] - 2026-09-04
 
 - Build both the compilation and production image stages on Node.js 24 and

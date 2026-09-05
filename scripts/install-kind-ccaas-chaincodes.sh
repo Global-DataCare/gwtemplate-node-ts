@@ -10,7 +10,7 @@ KIND_CCAAS_SPECS=(
   'employee-sc|identity-local'
   'evidence-sc|identity-local'
   'credential-sc|identity-local'
-  'artifact-sc|identity-local'
+  'artifact-sc|identity-local,health-care-local'
   'artifactevent-sc|identity-local'
   'subjectkeybinding-sc|identity-local'
   'consentaccess-sc|health-care-local'
@@ -118,9 +118,10 @@ install_kind_ccaas_chaincodes() {
   kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" cp \
     "${ORDERER_TLS_CA_HOST}" peer-join-tools:/tmp/orderer-tls-ca.pem
 
-  local name channel archive package_id image_ref remote_archive approval
+  local name channel_csv channel archive package_id image_ref remote_archive approval
+  local -a channels
   KIND_PEER_CCAAS_NAMES=''
-  while IFS=$'\t' read -r name channel archive package_id image_ref; do
+  while IFS=$'\t' read -r name channel_csv archive package_id image_ref; do
     remote_archive="/tmp/${name}-caas.tgz"
     kubectl --context "${KUBE_CONTEXT}" -n "${NAMESPACE}" cp \
       "${archive}" "peer-join-tools:${remote_archive}"
@@ -128,45 +129,52 @@ install_kind_ccaas_chaincodes() {
     kind_peer_exec peer lifecycle chaincode install "${remote_archive}"
     kind_peer_exec peer lifecycle chaincode queryinstalled | grep -Fq "${package_id}"
 
-    kind_peer_exec peer lifecycle chaincode approveformyorg \
-      -o orderer:7050 \
-      --ordererTLSHostnameOverride orderer \
-      --tls --cafile /tmp/orderer-tls-ca.pem \
-      --channelID "${channel}" \
-      --name "${name}" \
-      --version 1.0 \
-      --package-id "${package_id}" \
-      --sequence 1 \
-      --signature-policy "OR('Host1MSP.member','Host2MSP.member')"
+    IFS="," read -r -a channels <<< "${channel_csv}"
+    for channel in "${channels[@]}"; do
+      kind_peer_exec peer lifecycle chaincode approveformyorg \
+        -o orderer:7050 \
+        --ordererTLSHostnameOverride orderer \
+        --tls --cafile /tmp/orderer-tls-ca.pem \
+        --channelID "${channel}" \
+        --name "${name}" \
+        --version 1.0 \
+        --package-id "${package_id}" \
+        --sequence 1 \
+        --signature-policy "OR('Host1MSP.member','Host2MSP.member')"
 
-    approval="$(kind_peer_exec peer lifecycle chaincode queryapproved \
-      --channelID "${channel}" --name "${name}" --sequence 1 --output json)"
-    jq -e --arg package_id "${package_id}" \
-      '.source.Type.LocalPackage.package_id == $package_id' <<< "${approval}" >/dev/null
-    kind_peer_exec peer lifecycle chaincode querycommitted \
-      --channelID "${channel}" --name "${name}" --output json \
-      | jq -e --arg version '1.0' --arg msp "${KIND_PEER_MSP_ID}" \
-        '.version == $version and .sequence == 1 and .approvals[$msp] == true' >/dev/null
+      approval="$(kind_peer_exec peer lifecycle chaincode queryapproved \
+        --channelID "${channel}" --name "${name}" --sequence 1 --output json)"
+      jq -e --arg package_id "${package_id}" \
+        '.source.Type.LocalPackage.package_id == $package_id' <<< "${approval}" >/dev/null
+      kind_peer_exec peer lifecycle chaincode querycommitted \
+        --channelID "${channel}" --name "${name}" --output json \
+        | jq -e --arg version '1.0' --arg msp "${KIND_PEER_MSP_ID}" \
+          '.version == $version and .sequence == 1 and .approvals[$msp] == true' >/dev/null
+    done
 
     KIND_PEER_CCAAS_NAMES="${KIND_PEER_CCAAS_NAMES}${KIND_PEER_CCAAS_NAMES:+,}${name}"
   done < "${KIND_CCAAS_MANIFEST}"
 }
 
 verify_kind_ccaas_readiness() {
-  local spec name channel output status
+  local spec name channel_csv channel output status
+  local -a channels
   for spec in "${KIND_CCAAS_SPECS[@]}"; do
-    IFS='|' read -r name channel <<< "${spec}"
-    set +e
-    output="$(kind_peer_exec peer chaincode query \
-      --channelID "${channel}" --name "${name}" \
-      --ctor '{"Args":["__readiness_probe__"]}' 2>&1)"
-    status=$?
-    set -e
-    if [[ ${status} -ne 0 ]] \
-      && [[ "${output}" != *'function that does not exist: __readiness_probe__'* ]]; then
-      echo "El CCAAS ${name} no respondió a través del peer Kubernetes." >&2
-      echo "${output}" >&2
-      return 1
-    fi
+    IFS='|' read -r name channel_csv <<< "${spec}"
+    IFS="," read -r -a channels <<< "${channel_csv}"
+    for channel in "${channels[@]}"; do
+      set +e
+      output="$(kind_peer_exec peer chaincode query \
+        --channelID "${channel}" --name "${name}" \
+        --ctor '{"Args":["__readiness_probe__"]}' 2>&1)"
+      status=$?
+      set -e
+      if [[ ${status} -ne 0 ]] \
+        && [[ "${output}" != *'function that does not exist: __readiness_probe__'* ]]; then
+        echo "El CCAAS ${name} no respondió en ${channel} a través del peer Kubernetes." >&2
+        echo "${output}" >&2
+        return 1
+      fi
+    done
   done
 }

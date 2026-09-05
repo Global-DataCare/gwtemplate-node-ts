@@ -1,3 +1,6 @@
+// Flow contract: one primary-document data[] is processed atomically into one
+// CID-keyed asset per entry; the chaincode strips claims and display text and
+// never stores fullUrl or a clinical FHIR resource.
 // TDD contract: write this test red first; make it green only with the complete real behavior.
 /*
  * SPDX-License-Identifier: Apache-2.0
@@ -84,6 +87,73 @@ describe("ArtifactContract", () => {
     expect(history[0].timestamp).to.equal(99);
     const historyAlias = await contract.GetArtifactHistory(upsertCtx, ARTIFACT_ID);
     expect(historyAlias).to.have.length(1);
+  });
+
+  it("processes every data entry as an individual CID-keyed asset in one batch", async () => {
+    const ctx = createContractContext({ txSeconds: 12, txId: "TX-A-BATCH" });
+    const data = [
+      { type: "Observation", id: "bafy-observation-1", resource: { resourceType: "Observation", meta: { versionId: "bafy-observation-1", claims: { "Observation.code": "85354-9", "Observation.code-display": "must stay private" }, tag: [
+        { id: "Observation[0].code", system: "http://loinc.org", code: "85354-9", version: "2.78", userSelected: true, display: "must stay private" },
+        { id: "Observation[0].category" },
+      ] } } },
+      { type: "Condition", id: "bafy-condition-1", resource: { resourceType: "Condition", meta: { versionId: "bafy-condition-1" } } },
+    ];
+
+    const result = await contract.UpsertArtifacts(ctx, JSON.stringify({ data }));
+
+    expect(result.data).to.have.length(2);
+    expect(ctx.readJson("bafy-observation-1").artifactId).to.equal("bafy-observation-1");
+    expect(ctx.readJson("bafy-condition-1").artifactId).to.equal("bafy-condition-1");
+    expect(ctx.readJson("bafy-observation-1")).not.to.have.any.keys("fullUrl", "resource");
+    expect(ctx.readJson("bafy-observation-1").meta.attributes.tag).to.deep.equal([
+      { id: "Observation[0].code", system: "http://loinc.org", code: "85354-9", version: "2.78", userSelected: true },
+      { id: "Observation[0].category" },
+    ]);
+    expect(ctx.readJson("bafy-observation-1").meta.attributes).not.to.have.property("claims");
+    expect(ctx.writes.filter(({ key }) => !key.startsWith("cid~artifact"))).to.have.length(2);
+
+    await expect(contract.UpsertArtifacts(ctx, JSON.stringify({
+      data: [{ ...data[0], fullUrl: "urn:uuid:not-ledger-safe" }],
+    }))).to.be.rejectedWith("data[0].fullUrl is not allowed");
+    await expect(contract.UpsertArtifacts(ctx, JSON.stringify({
+      data: [{ ...data[0], id: "different-cid" }],
+    }))).to.be.rejectedWith("data[0].id must equal resource.meta.versionId");
+    await expect(contract.UpsertArtifacts(ctx, JSON.stringify({
+      data: [{ type: data[0].type, resource: data[0].resource }],
+    }))).to.be.rejectedWith("data[0].id must equal resource.meta.versionId");
+    await expect(contract.UpsertArtifacts(ctx, JSON.stringify({ data: [] })))
+      .to.be.rejectedWith("payload.data must be a non-empty array");
+    await expect(contract.UpsertArtifacts(ctx, JSON.stringify({ data: [null] })))
+      .to.be.rejectedWith("data[0] must be an object");
+    await expect(contract.UpsertArtifacts(ctx, JSON.stringify({ data: [{ ...data[0], type: "Condition" }] })))
+      .to.be.rejectedWith("data[0].type must equal resource.resourceType");
+    await expect(contract.UpsertArtifacts(ctx, JSON.stringify({
+      data: [{ id: data[0].id, resource: data[0].resource }],
+    }))).to.be.rejectedWith("data[0].type must equal resource.resourceType");
+    await expect(contract.UpsertArtifacts(ctx, JSON.stringify({ data: [{ ...data[0], resource: null }] })))
+      .to.be.rejectedWith("data[0].resource must be an object");
+    await expect(contract.UpsertArtifacts(ctx, JSON.stringify({
+      data: [{ ...data[0], resource: { ...data[0].resource, fullUrl: "urn:uuid:not-ledger-safe" } }],
+    }))).to.be.rejectedWith("data[0].resource.fullUrl is not allowed");
+    await expect(contract.UpsertArtifacts(ctx, JSON.stringify({
+      data: [{ ...data[0], resource: { meta: data[0].resource.meta } }],
+    }))).to.be.rejectedWith("data[0].resource.resourceType is required");
+    await expect(contract.UpsertArtifacts(ctx, JSON.stringify({
+      data: [{ ...data[0], resource: { resourceType: data[0].resource.resourceType } }],
+    }))).to.be.rejectedWith("data[0].resource.meta.versionId is required");
+
+    const minimalCid = "bafy-minimal";
+    const minimal = {
+      data: [{
+        type: "Observation",
+        id: minimalCid,
+        resource: { resourceType: "Observation", meta: { versionId: minimalCid } },
+      }],
+    };
+    const first = await contract.upsertArtifacts(ctx, JSON.stringify(minimal));
+    const second = await contract.UpsertArtifacts(ctx, JSON.stringify(minimal));
+    expect(first.data[0].resource.meta.audit.version).to.equal(1);
+    expect(second.data[0].resource.meta.audit.version).to.equal(2);
   });
 
   it("creates through upsert when missing and rejects duplicates or invalid payloads", async () => {

@@ -1,3 +1,6 @@
+// Flow contract: confidential DocumentReference content stays in the vault;
+// only its CID/version mapping crosses the batch ledger boundary, never fullUrl,
+// subject, claims or the original FHIR resource.
 // TDD contract: write this test red first; make it green only with the complete real behavior.
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/__tests__/unit/managers/DocumentReferenceManager.test.ts
@@ -97,8 +100,8 @@ describe('DocumentReferenceManager', () => {
 
   // This test proves the backend contract for attachment/document writes:
   // the vault write remains local, while the CID-backed artifact is also
-  // published through the blockchain adapter with the business identifier kept
-  // separate from the content hash.
+  // published through the CID batch boundary without copying the confidential
+  // FHIR envelope or its fullUrl to the ledger.
   it('registers content-addressed CID mappings on the blockchain adapter', async () => {
     const subject = 'did:web:api.acme.org:individual:321';
     const job = createJob({
@@ -112,18 +115,15 @@ describe('DocumentReferenceManager', () => {
     await manager.process(job);
 
     expect(mockBlockchainAdapter.registerCidVersionMappings).toHaveBeenCalledTimes(1);
-    expect(mockBlockchainAdapter.registerArtifactBundle).toHaveBeenCalledTimes(1);
+    expect(mockBlockchainAdapter.registerArtifactBundle).not.toHaveBeenCalled();
     const [mappings, channel, chaincode] = mockBlockchainAdapter.registerCidVersionMappings.mock.calls[0];
     expect(channel).toBe('health-care-es');
-    expect(chaincode).toBe('fhir-versioning');
+    expect(chaincode).toBe('artifact-sc');
     expect(mappings[0].resourceType).toBe('DocumentReference');
     expect(mappings[0].versionId.startsWith('z')).toBe(true);
     expect(mappings[0].cid).toBe(mappings[0].versionId);
     expect(mappings[0].resourceId).toBeDefined();
 
-    const [artifactParams] = mockBlockchainAdapter.registerArtifactBundle.mock.calls[0];
-    expect(artifactParams.assetId).toBe(mappings[0].cid);
-    expect(artifactParams.payload.resourceType).toBe('DocumentReference');
-    expect(artifactParams.payload.subject).toBe(subject);
+    expect(mappings[0]).not.toHaveProperty('fullUrl');
   });
 });

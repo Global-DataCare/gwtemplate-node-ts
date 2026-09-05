@@ -6,9 +6,11 @@ import type {
   RouteContext,
   SubmitAndPollResult,
   ClinicalCreatorIpsExport,
+  ClinicalSourceAuthorSelection,
   ServerProfileSessionManager,
 } from 'gdc-sdk-node-ts';
 import {
+  ClinicalSourceAuthorSelections,
   cloneImportedClinicalDocumentForDemo,
 } from 'gdc-sdk-node-ts';
 
@@ -67,6 +69,9 @@ export function exportClinicalCreator(
   profileManager: ServerProfileSessionManager,
   ownerId: string,
   profileId: string,
+  sourceAuthor: ClinicalSourceAuthorSelection = ClinicalSourceAuthorSelections.Owner,
 ): Promise<ClinicalCreatorIpsExport> {
-  return profileManager.exportClinicalCreatorIps({ ownerId, profileId });
+  // The BFF chooses only owner or authenticated registered creator. It never
+  // accepts a FHIR author reference, actorDid or signing kid from browser JSON.
+  return profileManager.exportClinicalCreatorIps({ ownerId, profileId, sourceAuthor });
 }

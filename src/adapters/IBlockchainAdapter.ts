@@ -30,7 +30,13 @@ export interface IBlockchainAdapter {
       versionId: string;
       resourceType?: string;
       resourceId?: string;
-      fullUrl?: string;
+      tags?: Array<{
+        id: string;
+        system?: string;
+        code?: string;
+        version?: string;
+        userSelected?: boolean;
+      }>;
     }>,
     channel: string,
     chaincode: string,

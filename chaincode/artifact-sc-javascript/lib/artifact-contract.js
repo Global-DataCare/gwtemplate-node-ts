@@ -19,7 +19,97 @@ async function writeCidIndex(ctx, cid, artifactId) {
   await ctx.stub.putState(indexKey, Buffer.from(""));
 }
 
+function parseFhirEvidenceBatch(payload) {
+  if (!Array.isArray(payload.data) || payload.data.length === 0) {
+    throw new Error("payload.data must be a non-empty array");
+  }
+
+  return payload.data.map((entry, index) => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+      throw new Error(`data[${index}] must be an object`);
+    }
+    if (Object.prototype.hasOwnProperty.call(entry, "fullUrl")) {
+      throw new Error(`data[${index}].fullUrl is not allowed`);
+    }
+    const resource = entry.resource;
+    if (!resource || typeof resource !== "object" || Array.isArray(resource)) {
+      throw new Error(`data[${index}].resource must be an object`);
+    }
+    if (Object.prototype.hasOwnProperty.call(resource, "fullUrl")) {
+      throw new Error(`data[${index}].resource.fullUrl is not allowed`);
+    }
+    const resourceType = String(resource.resourceType || "");
+    if (!resourceType) throw new Error(`data[${index}].resource.resourceType is required`);
+    if (String(entry.type || "") !== resourceType) {
+      throw new Error(`data[${index}].type must equal resource.resourceType`);
+    }
+    const versionId = String(resource.meta?.versionId || "");
+    if (!versionId) throw new Error(`data[${index}].resource.meta.versionId is required`);
+    if (String(entry.id || "") !== versionId) {
+      throw new Error(`data[${index}].id must equal resource.meta.versionId`);
+    }
+    const tags = Array.isArray(resource.meta?.tag)
+      ? resource.meta.tag
+        .filter((tag) => tag && typeof tag === "object" && !Array.isArray(tag) && typeof tag.id === "string" && tag.id)
+        .map((tag) => ({
+          id: tag.id,
+          ...(typeof tag.system === "string" ? { system: tag.system } : {}),
+          ...(typeof tag.code === "string" ? { code: tag.code } : {}),
+          ...(typeof tag.version === "string" ? { version: tag.version } : {}),
+          ...(typeof tag.userSelected === "boolean" ? { userSelected: tag.userSelected } : {}),
+        }))
+      : undefined;
+
+    return {
+      id: versionId,
+      resourceType,
+      versionId,
+      tags,
+    };
+  });
+}
+
 class ArtifactContract extends Contract {
+  /**
+   * Processes a JSON:API-style data[] in one Fabric transaction. Each entry is
+   * persisted as its own CID-keyed asset; the primary document itself is never
+   * stored as an aggregate artifact.
+   */
+  async UpsertArtifacts(ctx, payloadJson) {
+    const payload = parseJson(payloadJson, "payload");
+    const evidence = parseFhirEvidenceBatch(payload);
+    const data = [];
+
+    for (const item of evidence) {
+      const previous = (await existsAsset(ctx.stub, item.id))
+        ? await readAsset(ctx.stub, item.id, ARTIFACT_ASSET_LABEL)
+        : undefined;
+      const asset = buildStoredArtifactAsset(ctx, item.id, {
+        cid: item.id,
+        hashAlg: "sha3-384",
+        artifactType: "fhir-resource-version",
+        declaredBy: payload.declaredBy,
+        declaredByType: payload.declaredByType,
+        meta: {
+          attributes: {
+            resourceType: item.resourceType,
+            versionId: item.versionId,
+            ...(item.tags?.length ? { tag: item.tags } : {}),
+          },
+        },
+      }, previous);
+      await writeJsonAsset(ctx.stub, item.id, asset);
+      await writeCidIndex(ctx, item.id, item.id);
+      data.push({ type: item.resourceType, id: item.id, resource: asset });
+    }
+
+    return { data };
+  }
+
+  async upsertArtifacts(ctx, payloadJson) {
+    return this.UpsertArtifacts(ctx, payloadJson);
+  }
+
   async CreateArtifact(ctx, artifactId, payloadJson) {
     const exists = await existsAsset(ctx.stub, artifactId);
     if (exists) {

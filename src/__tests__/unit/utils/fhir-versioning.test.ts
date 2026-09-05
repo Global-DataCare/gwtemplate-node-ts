@@ -1,3 +1,6 @@
+// Flow contract: canonical FHIR content produces a deterministic CID while
+// transport location stays private and optional coded tags are positively
+// allowlisted before the mapping reaches a blockchain adapter.
 // TDD contract: write this test red first; make it green only with the complete real behavior.
 import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 import { describe, expect, it, jest } from '@jest/globals';
@@ -36,6 +39,9 @@ describe('fhir-versioning utils', () => {
       fullUrl: 'urn:uuid:8e4db04c-3536-4b03-a33a-69bb1f3729e7',
       resource: {
         resourceType: ResourceTypesFhirR4.DocumentReference,
+        meta: {
+          tag: [{ id: 'DocumentReference[0].type', system: 'http://loinc.org', code: '34133-9', display: 'must stay private' }],
+        },
       },
     };
     const claims: Record<string, any> = {
@@ -53,7 +59,10 @@ describe('fhir-versioning utils', () => {
     expect(entry.resource.meta.versionId).toBeDefined();
     expect(claims['DocumentReference.meta.versionId']).toBe(entry.resource.meta.versionId);
     expect(claims['org.hl7.fhir.r4.DocumentReference.meta.versionId']).toBe(entry.resource.meta.versionId);
-    expect(out.mapping?.fullUrl).toBe(entry.fullUrl);
+    expect(out.mapping).not.toHaveProperty('fullUrl');
+    expect(out.mapping?.tags).toEqual([
+      { id: 'DocumentReference[0].type', system: 'http://loinc.org', code: '34133-9' },
+    ]);
   });
 
   it('registers mappings only when adapter supports it', async () => {
@@ -68,7 +77,7 @@ describe('fhir-versioning utils', () => {
     expect(register).toHaveBeenCalledTimes(1);
     const firstCall = (register.mock.calls as any[])[0];
     expect(firstCall[1]).toBe('health-care-es');
-    expect(firstCall[2]).toBe('fhir-versioning');
+    expect(firstCall[2]).toBe('artifact-sc');
   });
 
   it('canonicalizes recursively', () => {

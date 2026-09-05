@@ -4,7 +4,10 @@
  * Communication route; 2) create one subject-scoped Immunization through an
  * attached Bundle.type=batch; 3) prove a stale optional If-Match returns 412
  * without deleting it; 4) delete the same technical resource.id without
- * If-Match; 5) prove the authoritative vault no longer contains the record.
+ * If-Match; 5) prove the authoritative vault no longer contains the record;
+ * 6) register two member creator bindings; 7) create individual-authored
+ * content with one member as personal attester; 8) let the other member
+ * correct it; 9) deny member deletion because neither is the author.
  * Authorization invariant: the verified route/DIDComm issuer is recorded as
  * creator and only that same creator may delete. Persistence invariant: every
  * inner batch entry has an independent terminal response and DELETE never
@@ -18,6 +21,11 @@ import { invokeExpress } from './helpers/invokeExpress';
 import { getTenantVaultId, generateTenantCollectionNameFromClaims } from '../../utils/tenant';
 import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { HealthcareBasicSections } from 'gdc-common-utils-ts/constants/index';
+import {
+  CompositionAttesterModes,
+  CompositionClaim,
+  FhirIpsCreatorKinds,
+} from 'gdc-common-utils-ts';
 import { CommunicationClaim } from 'gdc-common-utils-ts/models/interoperable-claims/communication-claims';
 import { testPayloadCreateTenant1 } from '../data/end-to-end.data';
 import { initializeTenantServicesConfig } from '../../utils/services';
@@ -26,6 +34,16 @@ import { startServer, resetServerConfig } from '../../server';
 import { getEnvSectionId } from '../../utils/section-env';
 import { getSubjectScopedSectionId } from '../../utils/individual-sections';
 import { testTenant1TenantId } from '../data/organization.data';
+import {
+  EXAMPLE_KYC_CONTROLLER_USER_UUID,
+  EXAMPLE_KYC_CONTROLLER_UUID,
+  EXAMPLE_CLIENT_INSTANCE_UUID,
+  EXAMPLE_CONTROLLER_DID,
+  EXAMPLE_OBSERVATION_IDENTIFIER,
+  EXAMPLE_RELATED_PERSON_MEMBER_DID,
+  EXAMPLE_RELATED_PERSON_ROLE,
+} from 'gdc-common-utils-ts/examples/shared';
+import { getClinicalCreatorBindingsSectionId } from '../../utils/ips-bundle';
 
 describe('clinical mixed batch API (integration)', () => {
   afterEach(() => resetServerConfig());
@@ -76,17 +94,23 @@ describe('clinical mixed batch API (integration)', () => {
       const resourceId = 'immunization-mistake';
       const sectionId = getSubjectScopedSectionId(subjectDid, 'individual', 'immunizations');
 
-      const submit = async (thid: string, innerEntry: Record<string, unknown>) => {
+      const submit = async (
+        thid: string,
+        innerEntry: Record<string, unknown>,
+        provenanceClaims?: Record<string, unknown>,
+        actorDid: string = EXAMPLE_RELATED_PERSON_MEMBER_DID,
+      ) => {
         const attachment = Buffer.from(JSON.stringify({
           resourceType: ResourceTypesFhirR4.Bundle,
           type: 'batch',
+          ...(provenanceClaims ? { meta: { claims: provenanceClaims } } : {}),
           entry: [innerEntry],
         }), 'utf8').toString('base64');
         const claims = {
           '@context': 'org.hl7.fhir.r4',
           [CommunicationClaim.Identifier]: `urn:uuid:${thid}`,
           [CommunicationClaim.Subject]: subjectDid,
-          [CommunicationClaim.Sender]: 'did:web:api.acme.org:employee:creator',
+          [CommunicationClaim.Sender]: actorDid,
           [CommunicationClaim.Topic]: HealthcareBasicSections.Immunizations.attributeValue,
           [CommunicationClaim.ContentAttachmentType]: 'application/fhir+json',
           [CommunicationClaim.ContentAttachmentData]: attachment,
@@ -97,7 +121,7 @@ describe('clinical mixed batch API (integration)', () => {
           headers: { 'content-type': 'application/json', authorization: 'Bearer demo-token' },
           body: {
             jti: `jti-${thid}`,
-            iss: 'did:web:api.acme.org:employee:creator',
+            iss: actorDid,
             aud: 'did:web:api.acme.org',
             type: 'application/didcomm-plain+json',
             thid,
@@ -160,6 +184,120 @@ describe('clinical mixed batch API (integration)', () => {
         expect.objectContaining({ id: resourceId, response: expect.objectContaining({ status: String(HttpStatusCodes.NoContent) }) }),
       ]));
       expect(await vaultRepository.get(tenantVaultId, resourceId, sectionId)).toBeUndefined();
+
+      const memberAuthor = `urn:uuid:${EXAMPLE_KYC_CONTROLLER_UUID}`;
+      const successorMemberAuthor = `urn:uuid:${EXAMPLE_CLIENT_INSTANCE_UUID}`;
+      await vaultRepository.put(tenantVaultId, [{
+        id: memberAuthor,
+        kind: FhirIpsCreatorKinds.IndividualMember,
+        actorIdentifier: `urn:uuid:${EXAMPLE_KYC_CONTROLLER_USER_UUID}`,
+        authorIdentifier: memberAuthor,
+        ownerIdentifier: subjectDid,
+        role: EXAMPLE_RELATED_PERSON_ROLE,
+        actorDids: [EXAMPLE_RELATED_PERSON_MEMBER_DID],
+      } as any, {
+        id: successorMemberAuthor,
+        kind: FhirIpsCreatorKinds.IndividualMember,
+        actorIdentifier: successorMemberAuthor,
+        authorIdentifier: successorMemberAuthor,
+        ownerIdentifier: subjectDid,
+        role: EXAMPLE_RELATED_PERSON_ROLE,
+        actorDids: [EXAMPLE_CONTROLLER_DID],
+      } as any], getClinicalCreatorBindingsSectionId());
+      const subjectAuthoredId = EXAMPLE_OBSERVATION_IDENTIFIER.split(':').at(-1)!;
+      const subjectAuthored = await submit('mixed-batch-subject-authored', {
+        type: GatewayRequestEntryTypes.ObservationCreate,
+        request: { method: HttpRequestMethods.Post, url: ResourceTypesFhirR4.Observation },
+        resource: {
+          resourceType: ResourceTypesFhirR4.Observation,
+          id: subjectAuthoredId,
+          subject: { reference: subjectDid },
+          status: 'final',
+        },
+      }, {
+        [CompositionClaim.Author]: subjectDid,
+        [CompositionClaim.Attester]: memberAuthor,
+        [CompositionClaim.AttesterMode]: CompositionAttesterModes.Personal,
+      });
+      expect(subjectAuthored.data).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          id: subjectAuthoredId,
+          response: expect.objectContaining({ status: String(HttpStatusCodes.Created) }),
+        }),
+      ]));
+      const observationSectionId = getSubjectScopedSectionId(subjectDid, 'individual', 'observations');
+      const subjectAuthoredRecord = await vaultRepository.get<any>(
+        tenantVaultId,
+        subjectAuthoredId,
+        observationSectionId,
+      );
+      expect(subjectAuthoredRecord?.[CompositionClaim.Author]).toBe(subjectDid);
+      expect(subjectAuthoredRecord?.[CompositionClaim.Attester]).toBe(memberAuthor);
+      const compositionRecords = await vaultRepository.getContainersInSection<any>(
+        tenantVaultId,
+        getSubjectScopedSectionId(subjectDid, 'individual', 'composition'),
+      );
+      const subjectComposition = compositionRecords.find(
+        (record: any) => record?.[CompositionClaim.Author] === subjectDid,
+      );
+      expect(subjectComposition?.[CompositionClaim.Attester]).toBe(memberAuthor);
+      expect(subjectComposition?.[CompositionClaim.AttesterMode]).toBe(
+        CompositionAttesterModes.Personal,
+      );
+
+      const correctedByAnotherMember = await submit('mixed-batch-subject-authored-update', {
+        type: GatewayRequestEntryTypes.ObservationEdit,
+        request: {
+          method: HttpRequestMethods.Put,
+          url: `${ResourceTypesFhirR4.Observation}/${subjectAuthoredId}`,
+        },
+        resource: {
+          resourceType: ResourceTypesFhirR4.Observation,
+          id: subjectAuthoredId,
+          subject: { reference: subjectDid },
+          status: 'corrected',
+        },
+      }, {
+        [CompositionClaim.Author]: subjectDid,
+        [CompositionClaim.Attester]: successorMemberAuthor,
+        [CompositionClaim.AttesterMode]: CompositionAttesterModes.Personal,
+      }, EXAMPLE_CONTROLLER_DID);
+      expect(correctedByAnotherMember.data).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          id: subjectAuthoredId,
+          response: expect.objectContaining({ status: String(HttpStatusCodes.Ok) }),
+        }),
+      ]));
+      const correctedRecord = await vaultRepository.get<any>(
+        tenantVaultId,
+        subjectAuthoredId,
+        observationSectionId,
+      );
+      expect(correctedRecord?.[CompositionClaim.Author]).toBe(subjectDid);
+      expect(correctedRecord?.[CompositionClaim.Attester]).toBe(successorMemberAuthor);
+      expect(correctedRecord?.audit).toEqual(expect.objectContaining({
+        creatorDid: subjectDid,
+        submitterDid: EXAMPLE_CONTROLLER_DID,
+      }));
+
+      const forbiddenMemberDelete = await submit('mixed-batch-subject-authored-delete', {
+        type: GatewayRequestEntryTypes.ObservationDelete,
+        request: {
+          method: HttpRequestMethods.Delete,
+          url: `${ResourceTypesFhirR4.Observation}/${subjectAuthoredId}`,
+        },
+      });
+      expect(forbiddenMemberDelete.data).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          id: subjectAuthoredId,
+          response: expect.objectContaining({ status: String(HttpStatusCodes.Forbidden) }),
+        }),
+      ]));
+      expect(await vaultRepository.get(
+        tenantVaultId,
+        subjectAuthoredId,
+        observationSectionId,
+      )).toBeDefined();
     } finally {
       queueAdapter.stop();
     }

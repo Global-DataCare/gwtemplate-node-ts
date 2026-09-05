@@ -72,16 +72,28 @@ export class ManageAsset {
    * temporary chaincode operations that do not yet have a dedicated helper.
    */
   public async submit(mspId: string, fnName: string, ...args: string[]): Promise<object> {
+    const submitted = await this.submitWithTransactionId(mspId, fnName, ...args);
+    return submitted.result;
+  }
+
+  /** Submits once and exposes the Fabric transaction id with the decoded result. */
+  public async submitWithTransactionId(
+    mspId: string,
+    fnName: string,
+    ...args: string[]
+  ): Promise<{ result: object; transactionId: string }> {
+    let transactionId = '';
     const result = await this.withContract(mspId, async ({ contract }) => {
       const proposal = contract.newProposal(fnName, {
         arguments: args,
         endorsingOrganizations: [mspId],
       });
       const transaction = await proposal.endorse();
+      transactionId = transaction.getTransactionId();
       await transaction.submit();
       return transaction.getResult();
     });
-    return this.parseJson<object>(result);
+    return { result: this.parseJson<object>(result), transactionId };
   }
 
   /**

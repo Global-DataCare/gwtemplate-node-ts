@@ -77,6 +77,22 @@ E2E gates before `npm publish` or any container image build.
   `Communication` or `Bundle`; they never receive DIDComm identity fields.
   HTTP Authorization proves the caller and `Communication.sender` remains a
   FHIR business participant reference.
+- In a clinical document Bundle, `Composition.author` identifies who created
+  the content and `Composition.attester` identifies the registered assignment
+  that attested/submitted it. A protected BFF profile chooses only `owner` or
+  `creator`: a RelatedPerson or PractitionerRole may be both author and
+  attester when that member/professional created the content. `actorDid` and
+  signing `kid` remain transport/audit evidence. Same-individual members and
+  authorized tenant professionals may create correction versions; delete stays
+  exact-author only. Communication-carried resource CIDs are submitted in one
+  sanitized `data[]` batch; the smart contract writes each CID as its own asset
+  in the same Fabric transaction. `fullUrl` and clinical content never enter
+  that ledger payload; optional research tags use a positive code-only
+  allowlist, while displays and free text stay in the consented confidential
+  projection. The response distinguishes a local receipt from a real
+  Fabric transaction id. See
+  [Authenticated clinical author](docs/01-OVERVIEW-AND-GUIDES/101-01.N-AUTHENTICATED-CLINICAL-AUTHOR.md)
+  and the linked Node BFF guide.
 
 If you are new and confused by the front-story vs GW boundary, read first:
 
@@ -99,6 +115,8 @@ GW starts after upstream profile/runtime unlock and document/Communication autho
 - Local audit/runtime with Fabric: [docs-v2/24-local-audit-fabric-runtime.md](docs-v2/24-local-audit-fabric-runtime.md)
 - Reproducible open-source production-readiness evidence: [PRODUCTION-READINESS.md](PRODUCTION-READINESS.md)
 - Portal/BFF to GW CORE reference: [portal-api-gw.md](portal-api-gw.md)
+- Clinical Bundle authorship and attestation:
+  [101-01.N-AUTHENTICATED-CLINICAL-AUTHOR.md](docs/01-OVERVIEW-AND-GUIDES/101-01.N-AUTHENTICATED-CLINICAL-AUTHOR.md)
 - Environment-variable reference: [docs-v2/22-environment-variables-reference.md](docs-v2/22-environment-variables-reference.md)
 - Testing and live E2E operations: [docs/TESTING.md](docs/TESTING.md)
 - Core integration baseline and rationale: [docs/API_CORE_INTEGRATION.md](docs/API_CORE_INTEGRATION.md)

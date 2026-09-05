@@ -18,6 +18,22 @@ export class ManageAssetArtifact extends ManageAsset {
   public async upsertArtifact(mspId: string, artifactId: string, payload: object): Promise<object> {
     return this.submit(mspId, 'UpsertArtifact', artifactId, JSON.stringify(payload));
   }
+
+  public async upsertArtifactWithTransactionId(
+    mspId: string,
+    artifactId: string,
+    payload: object,
+  ): Promise<{ result: object; transactionId: string }> {
+    return this.submitWithTransactionId(mspId, 'UpsertArtifact', artifactId, JSON.stringify(payload));
+  }
+
+  /** Upserts every CID-keyed artifact in one primary-document data[] transaction. */
+  public async upsertArtifactsWithTransactionId(
+    mspId: string,
+    payload: object,
+  ): Promise<{ result: object; transactionId: string }> {
+    return this.submitWithTransactionId(mspId, 'UpsertArtifacts', JSON.stringify(payload));
+  }
 }
 
 export const manageAssetArtifact = new ManageAssetArtifact();
