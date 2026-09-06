@@ -46,12 +46,16 @@ must not be represented as the audited production profile.
 - avoid `|RESPRSN` as canonical output.
 7. Every new persistence manager is claims-first:
 - `resource.meta.claims` is the canonical business source of truth;
+- pass incoming claims through the existing `normalizeContextualizedClaims`
+  canonical FHIR-claim validation before `protectConfidentialData`; do not add
+  a manager-local or parallel validator;
 - persist flat claims as `ConfidentialStorageDoc.content.claims` through
   `protectConfidentialData`, never a version-specific nested FHIR resource;
 - build `indexed.attributes` from the governed searchable claim subset and
   protect it with `protectAttributesNameAndValue` before repository storage;
 - materialize native FHIR only at an explicit import, projection or export
-  adapter boundary;
+  adapter boundary; `validateFhirResource` applies to native FHIR at that
+  boundary, not to the canonical flat-claims storage representation;
 - the mandatory manager test must inspect the exact argument passed to
   `protectConfidentialData`, prove protected attributes, and reject nested FHIR
   fields as persisted business state.

@@ -9,6 +9,9 @@
 - Add an executable policy test requiring each new persistence manager suite to
   inspect the exact `protectConfidentialData` input and reject nested FHIR as
   stored business state.
+- Require each claims-first manager to pass input through the existing
+  `normalizeContextualizedClaims` FHIR-claim validation before encryption;
+  reserve `validateFhirResource` for native R4/R5 adapter boundaries.
 
 ## [1.25.2] - 2026-09-05
 
