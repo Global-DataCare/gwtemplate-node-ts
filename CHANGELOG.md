@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+- Make claims-first persistence an obligatory gate for every new manager:
+  `resource.meta.claims` remains the canonical source, encrypted content keeps
+  `content.claims`, searchable attributes are protected before persistence,
+  and native FHIR is limited to explicit import/projection/export adapters.
+- Add an executable policy test requiring each new persistence manager suite to
+  inspect the exact `protectConfidentialData` input and reject nested FHIR as
+  stored business state.
+
 ## [1.25.2] - 2026-09-05
 
 - Scope tenant descendant lifecycle counts to actual individual registration

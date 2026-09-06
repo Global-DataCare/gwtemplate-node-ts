@@ -44,6 +44,17 @@ must not be represented as the audited production profile.
 - tenant controller authority uses bare `RESPRSN` in
   `ServiceControllerCredential.credentialSubject.owner.additionalType`;
 - avoid `|RESPRSN` as canonical output.
+7. Every new persistence manager is claims-first:
+- `resource.meta.claims` is the canonical business source of truth;
+- persist flat claims as `ConfidentialStorageDoc.content.claims` through
+  `protectConfidentialData`, never a version-specific nested FHIR resource;
+- build `indexed.attributes` from the governed searchable claim subset and
+  protect it with `protectAttributesNameAndValue` before repository storage;
+- materialize native FHIR only at an explicit import, projection or export
+  adapter boundary;
+- the mandatory manager test must inspect the exact argument passed to
+  `protectConfidentialData`, prove protected attributes, and reject nested FHIR
+  fields as persisted business state.
 
 ## Naming Discipline
 1. Keep the common concept first and the specialization last.
@@ -61,6 +72,8 @@ For any endpoint/manager behavior change:
 1. Add failing unit test in manager layer.
 2. Add/adjust integration test in route layer.
 3. Validate SDK live E2E impact when core flow is affected.
+4. For every new persistence manager, add the claims-first storage gate from
+   Hard Rule 7 before implementation.
 
 ## Quality Gates
 - Portal evidence follows `test -> local-network -> test-network -> network`.

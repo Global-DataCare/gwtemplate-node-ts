@@ -67,6 +67,26 @@ description: Enforce branch, TDD, canonical FHIR and schema.org vocabulary, fixt
   JSDoc and high-level docs, while tests import the governed constants instead
   of copying wire literals.
 
+## Enforce claims-first persistence
+
+- Treat `resource.meta.claims` as the canonical business source of truth for
+  every claims-first GW request and response. A manager must persist those flat
+  claims in `ConfidentialStorageDoc.content.claims`; it must not discard them
+  and replace them with a version-specific nested FHIR resource.
+- Build `indexed.attributes` only from the governed searchable subset of those
+  claims and pass that subset through `protectAttributesNameAndValue` before
+  repository persistence. Never expose plaintext searchable claim names or
+  values outside encrypted content.
+- Materialize native FHIR only at an explicit import, projection, or export
+  adapter boundary. Native FHIR input may be normalized into flat claims, but
+  it never replaces flat claims as the stored source of truth.
+- Make this an obligatory gate for every new persistence manager. Before its
+  implementation can pass review, add a focused test that inspects the exact
+  argument sent to `protectConfidentialData`, proves `content.claims` is the
+  canonical payload, proves protected `indexed.attributes`, and rejects nested
+  FHIR fields as persisted business state. Add the corresponding route test and
+  keep an affected real local E2E with no skip.
+
 ## Keep test layers separate
 
 - Enforce the same portal progression everywhere: `test -> local-network -> test-network -> network`.
