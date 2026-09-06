@@ -73,13 +73,19 @@ description: Enforce branch, TDD, canonical FHIR and schema.org vocabulary, fixt
   every claims-first GW request and response. A manager must persist those flat
   claims in `ConfidentialStorageDoc.content.claims`; it must not discard them
   and replace them with a version-specific nested FHIR resource.
+- Pass incoming flat claims through the existing
+  `normalizeContextualizedClaims` canonical FHIR-claim validation before
+  `protectConfidentialData`. Reuse its `normalizeFhirApiClaimKey` contract;
+  never create a manager-local or parallel validator.
 - Build `indexed.attributes` only from the governed searchable subset of those
   claims and pass that subset through `protectAttributesNameAndValue` before
   repository persistence. Never expose plaintext searchable claim names or
   values outside encrypted content.
 - Materialize native FHIR only at an explicit import, projection, or export
-  adapter boundary. Native FHIR input may be normalized into flat claims, but
-  it never replaces flat claims as the stored source of truth.
+  adapter boundary. `validateFhirResource` validates native FHIR at that
+  boundary, not the canonical flat-claims representation. Native FHIR input
+  may be normalized into flat claims, but it never replaces flat claims as the
+  stored source of truth.
 - Make this an obligatory gate for every new persistence manager. Before its
   implementation can pass review, add a focused test that inspects the exact
   argument sent to `protectConfidentialData`, proves `content.claims` is the

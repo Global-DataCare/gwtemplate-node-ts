@@ -12,6 +12,8 @@ describe('claims-first persistence policy', () => {
     // These exact phrases are the policy surface under test, not duplicated business fixtures.
     for (const contract of [skill, agents]) {
       expect(contract).toMatch(/resource\.meta\.claims.*canonical.*source of truth/is);
+      expect(contract).toMatch(/normalizeContextualizedClaims.*before.*protectConfidentialData/is);
+      expect(contract).toMatch(/validateFhirResource.*native FHIR.*boundary/is);
       expect(contract).toMatch(/content\.claims.*protectConfidentialData/is);
       expect(contract).toMatch(/indexed\.attributes.*protectAttributesNameAndValue/is);
       expect(contract).toMatch(/native FHIR.*explicit.*projection.*export/is);
