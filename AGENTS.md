@@ -81,10 +81,17 @@ For any endpoint/manager behavior change:
 
 ## Quality Gates
 - Portal evidence follows `test -> local-network -> test-network -> network`.
-  First prove normal local UI -> BFF -> high-level SDK -> GW/services with
-  in-memory `networkKind=test` and no blockchain. Fixture pages, mocked routes
+  First run unit and integration tests with `networkKind=test`, then prove the
+  normal local UI -> BFF -> high-level SDK -> GW/DataConv journey with real
+  Playwright, in-memory services and no blockchain. Fixture pages, mocked routes
   and API-only Playwright never replace that cross-system proof. Fabric,
   staging and production follow in that order.
+- Before publication, an unpublished SDK may be consumed from an immutable
+  `npm pack` tarball as a temporary `--no-save` fail-fast substitution. Restore
+  the registry dependency and lockfile immediately afterwards; never commit a
+  `file:`, Git, workspace, vendored tarball dependency or its generated lock.
+  Publish only after all no-blockchain gates pass, reinstall the exact registry
+  version, repeat the reproducible gate, then run `local-network` and staging.
 - Every affected package or SDK live E2E must run against the real local
   services. A live E2E reported as `SKIP` blocks the release. Finish those live
   E2E gates before `npm publish` or any container image build.

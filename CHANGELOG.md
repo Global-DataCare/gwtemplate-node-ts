@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Enforce a fail-fast release order across repository skills and testing docs:
+  unit/integration plus the real local portal journey run without blockchain
+  before npm publication; temporary `npm pack --no-save` substitutions must be
+  restored; exact registry pins precede Fabric `local-network` and staging.
 - Make claims-first persistence an obligatory gate for every new manager:
   `resource.meta.claims` remains the canonical source, encrypted content keeps
   `content.claims`, searchable attributes are protected before persistence,

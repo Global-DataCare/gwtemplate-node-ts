@@ -236,6 +236,13 @@ Search for stale claims before finishing, especially `researchOrganizationDid`, 
 
 ## Mandatory release authorization continuity
 
+Fail-fast order is unit and integration with `networkKind=test`, followed by a
+real local UI -> BFF -> SDK -> GW/DataConv Playwright journey without blockchain.
+An unpublished SDK may use `npm pack` only as a temporary `--no-save` install;
+restore the registry dependency and lockfile before any commit. Publish only
+after those gates pass, reinstall the exact registry version, repeat them, then
+run `local-network` and staging.
+
 For any release chain that requires npm authorization, make at most three
 attempts and keep each command session and browser window alive for up to five
 minutes. Never end the turn or imply continued work while a window is pending.
