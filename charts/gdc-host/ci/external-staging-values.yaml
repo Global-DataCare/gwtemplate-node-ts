@@ -15,7 +15,7 @@ host:
   dataChannel: health-care-eu
 gw:
   image: registry.example.invalid/gw-core@sha256:1111111111111111111111111111111111111111111111111111111111111111
-  providers: { queue: mem, database: firestore, storage: gcs, envelope: local, replayProtection: none }
+  providers: { queue: mem, database: firestore, storage: gcs, kms: local, replayProtection: none }
 images:
   init: registry.example.invalid/busybox@sha256:2222222222222222222222222222222222222222222222222222222222222222
 peer:

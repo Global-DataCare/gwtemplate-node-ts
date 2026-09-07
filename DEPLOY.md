@@ -89,7 +89,7 @@ Ejemplos:
 - `HOST_LEGAL_NAME`
 - `DB_PROVIDER`
 - `STORAGE_PROVIDER`
-- `ENVELOPE_PROVIDER`
+- `KMS_PROVIDER`
 - `HOST_PUBLIC_URL`
 
 Frontera de persistencia y Fabric:
@@ -120,17 +120,18 @@ Frontera de persistencia y Fabric:
 
 Regla de custodia:
 
-- `ENVELOPE_PROVIDER=memory` solo para dev/test
-- `ENVELOPE_PROVIDER=local` usa `KEK_SECRET` y es compat/local
-- `ENVELOPE_PROVIDER=gcp-kms` es el objetivo productivo en GCP
-- `ENVELOPE_PROVIDER=aws-kms` es el objetivo productivo en AWS
-- `ENVELOPE_PROVIDER=hashicorp-transit` es la opción portable/open source
+- `KMS_PROVIDER=memory` solo para dev/test
+- `KMS_PROVIDER=local` usa `KEK_SECRET` y es compat/local
+- `KMS_PROVIDER=gcp` es el objetivo productivo en GCP
+- `KMS_PROVIDER=aws` es el objetivo productivo en AWS
+- `KMS_PROVIDER=hashicorp-transit` es la opción portable/open source
 
 Los adaptadores cloud comparten `KMS_KEY_ID`,
 `KMS_RUNTIME_KEK_ID` y `KMS_RUNTIME_KEK_CIPHERTEXT`. En GCP, `KMS_KEY_ID` es
 el nombre completo de la CryptoKey; en AWS es el ARN, identificador o alias de
 la KMS Key. AWS obtiene región y credenciales mediante la cadena estándar del
-SDK (`AWS_REGION`/IRSA en Kubernetes).
+SDK (IRSA o Pod Identity en Kubernetes), y `KMS_REGION` define explícitamente
+la región KMS de GW.
 
 No uses solo la palabra `vault` para este tema en docs operativos, porque GW ya
 usa `vault` para almacenamiento confidencial y el provider externo de custodia

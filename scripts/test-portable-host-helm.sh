@@ -163,7 +163,7 @@ if helm template invalid "${CHART}" -f "${TMP_DIR}/invalid-tag.yaml" >/dev/null 
 fi
 
 cp "${CHART}/ci/production-values.yaml" "${TMP_DIR}/invalid-kek.yaml"
-sed -i.bak 's/envelope: hashicorp-transit/envelope: local/' "${TMP_DIR}/invalid-kek.yaml"
+sed -i.bak 's/kms: hashicorp-transit/kms: local/' "${TMP_DIR}/invalid-kek.yaml"
 if helm template invalid "${CHART}" -f "${TMP_DIR}/invalid-kek.yaml" >/dev/null 2>&1; then
   echo "chart accepted local KEK custody in production" >&2
   exit 1

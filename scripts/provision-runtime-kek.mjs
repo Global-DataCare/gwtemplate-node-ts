@@ -5,20 +5,21 @@ import { GoogleAuth } from 'google-auth-library';
 
 export async function provisionRuntimeKek(options = {}) {
   const env = options.env || process.env;
-  const provider = required(env, 'ENVELOPE_PROVIDER');
-  const keyId = required(env, 'KMS_KEY_ID', provider === 'gcp-kms' ? ['GCP_KMS_KEY_NAME'] : []);
-  const runtimeKekId = required(env, 'KMS_RUNTIME_KEK_ID', provider === 'gcp-kms' ? ['GCP_KMS_RUNTIME_KEK_ID'] : []);
+  const provider = normalizeProvider(required(env, 'KMS_PROVIDER', ['ENVELOPE_PROVIDER']));
+  const keyId = required(env, 'KMS_KEY_ID', provider === 'gcp' ? ['GCP_KMS_KEY_NAME'] : []);
+  const runtimeKekId = required(env, 'KMS_RUNTIME_KEK_ID', provider === 'gcp' ? ['GCP_KMS_RUNTIME_KEK_ID'] : []);
   const runtimeKek = (options.randomBytes || randomBytes)(32);
   const context = { entityVaultId: runtimeKekId, purpose: 'service-runtime-kek-v1' };
 
   try {
     let ciphertext;
-    if (provider === 'gcp-kms') {
+    if (provider === 'gcp') {
       ciphertext = await (options.gcpEncrypt || encryptWithGoogleKms)(keyId, runtimeKek, context);
-    } else if (provider === 'aws-kms') {
-      ciphertext = await (options.awsEncrypt || encryptWithAwsKms)(keyId, runtimeKek, context);
+    } else if (provider === 'aws') {
+      const region = required(env, 'KMS_REGION');
+      ciphertext = await (options.awsEncrypt || encryptWithAwsKms)(keyId, runtimeKek, context, region);
     } else {
-      throw new Error('Runtime KEK provisioning supports ENVELOPE_PROVIDER=gcp-kms or aws-kms.');
+      throw new Error('Runtime KEK provisioning supports KMS_PROVIDER=gcp or aws.');
     }
     return `KMS_RUNTIME_KEK_CIPHERTEXT=${ciphertext}`;
   } finally {
@@ -45,14 +46,20 @@ async function encryptWithGoogleKms(keyId, runtimeKek, context) {
   return body.ciphertext;
 }
 
-async function encryptWithAwsKms(keyId, runtimeKek, context) {
-  const response = await new KMSClient({}).send(new EncryptCommand({
+async function encryptWithAwsKms(keyId, runtimeKek, context, region) {
+  const response = await new KMSClient({ region }).send(new EncryptCommand({
     KeyId: keyId,
     Plaintext: runtimeKek,
     EncryptionContext: context,
   }));
   if (!response.CiphertextBlob) throw new Error('AWS KMS encrypt response did not include CiphertextBlob.');
   return Buffer.from(response.CiphertextBlob).toString('base64');
+}
+
+function normalizeProvider(value) {
+  if (value === 'gcp-kms') return 'gcp';
+  if (value === 'aws-kms') return 'aws';
+  return value;
 }
 
 function required(env, name, aliases = []) {

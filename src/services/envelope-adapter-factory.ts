@@ -9,10 +9,15 @@ import {
   type KmsEnvelopeAdapter,
 } from './kms-envelope-adapter';
 
-export type EnvelopeProvider = 'memory' | 'local' | 'gcp-kms' | 'aws-kms' | 'hashicorp-transit';
+export type KmsProvider = 'memory' | 'local' | 'gcp' | 'aws' | 'hashicorp-transit';
 
-export function resolveEnvelopeProvider(config: IServerConfig): EnvelopeProvider {
+export function resolveKmsProvider(config: IServerConfig): KmsProvider {
+  if (config.kms?.provider) {
+    return config.kms.provider;
+  }
   if (config.envelope?.provider) {
+    if (config.envelope.provider === 'gcp-kms') return 'gcp';
+    if (config.envelope.provider === 'aws-kms') return 'aws';
     return config.envelope.provider;
   }
   if (config.kekSecret) {
@@ -21,11 +26,14 @@ export function resolveEnvelopeProvider(config: IServerConfig): EnvelopeProvider
   return 'memory';
 }
 
-function assertProductionCustody(config: IServerConfig, provider: EnvelopeProvider): void {
+/** @deprecated Use `resolveKmsProvider`. */
+export const resolveEnvelopeProvider = resolveKmsProvider;
+
+function assertProductionCustody(config: IServerConfig, provider: KmsProvider): void {
   if (config.nodeEnv !== 'production') return;
   if (provider === 'memory' || provider === 'local') {
     throw new Error(
-      `NODE_ENV=production requires external envelope custody; ENVELOPE_PROVIDER=${provider} is not permitted. Use gcp-kms, aws-kms, or hashicorp-transit.`,
+      `NODE_ENV=production requires external KMS custody; KMS_PROVIDER=${provider} is not permitted. Use gcp, aws, or hashicorp-transit.`,
     );
   }
 }
@@ -35,9 +43,9 @@ export async function createEnvelopeAdapter(
   deps: { rootAdapter?: KmsEnvelopeAdapter } = {},
 ): Promise<{
   adapter: KmsEnvelopeAdapter;
-  provider: EnvelopeProvider;
+  provider: KmsProvider;
 }> {
-  const provider = resolveEnvelopeProvider(config);
+  const provider = resolveKmsProvider(config);
   assertProductionCustody(config, provider);
 
   if (provider === 'memory') {
@@ -46,28 +54,32 @@ export async function createEnvelopeAdapter(
 
   if (provider === 'local') {
     if (!config.kekSecret) {
-      throw new Error('ENVELOPE_PROVIDER=local requires KEK_SECRET.');
+      throw new Error('KMS_PROVIDER=local requires KEK_SECRET.');
     }
     return { adapter: new AesGcmEnvelopeAdapter(config.kekSecret), provider };
   }
 
-  if (provider === 'gcp-kms' || provider === 'aws-kms') {
-    const legacyGcp = provider === 'gcp-kms' ? config.gcpKms : undefined;
+  if (provider === 'gcp' || provider === 'aws') {
+    const legacyGcp = provider === 'gcp' ? config.gcpKms : undefined;
     const keyId = String(config.kms?.keyId || legacyGcp?.keyName || '').trim();
     const runtimeKekCiphertext = String(config.kms?.runtimeKekCiphertext || legacyGcp?.runtimeKekCiphertext || '').trim();
     const runtimeKekId = String(config.kms?.runtimeKekId || legacyGcp?.runtimeKekId || '').trim();
     if (!keyId) {
-      throw new Error(`ENVELOPE_PROVIDER=${provider} requires KMS_KEY_ID.`);
+      throw new Error(`KMS_PROVIDER=${provider} requires KMS_KEY_ID.`);
     }
-    if (provider === 'gcp-kms' && !/^projects\/[^/]+\/locations\/[^/]+\/keyRings\/[^/]+\/cryptoKeys\/[^/]+$/.test(keyId)) {
-      throw new Error('ENVELOPE_PROVIDER=gcp-kms requires KMS_KEY_ID as a full CryptoKey resource name (without a CryptoKeyVersion suffix).');
+    if (provider === 'gcp' && !/^projects\/[^/]+\/locations\/[^/]+\/keyRings\/[^/]+\/cryptoKeys\/[^/]+$/.test(keyId)) {
+      throw new Error('KMS_PROVIDER=gcp requires KMS_KEY_ID as a full CryptoKey resource name (without a CryptoKeyVersion suffix).');
     }
     if (!runtimeKekCiphertext || !runtimeKekId) {
-      throw new Error(`ENVELOPE_PROVIDER=${provider} requires KMS_RUNTIME_KEK_CIPHERTEXT and KMS_RUNTIME_KEK_ID.`);
+      throw new Error(`KMS_PROVIDER=${provider} requires KMS_RUNTIME_KEK_CIPHERTEXT and KMS_RUNTIME_KEK_ID.`);
     }
-    const rootAdapter = deps.rootAdapter || (provider === 'gcp-kms'
+    const region = String(config.kms?.region || '').trim();
+    if (provider === 'aws' && !region) {
+      throw new Error('KMS_PROVIDER=aws requires KMS_REGION. AWS_REGION and AWS_DEFAULT_REGION are not supported aliases.');
+    }
+    const rootAdapter = deps.rootAdapter || (provider === 'gcp'
       ? new CloudKmsEnvelopeAdapter(keyId)
-      : new KmsEnvelopeAdapterAws(keyId));
+      : new KmsEnvelopeAdapterAws(keyId, { region }));
     const runtimeKek = await rootAdapter.unwrapKeyMaterial(runtimeKekCiphertext, {
       entityVaultId: runtimeKekId,
       purpose: 'service-runtime-kek-v1',
@@ -84,7 +96,7 @@ export async function createEnvelopeAdapter(
   const token = String(config.hashicorpTransit?.token || '').trim();
   if (!baseUrl || !keyName || !token) {
     throw new Error(
-      'ENVELOPE_PROVIDER=hashicorp-transit requires HASHICORP_TRANSIT_BASE_URL, HASHICORP_TRANSIT_KEY_NAME, and HASHICORP_TRANSIT_TOKEN.',
+      'KMS_PROVIDER=hashicorp-transit requires HASHICORP_TRANSIT_BASE_URL, HASHICORP_TRANSIT_KEY_NAME, and HASHICORP_TRANSIT_TOKEN.',
     );
   }
   return {

@@ -207,12 +207,12 @@ export class CloudKmsEnvelopeAdapter implements KmsEnvelopeAdapter {
 type AwsKmsCommand = EncryptCommand | DecryptCommand;
 type AwsKmsSend = (command: AwsKmsCommand) => Promise<any>;
 
-/** AWS KMS root adapter. Credentials and region use the standard AWS SDK chain. */
+/** AWS KMS root adapter. Credentials use the AWS SDK chain; region is explicit GW configuration. */
 export class KmsEnvelopeAdapterAws implements KmsEnvelopeAdapter {
   private readonly keyId: string;
   private readonly send: AwsKmsSend;
 
-  constructor(keyId: string, deps?: { send?: AwsKmsSend }) {
+  constructor(keyId: string, deps?: { region?: string; send?: AwsKmsSend }) {
     const normalized = String(keyId || '').trim();
     if (!normalized) {
       throw new Error('KmsEnvelopeAdapterAws requires a non-empty KMS key id or ARN.');
@@ -221,7 +221,11 @@ export class KmsEnvelopeAdapterAws implements KmsEnvelopeAdapter {
     if (deps?.send) {
       this.send = deps.send;
     } else {
-      const client = new KMSClient({});
+      const region = String(deps?.region || '').trim();
+      if (!region) {
+        throw new Error('KmsEnvelopeAdapterAws requires KMS_REGION.');
+      }
+      const client = new KMSClient({ region });
       this.send = (command) => client.send(command as any);
     }
   }

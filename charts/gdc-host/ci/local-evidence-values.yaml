@@ -23,7 +23,7 @@ gw:
   existingSecret: host-evidence-gw
   service: { type: ClusterIP, port: 80 }
   ingress: { enabled: false, className: "", annotations: {}, tlsSecretName: "" }
-  providers: { queue: mem, database: postgres, storage: ipfs, envelope: local, replayProtection: mem }
+  providers: { queue: mem, database: postgres, storage: ipfs, kms: local, replayProtection: mem }
   authTokenVerifier: demo
   securityMode: demo
   didcommPlain: "true"

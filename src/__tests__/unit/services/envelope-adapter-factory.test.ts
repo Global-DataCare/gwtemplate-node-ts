@@ -1,7 +1,7 @@
 // Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 import { jest } from '@jest/globals';
 import type { IServerConfig } from '../../../config';
-import { createEnvelopeAdapter, resolveEnvelopeProvider } from '../../../services/envelope-adapter-factory';
+import { createEnvelopeAdapter, resolveKmsProvider } from '../../../services/envelope-adapter-factory';
 import {
   AesGcmEnvelopeAdapter,
   KmsEnvelopeAdapterAws,
@@ -42,30 +42,30 @@ function buildConfig(overrides: Partial<IServerConfig> = {}): IServerConfig {
 describe('envelope-adapter-factory', () => {
   it('defaults to memory when no provider and no KEK secret exist', async () => {
     const config = buildConfig();
-    expect(resolveEnvelopeProvider(config)).toBe('memory');
+    expect(resolveKmsProvider(config)).toBe('memory');
     expect((await createEnvelopeAdapter(config)).adapter).toBeInstanceOf(InMemoryEnvelopeAdapter);
   });
 
   it('keeps backward compatibility by selecting local when KEK_SECRET exists', async () => {
     const config = buildConfig({ kekSecret: 'dev-secret' });
-    expect(resolveEnvelopeProvider(config)).toBe('local');
+    expect(resolveKmsProvider(config)).toBe('local');
     expect((await createEnvelopeAdapter(config)).adapter).toBeInstanceOf(AesGcmEnvelopeAdapter);
   });
 
   it.each(['memory', 'local'] as const)('rejects %s custody in production', async (provider) => {
     const config = buildConfig({
       nodeEnv: 'production',
-      envelope: { provider },
+      kms: { provider },
       ...(provider === 'local' ? { kekSecret: 'dev-secret' } : {}),
     });
-    await expect(createEnvelopeAdapter(config)).rejects.toThrow('requires external envelope custody');
+    await expect(createEnvelopeAdapter(config)).rejects.toThrow('requires external KMS custody');
   });
 
   it('unwraps one runtime KEK with Cloud KMS and returns a local adapter', async () => {
     const rootAdapter = { wrapKeyMaterial: jest.fn(async () => 'unused'), unwrapKeyMaterial: jest.fn<any>().mockResolvedValue(Buffer.alloc(32, 7)) };
     const config = buildConfig({
-      envelope: { provider: 'gcp-kms' },
       kms: {
+        provider: 'gcp',
         keyId: 'projects/p/locations/l/keyRings/r/cryptoKeys/k',
         runtimeKekCiphertext: 'kms-ciphertext',
         runtimeKekId: 'gw-prod',
@@ -78,8 +78,9 @@ describe('envelope-adapter-factory', () => {
   it('unwraps one runtime KEK with AWS KMS through the provider-neutral configuration', async () => {
     const rootAdapter = { wrapKeyMaterial: jest.fn(async () => 'unused'), unwrapKeyMaterial: jest.fn<any>().mockResolvedValue(Buffer.alloc(32, 7)) };
     const config = buildConfig({
-      envelope: { provider: 'aws-kms' },
       kms: {
+        provider: 'aws',
+        region: 'eu-west-1',
         keyId: 'arn:aws:kms:eu-west-1:111122223333:key/00000000-0000-0000-0000-000000000001',
         runtimeKekCiphertext: 'kms-ciphertext',
         runtimeKekId: 'gw-prod',
@@ -90,9 +91,9 @@ describe('envelope-adapter-factory', () => {
     expect(rootAdapter.unwrapKeyMaterial).toHaveBeenCalledTimes(1);
   });
 
-  it('fails fast when aws-kms is selected without the provider-neutral KMS key id', async () => {
+  it('fails fast when AWS is selected without the provider-neutral KMS key id', async () => {
     const config = buildConfig({
-      envelope: { provider: 'aws-kms' },
+      kms: { provider: 'aws', region: 'eu-west-1' },
       gcpKms: {
         keyName: 'projects/p/locations/l/keyRings/r/cryptoKeys/k',
         runtimeKekCiphertext: 'legacy-gcp-ciphertext',
@@ -102,10 +103,22 @@ describe('envelope-adapter-factory', () => {
     await expect(createEnvelopeAdapter(config)).rejects.toThrow('KMS_KEY_ID');
   });
 
-  it('accepts the former GCP variables only for gcp-kms migration', async () => {
+  it('requires KMS_REGION for AWS and does not delegate region discovery to the AWS SDK', async () => {
+    const config = buildConfig({
+      kms: {
+        provider: 'aws',
+        keyId: 'alias/gw-production',
+        runtimeKekCiphertext: 'kms-ciphertext',
+        runtimeKekId: 'gw-prod',
+      },
+    });
+    await expect(createEnvelopeAdapter(config)).rejects.toThrow('KMS_REGION');
+  });
+
+  it('accepts the former GCP variables only for GCP migration', async () => {
     const rootAdapter = { wrapKeyMaterial: jest.fn(async () => 'unused'), unwrapKeyMaterial: jest.fn<any>().mockResolvedValue(Buffer.alloc(32, 7)) };
     const config = buildConfig({
-      envelope: { provider: 'gcp-kms' },
+      kms: { provider: 'gcp' },
       gcpKms: {
         keyName: 'projects/p/locations/l/keyRings/r/cryptoKeys/k',
         runtimeKekCiphertext: 'legacy-gcp-ciphertext',
@@ -118,7 +131,7 @@ describe('envelope-adapter-factory', () => {
 
   it('creates a HashiCorp Transit adapter when explicitly configured', async () => {
     const config = buildConfig({
-      envelope: { provider: 'hashicorp-transit' },
+      kms: { provider: 'hashicorp-transit' },
       hashicorpTransit: {
         baseUrl: 'https://vault.example.com',
         keyName: 'gw-envelope',
@@ -128,22 +141,21 @@ describe('envelope-adapter-factory', () => {
     expect((await createEnvelopeAdapter(config)).adapter).toBeInstanceOf(HashicorpTransitEnvelopeAdapter);
   });
 
-  it('fails fast when gcp-kms is selected without a key name', async () => {
-    const config = buildConfig({ envelope: { provider: 'gcp-kms' } });
+  it('fails fast when GCP is selected without a key name', async () => {
+    const config = buildConfig({ kms: { provider: 'gcp' } });
     await expect(createEnvelopeAdapter(config)).rejects.toThrow('KMS_KEY_ID');
   });
 
   it('rejects a CryptoKeyVersion where a rotatable CryptoKey name is required', async () => {
     const config = buildConfig({
-      envelope: { provider: 'gcp-kms' },
-      kms: { keyId: 'projects/p/locations/l/keyRings/r/cryptoKeys/k/cryptoKeyVersions/1' },
+      kms: { provider: 'gcp', keyId: 'projects/p/locations/l/keyRings/r/cryptoKeys/k/cryptoKeyVersions/1' },
     });
     await expect(createEnvelopeAdapter(config)).rejects.toThrow('full CryptoKey resource name');
   });
 
   it('fails fast when hashicorp-transit is selected without required settings', async () => {
     const config = buildConfig({
-      envelope: { provider: 'hashicorp-transit' },
+      kms: { provider: 'hashicorp-transit' },
       hashicorpTransit: { baseUrl: 'https://vault.example.com' },
     });
     await expect(createEnvelopeAdapter(config)).rejects.toThrow('HASHICORP_TRANSIT_BASE_URL');

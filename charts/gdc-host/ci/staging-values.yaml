@@ -15,7 +15,7 @@ host:
   dataChannel: health-care-eu
 gw:
   image: registry.example.invalid/gw-core@sha256:1111111111111111111111111111111111111111111111111111111111111111
-  providers: { queue: mem, database: postgres, storage: ipfs, envelope: hashicorp-transit, replayProtection: mem }
+  providers: { queue: mem, database: postgres, storage: ipfs, kms: hashicorp-transit, replayProtection: mem }
 images:
   init: registry.example.invalid/busybox@sha256:2222222222222222222222222222222222222222222222222222222222222222
 peer:

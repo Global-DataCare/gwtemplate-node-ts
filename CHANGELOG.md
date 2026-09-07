@@ -6,9 +6,11 @@
 
 - Add AWS KMS root custody with the same one-decrypt-per-process runtime-KEK
   bootstrap contract as Google Cloud KMS. Make `KMS_KEY_ID`,
-  `KMS_RUNTIME_KEK_ID` and `KMS_RUNTIME_KEK_CIPHERTEXT` the provider-neutral
-  deployment contract while retaining the former `GCP_KMS_*` inputs as
-  migration aliases.
+  `KMS_PROVIDER`, `KMS_REGION`, `KMS_RUNTIME_KEK_ID` and
+  `KMS_RUNTIME_KEK_CIPHERTEXT` the provider-neutral deployment contract.
+  Deliberately do not consume `AWS_REGION` or `AWS_DEFAULT_REGION`; retain only
+  the former GW-owned `ENVELOPE_PROVIDER` and `GCP_KMS_*` inputs as migration
+  aliases.
 
 ## [1.25.3] - 2026-09-07
 

@@ -48,12 +48,12 @@
         "existingSecret": { "type": "string", "minLength": 1 },
         "providers": {
           "type": "object",
-          "required": ["database", "storage", "envelope"],
+          "required": ["database", "storage", "kms"],
           "properties": {
             "queue": { "type": "string", "enum": ["mem"] },
             "database": { "type": "string", "enum": ["mem", "firestore", "postgres"] },
             "storage": { "type": "string", "enum": ["mem", "gcs", "ipfs", "supabase"] },
-            "envelope": { "type": "string", "enum": ["gcp-kms", "aws-kms", "hashicorp-transit", "local", "memory"] },
+            "kms": { "type": "string", "enum": ["gcp", "aws", "hashicorp-transit", "local", "memory"] },
             "replayProtection": { "type": "string", "enum": ["none", "mem", "redis"] }
           }
         }

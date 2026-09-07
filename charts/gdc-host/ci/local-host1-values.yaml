@@ -19,7 +19,7 @@ gw:
   existingSecret: host1-gw
   service: { type: ClusterIP, port: 80 }
   ingress: { enabled: false, className: "", annotations: {}, tlsSecretName: "" }
-  providers: { queue: mem, database: mem, storage: mem, envelope: local, replayProtection: mem }
+  providers: { queue: mem, database: mem, storage: mem, kms: local, replayProtection: mem }
   authTokenVerifier: demo
   securityMode: compat
   didcommPlain: "true"

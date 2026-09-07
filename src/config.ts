@@ -123,11 +123,14 @@ export interface IServerConfig {
     gatewayUrl?: string;
     mfsRoot?: string;
   };
+  /** @deprecated Use `kms.provider`. */
   envelope?: {
     provider?: 'memory' | 'local' | 'gcp-kms' | 'aws-kms' | 'hashicorp-transit';
   };
   kekSecret?: string;
   kms?: {
+    provider?: 'memory' | 'local' | 'gcp' | 'aws' | 'hashicorp-transit';
+    region?: string;
     keyId?: string;
     runtimeKekCiphertext?: string;
     runtimeKekId?: string;
