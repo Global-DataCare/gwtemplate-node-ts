@@ -201,6 +201,10 @@ An unpublished SDK may use `npm pack` only as a temporary `--no-save` install;
 restore the registry dependency and lockfile before any commit. Publish only
 after those gates pass, reinstall the exact registry version, repeat them, then
 run `local-network` and staging.
+After a failure, resume at the smallest failed gate. Rerun predecessor gates
+only when they create required state, the fix changes an earlier boundary, or
+environment state is no longer trustworthy. Run the complete suite once at
+branch closure.
 
 For any release chain that requires npm authorization, make at most three
 attempts and keep each command session and browser window alive for up to five

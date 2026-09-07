@@ -54,6 +54,10 @@ from `npm pack` only as a temporary `--no-save` fail-fast check; restore the
 registry dependency and lockfile before committing. After those gates pass,
 publish, reinstall the exact registry version, repeat the reproducible test,
 then proceed to Fabric `local-network` and staging.
+After a failure, resume at the smallest failed gate; rerun predecessor gates
+only when they create required state, the fix changes an earlier boundary, or
+environment state is no longer trustworthy. Run the complete suite once at
+branch closure.
 The first proof must cross normal local UI -> BFF -> high-level SDK
 -> GW/services with in-memory state and no blockchain. Fixture pages, mocked
 routes and API-only Playwright are diagnostics, never release evidence.

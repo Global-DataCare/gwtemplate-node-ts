@@ -22,6 +22,7 @@ describe('shared local-first portal release policy', () => {
       expect(contract).toMatch(/UI.*BFF.*SDK.*GW\/DataConv.*Playwright/is);
       expect(contract).toMatch(/npm pack.*temporary.*no-save.*restore.*lockfile/is);
       expect(contract).toMatch(/publish.*exact\s+registry\s+version.*local-network.*staging/is);
+      expect(contract).toMatch(/resume.*failed gate.*predecessor.*state/is);
     }
   });
 
@@ -40,6 +41,7 @@ describe('shared local-first portal release policy', () => {
       expect(contract).toMatch(/UI.*BFF.*SDK.*GW\/DataConv.*Playwright/is);
       expect(contract).toMatch(/npm pack.*temporary.*no-save.*restore.*lockfile/is);
       expect(contract).toMatch(/publish.*exact\s+registry\s+version.*local-network.*staging/is);
+      expect(contract).toMatch(/resume.*failed gate.*predecessor.*state/is);
     }
   });
 });

@@ -92,6 +92,10 @@ For any endpoint/manager behavior change:
   `file:`, Git, workspace, vendored tarball dependency or its generated lock.
   Publish only after all no-blockchain gates pass, reinstall the exact registry
   version, repeat the reproducible gate, then run `local-network` and staging.
+- After a failure, resume at the smallest failed gate. Rerun predecessor gates
+  only when they create required state, the fix changes an earlier boundary, or
+  environment state is no longer trustworthy. Run the complete suite once at
+  branch closure.
 - Every affected package or SDK live E2E must run against the real local
   services. A live E2E reported as `SKIP` blocks the release. Finish those live
   E2E gates before `npm publish` or any container image build.
