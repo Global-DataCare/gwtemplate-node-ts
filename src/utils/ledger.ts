@@ -11,6 +11,10 @@ import { getJurisdictionGroup } from './jurisdiction';
 export const ClinicalEvidenceChaincode = 'artifact-sc';
 /** Canonical manager-owned contract for independently governed consent rules. */
 export const ConsentAccessChaincode = 'consentaccess-sc';
+/** Canonical manager-owned contracts for the organization identity graph. */
+export const EmployeeIdentityChaincode = 'employee-sc';
+export const CryptographicKeyIdentityChaincode = 'cryptographickey-sc';
+export const SubjectKeyBindingIdentityChaincode = 'subjectkeybinding-sc';
 
 /**
  * Resolves the governed clinical channel from trusted job context.

@@ -103,7 +103,11 @@ E2E gates before `npm publish` or any container image build.
   in the same Fabric transaction. `fullUrl` and clinical content never enter
   that ledger payload. The same transaction stores only opaque SHA3-384
   multihashes for author, attester, custodian, sender, submitter, signing key
-  and subject ownership relationships. Optional research tags use a positive
+  and subject ownership relationships. For professional content, the author
+  hash is the CDS organization link and the attester hash is the distinct
+  PractitionerRole assignment link; `employee-sc` joins that assignment to the
+  employee UUID hash, while `subjectkeybinding-sc` joins it to the public-key
+  lifecycle. Optional research tags use a positive
   code-only allowlist, while raw identities, claims, displays and free text stay
   in the consented confidential projection. The response distinguishes a local receipt from a real
   Fabric transaction id. GW resolves the governed ledger route internally; the

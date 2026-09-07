@@ -144,7 +144,13 @@ description: Enforce branch, TDD, canonical FHIR and schema.org vocabulary, fixt
   signing-key and subject-ownership links distinct; never send their raw DID,
   URN, URL, key id or contact value. UUID-backed references must hash the
   canonical 16 UUID bytes so bare, `urn:uuid`, FHIR-relative and
-  `:instance:<uuid>` forms converge on the same employee/assignment link. Expose
+  `:instance:<uuid>` forms converge for the same UUID. Keep the professional
+  assignment link (PractitionerRole UUID), employee/person link (employee UUID)
+  and organization link (complete CDS legal-organization URN) distinct.
+  `artifact-sc.relationships.attester[]` must join the assignment asset in
+  `employee-sc`; that asset joins employee and organization, and
+  `subjectkeybinding-sc` repeats the same three opaque links beside `keyId`.
+  Expose
   the real Fabric transaction id. A memory-adapter
   receipt is local proof only and must never be reported as on-chain evidence.
 - Ledger channel and smart-contract selection is manager-owned policy. Managers

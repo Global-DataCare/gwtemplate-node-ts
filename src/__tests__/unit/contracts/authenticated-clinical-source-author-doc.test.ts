@@ -58,5 +58,10 @@ describe('authenticated clinical source-author documentation', () => {
     expect(ledgerSchema).toMatch(/UUID[\s\S]*16 bytes[\s\S]*SHA3-384[\s\S]*multihash/i);
     expect(ledgerSchema).toMatch(/role[\s\S]*validFrom[\s\S]*validUntil[\s\S]*history/i);
     expect(ledgerSchema).toMatch(/roleLicenseId[\s\S]*keyId[\s\S]*kid/i);
+    expect(ledgerSchema).toMatch(/Composition\.author[\s\S]*organizationLink/i);
+    expect(ledgerSchema).toMatch(/Composition\.attester[\s\S]*assignmentLink/i);
+    expect(ledgerSchema).toMatch(/assignmentLink[\s\S]*employeeLink[\s\S]*organizationLink/i);
+    expect(guide).toMatch(/artifact-sc\.relationships\.author[\s\S]*organization link/i);
+    expect(guide).toMatch(/artifact-sc\.relationships\.attester[\s\S]*assignment record/i);
   });
 });

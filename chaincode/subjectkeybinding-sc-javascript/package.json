@@ -1,6 +1,6 @@
 {
   "name": "subjectkeybinding-sc",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Derived subject-to-key relationship index referencing cryptographickey-sc assets",
   "main": "index.js",
   "engines": {

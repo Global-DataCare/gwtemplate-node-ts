@@ -6,6 +6,7 @@
 
 const { ALLOWED_STATUS } = require("./constants");
 const { getTxTimestampSeconds } = require("./history");
+const OPAQUE_LINK_PATTERN = /^(?:z[1-9A-HJ-NP-Za-km-z]+|b[a-z2-7]+)$/;
 
 function parseJson(input, label) {
   if (!input) {
@@ -21,6 +22,13 @@ function parseJson(input, label) {
 function assertStatus(status) {
   if (!ALLOWED_STATUS.has(status)) {
     throw new Error(`Invalid status ${status}. Allowed: active, suspended, revoked, expired`);
+  }
+}
+
+function assertOptionalOpaqueLink(value, field) {
+  if (value !== undefined && value !== null && value !== ""
+    && !OPAQUE_LINK_PATTERN.test(String(value))) {
+    throw new Error(`${field} must be an opaque multibase or CID value`);
   }
 }
 
@@ -51,6 +59,7 @@ function buildAudit(ctx, previousAudit, status, isCreate) {
 
 module.exports = {
   assertStatus,
+  assertOptionalOpaqueLink,
   buildAudit,
   parseJson,
   readMetaAttributes,

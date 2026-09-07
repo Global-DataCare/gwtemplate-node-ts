@@ -52,8 +52,12 @@ const uuidMock = {
   v4: jest.fn(),
   validate: jest.fn(),
 };
+const professionalAssignmentLedgerMock = {
+  registerProfessionalAssignmentOnLedger: jest.fn(),
+};
 
 jest.unstable_mockModule('uuid', () => uuidMock);
+jest.unstable_mockModule('../../../utils/professional-assignment-ledger', () => professionalAssignmentLedgerMock);
 
 const { v4: uuidv4 } = await import('uuid');
 const { EmployeeManager } = await import('../../../managers/EmployeeManager');
@@ -267,6 +271,13 @@ describe('EmployeeManager', () => {
         }],
         getClinicalCreatorBindingsSectionId(),
       );
+      expect(professionalAssignmentLedgerMock.registerProfessionalAssignmentOnLedger).toHaveBeenCalledWith({
+        jurisdiction: EXAMPLE_JURISDICTION.toLowerCase(),
+        assignmentIdentifier: `urn:uuid:${occupationUuid}`,
+        employeeIdentifier: `urn:uuid:${employeeUuid}`,
+        organizationIdentifier: TENANT_CDS_AUTHORIZATION_URN,
+        role: HealthcareActorRoles.Veterinarian,
+      });
     });
 
     it('does not create an IPS creator binding for a role outside the governed clinical catalog', async () => {

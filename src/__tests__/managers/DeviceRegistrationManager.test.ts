@@ -18,6 +18,7 @@ import type { EntityConfig } from '../../gdc-backend-utils-node/models/entity';
 import { ClaimsPersonSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { ManageAssetCryptographicKey } from '../../blockchain/fabric/v3/manageAssetCryptographicKey';
 import { ManageAssetSubjectKeyBinding } from '../../blockchain/fabric/v3/manageAssetSubjectKeyBinding';
+import { ManageAssetProfessionalAssignment } from '../../blockchain/fabric/v3/manageAssetProfessionalAssignment';
 import { normalizeSameAsHash } from 'gdc-common-utils-ts/utils/same-as';
 import { DeviceBindingStatuses } from 'gdc-common-utils-ts/constants/device';
 import {
@@ -56,6 +57,7 @@ import { HttpStatusCodes } from 'gdc-common-utils-ts/constants/http';
 import { FhirIpsCreatorKinds } from 'gdc-common-utils-ts/utils/fhir-ips-creator-identity';
 import { buildOrganizationRoleLicenseId } from 'gdc-common-utils-ts/utils/organization-role-license';
 import { getClinicalCreatorBindingsSectionId } from '../../utils/clinical-creator-binding';
+import { buildClinicalLedgerReferenceId } from '../../utils/fhir-versioning';
 
 const TEST_API_BASE_URL = 'http://localhost:3001';
 const FABRIC_LEDGER_TEST_ENV = {
@@ -379,6 +381,7 @@ describe('DeviceRegistrationManager', () => {
       const registerKeySpy = jest.spyOn(ManageAssetCryptographicKey.prototype, 'registerKey').mockResolvedValue({} as any);
       const keySubmitSpy = jest.spyOn(ManageAssetCryptographicKey.prototype, 'submit').mockResolvedValue({} as any);
       const bindingSpy = jest.spyOn(ManageAssetSubjectKeyBinding.prototype, 'upsertSubjectKeyBinding').mockResolvedValue({} as any);
+      const assignmentSpy = jest.spyOn(ManageAssetProfessionalAssignment.prototype, 'upsertProfessionalAssignment').mockResolvedValue({} as any);
 
       const job = cloneDeep(DCR_REGISTRATION_JOB);
       const actorDid = EXAMPLE_CONTROLLER_DID;
@@ -583,6 +586,15 @@ describe('DeviceRegistrationManager', () => {
       expect(registerKeySpy).toHaveBeenCalledTimes(2);
       expect(keySubmitSpy).not.toHaveBeenCalled();
       expect(bindingSpy).toHaveBeenCalled();
+      expect(assignmentSpy).toHaveBeenCalledWith(
+        'Host1MSP',
+        buildClinicalLedgerReferenceId(clinicalCreatorBinding.authorIdentifier),
+        expect.objectContaining({
+          assignmentLink: buildClinicalLedgerReferenceId(clinicalCreatorBinding.authorIdentifier),
+          employeeLink: buildClinicalLedgerReferenceId(clinicalCreatorBinding.actorIdentifier),
+          organizationLink: buildClinicalLedgerReferenceId(clinicalCreatorBinding.ownerIdentifier),
+        }),
+      );
       expect(bindingSpy).toHaveBeenCalledWith(
         expect.any(String),
         expect.stringContaining(employeeUrn),
@@ -595,6 +607,9 @@ describe('DeviceRegistrationManager', () => {
             stableContactIdentifier: normalizeSameAsHash(EXAMPLE_EMAIL_PROFESSIONAL),
             licensedRole: HealthcareActorRoles.GeneralistMedicalPractitioner,
           }),
+          professionalAssignmentLink: buildClinicalLedgerReferenceId(clinicalCreatorBinding.authorIdentifier),
+          employeeLink: buildClinicalLedgerReferenceId(clinicalCreatorBinding.actorIdentifier),
+          organizationLink: buildClinicalLedgerReferenceId(clinicalCreatorBinding.ownerIdentifier),
           meta: expect.objectContaining({
             attributes: expect.objectContaining({ did: employeeDid }),
           }),

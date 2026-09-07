@@ -14,7 +14,7 @@ const existsAsset = require("./exists");
 const { buildHistory } = require("./history");
 const readAsset = require("./read");
 const { buildStoredSubjectKeyBindingAsset } = require("./subject-key-binding-asset");
-const { assertStatus, parseJson } = require("./utils");
+const { assertOptionalOpaqueLink, assertStatus, parseJson } = require("./utils");
 const writeJsonAsset = require("./write");
 
 /**
@@ -29,6 +29,15 @@ async function writeIndexes(ctx, subjectType, subjectId, keyId, bindingId) {
   const keyIndexKey = ctx.stub.createCompositeKey(KEY_BINDING_INDEX, [keyId, bindingId]);
   await ctx.stub.putState(subjectIndexKey, Buffer.from(""));
   await ctx.stub.putState(keyIndexKey, Buffer.from(""));
+}
+
+function assertProfessionalLinks(payload, previous) {
+  for (const field of ["professionalAssignmentLink", "employeeLink", "organizationLink"]) {
+    assertOptionalOpaqueLink(payload[field], field);
+    if (previous?.[field] && payload[field] && previous[field] !== payload[field]) {
+      throw new Error(`${field} cannot change for an existing subject-key binding`);
+    }
+  }
 }
 
 /**
@@ -69,6 +78,7 @@ class SubjectKeyBindingContract extends Contract {
     if (!payload.subjectType || !payload.subjectId || !payload.keyId) {
       throw new Error("subjectType, subjectId, and keyId are required");
     }
+    assertProfessionalLinks(payload);
 
     const status = payload.status || "active";
     assertStatus(status);
@@ -96,6 +106,7 @@ class SubjectKeyBindingContract extends Contract {
     }
 
     const previous = await readAsset(ctx.stub, bindingId, SUBJECT_KEY_BINDING_ASSET_LABEL);
+    assertProfessionalLinks(payload, previous);
     const next = buildStoredSubjectKeyBindingAsset(ctx, bindingId, payload, previous);
     await writeJsonAsset(ctx.stub, bindingId, next);
     await writeIndexes(ctx, next.subjectType, next.subjectId, next.keyId, bindingId);

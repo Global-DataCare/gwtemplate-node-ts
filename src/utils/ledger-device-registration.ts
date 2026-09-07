@@ -1,7 +1,11 @@
 import { PublicJwk } from 'gdc-common-utils-ts/interfaces/Cryptography.types';
 import type { ClaimsRecord } from 'gdc-common-utils-ts/models/resource-document';
 import { VerificationMethod } from '../gdc-backend-utils-node/models/did';
-import { resolveSubjectIdentityChannel } from './ledger';
+import {
+  CryptographicKeyIdentityChaincode,
+  resolveSubjectIdentityChannel,
+  SubjectKeyBindingIdentityChaincode,
+} from './ledger';
 import { ManageAssetCryptographicKey, type CryptographicKeyLedgerPayload } from '../blockchain/fabric/v3/manageAssetCryptographicKey';
 import { ManageAssetSubjectKeyBinding } from '../blockchain/fabric/v3/manageAssetSubjectKeyBinding';
 import { shouldUseFabricLedger } from '../adapters/credential-ledger-resolver';
@@ -12,6 +16,7 @@ import {
   tryGetJwkThumbprint,
 } from './ledger-organization-registration-helpers';
 import { getEmployeeRoleFromUrn, normalizeEmployeeRole } from './urn';
+import { buildProfessionalAssignmentLedgerPayload } from './professional-assignment-ledger';
 
 function shouldSyncIdentityLedger(): boolean {
   return shouldUseFabricLedger();
@@ -47,6 +52,11 @@ export async function registerSubjectKeysOnLedger(params: {
   relationshipPrefix?: 'employee-device' | 'legal-organization-controller';
   keyOrigin?: string;
   auditAttributes?: Record<string, unknown>;
+  professionalAssignment?: Readonly<{
+    assignmentIdentifier: string;
+    employeeIdentifier: string;
+    organizationIdentifier: string;
+  }>;
 }): Promise<void> {
   if (!shouldSyncIdentityLedger()) return;
 
@@ -62,13 +72,19 @@ export async function registerSubjectKeysOnLedger(params: {
 
   const channelName = resolveSubjectIdentityChannel(params.subjectType, params.jurisdiction);
   const keyManager = new ManageAssetCryptographicKey({
-    chaincodeName: process.env.LEDGER_CRYPTOGRAPHIC_KEY_CHAINCODE || 'cryptographickey-sc',
+    chaincodeName: CryptographicKeyIdentityChaincode,
     channelName,
   });
   const bindingManager = new ManageAssetSubjectKeyBinding({
-    chaincodeName: process.env.LEDGER_SUBJECT_KEY_BINDING_CHAINCODE || 'subjectkeybinding-sc',
+    chaincodeName: SubjectKeyBindingIdentityChaincode,
     channelName,
   });
+  const professionalLinks = params.professionalAssignment
+    ? buildProfessionalAssignmentLedgerPayload({
+      ...params.professionalAssignment,
+      role: params.licensedRole || '',
+    })
+    : undefined;
 
   for (const method of params.verificationMethods) {
     const publicKeyJwk = method.publicKeyJwk as PublicJwk | undefined;
@@ -112,6 +128,11 @@ export async function registerSubjectKeysOnLedger(params: {
       keyId,
       relationship,
       status: 'active',
+      ...(professionalLinks ? {
+        professionalAssignmentLink: professionalLinks.assignmentLink,
+        employeeLink: professionalLinks.employeeLink,
+        organizationLink: professionalLinks.organizationLink,
+      } : {}),
       meta: {
         attributes: {
           did: params.subjectDid || params.subjectId,
@@ -185,11 +206,11 @@ export async function revokeSubjectKeysOnLedger(params: {
   const channelName = resolveSubjectIdentityChannel(params.subjectType, params.jurisdiction);
   const revokedAt = String(params.revokedAtEpochSec || Math.floor(Date.now() / 1000));
   const keyManager = new ManageAssetCryptographicKey({
-    chaincodeName: process.env.LEDGER_CRYPTOGRAPHIC_KEY_CHAINCODE || 'cryptographickey-sc',
+    chaincodeName: CryptographicKeyIdentityChaincode,
     channelName,
   });
   const bindingManager = new ManageAssetSubjectKeyBinding({
-    chaincodeName: process.env.LEDGER_SUBJECT_KEY_BINDING_CHAINCODE || 'subjectkeybinding-sc',
+    chaincodeName: SubjectKeyBindingIdentityChaincode,
     channelName,
   });
 

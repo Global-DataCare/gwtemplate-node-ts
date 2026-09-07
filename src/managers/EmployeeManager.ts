@@ -51,6 +51,7 @@ import { buildStableActorIdentifier } from 'gdc-common-utils-ts/utils/actor-iden
 import type { ClinicalCreatorBinding } from 'gdc-common-utils-ts/utils/fhir-ips-creator-identity';
 import { getClinicalCreatorBindingsSectionId } from '../utils/clinical-creator-binding';
 import { canonicalizeBundleEntryMetadata } from '../utils/canonical-entry-metadata';
+import { registerProfessionalAssignmentOnLedger } from '../utils/professional-assignment-ledger';
 import {
   ACTION_PURGE,
   LICENSE_STATUS_AVAILABLE,
@@ -526,6 +527,7 @@ export class EmployeeManager {
       tenantVaultId,
       employeeId,
       occupationId: occupationDoc.id,
+      jurisdiction: parsedTenantUrn.jurisdiction,
       ownerIdentifier: buildOrganizationAuthorizationUrnCds({
         jurisdiction: parsedTenantUrn.jurisdiction,
         version: parsedTenantUrn.version,
@@ -553,6 +555,7 @@ export class EmployeeManager {
     tenantVaultId: string;
     employeeId: string;
     occupationId: string;
+    jurisdiction: string;
     ownerIdentifier?: string;
     role: string;
     email: string;
@@ -576,6 +579,13 @@ export class EmployeeManager {
       [binding],
       getClinicalCreatorBindingsSectionId(),
     );
+    await registerProfessionalAssignmentOnLedger({
+      jurisdiction: params.jurisdiction,
+      assignmentIdentifier: authorIdentifier,
+      employeeIdentifier: actorIdentifier,
+      organizationIdentifier: ownerIdentifier,
+      role: params.role,
+    });
   }
 
   /**
