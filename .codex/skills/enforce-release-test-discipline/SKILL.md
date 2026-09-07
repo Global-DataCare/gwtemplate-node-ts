@@ -114,6 +114,10 @@ description: Enforce branch, TDD, canonical FHIR and schema.org vocabulary, fixt
   integration and local browser gates are green; reinstall the exact registry
   version, repeat the reproducible gate, and only then run `local-network` and
   staging.
+- After a failure, resume at the smallest failed gate. Rerun predecessor gates
+  only when they create required state, the fix changes an earlier boundary, or
+  environment state is no longer trustworthy. Run the complete suite once at
+  branch closure.
 - Preserve identity roles at every transport boundary: DIDComm `from` is a
   sender DID, JWT `iss` is the signing entity, `kid` is a concrete key DID URL,
   and SMART `sub` is the authorized actor. Native FHIR Communication/Bundle

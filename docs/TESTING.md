@@ -104,6 +104,10 @@ Restore the registry dependency and lockfile immediately after the run. Never
 commit a `file:`, Git, workspace or vendored tarball dependency. Only after the
 no-blockchain journey is green may the SDK publish; reinstall its exact registry
 version, repeat the reproducible gate, then run Fabric `local-network` and staging.
+After a failure, resume at the smallest failed gate. Rerun predecessor gates
+only when they create required state, the fix changes an earlier boundary, or
+environment state is no longer trustworthy. Run the complete suite once at
+branch closure.
 
 1. local process and browser E2E in `networkKind=test`
 2. Fabric `local-network` E2E and only then a local container smoke

@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Resume failed release validation from the smallest failing gate and rerun
+  predecessor gates only for state dependencies, earlier-boundary changes or an
+  untrustworthy environment; reserve the complete suite for branch closure.
 - Enforce a fail-fast release order across repository skills and testing docs:
   unit/integration plus the real local portal journey run without blockchain
   before npm publication; temporary `npm pack --no-save` substitutions must be
