@@ -24,6 +24,9 @@ const SubjectKeyBindingContract = contractModule.SubjectKeyBindingContract;
 const { createContractContext } = require("../../test-support/contract-test-context");
 
 const BINDING_ID = "organization_acme__key1";
+const ASSIGNMENT_LINK = "zG9G9MsjjKK3cqYznAg72qrQNQ4gr3EycS8eDSbVya9ymkUfp4wbagzcmJVPqLqarka3b";
+const EMPLOYEE_LINK = "zG9EU4AWxfuVgFj41YxQMzyo4Y9neV8zDtN9ZvevfwRaPxYvgFMAvjXsjty9TzEyZAA9r";
+const ORGANIZATION_LINK = "zG9LkpGXgpJx42X9w4BYP3FFM9AD8Lunh56NUQcbgfnddnFvU3JUc1iWJ1eNDW6AVE7c2";
 
 function createContract() {
   return new SubjectKeyBindingContract();
@@ -176,6 +179,59 @@ describe("SubjectKeyBindingContract", () => {
     expect(created).not.to.have.property("use");
     expect(created).not.to.have.property("keyStatus");
     expect(created.status).to.equal("active");
+  });
+
+  it("joins a professional key binding to the opaque assignment graph", async () => {
+    const contract = createContract();
+    const ctx = createContractContext({ txSeconds: 10, txId: "TX-PROFESSIONAL-LINK" });
+    const created = await contract.CreateSubjectKeyBinding(
+      ctx,
+      BINDING_ID,
+      JSON.stringify(buildPayload({
+        professionalAssignmentLink: ASSIGNMENT_LINK,
+        employeeLink: EMPLOYEE_LINK,
+        organizationLink: ORGANIZATION_LINK,
+      })),
+    );
+
+    expect(created.professionalAssignmentLink).to.equal(ASSIGNMENT_LINK);
+    expect(created.employeeLink).to.equal(EMPLOYEE_LINK);
+    expect(created.organizationLink).to.equal(ORGANIZATION_LINK);
+
+    for (const field of ["professionalAssignmentLink", "employeeLink", "organizationLink"]) {
+      await expect(contract.CreateSubjectKeyBinding(
+        createContractContext(),
+        `${BINDING_ID}-${field}`,
+        JSON.stringify(buildPayload({
+          bindingId: `${BINDING_ID}-${field}`,
+          [field]: "urn:uuid:41b2c3d4-e5f6-4890-9234-567890abcdef",
+        })),
+      )).to.be.rejectedWith(`${field} must be an opaque multibase or CID value`);
+    }
+
+    const existingCtx = createContractContext({
+      txSeconds: 20,
+      txId: "TX-PROFESSIONAL-LINK-UPDATE",
+      existingState: { [BINDING_ID]: created },
+    });
+    await expect(contract.UpsertSubjectKeyBinding(
+      existingCtx,
+      BINDING_ID,
+      JSON.stringify(buildPayload({ professionalAssignmentLink: EMPLOYEE_LINK })),
+    )).to.be.rejectedWith("professionalAssignmentLink cannot change for an existing subject-key binding");
+
+    const optionalCtx = createContractContext({ txSeconds: 30, txId: "TX-OPTIONAL-LINKS" });
+    const optional = await contract.CreateSubjectKeyBinding(
+      optionalCtx,
+      `${BINDING_ID}-optional`,
+      JSON.stringify(buildPayload({
+        bindingId: `${BINDING_ID}-optional`,
+        professionalAssignmentLink: "",
+        employeeLink: null,
+      })),
+    );
+    expect(optional.professionalAssignmentLink).to.equal(undefined);
+    expect(optional.employeeLink).to.equal(undefined);
   });
 
   it("rejects duplicates, malformed payloads and invalid status operations", async () => {

@@ -66,6 +66,7 @@ import {
 } from 'gdc-common-utils-ts/utils/fhir-ips-creator-identity';
 import { normalizeUuid } from 'gdc-common-utils-ts/utils/normalize-uuid';
 import { getClinicalCreatorBindingsSectionId } from '../utils/clinical-creator-binding';
+import { registerProfessionalAssignmentOnLedger } from '../utils/professional-assignment-ledger';
 import { resolveRoleLicenseOrganizationOfficialId } from '../utils/ledger-organization-registration-helpers';
 
 /**
@@ -294,6 +295,7 @@ export class DeviceRegistrationManager implements IJobProcessor {
           vaultId,
           clientId,
           context: deviceIdentityContext,
+          clinicalCreatorBinding,
         });
       }
 
@@ -747,6 +749,7 @@ export class DeviceRegistrationManager implements IJobProcessor {
     job: JobRequest;
     vaultId: string;
     clientId: string;
+    clinicalCreatorBinding?: ClinicalCreatorBinding;
     context: {
       subjectId: string;
       actorIdentifier: string;
@@ -824,6 +827,16 @@ export class DeviceRegistrationManager implements IJobProcessor {
     const employeeCollectionName = await this.resolveEmployeeCollectionName(params.vaultId);
     await this.vaultRepository.put(employeeCollectionName, [protectedEmployeeDoc], getEnvSectionId('employees'));
 
+    if (params.clinicalCreatorBinding?.kind === FhirIpsCreatorKinds.Professional) {
+      await registerProfessionalAssignmentOnLedger({
+        jurisdiction,
+        assignmentIdentifier: params.clinicalCreatorBinding.authorIdentifier,
+        employeeIdentifier: params.clinicalCreatorBinding.actorIdentifier,
+        organizationIdentifier: params.clinicalCreatorBinding.ownerIdentifier,
+        role: params.clinicalCreatorBinding.role,
+      });
+    }
+
     if (previousVerificationMethods.length > 0) {
       await revokeSubjectKeysOnLedger({
         jurisdiction,
@@ -848,6 +861,13 @@ export class DeviceRegistrationManager implements IJobProcessor {
         roleLicenseId,
         verificationMethods: newVerificationMethods,
         deviceId: params.clientId,
+        ...(params.clinicalCreatorBinding?.kind === FhirIpsCreatorKinds.Professional ? {
+          professionalAssignment: {
+            assignmentIdentifier: params.clinicalCreatorBinding.authorIdentifier,
+            employeeIdentifier: params.clinicalCreatorBinding.actorIdentifier,
+            organizationIdentifier: params.clinicalCreatorBinding.ownerIdentifier,
+          },
+        } : {}),
       });
     }
 

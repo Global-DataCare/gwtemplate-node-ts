@@ -24,6 +24,10 @@ function buildStoredSubjectKeyBindingAsset(ctx, bindingId, payload, previousAsse
     subjectType: payload.subjectType || previousAsset?.subjectType,
     subjectId: payload.subjectId || previousAsset?.subjectId,
     parentOrgId: payload.parentOrgId || previousAsset?.parentOrgId || undefined,
+    professionalAssignmentLink: payload.professionalAssignmentLink
+      || previousAsset?.professionalAssignmentLink || undefined,
+    employeeLink: payload.employeeLink || previousAsset?.employeeLink || undefined,
+    organizationLink: payload.organizationLink || previousAsset?.organizationLink || undefined,
     keyId: payload.keyId || previousAsset?.keyId,
     relationship: payload.relationship || previousAsset?.relationship || undefined,
     status,

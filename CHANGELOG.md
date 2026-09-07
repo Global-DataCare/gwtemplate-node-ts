@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [1.25.3] - 2026-09-07
+
+- Join professional clinical evidence to identity history without exposing raw
+  FHIR references: `artifact-sc` author hashes match the CDS legal-organization
+  `organizationLink`, attester hashes match the PractitionerRole
+  `assignmentLink`, and `employee-sc` links that assignment to a separate
+  employee UUID hash and lifecycle.
+- Extend `subjectkeybinding-sc` with the same optional opaque assignment,
+  employee and organization links so a registered device key can be traced to
+  the exact professional assignment. Preserve existing 1.0 assets and reject
+  raw UUID, DID, URN and URL values at both chaincode boundaries.
+- Fix `employee-sc`, `cryptographickey-sc` and `subjectkeybinding-sc` selection
+  inside their GW managers; deployment variables cannot redirect these writes.
 - Resume failed release validation from the smallest failing gate and rerun
   predecessor gates only for state dependencies, earlier-boundary changes or an
   untrustworthy environment; reserve the complete suite for branch closure.

@@ -7,6 +7,7 @@
 const { Contract } = require("fabric-contract-api");
 
 const ALLOWED_STATUS = new Set(["active", "suspended", "revoked"]);
+const OPAQUE_LINK_PATTERN = /^(?:z[1-9A-HJ-NP-Za-km-z]+|b[a-z2-7]+)$/;
 
 function getTxTimestampSeconds(stub) {
   const ts = stub.getTxTimestamp();
@@ -26,6 +27,12 @@ function parseJson(input, label) {
 function assertStatus(status) {
   if (!ALLOWED_STATUS.has(status)) {
     throw new Error(`Invalid status ${status}. Allowed: active, suspended, revoked`);
+  }
+}
+
+function assertOpaqueLink(value, field) {
+  if (!OPAQUE_LINK_PATTERN.test(String(value || ""))) {
+    throw new Error(`${field} must be an opaque multibase or CID value`);
   }
 }
 
@@ -80,6 +87,73 @@ async function buildHistory(ctx, assetId) {
 }
 
 class EmployeeContract extends Contract {
+  /**
+   * Stores the privacy-safe professional assignment graph used by clinical
+   * artifacts. The key is the hash of the PractitionerRole/Occupation UUID;
+   * no raw UUID, DID, organization URN, email or key material is accepted.
+   *
+   * This operation is additive to the legacy employee asset and can therefore
+   * be rolled out without rewriting existing employee records.
+   */
+  async UpsertProfessionalAssignment(ctx, assignmentLink, payloadJson) {
+    const payload = parseJson(payloadJson, "payload");
+    if (payload.assignmentLink && payload.assignmentLink !== assignmentLink) {
+      throw new Error(`Payload assignmentLink ${payload.assignmentLink} does not match ${assignmentLink}`);
+    }
+    assertOpaqueLink(assignmentLink, "assignmentLink");
+    assertOpaqueLink(payload.employeeLink, "employeeLink");
+    assertOpaqueLink(payload.organizationLink, "organizationLink");
+    if (!payload.role) {
+      throw new Error("role is required");
+    }
+
+    const previous = await assetExists(ctx, assignmentLink)
+      ? await readAsset(ctx, assignmentLink, "ProfessionalAssignment")
+      : undefined;
+    if (previous
+      && (previous.employeeLink !== payload.employeeLink
+        || previous.organizationLink !== payload.organizationLink)) {
+      throw new Error("Professional assignment cannot change employeeLink or organizationLink");
+    }
+
+    const now = getTxTimestampSeconds(ctx.stub);
+    const status = payload.status || previous?.status || "active";
+    assertStatus(status);
+    const asset = {
+      assignmentLink,
+      employeeLink: payload.employeeLink,
+      organizationLink: payload.organizationLink,
+      role: payload.role,
+      status,
+      validFrom: previous?.validFrom ?? now,
+      validUntil: status === "revoked" ? now : (status === "active" ? null : previous?.validUntil ?? null),
+      createdAt: previous?.createdAt ?? now,
+      updatedAt: now,
+    };
+    await ctx.stub.putState(assignmentLink, Buffer.from(JSON.stringify(asset)));
+    return asset;
+  }
+
+  async upsertProfessionalAssignment(ctx, assignmentLink, payloadJson) {
+    return this.UpsertProfessionalAssignment(ctx, assignmentLink, payloadJson);
+  }
+
+  async GetProfessionalAssignment(ctx, assignmentLink) {
+    return readAsset(ctx, assignmentLink, "ProfessionalAssignment");
+  }
+
+  async getProfessionalAssignment(ctx, assignmentLink) {
+    return this.GetProfessionalAssignment(ctx, assignmentLink);
+  }
+
+  async GetProfessionalAssignmentHistory(ctx, assignmentLink) {
+    return buildHistory(ctx, assignmentLink);
+  }
+
+  async getProfessionalAssignmentHistory(ctx, assignmentLink) {
+    return this.GetProfessionalAssignmentHistory(ctx, assignmentLink);
+  }
+
   async CreateEmployee(ctx, employeeId, payloadJson) {
     const exists = await assetExists(ctx, employeeId);
     if (exists) {
