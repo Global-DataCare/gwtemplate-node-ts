@@ -1,4 +1,5 @@
 import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
+import { DecryptCommand, EncryptCommand, KMSClient } from '@aws-sdk/client-kms';
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'crypto';
 import { GoogleAuth } from 'google-auth-library';
 
@@ -200,6 +201,53 @@ export class CloudKmsEnvelopeAdapter implements KmsEnvelopeAdapter {
       }
       return token;
     };
+  }
+}
+
+type AwsKmsCommand = EncryptCommand | DecryptCommand;
+type AwsKmsSend = (command: AwsKmsCommand) => Promise<any>;
+
+/** AWS KMS root adapter. Credentials and region use the standard AWS SDK chain. */
+export class KmsEnvelopeAdapterAws implements KmsEnvelopeAdapter {
+  private readonly keyId: string;
+  private readonly send: AwsKmsSend;
+
+  constructor(keyId: string, deps?: { send?: AwsKmsSend }) {
+    const normalized = String(keyId || '').trim();
+    if (!normalized) {
+      throw new Error('KmsEnvelopeAdapterAws requires a non-empty KMS key id or ARN.');
+    }
+    this.keyId = normalized;
+    if (deps?.send) {
+      this.send = deps.send;
+    } else {
+      const client = new KMSClient({});
+      this.send = (command) => client.send(command as any);
+    }
+  }
+
+  async wrapKeyMaterial(plaintext: Uint8Array, context: { entityVaultId: string; purpose: string }): Promise<string> {
+    const result = await this.send(new EncryptCommand({
+      KeyId: this.keyId,
+      Plaintext: plaintext,
+      EncryptionContext: context,
+    }));
+    if (!result?.CiphertextBlob) {
+      throw new Error('AWS KMS encrypt response did not include CiphertextBlob.');
+    }
+    return Buffer.from(result.CiphertextBlob).toString('base64');
+  }
+
+  async unwrapKeyMaterial(wrapped: string, context: { entityVaultId: string; purpose: string }): Promise<Uint8Array> {
+    const result = await this.send(new DecryptCommand({
+      KeyId: this.keyId,
+      CiphertextBlob: Buffer.from(wrapped, 'base64'),
+      EncryptionContext: context,
+    }));
+    if (!result?.Plaintext) {
+      throw new Error('AWS KMS decrypt response did not include Plaintext.');
+    }
+    return new Uint8Array(result.Plaintext);
   }
 }
 

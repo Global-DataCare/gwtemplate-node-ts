@@ -1,9 +1,10 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 import { jest } from '@jest/globals';
 import type { IServerConfig } from '../../../config';
 import { createEnvelopeAdapter, resolveEnvelopeProvider } from '../../../services/envelope-adapter-factory';
 import {
   AesGcmEnvelopeAdapter,
+  KmsEnvelopeAdapterAws,
   CloudKmsEnvelopeAdapter,
   HashicorpTransitEnvelopeAdapter,
   InMemoryEnvelopeAdapter,
@@ -64,14 +65,55 @@ describe('envelope-adapter-factory', () => {
     const rootAdapter = { wrapKeyMaterial: jest.fn(async () => 'unused'), unwrapKeyMaterial: jest.fn<any>().mockResolvedValue(Buffer.alloc(32, 7)) };
     const config = buildConfig({
       envelope: { provider: 'gcp-kms' },
-      gcpKms: {
-        keyName: 'projects/p/locations/l/keyRings/r/cryptoKeys/k',
+      kms: {
+        keyId: 'projects/p/locations/l/keyRings/r/cryptoKeys/k',
         runtimeKekCiphertext: 'kms-ciphertext',
         runtimeKekId: 'gw-prod',
       },
     });
     expect((await createEnvelopeAdapter(config, { rootAdapter })).adapter).toBeInstanceOf(RuntimeKekEnvelopeAdapter);
     expect(rootAdapter.unwrapKeyMaterial).toHaveBeenCalledTimes(1);
+  });
+
+  it('unwraps one runtime KEK with AWS KMS through the provider-neutral configuration', async () => {
+    const rootAdapter = { wrapKeyMaterial: jest.fn(async () => 'unused'), unwrapKeyMaterial: jest.fn<any>().mockResolvedValue(Buffer.alloc(32, 7)) };
+    const config = buildConfig({
+      envelope: { provider: 'aws-kms' },
+      kms: {
+        keyId: 'arn:aws:kms:eu-west-1:111122223333:key/00000000-0000-0000-0000-000000000001',
+        runtimeKekCiphertext: 'kms-ciphertext',
+        runtimeKekId: 'gw-prod',
+      },
+    });
+
+    expect((await createEnvelopeAdapter(config, { rootAdapter })).adapter).toBeInstanceOf(RuntimeKekEnvelopeAdapter);
+    expect(rootAdapter.unwrapKeyMaterial).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails fast when aws-kms is selected without the provider-neutral KMS key id', async () => {
+    const config = buildConfig({
+      envelope: { provider: 'aws-kms' },
+      gcpKms: {
+        keyName: 'projects/p/locations/l/keyRings/r/cryptoKeys/k',
+        runtimeKekCiphertext: 'legacy-gcp-ciphertext',
+        runtimeKekId: 'legacy-gcp',
+      },
+    });
+    await expect(createEnvelopeAdapter(config)).rejects.toThrow('KMS_KEY_ID');
+  });
+
+  it('accepts the former GCP variables only for gcp-kms migration', async () => {
+    const rootAdapter = { wrapKeyMaterial: jest.fn(async () => 'unused'), unwrapKeyMaterial: jest.fn<any>().mockResolvedValue(Buffer.alloc(32, 7)) };
+    const config = buildConfig({
+      envelope: { provider: 'gcp-kms' },
+      gcpKms: {
+        keyName: 'projects/p/locations/l/keyRings/r/cryptoKeys/k',
+        runtimeKekCiphertext: 'legacy-gcp-ciphertext',
+        runtimeKekId: 'legacy-gcp',
+      },
+    });
+
+    expect((await createEnvelopeAdapter(config, { rootAdapter })).adapter).toBeInstanceOf(RuntimeKekEnvelopeAdapter);
   });
 
   it('creates a HashiCorp Transit adapter when explicitly configured', async () => {
@@ -88,13 +130,13 @@ describe('envelope-adapter-factory', () => {
 
   it('fails fast when gcp-kms is selected without a key name', async () => {
     const config = buildConfig({ envelope: { provider: 'gcp-kms' } });
-    await expect(createEnvelopeAdapter(config)).rejects.toThrow('GCP_KMS_KEY_NAME');
+    await expect(createEnvelopeAdapter(config)).rejects.toThrow('KMS_KEY_ID');
   });
 
   it('rejects a CryptoKeyVersion where a rotatable CryptoKey name is required', async () => {
     const config = buildConfig({
       envelope: { provider: 'gcp-kms' },
-      gcpKms: { keyName: 'projects/p/locations/l/keyRings/r/cryptoKeys/k/cryptoKeyVersions/1' },
+      kms: { keyId: 'projects/p/locations/l/keyRings/r/cryptoKeys/k/cryptoKeyVersions/1' },
     });
     await expect(createEnvelopeAdapter(config)).rejects.toThrow('full CryptoKey resource name');
   });
@@ -148,6 +190,24 @@ describe('external envelope adapters', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(2);
     expect(fetchImpl.mock.calls[0][0]).toContain(':encrypt');
     expect(fetchImpl.mock.calls[1][0]).toContain(':decrypt');
+  });
+
+  it('uses AWS KMS encrypt/decrypt with the same authenticated context', async () => {
+    const send = jest.fn<any>()
+      .mockResolvedValueOnce({ CiphertextBlob: Buffer.from('wrapped') })
+      .mockResolvedValueOnce({ Plaintext: Buffer.from('secret') });
+    const keyId = 'arn:aws:kms:eu-west-1:111122223333:key/00000000-0000-0000-0000-000000000001';
+    const adapter = new KmsEnvelopeAdapterAws(keyId, { send });
+    const context = { entityVaultId: 'tenant-1', purpose: 'all' };
+
+    const wrapped = await adapter.wrapKeyMaterial(Buffer.from('secret'), context);
+    const plain = await adapter.unwrapKeyMaterial(wrapped, context);
+
+    expect(wrapped).toBe(Buffer.from('wrapped').toString('base64'));
+    expect(Buffer.from(plain).toString('utf8')).toBe('secret');
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(send.mock.calls[0][0].input).toMatchObject({ KeyId: keyId, EncryptionContext: context });
+    expect(send.mock.calls[1][0].input).toMatchObject({ KeyId: keyId, EncryptionContext: context });
   });
 
   it('uses HashiCorp Transit encrypt/decrypt REST calls without colliding with storage vault naming', async () => {

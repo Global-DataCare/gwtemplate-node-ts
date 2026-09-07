@@ -35,7 +35,7 @@
 {{- fail "peer.enabled=false requires externalPeer.host" -}}
 {{- end -}}
 {{- if and (eq .Values.environment "production") (or (eq .Values.gw.providers.envelope "local") (eq .Values.gw.providers.envelope "memory")) -}}
-{{- fail "production requires external KEK custody: gcp-kms or hashicorp-transit" -}}
+{{- fail "production requires external KEK custody: gcp-kms, aws-kms or hashicorp-transit" -}}
 {{- end -}}
 {{- if and (eq .Values.environment "production") (ne (int .Values.gw.replicas) 1) -}}
 {{- fail "production currently requires gw.replicas=1 because GW CORE queue processing is process-local" -}}

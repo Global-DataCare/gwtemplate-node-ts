@@ -169,7 +169,10 @@ The intended matrix is:
 3. `SECURITY_MODE=compat|strict` + `ENVELOPE_PROVIDER=gcp-kms`
    - preferred GCP production path
 
-4. `SECURITY_MODE=compat|strict` + `ENVELOPE_PROVIDER=hashicorp-transit`
+4. `SECURITY_MODE=compat|strict` + `ENVELOPE_PROVIDER=aws-kms`
+   - preferred AWS production path
+
+5. `SECURITY_MODE=compat|strict` + `ENVELOPE_PROVIDER=hashicorp-transit`
    - preferred portable/open-source production path
 
 Important clarification:

@@ -1,6 +1,7 @@
 import type { IServerConfig } from '../config';
 import {
   AesGcmEnvelopeAdapter,
+  KmsEnvelopeAdapterAws,
   CloudKmsEnvelopeAdapter,
   HashicorpTransitEnvelopeAdapter,
   InMemoryEnvelopeAdapter,
@@ -8,7 +9,7 @@ import {
   type KmsEnvelopeAdapter,
 } from './kms-envelope-adapter';
 
-export type EnvelopeProvider = 'memory' | 'local' | 'gcp-kms' | 'hashicorp-transit';
+export type EnvelopeProvider = 'memory' | 'local' | 'gcp-kms' | 'aws-kms' | 'hashicorp-transit';
 
 export function resolveEnvelopeProvider(config: IServerConfig): EnvelopeProvider {
   if (config.envelope?.provider) {
@@ -24,7 +25,7 @@ function assertProductionCustody(config: IServerConfig, provider: EnvelopeProvid
   if (config.nodeEnv !== 'production') return;
   if (provider === 'memory' || provider === 'local') {
     throw new Error(
-      `NODE_ENV=production requires external envelope custody; ENVELOPE_PROVIDER=${provider} is not permitted. Use gcp-kms or hashicorp-transit.`,
+      `NODE_ENV=production requires external envelope custody; ENVELOPE_PROVIDER=${provider} is not permitted. Use gcp-kms, aws-kms, or hashicorp-transit.`,
     );
   }
 }
@@ -50,17 +51,23 @@ export async function createEnvelopeAdapter(
     return { adapter: new AesGcmEnvelopeAdapter(config.kekSecret), provider };
   }
 
-  if (provider === 'gcp-kms') {
-    const keyName = String(config.gcpKms?.keyName || '').trim();
-    if (!/^projects\/[^/]+\/locations\/[^/]+\/keyRings\/[^/]+\/cryptoKeys\/[^/]+$/.test(keyName)) {
-      throw new Error('ENVELOPE_PROVIDER=gcp-kms requires GCP_KMS_KEY_NAME as a full CryptoKey resource name (without a CryptoKeyVersion suffix).');
+  if (provider === 'gcp-kms' || provider === 'aws-kms') {
+    const legacyGcp = provider === 'gcp-kms' ? config.gcpKms : undefined;
+    const keyId = String(config.kms?.keyId || legacyGcp?.keyName || '').trim();
+    const runtimeKekCiphertext = String(config.kms?.runtimeKekCiphertext || legacyGcp?.runtimeKekCiphertext || '').trim();
+    const runtimeKekId = String(config.kms?.runtimeKekId || legacyGcp?.runtimeKekId || '').trim();
+    if (!keyId) {
+      throw new Error(`ENVELOPE_PROVIDER=${provider} requires KMS_KEY_ID.`);
     }
-    const runtimeKekCiphertext = String(config.gcpKms?.runtimeKekCiphertext || '').trim();
-    const runtimeKekId = String(config.gcpKms?.runtimeKekId || '').trim();
+    if (provider === 'gcp-kms' && !/^projects\/[^/]+\/locations\/[^/]+\/keyRings\/[^/]+\/cryptoKeys\/[^/]+$/.test(keyId)) {
+      throw new Error('ENVELOPE_PROVIDER=gcp-kms requires KMS_KEY_ID as a full CryptoKey resource name (without a CryptoKeyVersion suffix).');
+    }
     if (!runtimeKekCiphertext || !runtimeKekId) {
-      throw new Error('ENVELOPE_PROVIDER=gcp-kms requires GCP_KMS_RUNTIME_KEK_CIPHERTEXT and GCP_KMS_RUNTIME_KEK_ID.');
+      throw new Error(`ENVELOPE_PROVIDER=${provider} requires KMS_RUNTIME_KEK_CIPHERTEXT and KMS_RUNTIME_KEK_ID.`);
     }
-    const rootAdapter = deps.rootAdapter || new CloudKmsEnvelopeAdapter(keyName);
+    const rootAdapter = deps.rootAdapter || (provider === 'gcp-kms'
+      ? new CloudKmsEnvelopeAdapter(keyId)
+      : new KmsEnvelopeAdapterAws(keyId));
     const runtimeKek = await rootAdapter.unwrapKeyMaterial(runtimeKekCiphertext, {
       entityVaultId: runtimeKekId,
       purpose: 'service-runtime-kek-v1',

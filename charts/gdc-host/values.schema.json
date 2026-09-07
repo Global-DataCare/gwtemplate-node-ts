@@ -53,7 +53,7 @@
             "queue": { "type": "string", "enum": ["mem"] },
             "database": { "type": "string", "enum": ["mem", "firestore", "postgres"] },
             "storage": { "type": "string", "enum": ["mem", "gcs", "ipfs", "supabase"] },
-            "envelope": { "type": "string", "enum": ["gcp-kms", "hashicorp-transit", "local", "memory"] },
+            "envelope": { "type": "string", "enum": ["gcp-kms", "aws-kms", "hashicorp-transit", "local", "memory"] },
             "replayProtection": { "type": "string", "enum": ["none", "mem", "redis"] }
           }
         }

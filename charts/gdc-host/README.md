@@ -159,6 +159,10 @@ REDIS_SECRET_ENV_FILE=/secure/host/redis.env \
 En producción se recomienda External Secrets, Secret Store CSI o mecanismo
 equivalente. `KEK_SECRET` solo es válido en local/demo. Cada pod de producción
 debe desenvolver una vez su KEK de runtime mediante el adaptador KMS elegido.
+Para `gcp-kms` y `aws-kms`, `gw.existingSecret` debe aportar `KMS_KEY_ID`,
+`KMS_RUNTIME_KEK_ID` y `KMS_RUNTIME_KEK_CIPHERTEXT`. En EKS configure
+`AWS_REGION` y asocie a la ServiceAccount un rol de pod/IRSA con `kms:Decrypt`
+sobre la clave exacta; no guarde access keys estáticas en el Secret.
 
 ## Perfiles
 

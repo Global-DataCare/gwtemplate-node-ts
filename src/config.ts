@@ -124,9 +124,15 @@ export interface IServerConfig {
     mfsRoot?: string;
   };
   envelope?: {
-    provider?: 'memory' | 'local' | 'gcp-kms' | 'hashicorp-transit';
+    provider?: 'memory' | 'local' | 'gcp-kms' | 'aws-kms' | 'hashicorp-transit';
   };
   kekSecret?: string;
+  kms?: {
+    keyId?: string;
+    runtimeKekCiphertext?: string;
+    runtimeKekId?: string;
+  };
+  /** @deprecated Use the provider-neutral `kms` configuration. */
   gcpKms?: {
     keyName?: string;
     runtimeKekCiphertext?: string;

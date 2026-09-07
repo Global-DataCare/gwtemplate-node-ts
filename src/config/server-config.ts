@@ -439,13 +439,18 @@ export function getConfig(): IServerConfig {
         provider: (() => {
           const value = String(process.env.ENVELOPE_PROVIDER || '').trim().toLowerCase();
           if (!value) return undefined;
-          if (value === 'memory' || value === 'local' || value === 'gcp-kms' || value === 'hashicorp-transit') {
+          if (value === 'memory' || value === 'local' || value === 'gcp-kms' || value === 'aws-kms' || value === 'hashicorp-transit') {
             return value;
           }
-          throw new Error("Config Error: Invalid ENVELOPE_PROVIDER. Allowed: memory, local, gcp-kms, hashicorp-transit");
+          throw new Error("Config Error: Invalid ENVELOPE_PROVIDER. Allowed: memory, local, gcp-kms, aws-kms, hashicorp-transit");
         })(),
       },
       kekSecret: process.env.KEK_SECRET,
+      kms: {
+        keyId: process.env.KMS_KEY_ID,
+        runtimeKekCiphertext: process.env.KMS_RUNTIME_KEK_CIPHERTEXT,
+        runtimeKekId: process.env.KMS_RUNTIME_KEK_ID,
+      },
       gcpKms: {
         keyName: process.env.GCP_KMS_KEY_NAME,
         runtimeKekCiphertext: process.env.GCP_KMS_RUNTIME_KEK_CIPHERTEXT,
