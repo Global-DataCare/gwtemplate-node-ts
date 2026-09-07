@@ -48,7 +48,7 @@ grep -Fq 'curl -fsS "${ICA_BASE_URL}/"' ./scripts/run-secure-e2e-google-user.sh
 grep -Fq 'ICA_URL_INTERNAL="$ICA_BASE_URL"' ./scripts/run-secure-e2e-google-user.sh
 grep -Fq 'HOST_LEGACY_REPRESENTATIVE_CONTROLLER="$HOST_LEGACY_REPRESENTATIVE_CONTROLLER"' ./cloud_deploy.sh
 grep -Fq '"AUTH_TOKEN_VERIFIER" "OIDC_TRUSTED_PROVIDERS_JSON" "TENANT_SERVICE_ROUTES_JSON"' ./cloud_deploy.sh
-grep -Fq '"GCP_KMS_RUNTIME_KEK_CIPHERTEXT" "GCP_KMS_RUNTIME_KEK_ID"' ./cloud_deploy.sh
+grep -Fq '"KMS_KEY_ID" "KMS_RUNTIME_KEK_CIPHERTEXT" "KMS_RUNTIME_KEK_ID"' ./cloud_deploy.sh
 grep -Fq 'HOST_LEGACY_REPRESENTATIVE_CONTROLLER=false' ./env.example
 grep -Fq 'ALLOWED_SECTORS is required for every gateway deployment' ./cloud_deploy.sh
 grep -Fq 'ALLOWED_SECTORS=health-research,health-care,health-index,onehealth-research' ./env.example

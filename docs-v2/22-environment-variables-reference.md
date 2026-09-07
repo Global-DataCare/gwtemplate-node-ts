@@ -278,19 +278,37 @@ Legacy note:
 
 ## 9. Envelope And Root-Key Custody
 
-`ENVELOPE_PROVIDER`
+`KMS_PROVIDER`
 - Root-key custody provider for wrapping/unwrapping persisted KMS key
   material.
-- Allowed values: `memory`, `local`, `gcp-kms`, `hashicorp-transit`.
+- Allowed values: `memory`, `local`, `gcp`, `aws`, `hashicorp-transit`.
 
 `KEK_SECRET`
 - Local compatibility root secret.
-- Used only when `ENVELOPE_PROVIDER=local`.
+- Used only when `KMS_PROVIDER=local`.
 - Development-only default in templates; not a production pattern.
 
-`GCP_KMS_KEY_NAME`
-- Fully qualified external GCP KMS key name.
-- Used only when `ENVELOPE_PROVIDER=gcp-kms`.
+`KMS_KEY_ID`
+- Provider-neutral external root-key identifier.
+- With `gcp`, use the fully qualified CryptoKey resource name without a
+  CryptoKeyVersion suffix.
+- With `aws`, use a KMS key ARN, key id, alias ARN or alias name.
+
+`KMS_RUNTIME_KEK_ID`
+- Stable service/environment identifier included in authenticated KMS context.
+
+`KMS_RUNTIME_KEK_CIPHERTEXT`
+- Base64 ciphertext containing the 32-byte runtime KEK encrypted by the
+  selected external provider.
+- Generate it with `npm run kms:provision-runtime-kek`; never put the plaintext
+  runtime KEK in deployment configuration.
+
+`KMS_REGION`
+- Explicit GW KMS region used with `KMS_PROVIDER=aws`; it is ignored by GCP.
+- `AWS_REGION` and `AWS_DEFAULT_REGION` are deliberately not configuration
+  aliases for this contract.
+- Kubernetes workloads should obtain credentials through their IAM role/IRSA,
+  not static access-key variables.
 
 `HASHICORP_TRANSIT_BASE_URL`
 - HashiCorp base URL for Transit-backed root-key custody.

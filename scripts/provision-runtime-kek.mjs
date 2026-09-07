@@ -1,36 +1,75 @@
 import { randomBytes } from 'node:crypto';
+import { pathToFileURL } from 'node:url';
+import { EncryptCommand, KMSClient } from '@aws-sdk/client-kms';
 import { GoogleAuth } from 'google-auth-library';
 
-const keyName = required('GCP_KMS_KEY_NAME');
-const runtimeKekId = required('GCP_KMS_RUNTIME_KEK_ID');
-const runtimeKek = randomBytes(32);
-const auth = new GoogleAuth({ scopes: ['https://www.googleapis.com/auth/cloud-platform'] });
+export async function provisionRuntimeKek(options = {}) {
+  const env = options.env || process.env;
+  const provider = normalizeProvider(required(env, 'KMS_PROVIDER', ['ENVELOPE_PROVIDER']));
+  const keyId = required(env, 'KMS_KEY_ID', provider === 'gcp' ? ['GCP_KMS_KEY_NAME'] : []);
+  const runtimeKekId = required(env, 'KMS_RUNTIME_KEK_ID', provider === 'gcp' ? ['GCP_KMS_RUNTIME_KEK_ID'] : []);
+  const runtimeKek = (options.randomBytes || randomBytes)(32);
+  const context = { entityVaultId: runtimeKekId, purpose: 'service-runtime-kek-v1' };
 
-try {
+  try {
+    let ciphertext;
+    if (provider === 'gcp') {
+      ciphertext = await (options.gcpEncrypt || encryptWithGoogleKms)(keyId, runtimeKek, context);
+    } else if (provider === 'aws') {
+      const region = required(env, 'KMS_REGION');
+      ciphertext = await (options.awsEncrypt || encryptWithAwsKms)(keyId, runtimeKek, context, region);
+    } else {
+      throw new Error('Runtime KEK provisioning supports KMS_PROVIDER=gcp or aws.');
+    }
+    return `KMS_RUNTIME_KEK_CIPHERTEXT=${ciphertext}`;
+  } finally {
+    runtimeKek.fill(0);
+  }
+}
+
+async function encryptWithGoogleKms(keyId, runtimeKek, context) {
+  const auth = new GoogleAuth({ scopes: ['https://www.googleapis.com/auth/cloud-platform'] });
   const client = await auth.getClient();
   const access = await client.getAccessToken();
   const token = typeof access === 'string' ? access : access?.token;
   if (!token) throw new Error('Google authentication returned no access token.');
-  const response = await fetch(`https://cloudkms.googleapis.com/v1/${keyName}:encrypt`, {
+  const response = await fetch(`https://cloudkms.googleapis.com/v1/${keyId}:encrypt`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       plaintext: runtimeKek.toString('base64'),
-      additionalAuthenticatedData: Buffer.from(JSON.stringify({
-        entityVaultId: runtimeKekId,
-        purpose: 'service-runtime-kek-v1',
-      })).toString('base64'),
+      additionalAuthenticatedData: Buffer.from(JSON.stringify(context)).toString('base64'),
     }),
   });
   const body = await response.json();
   if (!response.ok || !body.ciphertext) throw new Error(body?.error?.message || `Cloud KMS encrypt failed (${response.status}).`);
-  console.log(`GCP_KMS_RUNTIME_KEK_CIPHERTEXT=${body.ciphertext}`);
-} finally {
-  runtimeKek.fill(0);
+  return body.ciphertext;
 }
 
-function required(name) {
-  const value = String(process.env[name] || '').trim();
-  if (!value) throw new Error(`${name} is required.`);
+async function encryptWithAwsKms(keyId, runtimeKek, context, region) {
+  const response = await new KMSClient({ region }).send(new EncryptCommand({
+    KeyId: keyId,
+    Plaintext: runtimeKek,
+    EncryptionContext: context,
+  }));
+  if (!response.CiphertextBlob) throw new Error('AWS KMS encrypt response did not include CiphertextBlob.');
+  return Buffer.from(response.CiphertextBlob).toString('base64');
+}
+
+function normalizeProvider(value) {
+  if (value === 'gcp-kms') return 'gcp';
+  if (value === 'aws-kms') return 'aws';
   return value;
+}
+
+function required(env, name, aliases = []) {
+  for (const candidate of [name, ...aliases]) {
+    const value = String(env[candidate] || '').trim();
+    if (value) return value;
+  }
+  throw new Error(`${name} is required.`);
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  console.log(await provisionRuntimeKek());
 }

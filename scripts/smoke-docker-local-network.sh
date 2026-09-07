@@ -130,7 +130,7 @@ POSTGRES_SCHEMA=public
 IPFS_API_URL=http://gw-open-source-ipfs:5001
 IPFS_GATEWAY_URL=http://gw-open-source-ipfs:8080
 IPFS_MFS_ROOT=/gwtemplate/blobs
-ENVELOPE_PROVIDER=local
+KMS_PROVIDER=local
 KEK_SECRET=${local_kek_secret}
 CONFIDENTIAL_JWE_INLINE_MAX_BYTES=1
 EOF

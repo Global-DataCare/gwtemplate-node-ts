@@ -18,7 +18,7 @@ host:
 gw:
   image: registry.example.invalid/gw-core@sha256:1111111111111111111111111111111111111111111111111111111111111111
   existingSecret: host-gw
-  providers: { queue: mem, database: postgres, storage: ipfs, envelope: hashicorp-transit, replayProtection: redis }
+  providers: { queue: mem, database: postgres, storage: ipfs, kms: hashicorp-transit, replayProtection: redis }
 images:
   init: registry.example.invalid/busybox@sha256:2222222222222222222222222222222222222222222222222222222222222222
 peer:

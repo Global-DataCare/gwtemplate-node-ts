@@ -61,7 +61,7 @@ gw:
     queue: mem
     database: postgres
     storage: ipfs
-    envelope: hashicorp-transit
+    kms: hashicorp-transit
     replayProtection: mem
   authTokenVerifier: firebase
   securityMode: strict

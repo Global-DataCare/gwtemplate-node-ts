@@ -435,17 +435,21 @@ export function getConfig(): IServerConfig {
         gatewayUrl: process.env.IPFS_GATEWAY_URL,
         mfsRoot: process.env.IPFS_MFS_ROOT,
       },
-      envelope: {
-        provider: (() => {
-          const value = String(process.env.ENVELOPE_PROVIDER || '').trim().toLowerCase();
-          if (!value) return undefined;
-          if (value === 'memory' || value === 'local' || value === 'gcp-kms' || value === 'hashicorp-transit') {
-            return value;
-          }
-          throw new Error("Config Error: Invalid ENVELOPE_PROVIDER. Allowed: memory, local, gcp-kms, hashicorp-transit");
-        })(),
-      },
       kekSecret: process.env.KEK_SECRET,
+      kms: {
+        provider: (() => {
+          const value = String(process.env.KMS_PROVIDER || process.env.ENVELOPE_PROVIDER || '').trim().toLowerCase();
+          if (!value) return undefined;
+          if (value === 'memory' || value === 'local' || value === 'gcp' || value === 'aws' || value === 'hashicorp-transit') return value;
+          if (value === 'gcp-kms') return 'gcp';
+          if (value === 'aws-kms') return 'aws';
+          throw new Error("Config Error: Invalid KMS_PROVIDER. Allowed: memory, local, gcp, aws, hashicorp-transit");
+        })(),
+        region: process.env.KMS_REGION,
+        keyId: process.env.KMS_KEY_ID,
+        runtimeKekCiphertext: process.env.KMS_RUNTIME_KEK_CIPHERTEXT,
+        runtimeKekId: process.env.KMS_RUNTIME_KEK_ID,
+      },
       gcpKms: {
         keyName: process.env.GCP_KMS_KEY_NAME,
         runtimeKekCiphertext: process.env.GCP_KMS_RUNTIME_KEK_CIPHERTEXT,

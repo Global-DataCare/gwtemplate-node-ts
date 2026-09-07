@@ -133,7 +133,7 @@ The runtime root-custody provider names are:
 
 - `memory`: dev/test only
 - `local`: local compatibility mode using `KEK_SECRET`
-- `gcp-kms`: GCP production target
+- `gcp`: GCP production target
 - `hashicorp-transit`: open-source/self-hosted production target
 
 These names are intentional:
@@ -151,31 +151,34 @@ That means:
 - `SECURITY_MODE=demo` does not force `memory`
 - `SECURITY_MODE=demo` can still use `local` with `KEK_SECRET`
 - production-oriented custody decisions must be driven by
-  `ENVELOPE_PROVIDER`
+  `KMS_PROVIDER`
 
 The intended matrix is:
 
-1. `SECURITY_MODE=demo` + `ENVELOPE_PROVIDER=memory`
+1. `SECURITY_MODE=demo` + `KMS_PROVIDER=memory`
    - fastest dev/test path
    - no `KEK_SECRET`
    - no durable root-custody posture
 
-2. `SECURITY_MODE=demo` + `ENVELOPE_PROVIDER=local`
+2. `SECURITY_MODE=demo` + `KMS_PROVIDER=local`
    - deterministic configured root secret via `KEK_SECRET`
    - local/dev compatibility path
    - useful when operators explicitly want wrapped-key persistence rooted in a
      configured secret during demo or local environments
 
-3. `SECURITY_MODE=compat|strict` + `ENVELOPE_PROVIDER=gcp-kms`
+3. `SECURITY_MODE=compat|strict` + `KMS_PROVIDER=gcp`
    - preferred GCP production path
 
-4. `SECURITY_MODE=compat|strict` + `ENVELOPE_PROVIDER=hashicorp-transit`
+4. `SECURITY_MODE=compat|strict` + `KMS_PROVIDER=aws`
+   - preferred AWS production path
+
+5. `SECURITY_MODE=compat|strict` + `KMS_PROVIDER=hashicorp-transit`
    - preferred portable/open-source production path
 
 Important clarification:
 
 - `InMemoryEnvelopeAdapter` does not use `KEK_SECRET`
-- if you want `KEK_SECRET`, use `ENVELOPE_PROVIDER=local`
+- if you want `KEK_SECRET`, use `KMS_PROVIDER=local`
 
 ## Why "Reprovision on Startup" Is Not the Right Fix
 

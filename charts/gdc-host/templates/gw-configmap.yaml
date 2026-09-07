@@ -45,7 +45,7 @@ data:
   QUEUE_PROVIDER: {{ .Values.gw.providers.queue | quote }}
   DB_PROVIDER: {{ .Values.gw.providers.database | quote }}
   STORAGE_PROVIDER: {{ .Values.gw.providers.storage | quote }}
-  ENVELOPE_PROVIDER: {{ .Values.gw.providers.envelope | quote }}
+  KMS_PROVIDER: {{ .Values.gw.providers.kms | quote }}
   REPLAY_PROTECTION_PROVIDER: {{ .Values.gw.providers.replayProtection | quote }}
   {{- if eq .Values.gw.providers.database "postgres" }}
   POSTGRES_HOST: {{ include "gdc-host.postgresqlService" . | quote }}
