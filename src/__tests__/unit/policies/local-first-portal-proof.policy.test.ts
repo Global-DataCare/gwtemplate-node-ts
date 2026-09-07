@@ -1,5 +1,7 @@
 // Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
-// Every portal must prove normal local UI -> BFF -> SDK -> GW in networkKind=test before Fabric, staging, or production.
+// Every portal must prove normal local UI -> BFF -> SDK -> GW/DataConv in networkKind=test, including Playwright,
+// before npm publication, Docker/Fabric local-network, staging, or production. An unpublished SDK may be installed
+// temporarily from npm pack only to fail fast; it must never leave a file:/Git/workspace dependency or changed lockfile.
 import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -16,6 +18,10 @@ describe('shared local-first portal release policy', () => {
       expect(contract).toMatch(/Fixture.*mocked.*API-only/s);
       expect(contract).toMatch(/live.*E2E.*SKIP.*release/s);
       expect(contract).toMatch(/live.*E2E.*npm publish.*container image/s);
+      expect(contract).toMatch(/unit.*integration.*networkKind=test/is);
+      expect(contract).toMatch(/UI.*BFF.*SDK.*GW\/DataConv.*Playwright/is);
+      expect(contract).toMatch(/npm pack.*temporary.*no-save.*restore.*lockfile/is);
+      expect(contract).toMatch(/publish.*exact\s+registry\s+version.*local-network.*staging/is);
     }
   });
 
@@ -30,6 +36,10 @@ describe('shared local-first portal release policy', () => {
       expect(contract).toMatch(/three.*attempts.*five\s+minutes/is);
       expect(contract).toMatch(/npm pack.*tarball.*local.*test/is);
       expect(contract).toMatch(/registry.*publish.*consumer.*merge.*deploy/is);
+      expect(contract).toMatch(/unit.*integration.*networkKind=test/is);
+      expect(contract).toMatch(/UI.*BFF.*SDK.*GW\/DataConv.*Playwright/is);
+      expect(contract).toMatch(/npm pack.*temporary.*no-save.*restore.*lockfile/is);
+      expect(contract).toMatch(/publish.*exact\s+registry\s+version.*local-network.*staging/is);
     }
   });
 });

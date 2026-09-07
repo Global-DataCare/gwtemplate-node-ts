@@ -96,8 +96,9 @@ description: Enforce branch, TDD, canonical FHIR and schema.org vocabulary, fixt
 ## Keep test layers separate
 
 - Enforce the same portal progression everywhere: `test -> local-network -> test-network -> network`.
-  First prove normal local UI -> BFF -> high-level
-  SDK -> GW/services with in-memory `networkKind=test` and no blockchain.
+  First run unit and integration tests with `networkKind=test`, then prove the
+  normal local UI -> BFF -> high-level SDK -> GW/DataConv journey with real
+  Playwright, in-memory services and no blockchain.
   Fixture pages, mocked routes and API-only Playwright are diagnostics and
   never satisfy this cross-system gate. Run Fabric/local-network only after it
   is green; staging repeats the journey after deployment, and production is
@@ -106,6 +107,13 @@ description: Enforce branch, TDD, canonical FHIR and schema.org vocabulary, fixt
   local services before releasing it. A live E2E reported as `SKIP` means the
   release gate failed; it is not passing evidence. Complete these live E2E
   gates before `npm publish` or any container image build.
+- To fail fast across unpublished packages, use an immutable `npm pack` tarball
+  only as a temporary `--no-save` consumer install. After the test, restore the
+  registry dependency and lockfile and prove a clean diff: no `file:`, Git,
+  workspace or vendored dependency may be committed. Publish only after unit,
+  integration and local browser gates are green; reinstall the exact registry
+  version, repeat the reproducible gate, and only then run `local-network` and
+  staging.
 - Preserve identity roles at every transport boundary: DIDComm `from` is a
   sender DID, JWT `iss` is the signing entity, `kid` is a concrete key DID URL,
   and SMART `sub` is the authorized actor. Native FHIR Communication/Bundle

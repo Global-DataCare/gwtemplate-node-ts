@@ -90,12 +90,20 @@ legal-organization host onboarding flow:
 
 `test -> local-network -> test-network -> network`
 
-The first `test` gate crosses the normal local UI -> BFF -> high-level SDK ->
-GW boundary with in-memory services and no blockchain. Fixture pages, mocked
+The first `test` gate runs unit and integration suites with `networkKind=test`,
+then crosses the normal local UI -> BFF -> high-level SDK -> GW/DataConv boundary
+with real Playwright, in-memory services and no blockchain. Fixture pages, mocked
 routes and API-only Playwright are diagnostics; they never satisfy that gate.
 Every affected package or SDK live E2E must then run against the real local
 services. A live E2E reported as `SKIP` blocks the release. Finish all live E2E
 gates before `npm publish` or any container image build.
+
+For pre-publication fail-fast testing, create an immutable `npm pack` tarball
+and install it in the consumer only as a temporary `--no-save` substitution.
+Restore the registry dependency and lockfile immediately after the run. Never
+commit a `file:`, Git, workspace or vendored tarball dependency. Only after the
+no-blockchain journey is green may the SDK publish; reinstall its exact registry
+version, repeat the reproducible gate, then run Fabric `local-network` and staging.
 
 1. local process and browser E2E in `networkKind=test`
 2. Fabric `local-network` E2E and only then a local container smoke

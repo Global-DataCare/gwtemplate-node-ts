@@ -47,6 +47,13 @@ For the cross-repo 101 story order and security narrative, read
 [NARRATIVE-ALIGNMENT.md](NARRATIVE-ALIGNMENT.md).
 
 Every consuming portal follows `test -> local-network -> test-network -> network`.
+Before publishing a shared package, run unit and integration tests with
+`networkKind=test`, then the real local UI -> BFF -> SDK -> GW/DataConv journey
+with Playwright and no blockchain. An unpublished dependency may be installed
+from `npm pack` only as a temporary `--no-save` fail-fast check; restore the
+registry dependency and lockfile before committing. After those gates pass,
+publish, reinstall the exact registry version, repeat the reproducible test,
+then proceed to Fabric `local-network` and staging.
 The first proof must cross normal local UI -> BFF -> high-level SDK
 -> GW/services with in-memory state and no blockchain. Fixture pages, mocked
 routes and API-only Playwright are diagnostics, never release evidence.
