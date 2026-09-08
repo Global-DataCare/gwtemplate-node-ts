@@ -232,9 +232,62 @@ Report separately: branch, commit, pushed branch, merge commit, pushed
 For any release chain that requires npm authorization, make at most three
 attempts and keep each command session and browser window alive for up to five
 minutes. Never end the turn or imply continued work while a window is pending.
-After all three attempts fail, an immutable `npm pack` tarball may be used only
-to prepare a downstream consumer and continue local tests; never commit a
-`file:` dependency. The registry dependency must publish and its exact npm
-version must be reinstalled and verified before the consumer may publish, merge
-to `main`, build an image, or deploy. Final order remains: push the branch,
-run `npm publish` from it, verify, merge to `main`, push and delete the branch.
+After all three attempts fail, keep the release unpublished and continue the
+local `test` stage with an immutable `npm pack` tarball. Never commit a
+`file:`, Git, workspace or vendored tarball dependency.
+
+Follow the canonical contract in
+[`docs/LOCAL_FIRST_RELEASE_CONTRACT.md`](../../../docs/LOCAL_FIRST_RELEASE_CONTRACT.md):
+
+- Do not attempt `npm publish` until every affected local `test` gate is
+  green, including unit, integration, local services, real UI and Playwright.
+- An npm publish or authorization failure must never stop the `test` stage.
+- Continue unit, integration, local service, UI and Playwright gates with the
+  immutable tarball installed `--no-save` on pushed but unmerged branches.
+- The `npm pack` tarball is temporary: install it `--no-save`, then restore
+  the registry dependency and lockfile before committing dependency state.
+- Start the consumer from `npm ci`. If `npm install --no-save <tarball>`
+  re-resolves unrelated dependency ranges, overlay the exact packed contents in
+  the matching `node_modules` directory, or use an equivalent isolated method
+  that leaves manifests and lockfiles unchanged. Verify the local package
+  versions and runtime-sensitive baseline dependencies before testing; remove
+  the overlay with the next `npm ci`.
+- After a failure, resume only the smallest failed gate; do not repeat a green
+  gate unless the fix changed its boundary, it creates required state, or the
+  environment is no longer trustworthy.
+- Resume the failed gate; rerun a predecessor only for required state, a
+  changed earlier boundary or an untrustworthy environment.
+- After publication, install the exact registry version and run only the minimal
+  install/export smoke; do not repeat the green local matrix unless the
+  published artifact differs from the tested tarball or invalidates that
+  evidence.
+- Missing exact registry publication blocks only consumer merge, image build,
+  `local-network`, `test-network`/staging and `network` promotion.
+- A gateway consumer installs the exact registry version before its merge,
+  image build and `local-network`. A portal consumer may retain the immutable
+  tarball on its pushed, unmerged branch throughout `local-network`; after
+  `local-network` is green, it installs the exact registry version and runs
+  only the artifact smoke before its merge and staging. Do not reinstall or
+  rerun an already-green portal merely to build the gateway image or execute
+  the Fabric `local-network` gate.
+- Publish only after the local matrix is green, install the exact registry
+  version in the gateway before `local-network`, and install it in portals
+  before staging.
+- Registry order is dependency publish and verification, then consumer install
+  and lockfile pin, then package merge, consumer merge, image build and deploy.
+- Every test file's first line must be a `Flow contract:` comment linking this
+  policy. Apply TDD red -> green -> refactor: red must fail because the
+  production behavior is absent or wrong; green must prove the production
+  contract. A skip, accepted error, placeholder, pending setup, fixture-only UI
+  or mock replacing a real boundary is never green.
+- Reuse canonical types and terminology from HL7/FHIR, LOINC, SNOMED CT,
+  ICD-10, WHO ATC, Schema.org or the applicable governed standard before
+  inventing a local type, enum, code, identifier or vocabulary.
+- Put missing reusable types in the versioned domain data package or
+  `common-utils`, with tests in that owning shared package, before downstream
+  use.
+- Reuse canonical fixtures, builders, claims, identifiers and vocabulary from
+  the versioned domain data package (`<version>-data` or
+  `<version>-data-utils`) or `common-utils`; no duplicated literals are
+  allowed. If the reusable datum does not exist, add it first to its owning
+  shared package with tests and consume that export downstream.

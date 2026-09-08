@@ -1,5 +1,8 @@
 # Gateway Template - Node.js & TypeScript
 
+Development and releases follow the mandatory
+[`local-first TDD and release contract`](docs/LOCAL_FIRST_RELEASE_CONTRACT.md).
+
 La [documentación pública de los entregables en español](./deliverables/README.md)
 agrupa la guía Markdown, su fuente HTML editable y el Word para reproducir el
 host completo con Docker, Fabric, ICA, chaincodes, PostgreSQL/IPFS y Helm.
