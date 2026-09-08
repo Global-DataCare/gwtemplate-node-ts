@@ -12,6 +12,27 @@ export type ProfessionalAssignmentLedgerPayload = Readonly<{
   status: 'active' | 'suspended' | 'revoked';
 }>;
 
+/**
+ * Converts the three private professional provenance identifiers into the
+ * distinct opaque links shared by clinical evidence and assignment history.
+ * Callers pass canonical identifiers; they never pass precomputed hashes.
+ *
+ * @example
+ * ```ts
+ * const links = buildProfessionalAssignmentLedgerPayload({
+ *   organizationIdentifier: legalOrganizationUrn,
+ *   assignmentIdentifier: practitionerRoleReference,
+ *   employeeIdentifier: employeeReference,
+ *   role: healthcareRole,
+ * });
+ * // links.organizationLink identifies the responsible organization.
+ * // links.assignmentLink identifies the professional assignment.
+ * // links.employeeLink identifies the person holding that assignment.
+ * ```
+ *
+ * @see docs/01-OVERVIEW-AND-GUIDES/101-01.N-AUTHENTICATED-CLINICAL-AUTHOR.md
+ * @see docs-v2/28-clinical-employee-ledger-schema.md
+ */
 export function buildProfessionalAssignmentLedgerPayload(params: Readonly<{
   assignmentIdentifier: string;
   employeeIdentifier: string;

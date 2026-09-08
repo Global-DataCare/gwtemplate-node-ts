@@ -68,6 +68,41 @@ export function updateEditableImportedIpsForDemo(
   });
 }
 
+/**
+ * Submit one professionally authored clinical document through the public SDK.
+ *
+ * The BFF obtains the protected creator profile and passes that trusted export
+ * to the SDK helper. Browser input supplies neither author identifiers nor
+ * hashes. GW derives its privacy-safe audit relationships after authorization.
+ */
+export async function submitProfessionalClinicalDocument(
+  profileManager: ServerProfileSessionManager,
+  sdk: ClinicalSummaryWriter,
+  route: RouteContext,
+  input: Readonly<{
+    ownerId: string;
+    profileId: string;
+    importedIps: Record<string, unknown>;
+    individualDid: string;
+    actorSession: Pick<ActorSession, 'actorDid'>;
+    providerDid: string;
+  }>,
+): Promise<SubmitAndPollResult> {
+  const clinicalCreator = await exportClinicalCreator(
+    profileManager,
+    input.ownerId,
+    input.profileId,
+    ClinicalSourceAuthorSelections.Creator,
+  );
+  return updateEditableImportedIpsForDemo(sdk, route, {
+    importedIps: input.importedIps,
+    individualDid: input.individualDid,
+    actorSession: input.actorSession,
+    clinicalCreator,
+    providerDid: input.providerDid,
+  });
+}
+
 /** Export canonical FHIR author and attester without exposing the protected profile. */
 export function exportClinicalCreator(
   profileManager: ServerProfileSessionManager,

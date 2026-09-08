@@ -23,6 +23,8 @@ const readme = readFileSync('README.md', 'utf8');
 const releaseSkill = readFileSync('.codex/skills/enforce-release-test-discipline/SKILL.md', 'utf8');
 const provenanceSkill = readFileSync('.codex/skills/govern-digital-twin-consent/SKILL.md', 'utf8');
 const ledgerSchema = readFileSync('docs-v2/28-clinical-employee-ledger-schema.md', 'utf8');
+const currentReadingPath = readFileSync('docs-v2/101-README.md', 'utf8');
+const professionalAssignmentSource = readFileSync('src/utils/professional-assignment-ledger.ts', 'utf8');
 
 describe('authenticated clinical source-author documentation', () => {
   it('documents the personal and professional protected-provenance cases', () => {
@@ -63,5 +65,33 @@ describe('authenticated clinical source-author documentation', () => {
     expect(ledgerSchema).toMatch(/assignmentLink[\s\S]*employeeLink[\s\S]*organizationLink/i);
     expect(guide).toMatch(/artifact-sc\.relationships\.author[\s\S]*organization link/i);
     expect(guide).toMatch(/artifact-sc\.relationships\.attester[\s\S]*assignment record/i);
+  });
+
+  it('explains the application-facing audit graph without exposing ledger plumbing', () => {
+    const highLevelSection = guide.match(
+      /## Application-facing provenance audit([\s\S]*?)## Internal ledger reference/,
+    )?.[1] || '';
+
+    expect(highLevelSection).toMatch(/legal-organization author[\s\S]*professional assignment[\s\S]*employee/i);
+    expect(highLevelSection).toMatch(/applications? (?:never|do not)[\s\S]*hash/i);
+    expect(highLevelSection).toMatch(/URN[\s\S]*opaque link[\s\S]*cannot be reversed/i);
+    expect(highLevelSection).not.toMatch(/artifact-sc|employee-sc|subjectkeybinding-sc|channelName/i);
+
+    expect(snippet).toContain('submitProfessionalClinicalDocument');
+    expect(snippet).toMatch(/public SDK[\s\S]*protected creator profile/i);
+    expect(snippet).not.toMatch(/buildClinicalLedgerReferenceId|artifact-sc|employee-sc|channelName/i);
+    expect(readme).toContain('snippets/authenticated-clinical-data.ts');
+    expect(currentReadingPath).toContain(
+      '../docs/01-OVERVIEW-AND-GUIDES/101-01.N-AUTHENTICATED-CLINICAL-AUTHOR.md',
+    );
+    expect(currentReadingPath).toContain(
+      '../docs/01-OVERVIEW-AND-GUIDES/snippets/authenticated-clinical-data.ts',
+    );
+    expect(currentReadingPath).toContain('./28-clinical-employee-ledger-schema.md');
+
+    expect(professionalAssignmentSource).toContain('@example');
+    expect(professionalAssignmentSource).toMatch(/organizationIdentifier[\s\S]*organizationLink/i);
+    expect(professionalAssignmentSource).toMatch(/assignmentIdentifier[\s\S]*assignmentLink/i);
+    expect(professionalAssignmentSource).toMatch(/employeeIdentifier[\s\S]*employeeLink/i);
   });
 });

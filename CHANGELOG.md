@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [1.25.7] - 2026-09-08
+
+- Explain the professional clinical provenance graph at application level:
+  legal-organization author, registered professional assignment attester and
+  distinct employee identity, without requiring Fabric or chaincode knowledge.
+- Add a copyable public-SDK BFF snippet, synchronized JSDoc and executable
+  documentation assertions linking the high-level guide, internal ledger
+  schema, README and documentation index.
+
 ## [1.25.6] - 2026-09-07
 
 - Replace legacy person-discovery hashing and `discovery-person` routing with

@@ -61,6 +61,16 @@ Canonical upstream snippet references:
 - load one unlocked backend profile and submit/poll:
   [gdc-sdk-node-ts/tests/101-backend-profile-runtime.test.mjs](https://github.com/Global-DataCare/gdc-sdk-node-ts/blob/main/tests/101-backend-profile-runtime.test.mjs)
 
+Clinical provenance reading path:
+
+- begin with the application-facing explanation of legal-organization authors,
+  professional assignments and employees in
+  [Authenticated clinical authorship](../docs/01-OVERVIEW-AND-GUIDES/101-01.N-AUTHENTICATED-CLINICAL-AUTHOR.md)
+- copy the public SDK flow from
+  [authenticated-clinical-data.ts](../docs/01-OVERVIEW-AND-GUIDES/snippets/authenticated-clinical-data.ts)
+- consult [the internal ledger schema](./28-clinical-employee-ledger-schema.md)
+  only when implementing or auditing GW internals
+
 ## Read First
 
 1. [gdc-common-utils-ts/docs/101-BFF_AND_CHANNEL_MESSAGE_FLOW.md](https://github.com/Global-DataCare/gdc-common-utils-ts/blob/main/docs/101-BFF_AND_CHANNEL_MESSAGE_FLOW.md)

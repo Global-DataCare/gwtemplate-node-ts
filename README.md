@@ -116,7 +116,8 @@ E2E gates before `npm publish` or any container image build.
   Fabric transaction id. GW resolves the governed ledger route internally; the
   BFF and deployment configuration never select a channel or smart contract. See
   [Authenticated clinical author](docs/01-OVERVIEW-AND-GUIDES/101-01.N-AUTHENTICATED-CLINICAL-AUTHOR.md)
-  and the linked Node BFF guide.
+  and its copyable public-SDK
+  [authenticated clinical data snippet](docs/01-OVERVIEW-AND-GUIDES/snippets/authenticated-clinical-data.ts).
 
 If you are new and confused by the front-story vs GW boundary, read first:
 
