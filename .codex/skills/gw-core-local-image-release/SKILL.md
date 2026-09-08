@@ -270,6 +270,10 @@ endpoint results. A build or push alone is not a deployment.
   `Device/_dcr`, and project only the verified token claims into the worker.
 - Keep 101 examples on `ServerProfileSessionManager.enroll(...)`; JOSE packing,
   raw routes and queue inspection belong only in transport/integration tests.
+- Preserve the FHIR event-state boundary for Communication-carried writes:
+  `preparation` and `not-done` remain auditable inbox records without executing
+  attachments; only `completed` projects clinical state. An omitted status is
+  accepted solely for legacy envelopes.
 
 ## Mandatory release authorization continuity
 

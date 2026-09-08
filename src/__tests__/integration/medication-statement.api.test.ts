@@ -291,7 +291,11 @@ describe('MedicationStatement API (integration)', () => {
         return undefined;
       };
 
-      const submitReplay = async (suffix: string, sent: string) => {
+      const submitReplay = async (
+        suffix: string,
+        sent: string,
+        communicationStatus: 'preparation' | 'completed' = 'completed',
+      ) => {
         const embeddedDocumentReference = buildIpsDocumentReference(suffix, sent);
         const submitResp = await invokeExpress(app, {
           method: HttpRequestMethods.Post,
@@ -316,7 +320,7 @@ describe('MedicationStatement API (integration)', () => {
                   },
                   resource: {
                     resourceType: ResourceTypesFhirR4.Communication,
-                    status: 'completed',
+                    status: communicationStatus,
                     subject: { reference: subjectDid },
                     sent,
                     payload: [
@@ -339,6 +343,18 @@ describe('MedicationStatement API (integration)', () => {
         expect(payload?.resourceType).toBe('Bundle');
         expect(payload?.data?.[0]?.response?.status).toBe('200');
       };
+
+      // A telephone assistant's proposal remains an auditable inbox message;
+      // only an authorized completed version may alter clinical state.
+      await submitReplay('telephone-proposal', '2026-05-22T09:59:00Z', 'preparation');
+      expect((await vaultRepository.getContainersInSection(
+        tenantVaultId,
+        canonicalSectionIds.communications,
+      ))).toHaveLength(1);
+      expect((await vaultRepository.getContainersInSection(
+        tenantVaultId,
+        canonicalSectionIds.medications,
+      ))).toHaveLength(0);
 
       await submitReplay('v1', '2026-05-22T10:00:00Z');
 
@@ -385,7 +401,8 @@ describe('MedicationStatement API (integration)', () => {
         observations: (await vaultRepository.getContainersInSection(tenantVaultId, canonicalSectionIds.observations)).length,
       };
       expect(countsAfterSecond).toEqual(countsAfterFirst);
-      expect((await vaultRepository.getContainersInSection(tenantVaultId, canonicalSectionIds.communications)).length).toBe(2);
+      // Two completed imports plus the retained preparation proposal.
+      expect((await vaultRepository.getContainersInSection(tenantVaultId, canonicalSectionIds.communications)).length).toBe(3);
       expect((await vaultRepository.getContainersInSection(tenantVaultId, canonicalSectionIds.documentReferences)).length).toBe(2);
       expect((await vaultRepository.getContainersInSection(tenantVaultId, canonicalSectionIds.composition)).length).toBeGreaterThanOrEqual(1);
     } finally {
