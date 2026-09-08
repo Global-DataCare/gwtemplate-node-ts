@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+- Clarify the current generic subject-section provenance contract: section
+  batches retain Composition-compatible flat author/attester claims, each
+  write supplies its own author, and the authenticated profile supplies its
+  real RelatedPerson or PractitionerRole attester. Link the canonical,
+  type-checked Node SDK examples and reserve `Provenance.agent-<code>` for a
+  future internal migration.
+
 ## [1.25.8] - 2026-09-08
 
 - Persist assisted or telephone intake in the Communication inbox with FHIR
