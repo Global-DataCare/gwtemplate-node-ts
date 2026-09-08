@@ -53,6 +53,15 @@ description: Enforce branch, TDD, canonical FHIR and schema.org vocabulary, fixt
   value valid for that profile. For a shared claims-first contract, choose a
   deliberately supported cross-version representation and prove both
   projections. Never infer a value from a different FHIR release.
+- Human cross-provider identity lookup has two hard boundaries: derive the
+  canonical opaque subject identifier only for the provider-only Fabric
+  lookup, then stop that hash at Fabric; resolve `indexProviderDid` and use IHE
+  PDQm ITI-119 `POST Patient/$match` with the original governed identifier.
+  Do not implement PIXm or `$ihe-pix`. Direct FHIR carries one Parameters;
+  DIDComm carries exactly one Parameters entry in `body.data[]`; strict mode
+  carries that signed/encrypted DIDComm message in form fields `request` and
+  `response`. Managers/adapters own ledger channel and smart-contract routing;
+  SDKs, BFFs and portals never configure either name.
 - Introduce an extension only after proving that neither FHIR nor schema.org
   covers the requirement. Give it an explicit canonical extension URL,
   document ownership and compatibility, add it to the shared catalog first,

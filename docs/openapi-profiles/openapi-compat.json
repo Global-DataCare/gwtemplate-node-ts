@@ -5993,6 +5993,93 @@
         "x-profile": "compat"
       }
     },
+    "/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.api/Patient/$match": {
+      "post": {
+        "tags": [
+          "8.1 Subject Profile"
+        ],
+        "summary": "Match a Patient at the selected index provider (IHE PDQm ITI-119)",
+        "description": "Synchronous provider-local Patient matching. A preceding public\nsubject-identifier lookup returns only the provider DID; its opaque\nFabric key must not be submitted here. Direct FHIR carries one\nParameters resource. DIDComm carries that Parameters resource in\nexactly one `body.data[]` entry. Strict mode uses the same signed and\nencrypted message in form field `request` and returns `response`.\nPIXm and `$ihe-pix` are not supported.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AppId"
+          },
+          {
+            "$ref": "#/components/parameters/AppVersion"
+          },
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/fhir+json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "resourceType",
+                  "parameter"
+                ],
+                "properties": {
+                  "resourceType": {
+                    "type": "string",
+                    "enum": [
+                      "Parameters"
+                    ]
+                  },
+                  "parameter": {
+                    "type": "array",
+                    "items": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            },
+            "application/didcomm-plain+json": {
+              "schema": {
+                "$ref": "#/components/schemas/DidcommPlaintextMessage"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/SecureRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Synchronous FHIR searchset, DIDComm envelope, or encrypted response form."
+          },
+          "400": {
+            "description": "Invalid Parameters or DIDComm operation entry."
+          },
+          "401": {
+            "description": "Transport",
+            "signature": null,
+            "key binding": null,
+            "or bearer validation failed.": null
+          },
+          "404": {
+            "description": "Tenant or advertised endpoint is unavailable."
+          }
+        },
+        "x-profile": "core"
+      }
+    },
     "/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Order/_batch": {
       "post": {
         "tags": [

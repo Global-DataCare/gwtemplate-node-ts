@@ -46,4 +46,5 @@ deploy_chaincode "artifact-sc" "${GWTEMPLATE_DIR}/chaincode/artifact-sc-javascri
 deploy_chaincode "artifact-sc" "${GWTEMPLATE_DIR}/chaincode/artifact-sc-javascript" "${DATA_CHANNEL_NAME}" true
 deploy_chaincode "artifactevent-sc" "${GWTEMPLATE_DIR}/chaincode/artifactevent-sc-javascript"
 deploy_chaincode "subjectkeybinding-sc" "${GWTEMPLATE_DIR}/chaincode/subjectkeybinding-sc-javascript"
+deploy_chaincode "subjectidentifier-sc" "${GWTEMPLATE_DIR}/chaincode/subjectidentifier-sc-javascript"
 echo "Identity chaincodes deployed on ${CHANNEL_NAME}"

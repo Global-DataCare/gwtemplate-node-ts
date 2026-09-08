@@ -148,7 +148,7 @@ Memory aid:
 *   **[03.B-IDENTITY-BOOTSTRAP-GUIDE.md](03-IDENTITY-AND-TRUST/03.B-IDENTITY-BOOTSTRAP-GUIDE.md)**: Guide on the process of onboarding and verifying new identities in the system.
 *   **[03.C-TRUST-POLICY.md](03-IDENTITY-AND-TRUST/03.C-TRUST-POLICY.md)**: Defines the policies for trust levels and identity assurance.
 *   **[03.D-DID-URN-IDENTIFIERS.md](03-IDENTITY-AND-TRUST/03.D-DID-URN-IDENTIFIERS.md)**: Details on the format and use of Decentralized Identifiers (DIDs) and URNs.
-*   **[03.E-PERSON-DISCOVERY-ACTION-ARCHITECTURE.md](03-IDENTITY-AND-TRUST/03.E-PERSON-DISCOVERY-ACTION-ARCHITECTURE.md)**: Architecture for the user discovery and consent-driven data sharing mechanism.
+*   **[03.E-PERSON-DISCOVERY-ACTION-ARCHITECTURE.md](03-IDENTITY-AND-TRUST/03.E-PERSON-DISCOVERY-ACTION-ARCHITECTURE.md)**: Provider-only subject resolution followed by synchronous IHE PDQm `Patient/$match`, including FHIR, DIDComm plain and strict transports.
 *   **[03.F-ENTITY-KEY-MANAGEMENT-LIFECYCLE.md](03-IDENTITY-AND-TRUST/03.F-ENTITY-KEY-MANAGEMENT-LIFECYCLE.md)**: Explains how cryptographic keys for entities are managed throughout their lifecycle.
 *   **[03.G-LEGACY-AND-MANAGED-KEYS.md](03-IDENTITY-AND-TRUST/03.G-LEGACY-AND-MANAGED-KEYS.md)**: Discusses strategies for handling both externally managed and system-managed keys.
 *   **[03.H-ICA-CERTIFICATE-ISSUANCE.md](03-IDENTITY-AND-TRUST/03.H-ICA-CERTIFICATE-ISSUANCE.md)**: Documents the split between Fabric operational enrollment and dataspace ICA Host VC issuance, plus the boundary between host certificate bootstrap and host autodiscovery.

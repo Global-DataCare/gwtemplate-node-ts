@@ -159,7 +159,6 @@ describe('End-to-End API Flow (Legacy / Unencrypted)', () => {
           tenantManager,
           new CredentialManager(vaultRepository, kmsService, tenantManager, 'testhost.com'),
           new BlockchainAdapterMem(),
-          'test-ns',
           hostRuntime,
         ),
 	      compositionManager: new CompositionManager(vaultRepository),

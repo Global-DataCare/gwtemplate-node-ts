@@ -5,6 +5,7 @@ import { DidcommMessageTypes } from 'gdc-common-utils-ts/constants/didcomm';
 import { GatewayRequestEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
 import { HttpStatusCodes } from 'gdc-common-utils-ts/constants/http';
 import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 
 // This MUST be the first line to ensure deterministic key generation for the test run.
 process.env.DEV_SEED = 'true';
@@ -34,7 +35,7 @@ import { testClaimsTenant1Receptionist1, testTenant1Receptionist1DidExternal, te
 import { testTenant1AlternateName, testTenant1VaultId } from '../data/organization.data';
 import { testIndividualOnboardingBatchEntries } from '../data/customer-onboarding.data';
 import { ClaimsOfferSchemaorg, ClaimsOrderSchemaorg, ClaimsPersonSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
-import { generateUrnHash } from '../../utils/urn-hash';
+import { buildSubjectIdentifierAssetId } from 'gdc-common-utils-ts/utils/subject-identity';
 import { createHash } from 'crypto';
 import { BlockchainAdapterMem } from '../../adapters/BlockchainAdapterMem';
 import { invokeExpress } from './helpers/invokeExpress';
@@ -659,9 +660,11 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
     const discoveryClaimType = 'JHNES-CL';
     const discoveryClaimValue = '987654321';
     
-    // Manually replicate the URN generation logic from the manager to get the correct hash
-    const expectedUrn = `urn:${process.env.URN_NAMESPACE || 'gdc'}:eu:identifier:${discoveryClaimType}:${discoveryClaimValue}`;
-    const expectedHash = generateUrnHash(expectedUrn);
+    const expectedHash = buildSubjectIdentifierAssetId({
+      codingSystem: discoveryClaimType,
+      jurisdiction: 'ES',
+      codeValue: discoveryClaimValue,
+    });
     (blockchainAdapter as InstanceType<typeof BlockchainAdapterMem>).addMapping(expectedHash, targetDid);
     
     // 2. ARRANGE: Construct the discovery request payload
@@ -673,43 +676,35 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
         body: {
             data: [{
                 type: GatewayRequestEntryTypes.PersonDiscover,
-                meta: {
-                    claims: {
-                        [ClaimsPersonSchemaorg.identifierType]: discoveryClaimType,
-                        [ClaimsPersonSchemaorg.identifierValue]: discoveryClaimValue,
-                    }
-                }
+                resource: {
+                  resourceType: ResourceTypesFhirR4.Person,
+                  meta: {
+                      claims: {
+                          [ClaimsPersonSchemaorg.identifierType]: discoveryClaimType,
+                          [ClaimsPersonSchemaorg.identifierValue]: discoveryClaimValue,
+                      }
+                  },
+                },
             }]
         }
     };
 
-    // 3. ACT (Phase 1): Encrypt and POST the discovery job
-    const jwsProtectedHeader = {
-      alg: externalSigner.alg,
-      kid: externalSigner.kid,
-    };
-    const jws = await cryptoService.signDataJws(discoveryPayload, jwsProtectedHeader, externalSigner.privBytes);
-    const compactJws = `${jws.protected}.${jws.payload}.${jws.signature}`;
-
-    const jweProtectedHeader = {
-      enc: 'A256GCM',
-      cty: 'JWS',
-      skid: externalEncrypter.kid,
-    };
-    const compactJwe = await cryptoService.encryptJweToCompact(compactJws, jweProtectedHeader, externalEncrypter, hostEncryptionKey);
-
+    // 3. ACT (Phase 1): submit through the demo DIDComm-plain profile. The
+    // dedicated security suites prove registered-key strict transport; this
+    // journey proves the real queue -> manager -> ledger -> response boundary.
     const discoveryUrl = `/${testTenant1AlternateName}/cds-es/v1/health-care/test-network/org.schema/Person/_discovery`;
     
     const postResponse = await invokeExpress(app, {
       method: HttpRequestMethods.Post,
       url: discoveryUrl,
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
-      body: { request: compactJwe },
+      headers: {
+        'content-type': 'application/didcomm-plain+json',
+      },
+      body: discoveryPayload,
     });
 
     // 4. ASSERT (Phase 1): Check for 202 Accepted
-    expect([202, 401]).toContain(postResponse.status);
-    if (postResponse.status !== 202) return;
+    expect(postResponse.status).toBe(202);
     expect(postResponse.headers.location).toBeDefined();
     const pollingUrl = postResponse.headers.location;
 
@@ -734,12 +729,8 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
       
     // 6. ASSERT (Phase 2): Decrypt and verify the final response
     expect(pollResponse?.status).toBe(200);
-    const encryptedFinalResponse = pollResponse!.text.replace('response=', '');
-    
-    const { decryptedBytes } = await cryptoService.decryptJwe(encryptedFinalResponse, externalEncrypter);
-    const finalResponse = JSON.parse(Content.bytesToStringUTF8(decryptedBytes)) as IDecodedDidcommPayload;
-    
-    const responseEntry = finalResponse.body.data[0];
+    const responseBundle = JSON.parse(pollResponse!.text) as IDecodedDidcommPayload['body'];
+    const responseEntry = responseBundle.data[0];
     expect(responseEntry.response.status).toBe('200');
     expect(responseEntry.response.location).toBe(targetDid);
   });

@@ -27,7 +27,7 @@ describe('BreakGlassService shared policy boundary', () => {
         kind === BreakGlassSubjectKinds.Animal && candidate === subjectDid;
       const registerArtifactBundle = jest.fn().mockResolvedValue({ accepted: 1 });
       const service = new BreakGlassService(
-        { discoverDidsByHashes: jest.fn(), registerArtifactBundle },
+        { readSubjectIdentifierPayloads: jest.fn(), registerArtifactBundle },
         {
           get: jest.fn().mockResolvedValue(undefined),
           put: jest.fn().mockResolvedValue(true),

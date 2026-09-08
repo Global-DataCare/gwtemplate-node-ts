@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+## [1.25.6] - 2026-09-07
+
+- Replace legacy person-discovery hashing and `discovery-person` routing with
+  the shared canonical subject identifier asset id and the provider-only
+  `subjectidentifier-sc` contract. Fabric resolution now yields only
+  `indexProviderDid`; the opaque asset id stops at Fabric.
+- Add synchronous IHE PDQm ITI-119 `POST Patient/$match` for the versionless
+  FHIR API. Direct FHIR, DIDComm plain and strict form/JWE transports now
+  return the same FHIR `searchset` without entering the asynchronous queue.
+- Match protected schema.org individual identifiers inside the selected
+  provider and project the stable `sameAs` card as a governed FHIR
+  `Patient.identifier` without exposing confidential claims.
+- Pin `gdc-common-utils-ts@2.9.7` for the shared subject-identity builders and
+  strict provider-only ledger payload reader.
+- Add `subjectidentifier-sc` to the shared CCAAS runtime, immutable package
+  manifest, Helm/local-network deployment lists and readiness probes on the
+  manager-owned global identity channel.
+
 ## [1.25.5] - 2026-09-07
 
 - Recover and clarify the federated SMART Clearing House contract: the
