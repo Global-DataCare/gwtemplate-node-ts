@@ -27,6 +27,20 @@ const currentReadingPath = readFileSync('docs-v2/101-README.md', 'utf8');
 const professionalAssignmentSource = readFileSync('src/utils/professional-assignment-ledger.ts', 'utf8');
 
 describe('authenticated clinical source-author documentation', () => {
+  it('keeps current section batches on Composition-compatible author and attester claims', () => {
+    expect(guide).toContain('updateSubjectSection');
+    expect(guide).toContain('dataAuthorReference');
+    expect(guide).toMatch(/section batch[\s\S]*Composition-compatible flat claims/i);
+    expect(guide).toMatch(/author[\s\S]*may change[\s\S]*attester[\s\S]*same unlocked profile/i);
+    expect(guide).toMatch(/RelatedPerson\/_search[\s\S]*RelatedPerson\.identifier/i);
+    expect(guide).toMatch(/Employee creation receipt[\s\S]*contained `PractitionerRole`/i);
+    expect(guide).toMatch(/Provenance\.agent-<code>[\s\S]*future internal migration/i);
+    expect(guide).toContain(
+      'gdc-sdk-node-ts/blob/main/docs/snippets/subject-section-writes.ts',
+    );
+    expect(guide).toContain('gdc-sdk-node-ts/blob/main/docs/101-SDK_END_TO_END.md');
+  });
+
   it('documents the personal and professional protected-provenance cases', () => {
     expect(guide).toContain('ClinicalSourceAuthorSelections.Owner | Creator');
     expect(guide).toMatch(/RelatedPerson[\s\S]*both author and attester/i);
@@ -50,7 +64,8 @@ describe('authenticated clinical source-author documentation', () => {
     expect(snippet).toContain('ClinicalSourceAuthorSelection');
     expect(snippet).toContain('sourceAuthor');
     expect(snippet).toContain('clinicalCreator: input.clinicalCreator');
-    expect(guide).toContain('gdc-sdk-node-ts/blob/main/docs/101-BFF_CLINICAL_WRITES.md');
+    expect(guide).toContain('gdc-sdk-node-ts/blob/main/docs/101-SDK_END_TO_END.md');
+    expect(guide).toContain('gdc-sdk-node-ts/blob/main/docs/snippets/subject-section-writes.ts');
     expect(readme).toMatch(/Composition[\s\S]*author[\s\S]*attester/i);
     expect(readme).toContain('101-01.N-AUTHENTICATED-CLINICAL-AUTHOR.md');
     expect(releaseSkill).toContain('CDS legal-organization URN');
