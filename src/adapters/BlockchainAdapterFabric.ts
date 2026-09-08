@@ -5,6 +5,7 @@ import { ManageAssetConsentAccess } from '../blockchain/fabric/v3/manageAssetCon
 import { ManageAssetArtifact } from '../blockchain/fabric/v3/manageAssetArtifact';
 import type { FhirCidVersionMapping } from '../utils/fhir-versioning';
 import type { IBlockchainAdapter } from './IBlockchainAdapter';
+import { ManageAssetSubjectIdentifier } from '../blockchain/fabric/v3/manageAssetSubjectIdentifier';
 
 type FabricBlockchainConfig = {
   mspId: string;
@@ -32,8 +33,23 @@ function loadFabricBlockchainConfig(): FabricBlockchainConfig {
  * registration does not currently expose DID discovery semantics.
  */
 export class BlockchainAdapterFabric implements IBlockchainAdapter {
-  public async discoverDidsByHashes(hashes: string[], channel: string, chaincode: string): Promise<(string | undefined)[]> {
-    return hashes.map(() => undefined);
+  public async readSubjectIdentifierPayloads(
+    assetIds: string[],
+    channel: string,
+    chaincode: string,
+  ): Promise<(unknown | undefined)[]> {
+    const config = loadFabricBlockchainConfig();
+    const manager = new ManageAssetSubjectIdentifier({ channelName: channel, chaincodeName: chaincode });
+    return Promise.all(assetIds.map(async (assetId) => {
+      try {
+        const asset = await manager.read(config.mspId, assetId) as Record<string, unknown>;
+        return { indexProviderDid: asset.indexProviderDid };
+      } catch (error: any) {
+        const message = String(error?.message || '').toLowerCase();
+        if (message.includes('does not exist') || message.includes('not found')) return undefined;
+        throw error;
+      }
+    }));
   }
 
   public async registerCidVersionMappings(

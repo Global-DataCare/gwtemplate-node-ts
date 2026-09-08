@@ -437,6 +437,8 @@ npm test -- --runTestsByPath src/__tests__/unit/examples/markdown-examples.test.
 
 ## Project Documentation
 
+Human index lookup and provider matching: [Subject provider resolution and PDQm Patient/$match](docs/03-IDENTITY-AND-TRUST/03.E-PERSON-DISCOVERY-ACTION-ARCHITECTURE.md).
+
 This project contains extensive documentation covering architecture, development practices, and API usage. All documentation is located in the `docs/` directory.
 
 The canonical cross-custodian authorization contract is

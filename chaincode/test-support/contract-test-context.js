@@ -50,6 +50,9 @@ function createContractContext({
       writes.push({ key, value });
       state.set(key, value);
     },
+    deleteState: async (key) => {
+      state.delete(key);
+    },
     getTxTimestamp: () => ({ seconds: txSeconds }),
     getTxID: () => txId,
     getHistoryForKey: async (key) => createIterator(historyByKey[key] || []),

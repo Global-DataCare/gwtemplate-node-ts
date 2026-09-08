@@ -36,6 +36,7 @@ import {
   ACTION_PURGE,
   ACTION_PURGE_DESCENDANTS,
   ACTION_STATUS,
+  SUBJECT_SECTION_INDIVIDUAL,
   SUBJECT_SECTION_DIGITAL_TWIN,
 } from '../constants/domain';
 import { getTenantAuthorizationStatus as readTenantAuthorizationStatusFromConfig } from '../utils/tenant-lifecycle';
@@ -49,6 +50,9 @@ import { isVerifiedBearerBoundToActorDid } from '../utils/authenticated-job-acto
 import { requiresVerifiedBearerActorBindingForSecureRoute } from '../utils/secure-route-bearer-binding';
 import { resolveHostRegistrySector } from '../utils/services';
 import { decodeJwt } from 'jose';
+import { randomUUID } from 'crypto';
+import type { IndividualManager, PatientMatchSearchset } from '../managers/IndividualManager';
+import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
 
 const FORWARDED_HEADER_SEPARATOR = ',';
 type SecurityMode = 'strict' | 'compat' | 'demo';
@@ -76,8 +80,9 @@ function bearerVerificationOptionsForDataRoute(
   section: string,
   format: string,
 ): { acceptSmartAccessToken: true } | undefined {
+  const normalizedFormat = String(format || '').toLowerCase();
   return (section === GatewayRouteSections.Individual || section === SUBJECT_SECTION_DIGITAL_TWIN)
-    && String(format || '').toLowerCase() === Format.FHIR_R4
+    && (normalizedFormat === Format.FHIR_R4 || normalizedFormat === Format.FHIR_API)
     ? { acceptSmartAccessToken: true }
     : undefined;
 }
@@ -563,6 +568,7 @@ export function createApiRouter(
   apiBaseUrl: string,
   appAuthManager?: AppAuthorizationManager,
   replayProtectionStore: IReplayProtectionStore = new ReplayProtectionStoreNoop(),
+  individualManager?: Pick<IndividualManager, 'matchPatient'>,
 ): express.Router {
   const router = express.Router();
 
@@ -2604,6 +2610,48 @@ export function createApiRouter(
   *       - BearerAuth: []
   *     responses:
   *       '202': { description: Accepted. Poll the Location URL for the result. }
+  *
+  * /{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.api/Patient/$match:
+  *   post:
+  *     tags:
+  *       - 8.1 Subject Profile
+  *     summary: Match a Patient at the selected index provider (IHE PDQm ITI-119)
+  *     description: |
+  *       Synchronous provider-local Patient matching. A preceding public
+  *       subject-identifier lookup returns only the provider DID; its opaque
+  *       Fabric key must not be submitted here. Direct FHIR carries one
+  *       Parameters resource. DIDComm carries that Parameters resource in
+  *       exactly one `body.data[]` entry. Strict mode uses the same signed and
+  *       encrypted message in form field `request` and returns `response`.
+  *       PIXm and `$ihe-pix` are not supported.
+  *     parameters:
+  *       - $ref: '#/components/parameters/AppId'
+  *       - $ref: '#/components/parameters/AppVersion'
+  *       - $ref: '#/components/parameters/TenantId'
+  *       - $ref: '#/components/parameters/Jurisdiction'
+  *       - $ref: '#/components/parameters/Sector'
+  *     requestBody:
+  *       required: true
+  *       content:
+  *         application/fhir+json:
+  *           schema:
+  *             type: object
+  *             required: [resourceType, parameter]
+  *             properties:
+  *               resourceType: { type: string, enum: [Parameters] }
+  *               parameter: { type: array, items: { type: object } }
+  *         application/didcomm-plain+json:
+  *           schema: { $ref: '#/components/schemas/DidcommPlaintextMessage' }
+  *         application/x-www-form-urlencoded:
+  *           schema: { $ref: '#/components/schemas/SecureRequest' }
+  *     security:
+  *       - BearerAuth: []
+  *     responses:
+  *       '200':
+  *         description: Synchronous FHIR searchset, DIDComm envelope, or encrypted response form.
+  *       '400': { description: Invalid Parameters or DIDComm operation entry. }
+  *       '401': { description: Transport, signature, key binding, or bearer validation failed. }
+  *       '404': { description: Tenant or advertised endpoint is unavailable. }
    * 
    * /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Order/_batch:
    *   post:
@@ -3512,6 +3560,10 @@ export function createApiRouter(
     const contentTypeHeader = String(req.headers['content-type'] || '');
     const contentType = normalizeContentType(contentTypeHeader);
     const parsedContentType = parseIncomingContentType(contentType);
+    const isPdqmPatientMatch = section === SUBJECT_SECTION_INDIVIDUAL
+      && format === Format.FHIR_API
+      && normalizedResourceType === 'patient'
+      && normalizedAction === '$match';
     let jobRequest: JobRequest;
     let verifiedBearerPayload: Record<string, any> = {};
 
@@ -3973,7 +4025,7 @@ export function createApiRouter(
     (jobRequest as any).contentType = (jobRequest as any).contentType || contentType;
 
     const thid = jobRequest.content?.thid;
-    if (!thid) {
+    if (!thid && !(isPdqmPatientMatch && parsedContentType === 'fhir')) {
       return sendDidcommEarlyError(
         req,
         res,
@@ -4089,6 +4141,73 @@ export function createApiRouter(
           IssueLevel.Error,
         );
       }
+    }
+
+    // IHE PDQm ITI-119 is synchronous. Transport authentication above is
+    // shared with every GW route; only the post-authentication dispatch and
+    // response representation differ from the asynchronous ingestion path.
+    if (isPdqmPatientMatch) {
+      if (!individualManager) {
+        return sendDidcommEarlyError(req, res, 500, IssueType.Exception, 'Patient/$match manager is not configured.');
+      }
+
+      let parameters: Record<string, any> | undefined;
+      if (parsedContentType === 'fhir') {
+        parameters = jobRequest.content?.body as Record<string, any> | undefined;
+      } else {
+        const entries = jobRequest.content?.body?.data;
+        const entry = Array.isArray(entries) && entries.length === 1 ? entries[0] : undefined;
+        const method = String(entry?.request?.method || '').toUpperCase();
+        const url = String(entry?.request?.url || '').replace(/^\//, '');
+        if (!entry || method !== 'POST' || url !== 'Patient/$match') {
+          return sendDidcommEarlyError(
+            req,
+            res,
+            400,
+            IssueType.Invalid,
+            'DIDComm Patient/$match requires exactly one body.data entry with POST Patient/$match.',
+          );
+        }
+        parameters = entry.resource;
+      }
+
+      try {
+        const searchset: PatientMatchSearchset = await individualManager.matchPatient(parameters || {}, vaultId);
+        if (parsedContentType === 'fhir') {
+          return res.status(200).type('application/fhir+json').send(searchset);
+        }
+
+        const responseEnvelope = {
+          jti: randomUUID(),
+          thid: String(thid),
+          iss: String(jobRequest.content?.aud || ''),
+          aud: String(jobRequest.content?.iss || ''),
+          exp: Math.floor(Date.now() / 1000) + 300,
+          type: 'application/didcomm-plain+json',
+          body: searchset,
+        };
+        if (parsedContentType === 'secure-form') {
+          const requesterEncryptionJwk = jobRequest.content?.meta?.jwe?.header?.jwk;
+          if (!requesterEncryptionJwk) {
+            return sendDidcommEarlyError(req, res, 400, IssueType.Security, 'Secure Patient/$match request has no registered response encryption key.');
+          }
+          const encodedResponse = await kmsService.encodeResponse(responseEnvelope as any, [requesterEncryptionJwk], vaultId);
+          return res.status(200).type('application/x-www-form-urlencoded').send(`response=${encodedResponse}`);
+        }
+        return res.status(200).type('application/didcomm-plain+json').send(responseEnvelope);
+      } catch (error: any) {
+        return sendDidcommEarlyError(
+          req,
+          res,
+          error instanceof ManagerError ? 400 : 500,
+          error instanceof ManagerError ? error.code : IssueType.Exception,
+          error?.message || 'Patient/$match failed.',
+        );
+      }
+    }
+
+    if (!thid) {
+      return sendDidcommEarlyError(req, res, 400, IssueType.Required, 'Asynchronous requests require a thid.');
     }
 
     // --- 5. Enqueue Job ---

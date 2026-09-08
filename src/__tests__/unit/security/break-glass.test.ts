@@ -63,7 +63,7 @@ describe('break-glass audit and controller notice', () => {
     } as any;
     let now = new Date('2026-08-26T12:00:00.000Z');
     const service = new BreakGlassService(
-      { discoverDidsByHashes: jest.fn(), registerArtifactBundle },
+      { readSubjectIdentifierPayloads: jest.fn(), registerArtifactBundle },
       vaultRepository,
       { notify },
       () => now,
@@ -159,7 +159,7 @@ describe('break-glass audit and controller notice', () => {
   it('rejects a declared animal kind for a human DID before writing audit data', async () => {
     const registerArtifactBundle = jest.fn();
     const service = new BreakGlassService(
-      { discoverDidsByHashes: jest.fn(), registerArtifactBundle },
+      { readSubjectIdentifierPayloads: jest.fn(), registerArtifactBundle },
       { get: jest.fn(), put: jest.fn() } as any,
       { notify: jest.fn() },
     );

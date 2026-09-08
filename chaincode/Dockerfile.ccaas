@@ -1,8 +1,7 @@
 FROM node:22-alpine
 
 # Every public JavaScript contract uses the same Fabric runtime versions. Keep
-# those dependencies in one immutable layer and select the contract at runtime
-# instead of shipping nine duplicate Node images.
+# those dependencies in one immutable layer and select the contract at runtime.
 WORKDIR /runtime
 COPY organization-sc-javascript/package.json organization-sc-javascript/package-lock.json ./
 RUN npm ci --omit=dev
@@ -23,6 +22,7 @@ COPY artifactevent-sc-javascript/package.json artifactevent-sc-javascript/index.
 COPY artifactevent-sc-javascript/lib /chaincodes/artifactevent-sc/lib
 COPY subjectkeybinding-sc-javascript/package.json subjectkeybinding-sc-javascript/index.js /chaincodes/subjectkeybinding-sc/
 COPY subjectkeybinding-sc-javascript/lib /chaincodes/subjectkeybinding-sc/lib
+COPY subjectidentifier-sc-javascript/package.json subjectidentifier-sc-javascript/index.js /chaincodes/subjectidentifier-sc/
 COPY consentaccess-sc-javascript/package.json consentaccess-sc-javascript/index.js /chaincodes/consentaccess-sc/
 COPY consentaccess-sc-javascript/lib /chaincodes/consentaccess-sc/lib
 

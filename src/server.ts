@@ -392,6 +392,7 @@ async function startServer(options?: StartServerOptions) {
     config.apiBaseUrl,
     appAuthManager,
     replayProtectionStore,
+    individualManager,
   );
   const networkRouter = createNetworkRouter(queueAdapter, kmsService);
   const fhirRouter = createFhirRouter(queueAdapter, authManager);

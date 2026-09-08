@@ -22,6 +22,7 @@ CHAINCODES=(
   artifact-sc
   artifactevent-sc
   subjectkeybinding-sc
+  subjectidentifier-sc
 )
 
 for chaincode in "${CHAINCODES[@]}"; do

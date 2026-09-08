@@ -28,7 +28,9 @@ import {
 import { BundleEntry, BundleEntryResponse, ErrorEntry } from 'gdc-common-utils-ts/models/bundle';
 import { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
 import { getSubjectScopedSectionId } from '../../../utils/individual-sections';
+import { getEnvSectionId } from '../../../utils/section-env';
 import { extractBundleSearchResources } from 'gdc-common-utils-ts/utils/organization-employee-lifecycle';
+import { buildSubjectIdentifierAssetId } from 'gdc-common-utils-ts/utils/subject-identity';
 
 
 const uuidMock = {
@@ -65,8 +67,7 @@ describe('IndividualManager', () => {
       mockKmsService,
       mockTenantsCacheManager,
       mockCredentialManager,
-      mockBlockchainAdapter, // Add the new dependency
-      'test-network',        // Add the network name
+      mockBlockchainAdapter,
       {
         hostCollectionName: HOST_COLLECTION_NAME,
         hostDid: HOST_DID,
@@ -232,7 +233,7 @@ describe('IndividualManager', () => {
   });
 
   describe('Customer Discovery', () => {
-    it('should batch queries and call the adapter once per channel', async () => {
+    it('resolves only indexProviderDid from subjectidentifier-sc using canonical opaque asset ids', async () => {
       // ARRANGE
       const job: JobRequest = {
         id: 'discovery-job-id',
@@ -273,45 +274,65 @@ describe('IndividualManager', () => {
         }
       };
       mockTenantsCacheManager.getTenantIdentifierUrn.mockResolvedValue(TENANT_URN);
-      // Mock the batch response
-      mockBlockchainAdapter.discoverDidsByHashes.mockImplementation(async (hashes, channel) => {
-        if (channel === 'health-care-eu') {
-            return ['did:web:nnes-did', undefined]; // NNES found, PPN not found
-        }
-        if (channel === 'health-care-global') {
-            return ['did:web:phone-did'];
-        }
-        return [];
-      });
+      mockBlockchainAdapter.readSubjectIdentifierPayloads.mockResolvedValue([
+        { indexProviderDid: 'did:web:nnes-index.example' },
+        { indexProviderDid: 'did:web:phone-index.example' },
+        undefined,
+      ]);
 
       // ACT
       const response = await individualManager.process(job);
 
       // ASSERT
-      // 1. Verify adapter was called exactly once for each channel
-      expect(mockBlockchainAdapter.discoverDidsByHashes).toHaveBeenCalledTimes(2);
-
-      // 2. Verify the EU channel call
-      expect(mockBlockchainAdapter.discoverDidsByHashes).toHaveBeenCalledWith(
-        [expect.any(String), expect.any(String)], // An array of 2 hashes
-        'health-care-eu',
-        'discovery-person'
-      );
-
-      // 3. Verify the Global channel call
-      expect(mockBlockchainAdapter.discoverDidsByHashes).toHaveBeenCalledWith(
-        [expect.any(String)], // An array of 1 hash
-        'health-care-global',
-        'discovery-person'
-      );
+      expect(mockBlockchainAdapter.readSubjectIdentifierPayloads).toHaveBeenCalledTimes(1);
+      expect(mockBlockchainAdapter.readSubjectIdentifierPayloads).toHaveBeenCalledWith([
+        buildSubjectIdentifierAssetId({ codingSystem: 'NNES', jurisdiction: 'ES', codeValue: '12345678Z' }),
+        buildSubjectIdentifierAssetId({ codingSystem: 'E164', jurisdiction: '', codeValue: '+15551234567' }),
+        buildSubjectIdentifierAssetId({ codingSystem: 'PPNFR', jurisdiction: 'FR', codeValue: '987654321' }),
+      ], 'identity-global', 'subjectidentifier-sc');
       
       // 4. Verify the final response structure and order
       expect(response.body.data.length).toBe(3);
       expect((response.body.data[0] as BundleEntryResponse).response?.status).toBe('200');
-      expect((response.body.data[0] as BundleEntryResponse).response.location).toBe('did:web:nnes-did');
+      expect((response.body.data[0] as BundleEntryResponse).response.location).toBe('did:web:nnes-index.example');
       expect((response.body.data[1] as BundleEntryResponse).response.status).toBe('200');
-      expect((response.body.data[1] as BundleEntryResponse).response.location).toBe('did:web:phone-did');
+      expect((response.body.data[1] as BundleEntryResponse).response.location).toBe('did:web:phone-index.example');
       expect((response.body.data[2] as ErrorEntry).response.status).toBe('404');
+    });
+
+    it('fails closed when a subjectidentifier-sc payload exposes fields beyond indexProviderDid', async () => {
+      mockTenantsCacheManager.getTenantIdentifierUrn.mockResolvedValue(TENANT_URN);
+      mockBlockchainAdapter.readSubjectIdentifierPayloads.mockResolvedValue([{
+        indexProviderDid: 'did:web:index.example',
+        card: { identifier: { value: 'must-not-be-public' } },
+      }]);
+
+      await expect(individualManager.process({
+        id: 'discovery-provider-only',
+        status: JobStatus.DRAFT,
+        sequence: 0,
+        createdAtTimestamp: Date.now(),
+        sector: 'health-care',
+        tenantId: 'acme',
+        section: 'test-network',
+        format: 'org.schema',
+        action: '_discovery',
+        resourceType: ResourceTypesFhirR4.Person,
+        content: {
+          jti: 'discovery-provider-only-jti',
+          thid: 'discovery-provider-only-thid',
+          iss: 'did:web:caller.example',
+          aud: 'did:web:index.example',
+          type: 'api+json',
+          body: { data: [{
+            type: GatewayRequestEntryTypes.PersonDiscover,
+            meta: { claims: {
+              [ClaimsPersonSchemaorg.identifierType]: 'NNES',
+              [ClaimsPersonSchemaorg.identifierValue]: '12345678Z',
+            } },
+          }] },
+        },
+      })).rejects.toThrow('subject_identifier_payload_must_contain_only_index_provider_did');
     });
   });
 
@@ -447,6 +468,78 @@ describe('IndividualManager', () => {
       const matches = extractBundleSearchResources(response);
       expect(matches).toHaveLength(1);
       expect(matches[0].id).toBe('permit-globaldatacare');
+    });
+  });
+
+  describe('PDQm Patient/$match', () => {
+    it('matches a Patient by governed identifier and projects the stable sameAs card as a FHIR identifier', async () => {
+      const tenantVaultId = 'health-care_acme';
+      const identifierSystem = 'urn:oid:1.2.3.4.5';
+      const identifierValue = 'patient-123';
+      const stableCard = 'urn:cds:v1:health-care:person:card:patient-123';
+      const protectedAttributes = [
+        { name: 'hmac-system-name', value: 'hmac-system-value' },
+        { name: 'hmac-id-name', value: 'hmac-id-value' },
+      ];
+      const storedConfig: EntityConfig = {
+        id: testCustomer1Uuid,
+        type: 'Person' as any,
+        status: 'active' as any,
+        claims: {
+          [ClaimsPersonSchemaorg.identifierType]: identifierSystem,
+          [ClaimsPersonSchemaorg.identifierValue]: identifierValue,
+          [ClaimsPersonSchemaorg.sameAs]: stableCard,
+        },
+      };
+
+      mockTenantsCacheManager.getCollectionName.mockResolvedValue('tenant-collection');
+      mockKmsService.protectAttributesNameAndValue.mockResolvedValue(protectedAttributes as any);
+      mockVaultRepository.query.mockResolvedValue([{ id: testCustomer1Uuid, jwe: { ciphertext: 'encrypted' } }] as any);
+      mockKmsService.unprotectConfidentialData.mockResolvedValue(storedConfig);
+
+      const response = await individualManager.matchPatient({
+        resourceType: ResourceTypesFhirR4.Parameters,
+        parameter: [{
+          name: 'resource',
+          resource: {
+            resourceType: ResourceTypesFhirR4.Patient,
+            identifier: [{ system: identifierSystem, value: identifierValue }],
+          },
+        }],
+      }, tenantVaultId);
+
+      expect(mockKmsService.protectAttributesNameAndValue).toHaveBeenCalledWith([
+        { name: ClaimsPersonSchemaorg.identifierType, value: identifierSystem, unique: true, type: 'token' },
+        { name: ClaimsPersonSchemaorg.identifierValue, value: identifierValue, unique: true, type: 'token' },
+      ], tenantVaultId);
+      expect(mockVaultRepository.query).toHaveBeenCalledWith('tenant-collection', {
+        sectionId: getEnvSectionId('individual'),
+        where: protectedAttributes,
+      });
+      expect(response).toEqual({
+        resourceType: ResourceTypesFhirR4.Bundle,
+        type: 'searchset',
+        total: 1,
+        entry: [{
+          resource: {
+            resourceType: ResourceTypesFhirR4.Patient,
+            id: testCustomer1Uuid,
+            identifier: [
+              { system: identifierSystem, value: identifierValue },
+              { system: 'urn:ietf:rfc:3986', value: stableCard },
+            ],
+          },
+          search: { mode: 'match' },
+        }],
+      });
+    });
+
+    it('rejects a Parameters body without a Patient identifier', async () => {
+      await expect(individualManager.matchPatient({
+        resourceType: ResourceTypesFhirR4.Parameters,
+        parameter: [{ name: 'resource', resource: { resourceType: ResourceTypesFhirR4.Patient } }],
+      }, 'health-care_acme')).rejects.toThrow('Patient/$match requires one Patient.identifier with system and value');
+      expect(mockVaultRepository.query).not.toHaveBeenCalled();
     });
   });
 });

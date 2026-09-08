@@ -13,6 +13,7 @@ KIND_CCAAS_SPECS=(
   'artifact-sc|identity-local,health-care-local'
   'artifactevent-sc|identity-local'
   'subjectkeybinding-sc|identity-local'
+  'subjectidentifier-sc|identity-local'
   'consentaccess-sc|health-care-local'
 )
 

@@ -118,7 +118,7 @@ describe('CommunicationManager Unit Tests', () => {
     };
     ledgerTransactionId = randomUUID();
     mockBlockchainAdapter = {
-      discoverDidsByHashes: jest.fn(async () => []),
+      readSubjectIdentifierPayloads: jest.fn(async () => []),
       registerCidVersionMappings: jest.fn(async (mappings: any[]) => ({
         accepted: mappings.length,
         txId: ledgerTransactionId,

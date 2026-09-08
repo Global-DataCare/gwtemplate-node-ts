@@ -66,6 +66,9 @@ chaincodes:
   - name: subjectkeybinding-sc
     image: registry.example.invalid/host-runtime@sha256:7777777777777777777777777777777777777777777777777777777777777777
     packageId: subjectkeybinding-sc-v1:bcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbc
+  - name: subjectidentifier-sc
+    image: registry.example.invalid/host-runtime@sha256:7777777777777777777777777777777777777777777777777777777777777777
+    packageId: subjectidentifier-sc-v1:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd
   - name: consentaccess-sc
     image: registry.example.invalid/host-runtime@sha256:7777777777777777777777777777777777777777777777777777777777777777
     packageId: consentaccess-sc-v1:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd

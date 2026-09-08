@@ -22,8 +22,12 @@ export class BlockchainAdapterMulti implements IBlockchainAdapter {
     this.writeAdapter = params.writeAdapter;
   }
 
-  public async discoverDidsByHashes(hashes: string[], channel: string, chaincode: string): Promise<(string | undefined)[]> {
-    return this.discoveryAdapter.discoverDidsByHashes(hashes, channel, chaincode);
+  public async readSubjectIdentifierPayloads(
+    assetIds: string[],
+    channel: string,
+    chaincode: string,
+  ): Promise<(unknown | undefined)[]> {
+    return this.discoveryAdapter.readSubjectIdentifierPayloads(assetIds, channel, chaincode);
   }
 
   public async registerCidVersionMappings(

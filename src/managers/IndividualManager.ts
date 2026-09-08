@@ -26,10 +26,8 @@ import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { determineResourceId } from '../utils/resource';
 import { uuidToBytes } from '../utils/uuid';
 import { encodeMultibase58btc } from 'gdc-common-utils-ts/utils/multibase58';
-import { getJurisdictionGroup } from '../utils/jurisdiction';
 import { normalizePhoneNumber } from '../utils/phone-number';
 import { parseIdentifierType } from '../utils/identifier-parser';
-import { generateUrnHash } from '../utils/urn-hash';
 import { IBlockchainAdapter } from '../adapters/IBlockchainAdapter';
 import { IncludedResource } from 'gdc-common-utils-ts/models/jsonapi';
 import { ClaimsRecord } from 'gdc-common-utils-ts/models/resource-document';
@@ -54,10 +52,31 @@ import { getClaimValue } from '../utils/claims';
 import { buildSearchResponseEntries } from '../utils/didcomm-response';
 import { GatewayResponseEntryTypes } from '../shared/gateway-response-types';
 import { canonicalizeBundleEntryMetadata } from '../utils/canonical-entry-metadata';
+import { buildSubjectIdentifierAssetId, readSubjectIdentifierLedgerPayload } from 'gdc-common-utils-ts/utils/subject-identity';
 
 
 const INDIVIDUAL_SECTION = getEnvSectionId(SUBJECT_SECTION_INDIVIDUAL);
 const DEVICE_LICENSE_SECTION = getEnvSectionId('device-licenses');
+const URI_IDENTIFIER_SYSTEM = 'urn:ietf:rfc:3986';
+
+type FhirParameters = {
+  resourceType?: string;
+  parameter?: Array<{ name?: string; resource?: Record<string, any> }>;
+};
+
+export type PatientMatchSearchset = {
+  resourceType: 'Bundle';
+  type: 'searchset';
+  total: number;
+  entry?: Array<{
+    resource: {
+      resourceType: 'Patient';
+      id: string;
+      identifier: Array<{ system: string; value: string }>;
+    };
+    search: { mode: 'match' };
+  }>;
+};
 
 export class IndividualManager {
   private vaultRepository: IVaultRepository;
@@ -65,7 +84,6 @@ export class IndividualManager {
   private tenantsManager: Pick<ITenantsManager, 'getTenantIdentifierUrn' | 'getCollectionName'>;
   private credentialManager: CredentialManager;
   private blockchainAdapter: IBlockchainAdapter;
-  private network: string;
   private hostRuntime: IHostRuntime;
 
   /**
@@ -88,7 +106,6 @@ export class IndividualManager {
     tenantsManager: Pick<ITenantsManager, 'getTenantIdentifierUrn' | 'getCollectionName'>,
     credentialManager: CredentialManager,
     blockchainAdapter: IBlockchainAdapter,
-    network: string,
     hostRuntime: IHostRuntime,
   ) {
     this.vaultRepository = vaultRepository;
@@ -96,8 +113,80 @@ export class IndividualManager {
     this.tenantsManager = tenantsManager;
     this.credentialManager = credentialManager;
     this.blockchainAdapter = blockchainAdapter;
-    this.network = network;
     this.hostRuntime = hostRuntime;
+  }
+
+  /**
+   * Executes the human-facing IHE PDQm ITI-119 `Patient/$match` operation.
+   *
+   * The provider receives the clear governed identifier in a native FHIR
+   * `Parameters` resource. The opaque subject-identifier hash used to locate
+   * this provider in Fabric is deliberately not part of this boundary.
+   * Internally stored schema.org claims are projected to a minimal FHIR
+   * Patient; confidential claims are never returned wholesale.
+   */
+  public async matchPatient(parameters: FhirParameters, tenantVaultId: string): Promise<PatientMatchSearchset> {
+    const resourceParameters = (parameters.parameter || []).filter((parameter) => parameter?.name === 'resource');
+    const patient = resourceParameters.length === 1 ? resourceParameters[0]?.resource : undefined;
+    const identifiers = Array.isArray(patient?.identifier) ? patient.identifier : [];
+    const identifier = identifiers.find((candidate: any) => (
+      typeof candidate?.system === 'string'
+      && candidate.system.trim().length > 0
+      && typeof candidate?.value === 'string'
+      && candidate.value.trim().length > 0
+    ));
+    if (parameters.resourceType !== ResourceTypesFhirR4.Parameters || patient?.resourceType !== ResourceTypesFhirR4.Patient || !identifier) {
+      throw new ManagerError(
+        'Patient/$match requires one Patient.identifier with system and value inside Parameters.parameter[name=resource].',
+        IssueType.Required,
+      );
+    }
+
+    const identifierSystem = identifier.system.trim();
+    const identifierValue = identifier.value.trim();
+    const protectedAttributes = await this.kmsService.protectAttributesNameAndValue([
+      { name: ClaimsPersonSchemaorg.identifierType, value: identifierSystem, unique: true, type: 'token' },
+      { name: ClaimsPersonSchemaorg.identifierValue, value: identifierValue, unique: true, type: 'token' },
+    ], tenantVaultId);
+    const collectionName = await this.tenantsManager.getCollectionName(tenantVaultId);
+    if (!collectionName) {
+      throw new ManagerError(`Collection for tenant '${tenantVaultId}' could not be resolved.`, IssueType.NotFound);
+    }
+
+    const encryptedMatches = await this.vaultRepository.query(collectionName, {
+      sectionId: INDIVIDUAL_SECTION,
+      where: protectedAttributes.map(({ name, value }) => ({ name, value })),
+    });
+    const entries: NonNullable<PatientMatchSearchset['entry']> = [];
+    for (const encryptedMatch of encryptedMatches || []) {
+      const individual = await this.kmsService.unprotectConfidentialData<EntityConfig>(encryptedMatch, tenantVaultId);
+      const claims = individual.claims || {};
+      if (
+        String(claims[ClaimsPersonSchemaorg.identifierType] || '') !== identifierSystem
+        || String(claims[ClaimsPersonSchemaorg.identifierValue] || '') !== identifierValue
+      ) continue;
+
+      const projectedIdentifiers = [{ system: identifierSystem, value: identifierValue }];
+      const stableCard = String(claims[ClaimsPersonSchemaorg.sameAs] || '').trim();
+      if (stableCard && stableCard !== identifierValue) {
+        projectedIdentifiers.push({ system: URI_IDENTIFIER_SYSTEM, value: stableCard });
+      }
+      entries.push({
+        resource: {
+          resourceType: ResourceTypesFhirR4.Patient,
+          id: individual.id,
+          identifier: projectedIdentifiers,
+        },
+        search: { mode: 'match' },
+      });
+    }
+
+    return {
+      resourceType: ResourceTypesFhirR4.Bundle,
+      type: 'searchset',
+      total: entries.length,
+      ...(entries.length > 0 ? { entry: entries } : {}),
+    };
   }
 
   public async process(job: JobRequest, environment?: string): Promise<IDecodedDidcommPayload> {
@@ -243,19 +332,21 @@ export class IndividualManager {
 
   private async processDiscoveryBatch(
     entries: BundleEntryRequest[],
-    sector: string,
-    resourceType: string,
+    _sector: string,
+    _resourceType: string,
   ): Promise<(BundleEntry | ErrorEntry)[]> {
-    const tasksByTarget = new Map<string, { hash: string; originalEntry: BundleEntryRequest }[]>();
     const finalResults: (BundleEntry | ErrorEntry)[] = [];
     const entryMap = new Map(entries.map(e => [e.meta?.claims, e]));
+    const tasks: Array<{ assetId: string; originalEntry: BundleEntryRequest }> = [];
 
-    // 1. Prepare all discovery tasks and group them by target (channel + chaincode)
+    // The public ledger stops at the provider DID. The selected provider then
+    // receives the governed identifier through Patient/$match; the opaque
+    // Fabric asset id never crosses that provider boundary.
     for (const entry of entries) {
       const claims = entry.resource?.meta?.claims ?? entry.meta?.claims;
-      const prepResult = this.prepareUrnAndJurisdiction(claims as any);
+      const identifier = this.prepareSubjectIdentifier(claims as any);
 
-      if (!prepResult.urn) {
+      if (!identifier) {
         finalResults.push({
           type: entry.type,
           ...canonicalizeBundleEntryMetadata(entry.meta as Record<string, unknown> | undefined),
@@ -267,37 +358,27 @@ export class IndividualManager {
         continue;
       }
 
-      const hash = generateUrnHash(prepResult.urn);
-      const channel = `${sector}-${prepResult.jurisdictionGroup}`;
-      const chaincode = `discovery-${resourceType.toLowerCase()}`;
-      const targetKey = `${channel}:${chaincode}`;
-
-      if (!tasksByTarget.has(targetKey)) {
-        tasksByTarget.set(targetKey, []);
-      }
-      tasksByTarget.get(targetKey)!.push({ hash, originalEntry: entry });
+      tasks.push({ assetId: buildSubjectIdentifierAssetId(identifier), originalEntry: entry });
     }
 
-    // 2. Execute batch queries for each target group
-    const discoveryPromises = Array.from(tasksByTarget.entries()).map(async ([targetKey, tasks]) => {
-      const [channel, chaincode] = targetKey.split(':');
-      const hashesToQuery = tasks.map(t => t.hash);
-
-      const foundDids = await this.blockchainAdapter.discoverDidsByHashes(hashesToQuery, channel, chaincode);
-
-      foundDids.forEach((did, index) => {
+    const payloads = await this.blockchainAdapter.readSubjectIdentifierPayloads(
+      tasks.map((task) => task.assetId),
+      'identity-global',
+      'subjectidentifier-sc',
+    );
+    payloads.forEach((payload, index) => {
         const originalTask = tasks[index];
+        const indexProviderDid = payload === undefined
+          ? undefined
+          : readSubjectIdentifierLedgerPayload(payload);
         finalResults.push({
           type: originalTask.originalEntry.type,
           ...canonicalizeBundleEntryMetadata(originalTask.originalEntry.meta as Record<string, unknown> | undefined),
-          response: did
-            ? { status: String(HttpStatusCodes.Ok), location: did }
+          response: indexProviderDid
+            ? { status: String(HttpStatusCodes.Ok), location: indexProviderDid }
             : { status: '404', outcome: createOperationOutcome(IssueLevel.Information, IssueType.NotFound, 'Identifier not found on the network') },
         });
-      });
     });
-
-    await Promise.all(discoveryPromises);
     
     // Re-sort results to match the original input order, because Promise.all does not guarantee order
     const sortedResults = [...finalResults].sort((a, b) => {
@@ -392,27 +473,23 @@ export class IndividualManager {
     });
   }
 
-  private prepareUrnAndJurisdiction(claims: ClaimsRecord): { urn?: string; jurisdictionGroup: 'eu' | 'global' } {
-    let urn: string | undefined;
-    let jurisdictionGroup: 'eu' | 'global' = 'global';
-
+  private prepareSubjectIdentifier(claims: ClaimsRecord): {
+    codingSystem: string;
+    jurisdiction: string;
+    codeValue: string;
+  } | undefined {
     const identifierType = claims[ClaimsPersonSchemaorg.identifierType] as string;
     const identifierValue = claims[ClaimsPersonSchemaorg.identifierValue] as string;
     const telephone = claims[ClaimsPersonSchemaorg.telephone] as string;
 
     if (identifierType && identifierValue) {
       const parsedId = parseIdentifierType(identifierType);
-      if (parsedId.countryCode) {
-        jurisdictionGroup = getJurisdictionGroup(parsedId.countryCode);
-      }
-      urn = `urn:${this.network}:${jurisdictionGroup}:identifier:${identifierType}:${identifierValue}`;
-    } else if (telephone) {
-      const normalizedPhone = normalizePhoneNumber(telephone);
-      jurisdictionGroup = 'global';
-      urn = `urn:${this.network}:${jurisdictionGroup}:mobile:E164:${normalizedPhone}`;
+      return { codingSystem: identifierType, jurisdiction: parsedId.countryCode || '', codeValue: identifierValue };
     }
-
-    return { urn, jurisdictionGroup };
+    if (telephone) {
+      return { codingSystem: 'E164', jurisdiction: '', codeValue: normalizePhoneNumber(telephone) };
+    }
+    return undefined;
   }
 
 

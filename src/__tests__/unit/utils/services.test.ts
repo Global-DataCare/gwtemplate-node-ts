@@ -220,6 +220,15 @@ describe('Service Initialization Utilities', () => {
       expect(fhirApiService!.serviceEndpoint).toContain('Consent');
       expect(fhirApiService!.serviceEndpoint).toContain('DocumentReference');
 
+      const patientMatchService = services.find(
+        (service: DidService) =>
+          (service as any).selector?.section === 'individual'
+          && (service as any).selector?.format === 'org.hl7.fhir.api'
+          && service.serviceEndpoint === 'Patient'
+          && (service.actions || []).includes('$match'),
+      );
+      expect(patientMatchService).toBeDefined();
+
       const relatedPersonSearchServices = services.filter(
         (service: DidService) =>
           (service as any).selector?.section === 'individual'

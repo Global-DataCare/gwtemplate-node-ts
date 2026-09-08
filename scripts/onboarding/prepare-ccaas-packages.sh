@@ -37,6 +37,7 @@ specs=(
   "artifact-sc|${IDENTITY_GLOBAL_CHANNEL},${IDENTITY_ORGANIZATION_CHANNEL},${DATA_CHANNEL}"
   "artifactevent-sc|${IDENTITY_GLOBAL_CHANNEL},${IDENTITY_ORGANIZATION_CHANNEL}"
   "subjectkeybinding-sc|${IDENTITY_GLOBAL_CHANNEL},${IDENTITY_ORGANIZATION_CHANNEL}"
+  "subjectidentifier-sc|${IDENTITY_GLOBAL_CHANNEL}"
   "consentaccess-sc|${DATA_CHANNEL}"
 )
 
@@ -77,4 +78,4 @@ done
     > manifest.sha256
   shasum -a 256 chaincodes.values.yaml manifest.tsv >> manifest.sha256
 )
-echo "Nine deterministic CCAAS packages written to ${CCAAS_OUTPUT_DIR}." >&2
+echo "Ten deterministic CCAAS packages written to ${CCAAS_OUTPUT_DIR}." >&2

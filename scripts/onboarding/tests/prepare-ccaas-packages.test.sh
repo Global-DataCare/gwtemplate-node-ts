@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Flow contract:
 # 1. One host fullname and namespace determine every CCAAS Service address.
-# 2. Nine deterministic packages produce exact Fabric package IDs and a values fragment.
+# 2. Ten deterministic packages produce exact Fabric package IDs and a values fragment.
 # 3. Repeating the command with the same inputs produces identical hashes.
 # 4. artifact-sc is approved on identity channels and the clinical data channel.
 # Authorization invariant: package names come from the published allowlist, not user input.
@@ -23,10 +23,11 @@ CCAAS_IMAGE='registry.example.invalid/host-runtime@sha256:aaaaaaaaaaaaaaaaaaaaaa
 CCAAS_OUTPUT_DIR="${WORK}/second" \
   bash "${ROOT}/scripts/onboarding/prepare-ccaas-packages.sh"
 
-[[ "$(find "${WORK}/first" -name '*.tgz' | wc -l | tr -d ' ')" == "9" ]]
-[[ "$(yq '.chaincodes | length' "${WORK}/first/chaincodes.values.yaml")" == "9" ]]
+[[ "$(find "${WORK}/first" -name '*.tgz' | wc -l | tr -d ' ')" == "10" ]]
+[[ "$(yq '.chaincodes | length' "${WORK}/first/chaincodes.values.yaml")" == "10" ]]
 grep -R -Fq 'host2-cc-organization-sc.host2-system.svc.cluster.local:9999' "${WORK}/first/packages"
 grep -Fq $'artifact-sc\tidentity-global,identity-eu,health-care-eu\t' "${WORK}/first/manifest.tsv"
+grep -Fq $'subjectidentifier-sc\tidentity-global\t' "${WORK}/first/manifest.tsv"
 diff -r "${WORK}/first" "${WORK}/second"
 while IFS=$'\t' read -r name channel archive package_id; do
   digest="$(shasum -a 256 "${WORK}/first/${archive}" | awk '{print $1}')"

@@ -20,7 +20,7 @@ helm lint "${CHART}" -f "${CHART}/ci/production-values.yaml"
 helm lint "${CHART}" -f "${CHART}/ci/local-host1-values.yaml"
 helm lint "${CHART}" -f "${CHART}/ci/local-host2-values.yaml"
 helm lint "${CHART}" -f "${CHART}/ci/local-evidence-values.yaml"
-[[ "$(yq '.chaincodes | length' "${CHART}/ci/production-values.yaml")" == "9" ]] || {
+[[ "$(yq '.chaincodes | length' "${CHART}/ci/production-values.yaml")" == "10" ]] || {
   echo 'production example must enumerate all nine CCAAS runtimes' >&2
   exit 1
 }

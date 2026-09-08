@@ -143,7 +143,6 @@ export function buildManagers(options: {
     tenantManager,
     credentialManager,
     blockchainAdapter,
-    config.namespace,
     hostRuntime,
   );
 

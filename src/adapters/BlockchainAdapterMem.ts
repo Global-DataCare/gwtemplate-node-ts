@@ -17,18 +17,15 @@ export class BlockchainAdapterMem implements IBlockchainAdapter {
     this.consentAccessBundles = new Map<string, Record<string, unknown>>();
   }
 
-  /**
-   * Simulates querying the mock ledger for a batch of hashes.
-   */
-  public async discoverDidsByHashes(hashes: string[], channel: string, chaincode: string): Promise<(string | undefined)[]> {
-    // console.log(`[BlockchainAdapterMem] Querying channel "${channel}" on chaincode "${chaincode}" for ${hashes.length} hashes.`);
-    
-    const results = hashes.map(hash => this.ledger.get(hash));
-    
-    // Simulate a delay
-    await new Promise(resolve => setTimeout(resolve, 50));
-
-    return results;
+  public async readSubjectIdentifierPayloads(
+    assetIds: string[],
+    _channel: string,
+    _chaincode: string,
+  ): Promise<(unknown | undefined)[]> {
+    return assetIds.map((assetId) => {
+      const indexProviderDid = this.ledger.get(assetId);
+      return indexProviderDid ? { indexProviderDid } : undefined;
+    });
   }
 
   public async registerCidVersionMappings(
