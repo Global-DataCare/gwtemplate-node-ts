@@ -28,6 +28,13 @@ It does **not** provide strong identity proof, KYC, or operational authorization
 - **ICA**: strong identity, evidence, onboarding, operational access, Fabric enrollment.
 - **Clearing House**: compliance-only VC for discovery/federation; no access control.
 
+The separate custodian flow in which an EHR asks its own tenant to verify a
+foreign index-provider SMART token is defined in
+[Federated SMART token verification by a tenant Clearing House](03-IDENTITY-AND-TRUST/03.L-FEDERATED-SMART-CLEARING-HOUSE.md).
+That tenant-local `_verify` operation produces verification evidence; it does
+not turn the general Gaia-X compliance service into the clinical authorization
+issuer.
+
 ### Public metadata endpoints (host + tenants)
 To make the flow discoverable without Gaia-X jargon, the service exposes standard OIDC metadata:
 - `/.well-known/openid-configuration` (issuer metadata)

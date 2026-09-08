@@ -439,6 +439,11 @@ npm test -- --runTestsByPath src/__tests__/unit/examples/markdown-examples.test.
 
 This project contains extensive documentation covering architecture, development practices, and API usage. All documentation is located in the `docs/` directory.
 
+The canonical cross-custodian authorization contract is
+[Federated SMART token verification by a tenant Clearing House](docs/03-IDENTITY-AND-TRUST/03.L-FEDERATED-SMART-CLEARING-HOUSE.md).
+It preserves the index provider as the SMART token audience and defines how an
+EHR asks its own tenant to verify that token before releasing scoped data.
+
 To get a full overview and navigate the documentation effectively, please start with the main index:
 
 ### **[➡️ Go to the Full Documentation Index (`docs/README.md`)](docs/README.md)**

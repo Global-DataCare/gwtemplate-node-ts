@@ -155,6 +155,7 @@ Memory aid:
 *   **[03.I-HOSTING-OPERATOR-BOOTSTRAP-AUDIT.md](03-IDENTITY-AND-TRUST/03.I-HOSTING-OPERATOR-BOOTSTRAP-AUDIT.md)**: Audit reference for the hosting-operator bootstrap boundary, including `env -> vault -> Fabric bootstrap` resolution order and the separation between hosting validation, operational enrollment, and Host VC issuance.
 *   **[03.J-PROFESSIONAL-CONSENT-SMART.md](03-IDENTITY-AND-TRUST/03.J-PROFESSIONAL-CONSENT-SMART.md)**: Canonical professional DID reuse across employee/profile identity, Consent, VP and SMART, including endpoint audience resolution and hash-boundary semantics.
 *   **[03.K-LEGACY-REPRESENTATIVE-CONTROLLER-COMPATIBILITY.md](03-IDENTITY-AND-TRUST/03.K-LEGACY-REPRESENTATIVE-CONTROLLER-COMPATIBILITY.md)**: Fail-closed deployment compatibility for the historical legal-representative bootstrap controller without checked-in personal identifiers.
+*   **[03.L-FEDERATED-SMART-CLEARING-HOUSE.md](03-IDENTITY-AND-TRUST/03.L-FEDERATED-SMART-CLEARING-HOUSE.md)**: Cross-custodian SMART authorization, transitional VP placement and tenant-local verification evidence.
 
 ### 📂 04-DEEP-DIVES
 *   **[04.A-VC-ARCHITECTURE-DEEP-DIVE.md](04-DEEP-DIVES/04.A-VC-ARCHITECTURE-DEEP-DIVE.md)**: A deep dive into the Verifiable Credentials architecture.

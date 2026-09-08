@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+## [1.25.5] - 2026-09-07
+
+- Recover and clarify the federated SMART Clearing House contract: the
+  individual index provider remains the original token audience, while each
+  custodian EHR asks its own tenant to verify that token before releasing the
+  original scope.
+- Define the transitional move from sibling `body.vp_token` to
+  `client_assertion.vp`, rejecting mismatches when both are supplied.
+- Define the planned tenant `smart/token/_verify` extension as profiled RFC
+  7662/RFC 9701: its signed introspection JWT is addressed to the calling EHR
+  and carries a compact tenant-bound JWT-VP in
+  `token_introspection.vp_token`; after decoding it, the presentation is the
+  JWT payload claim `vp` and contains the same original professional VC. No
+  second verification VC is introduced.
+  Keep the route explicitly unimplemented until its fail-closed ledger and live
+  E2E gates exist.
+
 ## [1.25.4] - 2026-09-07
 
 - Add AWS KMS root custody with the same one-decrypt-per-process runtime-KEK
