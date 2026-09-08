@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+## [1.25.8] - 2026-09-08
+
+- Persist assisted or telephone intake in the Communication inbox with FHIR
+  event status `preparation`, while preventing its attached clinical batch,
+  document projections and ledger evidence from executing until an authorized
+  `completed` version is submitted. Preserve `not-done` as an auditable
+  rejection without clinical projection and retain omitted status only for
+  legacy envelopes.
+- Synchronize the high-level clinical-author guide, copyable SDK snippet,
+  manager JSDoc, flow tests and release skills with that event-state boundary.
+
 ## [1.25.7] - 2026-09-08
 
 - Explain the professional clinical provenance graph at application level:

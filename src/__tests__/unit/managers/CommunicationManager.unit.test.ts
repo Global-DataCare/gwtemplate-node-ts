@@ -147,6 +147,7 @@ describe('CommunicationManager Unit Tests', () => {
       authorDid?: string,
       attesterReference?: string,
       authenticatedActorDid: string = creatorDid,
+      communicationStatus = 'completed',
     ): JobRequest {
       const attachedBundle = {
         resourceType: ResourceTypesFhirR4.Bundle,
@@ -190,6 +191,7 @@ describe('CommunicationManager Unit Tests', () => {
                   claims: {
                     [CommunicationClaim.Subject]: subjectDid,
                     [CommunicationClaim.Sender]: authenticatedActorDid,
+                    [CommunicationClaim.Status]: communicationStatus,
                     [CommunicationClaim.Topic]: HealthcareBasicSections.AllergiesAndIntolerances.attributeValue,
                     [CommunicationClaim.ContentAttachmentType]: 'application/fhir+json',
                     [CommunicationClaim.ContentAttachmentData]: Buffer
@@ -580,6 +582,31 @@ describe('CommunicationManager Unit Tests', () => {
         'observation-forged-attester',
         getSubjectScopedSectionId(subjectDid, 'individual', 'observations'),
       )).toBeUndefined();
+    });
+
+    it.each(['preparation', 'not-done'])('keeps a %s telephone proposal in the inbox without projecting clinical state', async (status) => {
+      // Flow contract: telephone intake is persisted as an auditable
+      // Communication, but its attached batch cannot change the personal
+      // clinical index until an authorized actor submits a completed version.
+      mockTenantsCacheManager.getTenantDid.mockResolvedValue(testServerDid as any);
+      const resourceId = `telephone-medication-${status}`;
+      const response = await communicationManager.process(buildClinicalBatchJob([{
+        request: { method: HttpRequestMethods.Post, url: ResourceTypesFhirR4.MedicationStatement },
+        resource: {
+          resourceType: ResourceTypesFhirR4.MedicationStatement,
+          id: resourceId,
+          subject: { reference: subjectDid },
+          status: 'active',
+        },
+      }], undefined, undefined, creatorDid, status));
+
+      expect((response.body as any).data[0].response.status).toBe(String(HttpStatusCodes.Ok));
+      expect(await mockVaultRepository.get(
+        'animal-care_acme',
+        resourceId,
+        getSubjectScopedSectionId(subjectDid, 'individual', 'medications'),
+      )).toBeUndefined();
+      expect(mockBlockchainAdapter.registerCidVersionMappings).not.toHaveBeenCalled();
     });
 
     it('lets another registered member of the same individual correct, but not delete, personal content', async () => {

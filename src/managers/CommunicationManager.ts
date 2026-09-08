@@ -305,25 +305,30 @@ export class CommunicationManager implements IJobProcessor {
           fhirResource,
         );
         await this.persistCommunicationChannelRecord(job, entry as any, fhirResource, commMsg);
-        const compositionEvidence = await this.persistCompositionProjectionFromCommunication(
-          job,
-          entry as any,
-          fhirResource,
-          serverDid,
-        );
-        await this.persistDocumentReferenceProjectionFromCommunication(job, entry as any, fhirResource);
-        const clinicalProjection = await this.persistProjectedResourcesFromCommunication(
-          job,
-          entry as any,
-          fhirResource,
-          compositionEvidence ? [compositionEvidence] : [],
-        );
+        const projectsAttachedClinicalState = this.shouldProjectAttachedClinicalState(entry, fhirResource);
+        const compositionEvidence = projectsAttachedClinicalState
+          ? await this.persistCompositionProjectionFromCommunication(
+            job,
+            entry as any,
+            fhirResource,
+            serverDid,
+          )
+          : undefined;
+        if (projectsAttachedClinicalState) {
+          await this.persistDocumentReferenceProjectionFromCommunication(job, entry as any, fhirResource);
+        }
+        const clinicalProjection = projectsAttachedClinicalState
+          ? await this.persistProjectedResourcesFromCommunication(
+            job,
+            entry as any,
+            fhirResource,
+            compositionEvidence ? [compositionEvidence] : [],
+          )
+          : { responses: [], receipt: undefined };
 
-        const embeddedSearchResponseEntries = await this.executeEmbeddedSearchRequest(
-          job,
-          entry,
-          fhirResource,
-        );
+        const embeddedSearchResponseEntries = projectsAttachedClinicalState
+          ? await this.executeEmbeddedSearchRequest(job, entry, fhirResource)
+          : undefined;
         if (embeddedSearchResponseEntries && embeddedSearchResponseEntries.length > 0) {
           bundleEntries.push(...embeddedSearchResponseEntries);
           continue;
@@ -2732,6 +2737,20 @@ export class CommunicationManager implements IJobProcessor {
     }
 
     return Array.from(new Set(references.filter(Boolean)));
+  }
+
+  /**
+   * Only a completed Communication commits its attached clinical mutation.
+   * `preparation` remains an auditable proposal and `not-done` records its
+   * rejection; an omitted status is retained solely for legacy envelopes.
+   */
+  private shouldProjectAttachedClinicalState(entry: any, fhirResource: FhirCommunication): boolean {
+    const status = this.normalizeOptionalString(
+      entry?.resource?.meta?.claims?.[CommunicationClaim.Status]
+      || entry?.meta?.claims?.[CommunicationClaim.Status]
+      || (fhirResource as any)?.status,
+    )?.toLowerCase();
+    return !status || status === 'completed';
   }
 
   private normalizeOptionalString(value: unknown): string | undefined {

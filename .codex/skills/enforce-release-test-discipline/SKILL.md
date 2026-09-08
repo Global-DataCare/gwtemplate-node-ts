@@ -132,6 +132,10 @@ description: Enforce branch, TDD, canonical FHIR and schema.org vocabulary, fixt
   and SMART `sub` is the authorized actor. Native FHIR Communication/Bundle
   inputs carry none of those DIDComm fields; HTTP Authorization proves the
   caller and `Communication.sender` keeps its FHIR business meaning.
+- Treat assisted or telephone clinical intake as `Communication.status =
+  preparation`: persist the Communication for audit but do not execute attached
+  clinical mutations. Only `completed` projects clinical state; `not-done`
+  records rejection without projection. Never call this state `draft`.
 - For generated clinical content, resolve Composition provenance from the
   protected registered creator binding. The closed `owner | creator` BFF choice
   is compatibility only: member/controller content may use one registered

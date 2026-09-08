@@ -26,7 +26,13 @@ export function importIps(
   return sdk.importIpsOrFhirAndUpdateIndex(route, input);
 }
 
-/** Apply typed create/delete entries as the authenticated controller. */
+/**
+ * Apply typed create/delete entries as an authenticated, completed write.
+ * Assisted intake is first sent as Communication status `preparation`; GW
+ * retains that proposal without executing its attached entries. After review,
+ * the authorized facade submits the attested `completed` write through this
+ * high-level method. Rejection uses `not-done`, never `draft`.
+ */
 export function updateClinicalData(
   sdk: IndividualControllerSdk,
   route: RouteContext,
