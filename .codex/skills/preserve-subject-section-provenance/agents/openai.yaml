@@ -1,0 +1,4 @@
+interface:
+  display_name: "Preserve subject section provenance"
+  short_description: "Keep section author and profile attester boundaries correct"
+  default_prompt: "Preserve the current subject-section Composition claims and author-attester separation."
