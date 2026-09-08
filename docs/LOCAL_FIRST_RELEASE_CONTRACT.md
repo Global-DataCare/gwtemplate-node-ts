@@ -55,6 +55,14 @@ Keep all participating repositories on pushed but unmerged branches while the
 local matrix is still being corrected. Build an immutable tarball with
 `npm pack` and install it in downstream branches with `--no-save`.
 
+Start every downstream proof from its committed lockfile with `npm ci`. If a
+normal `npm install --no-save <tarball>` would re-resolve unrelated dependency
+ranges, do not use that resolver path: overlay the exact packed contents in the
+matching `node_modules` package directory, or use an equivalent isolated
+installation that leaves `package.json` and the lockfile unchanged. Before
+testing, verify the exact local package versions and any runtime-sensitive
+baseline dependencies. A later `npm ci` must remove the temporary overlay.
+
 The tarball is temporary test input. Never commit a `file:`, Git, workspace or
 vendored tarball dependency or its generated lockfile state. An npm
 authorization or publication failure must never stop the local `test` stage.
@@ -78,7 +86,8 @@ After all local gates are green:
    versions installed, then build immutable GW images and run `local-network`.
 6. Portal consumers remain on pushed, unmerged branches with the immutable
    tarball during `local-network`; do not reinstall or repeat their already-green
-   local matrix.
+   local matrix. The gateway image and Fabric gate do not require changing a
+   portal that already proved the same package tarball locally.
 7. After `local-network` is green, install the exact registry version in each
    affected portal, commit its registry dependency and lockfile, and run only
    the minimal artifact smoke.

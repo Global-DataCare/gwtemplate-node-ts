@@ -246,6 +246,12 @@ Follow the canonical contract in
   immutable tarball installed `--no-save` on pushed but unmerged branches.
 - The `npm pack` tarball is temporary: install it `--no-save`, then restore
   the registry dependency and lockfile before committing dependency state.
+- Start the consumer from `npm ci`. If `npm install --no-save <tarball>`
+  re-resolves unrelated dependency ranges, overlay the exact packed contents in
+  the matching `node_modules` directory, or use an equivalent isolated method
+  that leaves manifests and lockfiles unchanged. Verify the local package
+  versions and runtime-sensitive baseline dependencies before testing; remove
+  the overlay with the next `npm ci`.
 - After a failure, resume only the smallest failed gate; do not repeat a green
   gate unless the fix changed its boundary, it creates required state, or the
   environment is no longer trustworthy.
@@ -261,7 +267,9 @@ Follow the canonical contract in
   image build and `local-network`. A portal consumer may retain the immutable
   tarball on its pushed, unmerged branch throughout `local-network`; after
   `local-network` is green, it installs the exact registry version and runs
-  only the artifact smoke before its merge and staging.
+  only the artifact smoke before its merge and staging. Do not reinstall or
+  rerun an already-green portal merely to build the gateway image or execute
+  the Fabric `local-network` gate.
 - Publish only after the local matrix is green, install the exact registry
   version in the gateway before `local-network`, and install it in portals
   before staging.
