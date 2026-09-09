@@ -134,7 +134,12 @@ The runtime root-custody provider names are:
 - `memory`: dev/test only
 - `local`: local compatibility mode using `KEK_SECRET`
 - `gcp`: GCP production target
+- `aws`: AWS production target
 - `hashicorp-transit`: open-source/self-hosted production target
+
+All three external roots provision the same encrypted runtime KEK and unwrap it
+once per pod or process start. Host and tenant operations then use that
+process-owned key locally and do not call the external root.
 
 These names are intentional:
 

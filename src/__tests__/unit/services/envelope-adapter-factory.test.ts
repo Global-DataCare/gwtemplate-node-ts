@@ -129,16 +129,23 @@ describe('envelope-adapter-factory', () => {
     expect((await createEnvelopeAdapter(config, { rootAdapter })).adapter).toBeInstanceOf(RuntimeKekEnvelopeAdapter);
   });
 
-  it('creates a HashiCorp Transit adapter when explicitly configured', async () => {
+  it('unwraps one runtime KEK with HashiCorp Transit and returns a local adapter', async () => {
+    const rootAdapter = { wrapKeyMaterial: jest.fn(async () => 'unused'), unwrapKeyMaterial: jest.fn<any>().mockResolvedValue(Buffer.alloc(32, 7)) };
     const config = buildConfig({
-      kms: { provider: 'hashicorp-transit' },
+      kms: {
+        provider: 'hashicorp-transit',
+        keyId: 'gw-envelope',
+        runtimeKekCiphertext: 'vault:v1:kms-ciphertext',
+        runtimeKekId: 'gw-prod',
+      },
       hashicorpTransit: {
         baseUrl: 'https://vault.example.com',
-        keyName: 'gw-envelope',
         token: 'token-1',
       },
     });
-    expect((await createEnvelopeAdapter(config)).adapter).toBeInstanceOf(HashicorpTransitEnvelopeAdapter);
+
+    expect((await createEnvelopeAdapter(config, { rootAdapter })).adapter).toBeInstanceOf(RuntimeKekEnvelopeAdapter);
+    expect(rootAdapter.unwrapKeyMaterial).toHaveBeenCalledTimes(1);
   });
 
   it('fails fast when GCP is selected without a key name', async () => {
@@ -155,7 +162,12 @@ describe('envelope-adapter-factory', () => {
 
   it('fails fast when hashicorp-transit is selected without required settings', async () => {
     const config = buildConfig({
-      kms: { provider: 'hashicorp-transit' },
+      kms: {
+        provider: 'hashicorp-transit',
+        keyId: 'gw-envelope',
+        runtimeKekCiphertext: 'vault:v1:kms-ciphertext',
+        runtimeKekId: 'gw-prod',
+      },
       hashicorpTransit: { baseUrl: 'https://vault.example.com' },
     });
     await expect(createEnvelopeAdapter(config)).rejects.toThrow('HASHICORP_TRANSIT_BASE_URL');
