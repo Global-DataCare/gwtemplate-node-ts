@@ -126,12 +126,14 @@ Regla de custodia:
 - `KMS_PROVIDER=aws` es el objetivo productivo en AWS
 - `KMS_PROVIDER=hashicorp-transit` es la opción portable/open source
 
-Los adaptadores cloud comparten `KMS_KEY_ID`,
+Los proveedores externos comparten `KMS_KEY_ID`,
 `KMS_RUNTIME_KEK_ID` y `KMS_RUNTIME_KEK_CIPHERTEXT`. En GCP, `KMS_KEY_ID` es
 el nombre completo de la CryptoKey; en AWS es el ARN, identificador o alias de
-la KMS Key. AWS obtiene región y credenciales mediante la cadena estándar del
-SDK (IRSA o Pod Identity en Kubernetes), y `KMS_REGION` define explícitamente
-la región KMS de GW.
+la KMS Key; con HashiCorp Transit es el nombre de la clave Transit. AWS obtiene
+credenciales mediante la cadena estándar del SDK (IRSA o Pod Identity en
+Kubernetes), y `KMS_REGION` define explícitamente la región KMS de GW.
+HashiCorp Transit conserva sus parámetros de conexión y token separados, pero
+provisiona y descifra la misma runtime KEK una sola vez por proceso.
 
 No uses solo la palabra `vault` para este tema en docs operativos, porque GW ya
 usa `vault` para almacenamiento confidencial y el provider externo de custodia

@@ -59,9 +59,10 @@ export async function createEnvelopeAdapter(
     return { adapter: new AesGcmEnvelopeAdapter(config.kekSecret), provider };
   }
 
-  if (provider === 'gcp' || provider === 'aws') {
+  if (provider === 'gcp' || provider === 'aws' || provider === 'hashicorp-transit') {
     const legacyGcp = provider === 'gcp' ? config.gcpKms : undefined;
-    const keyId = String(config.kms?.keyId || legacyGcp?.keyName || '').trim();
+    const legacyTransit = provider === 'hashicorp-transit' ? config.hashicorpTransit : undefined;
+    const keyId = String(config.kms?.keyId || legacyGcp?.keyName || legacyTransit?.keyName || '').trim();
     const runtimeKekCiphertext = String(config.kms?.runtimeKekCiphertext || legacyGcp?.runtimeKekCiphertext || '').trim();
     const runtimeKekId = String(config.kms?.runtimeKekId || legacyGcp?.runtimeKekId || '').trim();
     if (!keyId) {
@@ -77,9 +78,7 @@ export async function createEnvelopeAdapter(
     if (provider === 'aws' && !region) {
       throw new Error('KMS_PROVIDER=aws requires KMS_REGION. AWS_REGION and AWS_DEFAULT_REGION are not supported aliases.');
     }
-    const rootAdapter = deps.rootAdapter || (provider === 'gcp'
-      ? new CloudKmsEnvelopeAdapter(keyId)
-      : new KmsEnvelopeAdapterAws(keyId, { region }));
+    const rootAdapter = deps.rootAdapter || buildExternalRootAdapter(config, provider, keyId, region);
     const runtimeKek = await rootAdapter.unwrapKeyMaterial(runtimeKekCiphertext, {
       entityVaultId: runtimeKekId,
       purpose: 'service-runtime-kek-v1',
@@ -91,22 +90,30 @@ export async function createEnvelopeAdapter(
     }
   }
 
+  throw new Error(`Unsupported KMS provider: ${provider}`);
+}
+
+function buildExternalRootAdapter(
+  config: IServerConfig,
+  provider: 'gcp' | 'aws' | 'hashicorp-transit',
+  keyId: string,
+  region: string,
+): KmsEnvelopeAdapter {
+  if (provider === 'gcp') return new CloudKmsEnvelopeAdapter(keyId);
+  if (provider === 'aws') return new KmsEnvelopeAdapterAws(keyId, { region });
+
   const baseUrl = String(config.hashicorpTransit?.baseUrl || '').trim();
-  const keyName = String(config.hashicorpTransit?.keyName || '').trim();
   const token = String(config.hashicorpTransit?.token || '').trim();
-  if (!baseUrl || !keyName || !token) {
+  if (!baseUrl || !token) {
     throw new Error(
-      'KMS_PROVIDER=hashicorp-transit requires HASHICORP_TRANSIT_BASE_URL, HASHICORP_TRANSIT_KEY_NAME, and HASHICORP_TRANSIT_TOKEN.',
+      'KMS_PROVIDER=hashicorp-transit requires HASHICORP_TRANSIT_BASE_URL and HASHICORP_TRANSIT_TOKEN.',
     );
   }
-  return {
-    adapter: new HashicorpTransitEnvelopeAdapter({
-      baseUrl,
-      keyName,
-      token,
-      mountPath: config.hashicorpTransit?.mountPath,
-      namespace: config.hashicorpTransit?.namespace,
-    }),
-    provider,
-  };
+  return new HashicorpTransitEnvelopeAdapter({
+    baseUrl,
+    keyName: keyId,
+    token,
+    mountPath: config.hashicorpTransit?.mountPath,
+    namespace: config.hashicorpTransit?.namespace,
+  });
 }

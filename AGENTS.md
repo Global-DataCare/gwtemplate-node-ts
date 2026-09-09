@@ -25,8 +25,8 @@ Primary references:
 runtime KEK exactly once through KMS during bootstrap. Inject that process-owned
 resource from `buildInfrastructure`; tenant operations use it locally and must
 not call KMS. Do not add a singleton/global registry or shared plaintext key.
-Google KMS is the current production root; preserve an adapter boundary for
-future AWS KMS/multi-root support. `KEK_SECRET` remains local/demo custody and
+Google Cloud KMS, AWS KMS and self-hosted HashiCorp Transit are supported
+production roots behind the same runtime-KEK boundary. `KEK_SECRET` remains local/demo custody and
 must not be represented as the audited production profile.
 1. Manager logic is deterministic and claim-driven.
 2. Search semantics must be explicit:

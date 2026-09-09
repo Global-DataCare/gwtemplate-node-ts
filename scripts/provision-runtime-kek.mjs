@@ -6,7 +6,9 @@ import { GoogleAuth } from 'google-auth-library';
 export async function provisionRuntimeKek(options = {}) {
   const env = options.env || process.env;
   const provider = normalizeProvider(required(env, 'KMS_PROVIDER', ['ENVELOPE_PROVIDER']));
-  const keyId = required(env, 'KMS_KEY_ID', provider === 'gcp' ? ['GCP_KMS_KEY_NAME'] : []);
+  const keyId = required(env, 'KMS_KEY_ID', provider === 'gcp'
+    ? ['GCP_KMS_KEY_NAME']
+    : provider === 'hashicorp-transit' ? ['HASHICORP_TRANSIT_KEY_NAME'] : []);
   const runtimeKekId = required(env, 'KMS_RUNTIME_KEK_ID', provider === 'gcp' ? ['GCP_KMS_RUNTIME_KEK_ID'] : []);
   const runtimeKek = (options.randomBytes || randomBytes)(32);
   const context = { entityVaultId: runtimeKekId, purpose: 'service-runtime-kek-v1' };
@@ -18,8 +20,19 @@ export async function provisionRuntimeKek(options = {}) {
     } else if (provider === 'aws') {
       const region = required(env, 'KMS_REGION');
       ciphertext = await (options.awsEncrypt || encryptWithAwsKms)(keyId, runtimeKek, context, region);
+    } else if (provider === 'hashicorp-transit') {
+      const transitOptions = {
+        baseUrl: required(env, 'HASHICORP_TRANSIT_BASE_URL'),
+        mountPath: String(env.HASHICORP_TRANSIT_MOUNT_PATH || 'transit').trim(),
+        keyId,
+        token: required(env, 'HASHICORP_TRANSIT_TOKEN'),
+        namespace: String(env.HASHICORP_NAMESPACE || '').trim(),
+        plaintext: runtimeKek,
+        context,
+      };
+      ciphertext = await (options.transitEncrypt || encryptWithHashicorpTransit)(transitOptions);
     } else {
-      throw new Error('Runtime KEK provisioning supports KMS_PROVIDER=gcp or aws.');
+      throw new Error('Runtime KEK provisioning supports KMS_PROVIDER=gcp, aws, or hashicorp-transit.');
     }
     return `KMS_RUNTIME_KEK_CIPHERTEXT=${ciphertext}`;
   } finally {
@@ -54,6 +67,29 @@ async function encryptWithAwsKms(keyId, runtimeKek, context, region) {
   }));
   if (!response.CiphertextBlob) throw new Error('AWS KMS encrypt response did not include CiphertextBlob.');
   return Buffer.from(response.CiphertextBlob).toString('base64');
+}
+
+async function encryptWithHashicorpTransit(options) {
+  const baseUrl = options.baseUrl.replace(/\/$/, '');
+  const mountPath = options.mountPath.replace(/^\/+|\/+$/g, '');
+  const headers = {
+    'Content-Type': 'application/json',
+    'X-Vault-Token': options.token,
+  };
+  if (options.namespace) headers['X-Vault-Namespace'] = options.namespace;
+  const response = await fetch(`${baseUrl}/v1/${mountPath}/encrypt/${options.keyId}`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      plaintext: Buffer.from(options.plaintext).toString('base64'),
+      context: Buffer.from(JSON.stringify(options.context)).toString('base64'),
+    }),
+  });
+  const body = await response.json();
+  if (!response.ok || !body?.data?.ciphertext) {
+    throw new Error(body?.errors?.join('; ') || `HashiCorp Transit encrypt failed (${response.status}).`);
+  }
+  return body.data.ciphertext;
 }
 
 function normalizeProvider(value) {

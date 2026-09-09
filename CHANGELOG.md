@@ -9,6 +9,15 @@
   type-checked Node SDK examples and reserve `Provenance.agent-<code>` for a
   future internal migration.
 
+## [1.25.9] - 2026-09-08
+
+- Document the provider-neutral deployment audit model for external root
+  custody without fixed prices or provider comparisons, including predictable
+  call volume, split provisioning/runtime permissions, restart-loop evidence
+  and the bounded legacy migration exception.
+- Bring the open-source HashiCorp Transit provider under the same one external
+  decrypt per pod runtime-KEK model used by managed cloud KMS providers.
+
 ## [1.25.8] - 2026-09-08
 
 - Persist assisted or telephone intake in the Communication inbox with FHIR

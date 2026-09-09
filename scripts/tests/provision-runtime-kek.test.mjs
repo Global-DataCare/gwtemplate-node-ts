@@ -60,3 +60,28 @@ test('keeps the deprecated GCP names only as migration aliases', async () => {
 
   assert.equal(output, 'KMS_RUNTIME_KEK_CIPHERTEXT=gcp-ciphertext');
 });
+
+test('provisions a HashiCorp Transit runtime KEK through the same provider-neutral configuration', async () => {
+  let received;
+  const output = await provisionRuntimeKek({
+    env: {
+      KMS_PROVIDER: 'hashicorp-transit',
+      KMS_KEY_ID: 'gw-envelope',
+      KMS_RUNTIME_KEK_ID: 'gw-production',
+      HASHICORP_TRANSIT_BASE_URL: 'https://vault.example.com',
+      HASHICORP_TRANSIT_TOKEN: 'test-token',
+    },
+    randomBytes: () => Buffer.alloc(32, 5),
+    transitEncrypt: async (options) => {
+      received = options;
+      return 'vault:v1:runtime-kek';
+    },
+  });
+
+  assert.equal(output, 'KMS_RUNTIME_KEK_CIPHERTEXT=vault:v1:runtime-kek');
+  assert.equal(received.keyId, 'gw-envelope');
+  assert.deepEqual(received.context, {
+    entityVaultId: 'gw-production',
+    purpose: 'service-runtime-kek-v1',
+  });
+});
