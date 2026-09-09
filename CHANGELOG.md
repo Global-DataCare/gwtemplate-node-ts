@@ -2,7 +2,10 @@
 
 ## [Unreleased]
 
-- Clarify the current generic subject-section provenance contract: section
+- Correct AWS KMS authentication guidance for Kubernetes hosted outside AWS:
+  use temporary credentials from IAM Roles Anywhere or explicitly trusted OIDC
+  federation, and limit Pod Identity/IRSA guidance to EKS.
+- Clarify the current generic subject-section provenance model: section
   batches retain Composition-compatible flat author/attester claims, each
   write supplies its own author, and the authenticated profile supplies its
   real RelatedPerson or PractitionerRole attester. Link the canonical,

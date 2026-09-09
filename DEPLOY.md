@@ -130,8 +130,18 @@ Los proveedores externos comparten `KMS_KEY_ID`,
 `KMS_RUNTIME_KEK_ID` y `KMS_RUNTIME_KEK_CIPHERTEXT`. En GCP, `KMS_KEY_ID` es
 el nombre completo de la CryptoKey; en AWS es el ARN, identificador o alias de
 la KMS Key; con HashiCorp Transit es el nombre de la clave Transit. AWS obtiene
-credenciales mediante la cadena estándar del SDK (IRSA o Pod Identity en
-Kubernetes), y `KMS_REGION` define explícitamente la región KMS de GW.
+credenciales temporales mediante la cadena estándar del SDK, y `KMS_REGION`
+define explícitamente la región de la clave KMS pero no autentica el pod. Debe
+coincidir con `KMS_KEY_ID`; la región física del clúster no selecciona la región
+de la clave. IRSA y Pod Identity son opciones de EKS. En un Kubernetes alojado
+fuera de AWS se debe
+usar IAM Roles Anywhere con certificado X.509, o federación OIDC directa si el
+clúster publica un issuer estable y confiable. Para un proceso GW de larga
+duración se prefiere ejecutar
+`aws_signing_helper serve` como sidecar fijado por digest y configurar
+`AWS_EC2_METADATA_SERVICE_ENDPOINT=http://127.0.0.1:9911` en GW;
+`credential_process` queda como alternativa si el helper está dentro del
+contenedor GW. No se inyectan claves de acceso AWS de larga duración.
 HashiCorp Transit conserva sus parámetros de conexión y token separados, pero
 provisiona y descifra la misma runtime KEK una sola vez por proceso.
 

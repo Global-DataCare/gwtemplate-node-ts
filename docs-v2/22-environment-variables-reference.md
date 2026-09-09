@@ -309,8 +309,18 @@ Legacy note:
 - Explicit GW KMS region used with `KMS_PROVIDER=aws`; it is ignored by GCP.
 - `AWS_REGION` and `AWS_DEFAULT_REGION` are deliberately not configuration
   aliases for this configuration.
-- Kubernetes workloads should obtain credentials through their IAM role/IRSA,
-  not static access-key variables.
+- `KMS_REGION` selects the regional KMS endpoint; it does not authenticate the
+  workload. It must match the region of `KMS_KEY_ID`; the Kubernetes cluster's
+  physical region does not select the KMS key region.
+- EKS may use Pod Identity or IRSA. Kubernetes hosted outside AWS should use
+  temporary credentials through IAM Roles Anywhere, or direct web-identity
+  federation only when the cluster exposes a stable trusted OIDC issuer.
+- For a long-running GW process with IAM Roles Anywhere, prefer an official
+  `aws_signing_helper serve` sidecar and point the SDK at its local endpoint
+  with `AWS_EC2_METADATA_SERVICE_ENDPOINT`. `credential_process` remains an
+  alternative when the helper is included in the GW container.
+- The AWS SDK reads those credentials from its standard chain. Do not inject
+  long-lived AWS access keys.
 
 `HASHICORP_TRANSIT_BASE_URL`
 - HashiCorp base URL for Transit-backed root-key custody.
