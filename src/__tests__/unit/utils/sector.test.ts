@@ -8,4 +8,11 @@ describe('FHIR sector classification', () => {
     expect(isFhirSector('company-book')).toBe(false);
     expect(isFhirSector('family-book')).toBe(false);
   });
+
+  it.each(['onehealth-care', 'onehealth-insurance', 'public-health'])(
+    'publishes FHIR services for %s',
+    (sector) => {
+      expect(isFhirSector(sector)).toBe(true);
+    },
+  );
 });

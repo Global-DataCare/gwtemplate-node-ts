@@ -54,7 +54,7 @@ export ICA_MODE="${ICA_MODE:-}"
 
 # Canonical gateway catalog. GW CORE adds onehealth-research by default and
 # requires an explicit DISABLED_DEFAULT_SECTORS plus reason to remove it.
-export ALLOWED_SECTORS="${ALLOWED_SECTORS:-animal-care,animal-tech,animal-research,animal-insurance,health-care,health-tech,health-research,health-insurance,onehealth-research}"
+export ALLOWED_SECTORS="${ALLOWED_SECTORS:-animal-care,animal-tech,animal-research,animal-insurance,health-care,health-tech,health-research,health-insurance,onehealth-care,onehealth-research,onehealth-insurance,public-health}"
 
 # GCS bucket is optional in demo/mem mode but the template still accepts it.
 export GCS_BUCKET_NAME="${GCS_BUCKET_NAME:-}"
