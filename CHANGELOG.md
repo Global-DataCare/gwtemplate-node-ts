@@ -4,9 +4,14 @@
 
 - Make individual Organization Order confirmation materialize the principal
   owner/controller RelatedPerson automatically while issuing the same bare
-  `RESPRSN` licence seat. Return the assignment as a sibling
-  `resource.meta.claims` resource so email and telephone integrations enroll
-  without portal-side RelatedPerson ingestion or search.
+  `RESPRSN` licence seat. Reuse the exact
+  `Organization.owner.identifier.value` as both `RelatedPerson.identifier`
+  and the licence `relatedPersonId`; never invent a second UUID. Return the
+  assignment as a sibling `resource.meta.claims` resource so email and
+  telephone integrations enroll without portal-side ingestion or search.
+  Canonical registrations carry a UUID in that owner claim; a legacy request
+  that omitted it receives one UUID from GW instead of turning its email or
+  telephone into creator identity.
 - Accept `onehealth-care`, `onehealth-insurance`, and `public-health` in the
   explicit gateway sector catalog and classify them as FHIR sectors.
 - Expand the default development-host deployment catalog to all configured

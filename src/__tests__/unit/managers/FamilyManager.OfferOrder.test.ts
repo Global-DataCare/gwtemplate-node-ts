@@ -53,6 +53,7 @@ import {
   EXAMPLE_LICENSE_PAYMENT_METHOD_STRIPE,
   EXAMPLE_INDIVIDUAL_CONTROLLER_ROLE_TYPE,
   EXAMPLE_INDIVIDUAL_CONTROLLER_ROLE_VALUE,
+  EXAMPLE_KYC_CONTROLLER_UUID,
   EXAMPLE_REGISTERED_SUBJECT_ALTERNATE_NAME,
 } from 'gdc-common-utils-ts/examples/shared';
 
@@ -97,13 +98,19 @@ describe('FamilyManager - Offer/Order Flow', () => {
   let hostCollectionName: string;
   let config: IServerConfig;
 
-  function buildFamilyRegistrationRequestWithoutPdfAttachment(addressCountry?: string) {
+  function buildFamilyRegistrationRequestWithoutPdfAttachment(addressCountry?: string, includeOwnerIdentifier = true) {
     const payload = structuredClone(FAMILY_REGISTRATION_REQUEST) as any;
     delete payload.attachments;
     for (const entry of payload.body.data) {
       const claimBlocks = [entry.meta?.claims, entry.resource?.meta?.claims].filter(Boolean);
       for (const claims of claimBlocks) {
         claims[ClaimsOrganizationSchemaorg.alternateName] = EXAMPLE_REGISTERED_SUBJECT_ALTERNATE_NAME;
+        if (includeOwnerIdentifier) {
+          claims[ClaimsOrganizationSchemaorg.ownerIdentifierValue] = EXAMPLE_KYC_CONTROLLER_UUID;
+        } else {
+          delete claims[ClaimsOrganizationSchemaorg.ownerIdentifierValue];
+          delete claims[ClaimsOrganizationSchemaorg.ownerIdentifierValue.replace('org.schema.', '')];
+        }
         if (addressCountry) {
           claims[ClaimsOrganizationSchemaorg.addressCountry] = addressCountry;
         } else {
@@ -223,6 +230,27 @@ describe('FamilyManager - Offer/Order Flow', () => {
     expect(entry.resource.meta.claims[ClaimsOfferSchemaorg.identifier]).not.toContain('undefined');
   });
 
+  it('creates one UUID controller assignment when a legacy registration omitted it', async () => {
+    const responsePayload = await familyManager.process({
+      id: 'job-family-owner-uuid',
+      status: JobStatus.DRAFT,
+      sequence: 0,
+      createdAtTimestamp: Date.now(),
+      tenantId: testTenant1TenantId,
+      jurisdiction: 'ES',
+      sector: Sector.HEALTH_CARE,
+      section: 'individual',
+      format: 'org.schema',
+      action: '_batch',
+      resourceType: ResourceTypesFhirR4.Organization,
+      content: buildFamilyRegistrationRequestWithoutPdfAttachment(undefined, false),
+    });
+
+    expect(responsePayload.body.data[0].resource.meta.claims[
+      ClaimsOrganizationSchemaorg.ownerIdentifierValue
+    ]).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+  });
+
   it('should process a family Order and finalize the family registration', async () => {
     const tenantId = testTenant1TenantId;
     const familyRegistrationJob: JobRequest = {
@@ -289,7 +317,9 @@ describe('FamilyManager - Offer/Order Flow', () => {
     expect(controllerLicense?.content).toEqual(expect.objectContaining({
       subjectId: firstEntry.resource.id,
       issuedToRole: `${EXAMPLE_INDIVIDUAL_CONTROLLER_ROLE_TYPE}|${EXAMPLE_INDIVIDUAL_CONTROLLER_ROLE_VALUE}`,
-      relatedPersonId: expect.stringMatching(/^urn:uuid:[0-9a-f-]+$/i),
+      relatedPersonId: firstEntry.resource.meta.claims[
+        ClaimsOrganizationSchemaorg.ownerIdentifierValue
+      ],
       authorizedSubjectDid: expect.stringMatching(
         /:individual:UUID:z[1-9A-HJ-NP-Za-km-z]+$/,
       ),
@@ -310,6 +340,11 @@ describe('FamilyManager - Offer/Order Flow', () => {
         [`${Format.FHIR_API}.${RelatedPersonClaim.Active}`]: 'true',
       } },
     });
+    expect(controllerAssignment?.resource.meta.claims[
+      `${Format.FHIR_API}.${RelatedPersonClaim.Identifier}`
+    ]).toBe(firstEntry.resource.meta.claims[
+      ClaimsOrganizationSchemaorg.ownerIdentifierValue
+    ]);
 
     const relatedPersonRecords = await vaultRepository.getContainersInSection(
       tenantVaultId,

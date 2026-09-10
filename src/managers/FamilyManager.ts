@@ -42,6 +42,7 @@ import { getTenantVaultId } from '../utils/tenant';
 import { generateLicenseOffer } from '../utils/offer';
 import { getEnvSectionId } from '../utils/section-env';
 import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
+import { normalizeUuid } from 'gdc-common-utils-ts/utils/normalize-uuid';
 import { EntityLifecycleStatus } from '../gdc-backend-utils-node/models/enums';
 import type { ITenantsManager } from './ITenantsManager';
 import { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
@@ -68,7 +69,6 @@ import { GatewayResponseEntryTypes } from '../shared/gateway-response-types';
 import { FamilyRegistrationStatus, GatewayClaim } from '../shared/gateway-claim-contract';
 import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 import { Format } from 'gdc-common-utils-ts/constants/Schemas';
-import { UrnPrefixes } from 'gdc-common-utils-ts/constants/urn';
 import { RelatedPersonClaim } from 'gdc-common-utils-ts/models/interoperable-claims/related-person-claims';
 import { getSubjectScopedSectionId } from '../utils/individual-sections';
 import { normalizeIndexedPhone } from '../utils/indexed-contact';
@@ -369,6 +369,9 @@ export class FamilyManager {
 
     const processedClaims: ClaimsRecord = {
       ...claims,
+      [ClaimsOrganizationSchemaorg.ownerIdentifierValue]: canonicalControllerUuidOrNew(
+        claims[ClaimsOrganizationSchemaorg.ownerIdentifierValue],
+      ),
       ...(processedService?.meta.claims || {}),
       ...offerClaims,
       '@type': 'receipt',
@@ -615,7 +618,15 @@ export class FamilyManager {
               privateIdValueIndividual: secureDoc.id,
             }),
           });
-          const controllerAssignmentIdentifier = `${UrnPrefixes.Uuid}${uuidv4()}`;
+          const controllerAssignmentIdentifier = String(
+            finalizedContent.claims[ClaimsOrganizationSchemaorg.ownerIdentifierValue] || '',
+          ).trim();
+          if (!controllerAssignmentIdentifier) {
+            throw new ManagerError(
+              `The family Order requires '${ClaimsOrganizationSchemaorg.ownerIdentifierValue}' for its controller assignment.`,
+              IssueType.Required,
+            );
+          }
           const { activationCode } = await issueActivationCodeFromPool({
             vaultRepository: this.vaultRepository,
             kmsService: this.kmsService,
@@ -1463,4 +1474,17 @@ export class FamilyManager {
       service: resources.service,
     } as any;
   }
+}
+
+/** Preserves a canonical controller UUID or creates one for legacy requests. */
+function canonicalControllerUuidOrNew(value: unknown): string {
+  const hexadecimal = normalizeUuid(String(value || '').trim());
+  if (!hexadecimal) return uuidv4();
+  return [
+    hexadecimal.slice(0, 8),
+    hexadecimal.slice(8, 12),
+    hexadecimal.slice(12, 16),
+    hexadecimal.slice(16, 20),
+    hexadecimal.slice(20),
+  ].join('-');
 }
