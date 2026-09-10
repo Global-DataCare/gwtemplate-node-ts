@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Accept `onehealth-care`, `onehealth-insurance`, and `public-health` in the
+  explicit gateway sector catalog and classify them as FHIR sectors.
+- Expand the default development-host deployment catalog to all configured
+  animal, human-health, One Health, and public-health sectors.
 - Correct AWS KMS authentication guidance for Kubernetes hosted outside AWS:
   use temporary credentials from IAM Roles Anywhere or explicitly trusted OIDC
   federation, and limit Pod Identity/IRSA guidance to EKS.

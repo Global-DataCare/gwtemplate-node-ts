@@ -115,6 +115,17 @@ describe('server-config sector resolution', () => {
     ]);
   });
 
+  it('should accept the complete public and One Health sector catalog', () => {
+    expect(parseAndValidateSectors(
+      'onehealth-care,onehealth-research,onehealth-insurance,public-health',
+    )).toEqual([
+      'onehealth-care',
+      'onehealth-research',
+      'onehealth-insurance',
+      'public-health',
+    ]);
+  });
+
   it('should validate MAINSECTOR values', () => {
     expect(parseAndValidateMainSector('animal')).toBe('animal');
     expect(() => parseAndValidateMainSector('finance')).toThrow(
