@@ -67,6 +67,12 @@ import { buildSearchResponseEntries } from '../utils/didcomm-response';
 import { GatewayResponseEntryTypes } from '../shared/gateway-response-types';
 import { FamilyRegistrationStatus, GatewayClaim } from '../shared/gateway-claim-contract';
 import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
+import { Format } from 'gdc-common-utils-ts/constants/Schemas';
+import { UrnPrefixes } from 'gdc-common-utils-ts/constants/urn';
+import { RelatedPersonClaim } from 'gdc-common-utils-ts/models/interoperable-claims/related-person-claims';
+import { getSubjectScopedSectionId } from '../utils/individual-sections';
+import { normalizeIndexedPhone } from '../utils/indexed-contact';
+import { validateFhirPayloadByVersion } from '../utils/fhir-ingestion';
 
 type FamilyRegistrationContent = {
   status: EntityLifecycleStatus;
@@ -111,7 +117,7 @@ export class FamilyManager {
           } else if (job.resourceType === 'Organization') {
             responseEntries.push(await this.processFamilyRegistrationEntry(job, entry, environment));
           } else if (job.resourceType === 'Order') {
-            responseEntries.push(await this.processFamilyOrderEntry(job, entry, environment));
+            responseEntries.push(...await this.processFamilyOrderEntry(job, entry, environment));
           } else {
             throw new ManagerError(`Unsupported resourceType for family flow: '${job.resourceType}'`, IssueType.NotSupported);
           }
@@ -517,7 +523,7 @@ export class FamilyManager {
     }).claims as ClaimsRecord;
   }
 
-  private async processFamilyOrderEntry(job: JobRequest, entry: BundleEntry, environment?: string): Promise<BundleEntry | ErrorEntry> {
+  private async processFamilyOrderEntry(job: JobRequest, entry: BundleEntry, environment?: string): Promise<(BundleEntry | ErrorEntry)[]> {
     const entryType = entry.type || 'Family-order-request-v1.0';
     const rawClaims = entry?.resource?.meta?.claims ?? entry?.meta?.claims;
     const claims: ClaimsRecord | undefined = rawClaims ? (normalizeContextualizedClaims(rawClaims) as ClaimsRecord) : rawClaims;
@@ -554,7 +560,7 @@ export class FamilyManager {
     });
 
     if (results.length === 0) {
-      return this.processFamilyLicenseOrderEntry(job, claims, offerId);
+      return [await this.processFamilyLicenseOrderEntry(job, claims, offerId)];
     }
     if (results.length > 1) {
       this.logger.error(`CRITICAL: Multiple pending family registrations found for the same offerId: '${offerId}'`);
@@ -573,6 +579,7 @@ export class FamilyManager {
     };
 
     // Create individual (family member) license seats purchased via the family registration Offer and auto-issue one for the controller.
+    let controllerAssignmentEntry: BundleEntry | undefined;
     const familySeats = finalizedContent.claims[ClaimsOfferSchemaorg.eligibleQuantityValue] as number | undefined;
     const familyOfferIdentifier = finalizedContent.claims[ClaimsOfferSchemaorg.identifier] as string | undefined;
     if (familySeats && familySeats > 0 && familyOfferIdentifier) {
@@ -608,6 +615,7 @@ export class FamilyManager {
               privateIdValueIndividual: secureDoc.id,
             }),
           });
+          const controllerAssignmentIdentifier = `${UrnPrefixes.Uuid}${uuidv4()}`;
           const { activationCode } = await issueActivationCodeFromPool({
             vaultRepository: this.vaultRepository,
             kmsService: this.kmsService,
@@ -618,8 +626,17 @@ export class FamilyManager {
             phone: controllerEmail ? undefined : controllerPhoneForActivation,
             role: controllerRole,
             ownerOrganizationId: secureDoc.id,
+            relatedPersonId: controllerAssignmentIdentifier,
             subjectId: secureDoc.id,
             subjectDid: authorizedSubjectDid,
+          });
+          controllerAssignmentEntry = await this.materializePrimaryControllerAssignment({
+            tenantVaultId,
+            subjectDid: authorizedSubjectDid,
+            assignmentIdentifier: controllerAssignmentIdentifier,
+            controllerRole,
+            controllerEmail,
+            controllerTelephone: controllerEmail ? undefined : controllerPhoneForActivation,
           });
           finalizedContent.claims[ClaimsIndividualProductSchemaorg.serialNumber] = activationCode;
           finalizedContent.claims[ClaimsIndividualProductSchemaorg.category] = LICENSE_CATEGORY_INDIVIDUAL;
@@ -716,9 +733,57 @@ export class FamilyManager {
     const secureCommunicationDoc = await this.kmsService.protectConfidentialData(communicationDoc, tenantVaultId);
     await this.vaultRepository.put(tenantCollectionName, [secureCommunicationDoc], getEnvSectionId('communications'));
 
-    return {
+    const orderEntry: BundleEntry = {
       type: GatewayResponseEntryTypes.FamilyOrder,
       resource: { ...(invoiceBundle as any), meta: { ...((invoiceBundle as any).meta || {}), claims: paymentCommunication.claims } },
+      response: { status: String(HttpStatusCodes.Created) },
+    };
+    return controllerAssignmentEntry ? [orderEntry, controllerAssignmentEntry] : [orderEntry];
+  }
+
+  /**
+   * Materializes the principal owner/controller as one claims-first FHIR-like
+   * RelatedPerson assignment. The authoritative source remains the validated
+   * individual Organization owner plus its issued RESPRSN seat; portals never
+   * create or select this assignment separately.
+   */
+  private async materializePrimaryControllerAssignment(input: Readonly<{
+    tenantVaultId: string;
+    subjectDid: string;
+    assignmentIdentifier: string;
+    controllerRole: string;
+    controllerEmail?: string;
+    controllerTelephone?: string;
+  }>): Promise<BundleEntry> {
+    const telecom = input.controllerEmail
+      ? `mailto:${normalizeIndexedEmail(input.controllerEmail)}`
+      : normalizeIndexedPhone(input.controllerTelephone);
+    const claims = normalizeContextualizedClaims({
+      '@context': Format.FHIR_API,
+      [RelatedPersonClaim.Identifier]: input.assignmentIdentifier,
+      [RelatedPersonClaim.Patient]: input.subjectDid,
+      [RelatedPersonClaim.Relationship]: input.controllerRole,
+      [RelatedPersonClaim.Active]: 'true',
+      ...(telecom ? { [RelatedPersonClaim.Telecom]: telecom } : {}),
+    });
+    const resource: BundleEntry['resource'] = {
+      resourceType: ResourceTypesFhirR4.RelatedPerson,
+      id: input.assignmentIdentifier,
+      meta: { claims },
+    } as BundleEntry['resource'];
+    validateFhirPayloadByVersion(Format.FHIR_API, ResourceTypesFhirR4.RelatedPerson, { resource });
+    await this.vaultRepository.put(input.tenantVaultId, [{
+      id: input.assignmentIdentifier,
+      status: EntityLifecycleStatus.Active,
+      ...claims,
+    } as ConfidentialStorageDoc], getSubjectScopedSectionId(
+      input.subjectDid,
+      SUBJECT_SECTION_INDIVIDUAL,
+      'related-persons',
+    ));
+    return {
+      type: ResourceTypesFhirR4.RelatedPerson,
+      resource,
       response: { status: String(HttpStatusCodes.Created) },
     };
   }

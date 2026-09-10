@@ -153,6 +153,12 @@ Teaching rule:
   CORE resolves it through the shared claim contract and verifies the request
   with the controller keys protected in that pending Offer. A public JWK in the
   incoming envelope is never authority for the continuation.
+- For an individual Organization, the same Order confirmation derives the
+  principal controller from `Organization.owner.email|telephone`, issues its
+  bare `RESPRSN` seat, persists a subject-scoped RelatedPerson and returns it
+  as a sibling Bundle entry under `resource.meta.claims`. No custom Order claim
+  carries that assignment, and no portal-side RelatedPerson ingestion/search
+  precedes controller enrollment.
 
 3. Modern controller/employee device identity bootstrap
 - After canonical `Order/_batch`, the modern controller uses the activation code (`org.schema.IndividualProduct.serialNumber`) to run:

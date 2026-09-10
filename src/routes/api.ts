@@ -3013,8 +3013,11 @@ export function createApiRouter(
   *     summary: Confirm the legacy individual organization order (accept Offer)
    *     description: |
   *       Legacy compatibility only. Submits an Order that accepts the registration Offer to complete the historical onboarding flow.
-   *       The Offer ID is supplied in the request body as Order.acceptedOffer.identifier and must match the
-   *       Offer returned by the family registration _batch-response.
+  *       The Offer ID is supplied in the request body as Order.acceptedOffer.identifier and must match the
+  *       Offer returned by the family registration _batch-response.
+   *       GW derives the principal controller from Organization.owner.email or Organization.owner.telephone,
+   *       issues the bare RESPRSN licence seat, and materializes its subject-scoped RelatedPerson automatically.
+   *       The portal does not submit or search that assignment before enrollment.
    *     parameters:
    *       - $ref: '#/components/parameters/AppId'
    *       - $ref: '#/components/parameters/AppVersion'
@@ -3051,9 +3054,12 @@ export function createApiRouter(
   *     summary: Poll the legacy individual order result
    *     description: |
    *       Polls the asynchronous job submitted to `.../Order/_batch`. The `tenantId`, `jurisdiction`, and `sector` are path routing parameters for the tenant's individual registry.
-   *       The completed response returns a Bundle entry with order invoice claims plus one embedded invoice
-   *       `resource` Bundle containing a FHIR `Invoice`, one PDF `DocumentReference`, and one structured
-   *       `DocumentReference` carrying JSON/XML invoice payloads.
+  *       The completed response returns a Bundle entry with order invoice claims plus one embedded invoice
+  *       `resource` Bundle containing a FHIR `Invoice`, one PDF `DocumentReference`, and one structured
+  *       `DocumentReference` carrying JSON/XML invoice payloads.
+   *       It also returns the principal controller as a sibling `RelatedPerson` entry whose canonical fields
+   *       live only in `resource.meta.claims`; the activation code remains
+   *       `org.schema.IndividualProduct.serialNumber` in the Order response claims.
    *     parameters:
    *       - $ref: '#/components/parameters/AppId'
    *       - $ref: '#/components/parameters/AppVersion'

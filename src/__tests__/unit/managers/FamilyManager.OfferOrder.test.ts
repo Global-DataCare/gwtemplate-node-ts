@@ -13,6 +13,8 @@
 import { GatewayResponseEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
 import { GatewayRequestEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
 import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
+import { Format } from 'gdc-common-utils-ts/constants/Schemas';
+import { RelatedPersonClaim } from 'gdc-common-utils-ts/models/interoperable-claims/related-person-claims';
 
 import { jest } from '@jest/globals';
 import { VaultMemRepository } from '../../../database/repositories/vault/vault.mem.repository';
@@ -35,6 +37,7 @@ import {
 } from 'gdc-common-utils-ts/constants/schemaorg';
 import { JobRequest, JobStatus } from 'gdc-common-utils-ts/models/confidential-job';
 import { getEnvSectionId } from '../../../utils/section-env';
+import { getSubjectScopedSectionId } from '../../../utils/individual-sections';
 import { FamilyManager } from '../../../managers/FamilyManager';
 import {
   testConfigTenant1,
@@ -286,10 +289,44 @@ describe('FamilyManager - Offer/Order Flow', () => {
     expect(controllerLicense?.content).toEqual(expect.objectContaining({
       subjectId: firstEntry.resource.id,
       issuedToRole: `${EXAMPLE_INDIVIDUAL_CONTROLLER_ROLE_TYPE}|${EXAMPLE_INDIVIDUAL_CONTROLLER_ROLE_VALUE}`,
+      relatedPersonId: expect.stringMatching(/^urn:uuid:[0-9a-f-]+$/i),
       authorizedSubjectDid: expect.stringMatching(
         /:individual:UUID:z[1-9A-HJ-NP-Za-km-z]+$/,
       ),
     }));
+
+    // The owner/controller assignment is part of the same authoritative Order
+    // transition. A portal must not create it later through a second ingestion.
+    const controllerAssignment = finalPayload.body.data.find(
+      (candidate: any) => candidate.type === ResourceTypesFhirR4.RelatedPerson,
+    );
+    expect(controllerAssignment?.resource).toMatchObject({
+      resourceType: ResourceTypesFhirR4.RelatedPerson,
+      meta: { claims: {
+        '@context': Format.FHIR_API,
+        [`${Format.FHIR_API}.${RelatedPersonClaim.Identifier}`]: (controllerLicense?.content as any)?.relatedPersonId,
+        [`${Format.FHIR_API}.${RelatedPersonClaim.Patient}`]: (controllerLicense?.content as any)?.authorizedSubjectDid,
+        [`${Format.FHIR_API}.${RelatedPersonClaim.Relationship}`]: `${EXAMPLE_INDIVIDUAL_CONTROLLER_ROLE_TYPE}|${EXAMPLE_INDIVIDUAL_CONTROLLER_ROLE_VALUE}`,
+        [`${Format.FHIR_API}.${RelatedPersonClaim.Active}`]: 'true',
+      } },
+    });
+
+    const relatedPersonRecords = await vaultRepository.getContainersInSection(
+      tenantVaultId,
+      getSubjectScopedSectionId(
+        String((controllerLicense?.content as any)?.authorizedSubjectDid),
+        'individual',
+        'related-persons',
+      ),
+    );
+    expect(relatedPersonRecords).toEqual([
+      expect.objectContaining({
+        id: (controllerLicense?.content as any)?.relatedPersonId,
+        [`${Format.FHIR_API}.${RelatedPersonClaim.Identifier}`]: (controllerLicense?.content as any)?.relatedPersonId,
+        [`${Format.FHIR_API}.${RelatedPersonClaim.Patient}`]: (controllerLicense?.content as any)?.authorizedSubjectDid,
+        [`${Format.FHIR_API}.${RelatedPersonClaim.Relationship}`]: `${EXAMPLE_INDIVIDUAL_CONTROLLER_ROLE_TYPE}|${EXAMPLE_INDIVIDUAL_CONTROLLER_ROLE_VALUE}`,
+      }),
+    ]);
   });
 
   it('does not activate a family Order when its controller activation code cannot be issued', async () => {
@@ -344,6 +381,10 @@ describe('FamilyManager - Offer/Order Flow', () => {
     );
     expect((storedContent as { status: EntityLifecycleStatus }).status)
       .toBe(EntityLifecycleStatus.Pending);
+    expect(orderPayload.body.data).toHaveLength(1);
+    expect(orderPayload.body.data).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: ResourceTypesFhirR4.RelatedPerson }),
+    ]));
   });
 
   it('should reopen family Offer and Order records through _search for portal-style read models', async () => {

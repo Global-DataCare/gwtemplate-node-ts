@@ -6698,7 +6698,7 @@
           "4.2 Family Order"
         ],
         "summary": "Confirm the legacy individual organization order (accept Offer)",
-        "description": "Legacy compatibility only. Submits an Order that accepts the registration Offer to complete the historical onboarding flow.\nThe Offer ID is supplied in the request body as Order.acceptedOffer.identifier and must match the\nOffer returned by the family registration _batch-response.\n",
+        "description": "Legacy compatibility only. Submits an Order that accepts the registration Offer to complete the historical onboarding flow.\nThe Offer ID is supplied in the request body as Order.acceptedOffer.identifier and must match the\nOffer returned by the family registration _batch-response.\nGW derives the principal controller from Organization.owner.email or Organization.owner.telephone,\nissues the bare RESPRSN licence seat, and materializes its subject-scoped RelatedPerson automatically.\nThe portal does not submit or search that assignment before enrollment.\n",
         "parameters": [
           {
             "$ref": "#/components/parameters/AppId"
@@ -6761,7 +6761,7 @@
           "4.2 Family Order"
         ],
         "summary": "Poll the legacy individual order result",
-        "description": "Polls the asynchronous job submitted to `.../Order/_batch`. The `tenantId`, `jurisdiction`, and `sector` are path routing parameters for the tenant's individual registry.\nThe completed response returns a Bundle entry with order invoice claims plus one embedded invoice\n`resource` Bundle containing a FHIR `Invoice`, one PDF `DocumentReference`, and one structured\n`DocumentReference` carrying JSON/XML invoice payloads.\n",
+        "description": "Polls the asynchronous job submitted to `.../Order/_batch`. The `tenantId`, `jurisdiction`, and `sector` are path routing parameters for the tenant's individual registry.\nThe completed response returns a Bundle entry with order invoice claims plus one embedded invoice\n`resource` Bundle containing a FHIR `Invoice`, one PDF `DocumentReference`, and one structured\n`DocumentReference` carrying JSON/XML invoice payloads.\nIt also returns the principal controller as a sibling `RelatedPerson` entry whose canonical fields\nlive only in `resource.meta.claims`; the activation code remains\n`org.schema.IndividualProduct.serialNumber` in the Order response claims.\n",
         "parameters": [
           {
             "$ref": "#/components/parameters/AppId"

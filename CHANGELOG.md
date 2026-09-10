@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Make individual Organization Order confirmation materialize the principal
+  owner/controller RelatedPerson automatically while issuing the same bare
+  `RESPRSN` licence seat. Return the assignment as a sibling
+  `resource.meta.claims` resource so email and telephone integrations enroll
+  without portal-side RelatedPerson ingestion or search.
 - Correct AWS KMS authentication guidance for Kubernetes hosted outside AWS:
   use temporary credentials from IAM Roles Anywhere or explicitly trusted OIDC
   federation, and limit Pod Identity/IRSA guidance to EKS.
