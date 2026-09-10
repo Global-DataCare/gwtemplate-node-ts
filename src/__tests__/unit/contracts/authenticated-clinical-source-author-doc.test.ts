@@ -32,7 +32,8 @@ describe('authenticated clinical source-author documentation', () => {
     expect(guide).toContain('dataAuthorReference');
     expect(guide).toMatch(/section batch[\s\S]*Composition-compatible flat claims/i);
     expect(guide).toMatch(/author[\s\S]*may change[\s\S]*attester[\s\S]*same unlocked profile/i);
-    expect(guide).toMatch(/RelatedPerson\/_search[\s\S]*RelatedPerson\.identifier/i);
+    expect(guide).toMatch(/Organization\.owner\.email[\s\S]*RESPRSN[\s\S]*controllerAssignmentIdentifier/i);
+    expect(guide).toMatch(/application code neither ingests nor[\s\S]*searches for it/i);
     expect(guide).toMatch(/Employee creation receipt[\s\S]*contained `PractitionerRole`/i);
     expect(guide).toMatch(/Provenance\.agent-<code>[\s\S]*future internal migration/i);
     expect(guide).toContain(
