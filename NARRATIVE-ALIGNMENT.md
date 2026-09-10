@@ -151,5 +151,5 @@ The local governance files that must stay aligned with this contract are:
 
 - [ARCHITECTURE.md](./ARCHITECTURE.md)
 - [CONTRIBUTING.md](./CONTRIBUTING.md)
-- [docs-v2/01-narrative-contract.md](./docs-v2/01-narrative-contract.md)
+- [docs-v2/01-narrative-rules.md](./docs-v2/01-narrative-rules.md)
 - [README.md](./README.md)

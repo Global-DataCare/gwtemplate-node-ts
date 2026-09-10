@@ -13,7 +13,7 @@
  * reachability is not mistaken for the recommended application contract.
  *
  * Keep this explanation synchronized with
- * `docs/01-OVERVIEW-AND-GUIDES/01.I-GW-CORE-CONTRACT-MAP.md` and its unit test.
+ * `docs-v1/01-OVERVIEW-AND-GUIDES/01.H-GW-CORE-CONTRACT-MAP.md` and its unit test.
  */
 export function createApiDocsSetupOptions(
   swaggerSpecUrl = '/swagger-spec.json',

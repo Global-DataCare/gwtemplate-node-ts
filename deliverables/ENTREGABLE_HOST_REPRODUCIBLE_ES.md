@@ -8,7 +8,7 @@ operativo privado de la red.
 ## Límite externo de Pontus-X
 
 Este entregable no incluye, reproduce ni simula Pontus-X. Tampoco incluye el
-portal `globaldatacare.es` ni su BFF. La publicación de productos, datasets y
+portal/BFF externo. La publicación de productos, datasets y
 servicios en Pontus-X es responsabilidad del controller de la organización a
 través de ese portal/BFF y se acredita, cuando corresponda, con evidencia
 externa separada.

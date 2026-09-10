@@ -100,6 +100,7 @@ export function buildClaimsFromIndividualOrganizationKyc(
   const givenName = normalizeUpperText(profile.first_name);
   const familyName = normalizeUpperText(profile.last_name);
   const controllerName = [givenName, familyName].filter(Boolean).join(' ').trim() || undefined;
+  const controllerUuid = normalizeText(profile.uuid) || normalizeText(profile.user_uuid) || undefined;
   const controllerIdentifier = normalizeText(profile.id_number) || undefined;
   const controllerEmail = normalizeEmail(options.controllerEmail);
   const controllerTelephone = normalizeText(profile.phone_number) || undefined;
@@ -113,9 +114,11 @@ export function buildClaimsFromIndividualOrganizationKyc(
   };
 
   if (controllerIdentifier) {
-    claims[ClaimsOrganizationSchemaorg.ownerIdentifierValue] = controllerIdentifier;
     claims[ClaimsPersonSchemaorg.identifierValue] = controllerIdentifier;
     claims[ClaimsPersonSchemaorg.identifier] = `urn:person:identifier:${controllerIdentifier}`;
+  }
+  if (controllerUuid) {
+    claims[ClaimsOrganizationSchemaorg.ownerIdentifierValue] = controllerUuid;
   }
   claims[ClaimsOrganizationSchemaorg.ownerAlternateName] = organizationAlternateName;
   if (controllerEmail) {

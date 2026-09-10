@@ -74,7 +74,7 @@ export const TEST_OBSERVATION_CLAIMS_FROM_CLIENT = {
 } as const;
 
 /**
- * Literal JSON view (same content) to make the wire payload easy to read in docs/tests.
+ * Literal JSON view (same content) to make the wire payload easy to read in documentation and tests.
  * This is derived from `TEST_OBSERVATION_CLAIMS_FROM_CLIENT` but written explicitly for clarity.
  */
 export const TEST_OBSERVATION_CLAIMS_FROM_CLIENT_LITERAL = {

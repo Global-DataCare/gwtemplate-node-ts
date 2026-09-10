@@ -45,7 +45,7 @@ COPY --from=builder /usr/src/gwtemplate-node-ts/swagger.config.cjs ./
 COPY --from=builder /usr/src/gwtemplate-node-ts/swagger-spec.json ./
 
 # Copy generated OpenAPI profile documents used by Swagger UI profile selector
-COPY --from=builder /usr/src/gwtemplate-node-ts/docs/openapi-profiles ./docs/openapi-profiles
+COPY --from=builder /usr/src/gwtemplate-node-ts/docs-v1/openapi-profiles ./docs/openapi-profiles
 
 # Copy runtime scripts (used by the start command)
 COPY --from=builder /usr/src/gwtemplate-node-ts/scripts ./scripts

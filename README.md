@@ -1,7 +1,7 @@
 # Gateway Template - Node.js & TypeScript
 
 Development and releases follow the mandatory
-[`local-first TDD and release contract`](docs/LOCAL_FIRST_RELEASE_CONTRACT.md).
+[`local-first TDD and release contract`](docs-v1/06-AUDIT-AND-EVIDENCE/06.C-LOCAL-FIRST-RELEASE-CONTRACT.md).
 
 La [documentación pública de los entregables en español](./deliverables/README.md)
 agrupa la guía Markdown, su fuente HTML editable y el Word para reproducir el
@@ -37,8 +37,6 @@ GW CORE and the CCAAS host runtime are separate artifacts. The latter contains
 the nine public chaincode servers selected through `CHAINCODE_NAME`; its
 deployment-specific package IDs must still be generated for the exact Helm
 release, namespace and Service addresses.
-
-([test-api](https://globaldatacare-test-961105121121.europe-southwest1.run.app/api-docs/))
 
 This repository provides a robust, asynchronous, and policy-driven API gateway template.
 
@@ -115,9 +113,9 @@ E2E gates before `npm publish` or any container image build.
   in the consented confidential projection. The response distinguishes a local receipt from a real
   Fabric transaction id. GW resolves the governed ledger route internally; the
   BFF and deployment configuration never select a channel or smart contract. See
-  [Authenticated clinical author](docs/01-OVERVIEW-AND-GUIDES/101-01.N-AUTHENTICATED-CLINICAL-AUTHOR.md)
+  [Authenticated clinical author](docs-v1/01-OVERVIEW-AND-GUIDES/01.M-AUTHENTICATED-CLINICAL-AUTHOR.md)
   and its copyable public-SDK
-  [authenticated clinical data snippet](docs/01-OVERVIEW-AND-GUIDES/snippets/authenticated-clinical-data.ts).
+  [authenticated clinical data snippet](docs-v1/01-OVERVIEW-AND-GUIDES/snippets/authenticated-clinical-data.ts).
 
 If you are new and confused by the front-story vs GW boundary, read first:
 
@@ -130,25 +128,23 @@ GW starts after upstream profile/runtime unlock and document/Communication autho
 ## Repository Navigation
 
 - Canonical local/GKE/live operations index:
-  - local demo/runtime: [docs/TESTING.md](docs/TESTING.md)
+  - local demo/runtime: [docs-v1 testing guide](docs-v1/06-AUDIT-AND-EVIDENCE/06.D-TESTING-GUIDE.md)
   - deployment details and env split: [DEPLOY.md](DEPLOY.md)
-  - API/docs index: [docs/README.md](docs/README.md)
-  - current controller lifecycle contract: [docs-v2/18-organization-controller-lifecycle.md](docs-v2/18-organization-controller-lifecycle.md)
+  - API/docs index: [docs-v1/README.md](docs-v1/README.md)
+  - current controller lifecycle contract: [docs-v2/19-organization-controller-lifecycle.md](docs-v2/19-organization-controller-lifecycle.md)
   - SDK live controller proof runner: [gdc-sdk-node-ts/docs/101-ORGANIZATION_CONTROLLER_LIFECYCLE.md](https://github.com/Global-DataCare/gdc-sdk-node-ts/blob/main/docs/101-ORGANIZATION_CONTROLLER_LIFECYCLE.md)
 - Fast path docs (recommended): [docs-v2/00-quickstart.md](docs-v2/00-quickstart.md)
-- Key custody and audit posture: [docs-v2/19-key-custody-and-audit-readiness.md](docs-v2/19-key-custody-and-audit-readiness.md)
-- Local audit/runtime with Fabric: [docs-v2/24-local-audit-fabric-runtime.md](docs-v2/24-local-audit-fabric-runtime.md)
+- Key custody and audit posture: [docs-v2/20-key-custody-and-audit.md](docs-v2/20-key-custody-and-audit.md)
+- Local audit/runtime with Fabric: [docs-v1/04-DEEP-DIVES/04.F-LOCAL-TOPOLOGY-AND-FABRIC-ENV-LOADER.md](docs-v1/04-DEEP-DIVES/04.F-LOCAL-TOPOLOGY-AND-FABRIC-ENV-LOADER.md)
 - Reproducible open-source production-readiness evidence: [PRODUCTION-READINESS.md](PRODUCTION-READINESS.md)
-- Portal/BFF to GW CORE reference: [portal-api-gw.md](portal-api-gw.md)
 - Clinical Bundle authorship and attestation:
-  [101-01.N-AUTHENTICATED-CLINICAL-AUTHOR.md](docs/01-OVERVIEW-AND-GUIDES/101-01.N-AUTHENTICATED-CLINICAL-AUTHOR.md)
-- Environment-variable reference: [docs-v2/22-environment-variables-reference.md](docs-v2/22-environment-variables-reference.md)
-- Testing and live E2E operations: [docs/TESTING.md](docs/TESTING.md)
-- Core integration baseline and rationale: [docs/API_CORE_INTEGRATION.md](docs/API_CORE_INTEGRATION.md)
+  [01.M-AUTHENTICATED-CLINICAL-AUTHOR.md](docs-v1/01-OVERVIEW-AND-GUIDES/01.M-AUTHENTICATED-CLINICAL-AUTHOR.md)
+- Environment-variable reference: [docs-v2/21-environment-variables.md](docs-v2/21-environment-variables.md)
+- Testing and live E2E operations: [docs-v1 testing guide](docs-v1/06-AUDIT-AND-EVIDENCE/06.D-TESTING-GUIDE.md)
+- Core integration baseline and rationale: [docs-v1 API CORE integration](docs-v1/02-API-AND-ENDPOINTS/02.D-API-CORE-INTEGRATION.md)
 - Shared controller/device lifecycle note:
   [gdc-sdk-core-ts/docs/ARCHITECTURE_CONTROLLER_DEVICE_LIFECYCLES.md](https://github.com/Global-DataCare/gdc-sdk-core-ts/blob/main/docs/ARCHITECTURE_CONTROLLER_DEVICE_LIFECYCLES.md)
-- Main docs index: [docs/README.md](docs/README.md)
-- Example-data and docs-sync guide: [docs/README.md#example-data-and-docs-sync](docs/README.md#example-data-and-docs-sync)
+- Main docs index: [docs-v1/README.md](docs-v1/README.md)
 - Employee bundle/lifecycle contract reference: [gdc-sdk-core-ts/docs/101-EMPLOYEES.md](https://github.com/Global-DataCare/gdc-sdk-core-ts/blob/main/docs/101-EMPLOYEES.md)
 - SDK live local reference before running cross-repo E2E: [gdc-sdk-node-ts/docs/101-LIVE_GW_LOCAL.md](https://github.com/Global-DataCare/gdc-sdk-node-ts/blob/main/docs/101-LIVE_GW_LOCAL.md)
 - Local environment template: [env.example](env.example)
@@ -171,7 +167,7 @@ For the canonical ICA + GW + SDK Node live verification workflow, including:
 - staging checks
 - the exact env vars that avoid ICA URL / jurisdiction / host-network mistakes
 
-go first to [docs/TESTING.md](docs/TESTING.md).
+go first to the [docs-v1 testing guide](docs-v1/06-AUDIT-AND-EVIDENCE/06.D-TESTING-GUIDE.md).
 
 ## Canonical Operations
 
@@ -363,7 +359,7 @@ For one section, `updateClinicalSection` accepts a FHIR `batch` whose entries
 may create and delete different resources. A delete addresses exactly
 `ResourceType/id`; the clinical resource retains only its creator DID, while
 GW checks any linked verified login channel during authorization. See the
-[high-level lifecycle 101](docs/01-OVERVIEW-AND-GUIDES/101-01.I-LIFECYCLE.md#authored-clinical-resource-deletion).
+[high-level lifecycle 101](docs-v1/01-OVERVIEW-AND-GUIDES/01.I-LIFECYCLE.md#authored-clinical-resource-deletion).
 
 Default mode (`didcomm`):
 
@@ -407,48 +403,36 @@ Canonical payload examples are not maintained separately in Swagger, markdown, a
 - GW fixture source of truth: [`src/__tests__/data/example-payloads.ts`](src/__tests__/data/example-payloads.ts)
 - Swagger/OpenAPI generation: [`src/utils/swagger-spec.ts`](src/utils/swagger-spec.ts) and [`scripts/generate-swagger-spec.mts`](scripts/generate-swagger-spec.mts)
 - Script payload rendering from the same fixtures: [`scripts/render-example-payload.mts`](scripts/render-example-payload.mts)
-- GW markdown conformance test: [`src/__tests__/unit/examples/markdown-examples.test.ts`](src/__tests__/unit/examples/markdown-examples.test.ts)
 - Canonical document-bundle story check: [`src/__tests__/unit/api-examples/communication.examples.test.ts`](src/__tests__/unit/api-examples/communication.examples.test.ts)
 - Canonical backend search check: [`src/__tests__/integration/composition.bundle-search.api.test.ts`](src/__tests__/integration/composition.bundle-search.api.test.ts)
 - GW to shared `gdc-common-utils-ts` conformance test: [`src/__tests__/unit/examples/shared-flow-examples.test.ts`](src/__tests__/unit/examples/shared-flow-examples.test.ts)
 - GW shared bundle editor surface contract: [`src/__tests__/unit/examples/shared-bundle-entry-editors.test.ts`](src/__tests__/unit/examples/shared-bundle-entry-editors.test.ts)
 - Shared lifecycle source of truth: [`gdc-common-utils-ts/src/examples/lifecycle.ts`](https://github.com/Global-DataCare/gdc-common-utils-ts/blob/main/src/examples/lifecycle.ts)
 - Shared lifecycle guide "for torpes": [`gdc-common-utils-ts/docs/101-LIFECYCLE.md`](https://github.com/Global-DataCare/gdc-common-utils-ts/blob/main/docs/101-LIFECYCLE.md)
-- GW lifecycle 101 for current local contract and SDK prompts: [`docs/01-OVERVIEW-AND-GUIDES/101-01.I-LIFECYCLE.md`](docs/01-OVERVIEW-AND-GUIDES/101-01.I-LIFECYCLE.md)
-- GW shared bundle editor note for `asVitalSign()` vs generic Allergy/Medication/Condition editing: [`docs/01-OVERVIEW-AND-GUIDES/101-01.J-SHARED_BUNDLE_ENTRY_EDITORS.md`](docs/01-OVERVIEW-AND-GUIDES/101-01.J-SHARED_BUNDLE_ENTRY_EDITORS.md)
-- GW canonical v2 clinical bundle reader contract: [`docs-v2/17-clinical-bundle-readers.md`](docs-v2/17-clinical-bundle-readers.md)
-- GW deactivation/purge contract for auditors and integrators: [`docs-v2/16-deactivation-and-purge-lifecycle.md`](docs-v2/16-deactivation-and-purge-lifecycle.md)
-- GW deactivation/purge lifecycle: [`docs-v2/16-deactivation-and-purge-lifecycle.md`](docs-v2/16-deactivation-and-purge-lifecycle.md)
+- GW lifecycle 101 for current local contract and SDK prompts: [`docs-v1/01-OVERVIEW-AND-GUIDES/01.I-LIFECYCLE.md`](docs-v1/01-OVERVIEW-AND-GUIDES/01.I-LIFECYCLE.md)
+- GW canonical v2 clinical bundle reader contract: [`docs-v2/18-clinical-bundle-readers.md`](docs-v2/18-clinical-bundle-readers.md)
+- GW deactivation/purge contract for auditors and integrators: [`docs-v2/17-deactivation-and-purge.md`](docs-v2/17-deactivation-and-purge.md)
+- GW deactivation/purge lifecycle: [`docs-v2/17-deactivation-and-purge.md`](docs-v2/17-deactivation-and-purge.md)
 - Shared lifecycle `101` guide: [`gdc-common-utils-ts/docs/101-LIFECYCLE.md`](https://github.com/Global-DataCare/gdc-common-utils-ts/blob/main/docs/101-LIFECYCLE.md)
 
-Current rule:
-
-- If a markdown example in `docs/90.A-API_INTEGRATORS_GUIDE.md` is canonical, mark it with `<!-- sync-example: EXAMPLE_NAME -->`.
-- The markdown block must then match the exported payload from `example-payloads.ts` exactly.
-- Demo/incremental flow scripts should render from `example-payloads.ts` and only apply explicit overrides for values such as tenant id, tax id, legal name, employee email, role, or subject id.
-- If shared examples in `gdc-common-utils-ts` change, the GW conformance test must still pass.
-- Lifecycle payloads must not be hardcoded independently in GW, SDK core, SDK node, SDK front, or Swagger once the shared package export is available locally.
+Current examples are generated from `example-payloads.ts`; SDK and Swagger
+consumers must reuse those fixtures rather than duplicate governed values.
 
 Useful checks:
 
 ```bash
-npm test -- --runTestsByPath src/__tests__/unit/examples/markdown-examples.test.ts src/__tests__/unit/examples/shared-flow-examples.test.ts src/__tests__/unit/utils/swagger-spec.test.ts
+npm test -- --runTestsByPath src/__tests__/unit/examples/shared-flow-examples.test.ts src/__tests__/unit/utils/swagger-spec.test.ts
 ```
 
 ## Project Documentation
 
-Human index lookup and provider matching: [Subject provider resolution and PDQm Patient/$match](docs/03-IDENTITY-AND-TRUST/03.E-PERSON-DISCOVERY-ACTION-ARCHITECTURE.md).
+Human index lookup and provider matching: [Subject provider resolution and PDQm Patient/$match](docs-v1/03-IDENTITY-AND-TRUST/03.B-PERSON-DISCOVERY-ACTION-ARCHITECTURE.md).
 
-This project contains extensive documentation covering architecture, development practices, and API usage. All documentation is located in the `docs/` directory.
-
-The canonical cross-custodian authorization contract is
-[Federated SMART token verification by a tenant Clearing House](docs/03-IDENTITY-AND-TRUST/03.L-FEDERATED-SMART-CLEARING-HOUSE.md).
-It preserves the index provider as the SMART token audience and defines how an
-EHR asks its own tenant to verify that token before releasing scoped data.
+This project contains extensive documentation covering architecture, development practices, and API usage. All documentation is located in the `docs-v1/` directory.
 
 To get a full overview and navigate the documentation effectively, please start with the main index:
 
-### **[➡️ Go to the Full Documentation Index (`docs/README.md`)](docs/README.md)**
+### **[➡️ Go to the Full Documentation Index (`docs-v1/README.md`)](docs-v1/README.md)**
 
 ## Quick Start
 
@@ -607,8 +591,8 @@ To ensure everything is working correctly, run the test suite:
 npm test
 ```
 For test tiers and E2E setup details, see:
-- [docs/TESTING.md](docs/TESTING.md)
-- [docs/TESTING-E2E.md](docs/TESTING-E2E.md)
+- [docs-v1 testing guide](docs-v1/06-AUDIT-AND-EVIDENCE/06.D-TESTING-GUIDE.md)
+- [docs-v1 E2E guide](docs-v1/06-AUDIT-AND-EVIDENCE/06.E-END-TO-END-TESTING.md)
 
 ## Next Steps: Exploring the API
 
@@ -624,7 +608,7 @@ The server provides a live, interactive Swagger UI that documents all available 
 
 For more advanced testing and scripting, the project includes a comprehensive collection of `curl` commands. These are useful for simulating client requests from the command line and are essential for understanding the data structures.
 
-*   **Location**: Use the current [API integrator guide](docs-v2/09-api-integrators-guide.md) and generated OpenAPI examples.
+*   **Location**: Use the current [API integrator guide](docs-v2/10-api-integrator-guide.md) and generated OpenAPI examples.
 
 ## Useful Commands
 
@@ -656,7 +640,7 @@ To validate `gdc-sdk-client-ts` from `apptemplate` (web portal), keep `gwtemplat
 Use this order to avoid drift between implementations:
 
 1. GW readiness and route compatibility:
-   - [docs/05-USE-CASES/PORTAL_WEB_GO_NO_GO_CHECKLIST.md](docs/05-USE-CASES/PORTAL_WEB_GO_NO_GO_CHECKLIST.md)
+   - [docs-v1 portal web checklist](docs-v1/05-USE-CASES/05.B-PORTAL-WEB-GO-NO-GO-CHECKLIST.md)
 2. Frontend SDK use cases and exact calls (`gdc-sdk-client-ts`):
    - [gdc-sdk-client-ts/docs/DEVELOPER_USE_CASES.md](https://github.com/Global-DataCare/gdc-sdk-client-ts/blob/main/docs/DEVELOPER_USE_CASES.md)
 3. Backend Node SDK use cases and exact calls (`dataspace-client-sdk-node`):
@@ -735,7 +719,7 @@ Recommended local preparation sequence:
 
 Before opening `apptemplate`, run the 5-minute Go/No-Go checklist:
 
-- [docs/05-USE-CASES/PORTAL_WEB_GO_NO_GO_CHECKLIST.md](docs/05-USE-CASES/PORTAL_WEB_GO_NO_GO_CHECKLIST.md)
+- [docs-v1 portal web checklist](docs-v1/05-USE-CASES/05.B-PORTAL-WEB-GO-NO-GO-CHECKLIST.md)
 
 Automated check command:
 
@@ -747,7 +731,8 @@ This command is a route smoke check. It renders canonical GW example fixtures an
 
 ## API Integrators Flow Runner
 
-Use this runner to validate the journey documented in `docs/API_INTEGRATORS_GUIDE.md` against the current code:
+Use this runner to validate the journey documented in
+`docs-v2/10-api-integrator-guide.md` against the current code:
 
 - Command: `npm run docs:flow-report`
 - Output: `artifacts/api-integrators-guide.flow-report.json`
@@ -922,7 +907,7 @@ DEMO_ALLOW_INSECURE_BEARER=false
 
 For a deterministic Fabric v3 devnet (DEMO single-host or multi-org), see:
 - `infra/fabric/local-network/README.md`
-- local audit/operator profile in this repo: `docs-v2/24-local-audit-fabric-runtime.md`
+- local audit/operator profile in this repo: `docs-v1/04-DEEP-DIVES/04.F-LOCAL-TOPOLOGY-AND-FABRIC-ENV-LOADER.md`
 
 Before a local-network image smoke, verify that its packaged organization/key
 chaincode mirror matches the canonical public CCAAS source in this repository:
@@ -934,7 +919,6 @@ npm run check:identity-chaincode-parity
 For the multi-cloud Fabric deployment plan and scripts, see:
 - `deliverables/ENTREGABLE_HOST_REPRODUCIBLE_ES.md`
 - `charts/gdc-host/README.md`
-- `docs/04-DEEP-DIVES/04.I-FABRIC-MULTICLOUD-BLUEPRINT.md`
 
 Local (minikube/k3s) is test-only and documented in:
 - `private-deploy.local.config`

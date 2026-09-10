@@ -3,7 +3,7 @@
 > 101 note
 > - This is part of the current GW entrypoint in `docs-v2`.
 > - Start the self-managed user story upstream with `login -> loadProfile -> actor facade`, then come here for GW runtime/contract validation.
-> - Read [101-README.md](./101-README.md) for the current ordered path.
+> - Read [26-tutorial-reading-order.md](./26-tutorial-reading-order.md) for the current ordered path.
 
 Objective: run API, validate health, run one core test flow.
 
@@ -17,7 +17,7 @@ Objective: run API, validate health, run one core test flow.
 ## Read first (context that must not be skipped)
 
 This file follows the shared narrative contract in
-[01-narrative-contract.md](./01-narrative-contract.md) and the repository
+[01-narrative-rules.md](./01-narrative-rules.md) and the repository
 governance in [ARCHITECTURE.md](../ARCHITECTURE.md) and
 [CONTRIBUTING.md](../CONTRIBUTING.md).
 
@@ -39,7 +39,7 @@ Before authoring payloads or integrations, read these source-of-truth docs:
 - [Communication layering 101](https://github.com/Global-DataCare/gdc-common-utils-ts/blob/main/docs/101-COMMUNICATION_LAYERING.md)
 - [IPS Communication outbox 101](https://github.com/Global-DataCare/gdc-sdk-core-ts/blob/main/docs/101-IPS_COMMUNICATION_OUTBOX.md)
 - [SDK node integration 101](https://github.com/Global-DataCare/gdc-sdk-node-ts/blob/main/docs/101-SDK_INTEGRATION.md)
-- [Core integration baseline for this GW](../docs/API_CORE_INTEGRATION.md)
+- [Core integration baseline for this GW](../docs-v1/02-API-AND-ENDPOINTS/02.D-API-CORE-INTEGRATION.md)
 
 ## What GW CORE expects on the wire
 
@@ -67,12 +67,12 @@ Teaching rule:
 
 ## Read next
 
-- `docs-v2/01-architecture-core-vs-extension.md`
-- `docs-v2/02-api-contracts.md`
-- `docs-v2/04-claims-and-fhir-rules.md`
-- `docs-v2/05-use-case-flow-explanations.md`
-- `docs-v2/06-security-model-and-why.md`
-- `docs-v2/07-didweb-pqc-and-trust-chain.md`
-- `docs-v2/09-api-integrators-guide.md`
-- `docs-v2/17-clinical-bundle-readers.md`
-- `docs-v2/19-key-custody-and-audit-readiness.md`
+- `docs-v2/02-architecture-boundaries.md`
+- `docs-v2/03-api-behavior.md`
+- `docs-v2/05-claims-and-fhir-rules.md`
+- `docs-v2/06-use-case-flows.md`
+- `docs-v2/07-security-model.md`
+- `docs-v2/08-did-web-pqc-trust-chain.md`
+- `docs-v2/10-api-integrator-guide.md`
+- `docs-v2/18-clinical-bundle-readers.md`
+- `docs-v2/20-key-custody-and-audit.md`

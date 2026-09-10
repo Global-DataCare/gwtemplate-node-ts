@@ -12,18 +12,18 @@
 import { readFileSync } from 'node:fs';
 
 const guide = readFileSync(
-  'docs/01-OVERVIEW-AND-GUIDES/101-01.N-AUTHENTICATED-CLINICAL-AUTHOR.md',
+  'docs-v1/01-OVERVIEW-AND-GUIDES/01.M-AUTHENTICATED-CLINICAL-AUTHOR.md',
   'utf8',
 );
 const snippet = readFileSync(
-  'docs/01-OVERVIEW-AND-GUIDES/snippets/authenticated-clinical-data.ts',
+  'docs-v1/01-OVERVIEW-AND-GUIDES/snippets/authenticated-clinical-data.ts',
   'utf8',
 );
 const readme = readFileSync('README.md', 'utf8');
 const releaseSkill = readFileSync('.codex/skills/enforce-release-test-discipline/SKILL.md', 'utf8');
 const provenanceSkill = readFileSync('.codex/skills/govern-digital-twin-consent/SKILL.md', 'utf8');
-const ledgerSchema = readFileSync('docs-v2/28-clinical-employee-ledger-schema.md', 'utf8');
-const currentReadingPath = readFileSync('docs-v2/101-README.md', 'utf8');
+const ledgerSchema = readFileSync('docs-v2/25-clinical-employee-ledger-schema.md', 'utf8');
+const currentReadingPath = readFileSync('docs-v2/26-tutorial-reading-order.md', 'utf8');
 const professionalAssignmentSource = readFileSync('src/utils/professional-assignment-ledger.ts', 'utf8');
 
 describe('authenticated clinical source-author documentation', () => {
@@ -68,7 +68,7 @@ describe('authenticated clinical source-author documentation', () => {
     expect(guide).toContain('gdc-sdk-node-ts/blob/main/docs/101-SDK_END_TO_END.md');
     expect(guide).toContain('gdc-sdk-node-ts/blob/main/docs/snippets/subject-section-writes.ts');
     expect(readme).toMatch(/Composition[\s\S]*author[\s\S]*attester/i);
-    expect(readme).toContain('101-01.N-AUTHENTICATED-CLINICAL-AUTHOR.md');
+    expect(readme).toContain('01.M-AUTHENTICATED-CLINICAL-AUTHOR.md');
     expect(releaseSkill).toContain('CDS legal-organization URN');
     expect(releaseSkill).toContain('relationships`/`ownerships');
     expect(provenanceSkill).toMatch(/CDS\s+legal-organization URN/);
@@ -98,12 +98,12 @@ describe('authenticated clinical source-author documentation', () => {
     expect(snippet).not.toMatch(/buildClinicalLedgerReferenceId|artifact-sc|employee-sc|channelName/i);
     expect(readme).toContain('snippets/authenticated-clinical-data.ts');
     expect(currentReadingPath).toContain(
-      '../docs/01-OVERVIEW-AND-GUIDES/101-01.N-AUTHENTICATED-CLINICAL-AUTHOR.md',
+      '../docs-v1/01-OVERVIEW-AND-GUIDES/01.M-AUTHENTICATED-CLINICAL-AUTHOR.md',
     );
     expect(currentReadingPath).toContain(
-      '../docs/01-OVERVIEW-AND-GUIDES/snippets/authenticated-clinical-data.ts',
+      '../docs-v1/01-OVERVIEW-AND-GUIDES/snippets/authenticated-clinical-data.ts',
     );
-    expect(currentReadingPath).toContain('./28-clinical-employee-ledger-schema.md');
+    expect(currentReadingPath).toContain('./25-clinical-employee-ledger-schema.md');
 
     expect(professionalAssignmentSource).toContain('@example');
     expect(professionalAssignmentSource).toMatch(/organizationIdentifier[\s\S]*organizationLink/i);

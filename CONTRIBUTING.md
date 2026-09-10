@@ -4,7 +4,7 @@ Read [ARCHITECTURE.md](./ARCHITECTURE.md) before changing managers, routes,
 queue adapters, storage adapters, or gateway-facing examples.
 
 For 101 material, also read [NARRATIVE-ALIGNMENT.md](./NARRATIVE-ALIGNMENT.md)
-and [docs-v2/01-narrative-contract.md](./docs-v2/01-narrative-contract.md).
+and [docs-v2/01-narrative-rules.md](./docs-v2/01-narrative-rules.md).
 
 ## Main Rule
 

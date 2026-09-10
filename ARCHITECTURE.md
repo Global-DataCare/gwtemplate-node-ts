@@ -9,7 +9,7 @@ actually exposed by the gateway.
 For any 101-facing docs, snippets, or tests, also follow:
 
 - [NARRATIVE-ALIGNMENT.md](./NARRATIVE-ALIGNMENT.md)
-- [docs-v2/01-narrative-contract.md](./docs-v2/01-narrative-contract.md)
+- [docs-v2/01-narrative-rules.md](./docs-v2/01-narrative-rules.md)
 
 This repository is the source of truth for:
 
@@ -62,7 +62,6 @@ Clinical artifact anchoring rule:
 When this repository references the cross-repo route/domain split, align it
 with the GW template portal contract:
 
-- [gwtemplate-node-ts/docs/PORTAL_API_TO_GW_CORE.md](https://github.com/Global-DataCare/gwtemplate-node-ts/blob/main/docs/PORTAL_API_TO_GW_CORE.md)
 
 This repository is not the place for:
 
@@ -135,7 +134,7 @@ while preserving the same route/manager contract.
 At the gateway layer, endpoint and manager names must describe actual backend
 operations and must not blur CRUD, search, lifecycle, or transport semantics.
 
-Use explicit names and keep docs/examples aligned with tested behavior.
+Use explicit names and keep docs-v1/examples aligned with tested behavior.
 
 For specialized stores, vaults, and runtime adapters, keep the shared concept
 first and the specialization suffix last, for example:
@@ -227,6 +226,6 @@ Communication-specific reminder:
 
 ## Extension Rule
 
-If a GW variant such as `GW UNID` extends GW CORE, it should add its own
-architecture note as a suffix/extension document over this baseline rather than
-forking the core layering rules silently.
+Product-specific GW variants must keep their architecture notes in their own
+repositories rather than adding product behavior or names to this neutral
+baseline.

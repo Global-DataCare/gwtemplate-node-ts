@@ -31,7 +31,7 @@ import { EXAMPLE_SIGNED_TERMS_PDF_URL } from 'gdc-common-utils-ts/examples/share
  * @file This file serves as the Single Source of Truth for all complex test payloads
  * and examples used across integration tests, cURL documentation, and Swagger specs.
  * It is designed to be a 1:1 representation of the payloads described in the
- * `docs/API_INTEGRATORS_GUIDE.md`, while also retaining other payloads used in tests.
+ * current generated documentation, while also retaining other payloads used in tests.
  */
 
 // --- Reusable Constants ---

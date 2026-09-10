@@ -5,7 +5,7 @@ This public repository is the entry point for the deliverable. It contains the G
 ## External Pontus-X boundary
 
 This deliverable does not include, reproduce or simulate Pontus-X. It also does
-not include the `globaldatacare.es` portal or its BFF. Publication of products,
+not include the external portal/BFF. Publication of products,
 datasets and services in Pontus-X is performed by the organization controller
 through that portal/BFF and, where required, is evidenced separately from this
 local host deliverable.

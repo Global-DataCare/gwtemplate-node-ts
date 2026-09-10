@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Rename the detailed documentation tree to `docs-v1`, normalize every
+  detailed guide into numbered sections, continuously renumber the current
+  `docs-v2` guide, repair local links and generated OpenAPI paths, and enforce
+  product-neutral public documentation and repository skills with executable
+  governance tests.
 - Make individual Organization Order confirmation materialize the principal
   owner/controller RelatedPerson automatically while issuing the same bare
   `RESPRSN` licence seat. Reuse the exact
@@ -1120,7 +1125,7 @@
   `FABRIC_DEVNET_ROOT` so clean worktrees and independent clones use their own
   host-scoped MSP material without modifying another checkout.
 - Remove root-level `TEST*` and `TODO*` clutter by moving maintained testing
-  guides to `docs/` and internal backlog/handoff material to `docs-internal/`;
+  guides to `docs-v1/` and internal backlog/handoff material to `docs-internal/`;
   update repository navigation and repair the affected documentation links.
 - Move the public production-readiness guide to the repository root as
   `PRODUCTION-READINESS.md`, link it from the main README, and replace the
@@ -1202,7 +1207,7 @@
   sector variables.
 
 - Consolidate the portal-to-GW mapping in
-  `docs/PORTAL_API_TO_GW_CORE.md`, with one root navigation pointer instead of
+  `docs-v1/02-API-AND-ENDPOINTS/02.G-PORTAL-API-TO-GW-CORE.md`, with one root navigation pointer instead of
   a competing versioned source of truth.
 
 ## [1.21.22] - 2026-08-20
@@ -2069,9 +2074,9 @@
   - `TenantServiceRuntime` as the technical service/tenant wallet/runtime
   - `ChannelBackendPort` as the product/channel API above those runtimes
   in:
-  - `docs-v2/101-README.md`
-  - `docs-v2/09-api-integrators-guide.md`
-  - `docs-v2/19-key-custody-and-audit-readiness.md`
+  - `docs-v2/26-tutorial-reading-order.md`
+  - `docs-v2/10-api-integrator-guide.md`
+  - `docs-v2/20-key-custody-and-audit.md`
 - Added one centralized integration map so
   front/BFF/backend contributors now have one high-level entry point for:
   - inter-tenant research access choreography
@@ -2134,7 +2139,7 @@
     role and by direct email
   Files:
   - `ARCHITECTURE.md`
-  - `docs-v2/23-digital-twin-composition-search-contract.md`
+  - `docs-v2/22-digital-twin-search.md`
   - `docs-end/03-identity-ledger-contract-plan.md`
   - `docs-end/05-project-closure-use-cases-and-lifecycles-summary.md`
 - Repackaged the closeout document set under `docs-end/` and added index files
@@ -2156,9 +2161,9 @@
   Files:
   - `chaincode/docs/101-CONSENTACCESS-SC-CCAAS.md`
   - `docs-v2/21-research-digital-twin-technical-backlog.md`
-  - `docs/04-DEEP-DIVES/04.K-FABRIC-ADAPTER-INVENTORY-AND-DUAL-NETWORK-TARGET.md`
-  - `docs/04-DEEP-DIVES/04.L-TEST-LOCAL-TOPOLOGY-AND-FABRIC-ENV-LOADER.md`
-  - `docs/04-DEEP-DIVES/04.M-CONSENTACCESS-NETWORK-DEPLOY.md`
+  - `docs-v1/04-DEEP-DIVES/04.E-FABRIC-ADAPTER-INVENTORY.md`
+  - `docs-v1/04-DEEP-DIVES/04.F-LOCAL-TOPOLOGY-AND-FABRIC-ENV-LOADER.md`
+  - `docs-v1/04-DEEP-DIVES/04.M-CONSENTACCESS-NETWORK-DEPLOY.md`
 - Expanded gateway-facing example payload fixtures to show the canonical SMART
   proof layering and to mirror claims into `resource.meta.claims` where shared
   readers now expect canonical bundle payloads.
@@ -2174,9 +2179,9 @@
   synchronized with the current branch content.
   Files:
   - `v1.5-tabla-portal-api-gw.md`
-  - `docs/openapi-profiles/openapi-core.json`
-  - `docs/openapi-profiles/openapi-compat.json`
-  - `docs/openapi-profiles/openapi-extension.json`
+  - `docs-v1/openapi-profiles/openapi-core.json`
+  - `docs-v1/openapi-profiles/openapi-compat.json`
+  - `docs-v1/openapi-profiles/openapi-extension.json`
   - `CONTRIBUTING.md`
 
 ## [1.19.2] - 2026-06-30
@@ -2200,11 +2205,11 @@
   Files:
   - `src/managers/OpenIdAuthManager.ts`
   - `src/routes/api.ts`
-  - `docs/90.A-API_INTEGRATORS_GUIDE.md`
-  - `docs/openapi-examples/core-flow-examples.json`
-  - `docs/openapi-profiles/openapi-core.json`
-  - `docs/openapi-profiles/openapi-compat.json`
-  - `docs/openapi-profiles/openapi-extension.json`
+  - `docs-v1/90.A-API_INTEGRATORS_GUIDE.md`
+  - `docs-v1/openapi-examples/core-flow-examples.json`
+  - `docs-v1/openapi-profiles/openapi-core.json`
+  - `docs-v1/openapi-profiles/openapi-compat.json`
+  - `docs-v1/openapi-profiles/openapi-extension.json`
 - Extended consent-rule evaluation for SMART token issuance so stored
   `Consent.action` values may be interpreted as either:
   - legacy section-only clinical actions such as
@@ -2378,7 +2383,7 @@
 - Linked the new shared SDK lifecycle note for controller/device recovery from
   GW CORE documentation entry points:
   - `README.md`
-  - `docs/README.md`
+  - `docs-v1/README.md`
 - The canonical cross-repository reference for:
   - legal organization controller recovery via `_issue`
   - professional device replacement via `_exchange` + `Device/_dcr`
@@ -2390,9 +2395,9 @@
 - Refreshed the generated OpenAPI profile documents and swagger wiring so the
   published API examples stay aligned with the current host onboarding and
   lifecycle behavior:
-  - `docs/openapi-profiles/openapi-compat.json`
-  - `docs/openapi-profiles/openapi-core.json`
-  - `docs/openapi-profiles/openapi-extension.json`
+  - `docs-v1/openapi-profiles/openapi-compat.json`
+  - `docs-v1/openapi-profiles/openapi-core.json`
+  - `docs-v1/openapi-profiles/openapi-extension.json`
   - `swagger.config.cjs`
 
 ### Validation
@@ -2413,7 +2418,7 @@
 - Added manager coverage for the employee device replacement flow, including
   local identity-ledger revocation/registration calls:
   - `src/__tests__/managers/DeviceRegistrationManager.test.ts`
-- Added `docs-v2/24-local-audit-fabric-runtime.md` to define the current
+- Added `docs-v1/04-DEEP-DIVES/04.F-LOCAL-TOPOLOGY-AND-FABRIC-ENV-LOADER.md` to define the current
   local ICA + GW CORE + Fabric baseline for auditors/integrators, including:
   - the supported deterministic local Fabric devnet path
   - the current local channel scope (`health-care-local` and `identity-local`,
@@ -2524,8 +2529,8 @@
   v2 docs set, including the technical backlog, environment variable
   reference, and the dedicated `Composition/_search` contract:
   - `docs-v2/21-research-digital-twin-technical-backlog.md`
-  - `docs-v2/22-environment-variables-reference.md`
-  - `docs-v2/23-digital-twin-composition-search-contract.md`
+  - `docs-v2/21-environment-variables.md`
+  - `docs-v2/22-digital-twin-search.md`
 - Added the official HL7 IPS all-sections fixture plus TDD coverage for
   section-first twin search and `ResearchSubject/$summary` materialization:
   - `src/__tests__/data/fhir-ips-bundle-all-sections.json`
@@ -2557,11 +2562,11 @@
 ## [1.16.0] - 2026-06-26
 
 ### Added
-- Added a dedicated `docs-v2/18-organization-controller-lifecycle.md` guide
+- Added a dedicated `docs-v2/19-organization-controller-lifecycle.md` guide
   that explains the narrow controller recovery/rebind lifecycle, the direct GW
   route order, and the relationship to the canonical `gdc-sdk-node-ts`
   executable proof.
-- Added `docs-v2/19-key-custody-and-audit-readiness.md` so the current KMS
+- Added `docs-v2/20-key-custody-and-audit.md` so the current KMS
   persistence model, the residual `KEK_SECRET` weakness, and the production
   migration target toward external KMS/HSM custody are documented in the v2
   docs set.
@@ -2569,7 +2574,7 @@
   separate research-store plan now has a code-targeted backlog for
   `server-config.ts`, research-store adapters, and the initial explicit
   `digitaltwin` search contract.
-- Added `docs-v2/23-digital-twin-composition-search-contract.md` so the
+- Added `docs-v2/22-digital-twin-search.md` so the
   now-implemented `digitaltwin/.../Composition/_search` contract has one
   concise source of truth for accepted parameters, section/resource support,
   and step-by-step test flow.
@@ -2594,7 +2599,7 @@
   tests and generated profile documents consume the same organization
   controller example set.
 - Moved generated core flow examples out of `artifacts/` and into
-  `docs/openapi-examples/core-flow-examples.json` so versioned example
+  `docs-v1/openapi-examples/core-flow-examples.json` so versioned example
   documents live alongside the rest of the published API contract.
 - Updated controller-facing bearer authentication so host registry and other
   bearer-protected API routes can accept either a verified `id_token` or one
@@ -2663,7 +2668,7 @@
 ## [1.15.0] - 2026-06-25
 
 ### Added
-- Added a dedicated `docs-v2/18-organization-controller-lifecycle.md` guide
+- Added a dedicated `docs-v2/19-organization-controller-lifecycle.md` guide
   that explains the narrow controller recovery/rebind lifecycle, the direct GW
   route order, and the relationship to the canonical `gdc-sdk-node-ts`
   executable proof.
@@ -2684,7 +2689,7 @@
   tests and generated profile documents consume the same organization
   controller example set.
 - Moved generated core flow examples out of `artifacts/` and into
-  `docs/openapi-examples/core-flow-examples.json` so versioned example
+  `docs-v1/openapi-examples/core-flow-examples.json` so versioned example
   documents live alongside the rest of the published API contract.
 - Updated controller-facing bearer authentication so host registry and other
   bearer-protected API routes can accept either a verified `id_token` or one
@@ -2719,7 +2724,7 @@
 ### Changed
 - Updated the shared dependency target to `gdc-common-utils-ts@^2.0.11`.
 - Moved the versioned generated OpenAPI profile documents out of
-  `artifacts/openapi-profiles` and into `docs/openapi-profiles` so `artifacts/`
+  `artifacts/openapi-profiles` and into `docs-v1/openapi-profiles` so `artifacts/`
   can remain reserved for ephemeral logs, traces, and local test output while
   Swagger UI still serves the profile selector at runtime.
 - Added deterministic demo token test fixtures that reuse the shared
@@ -2944,9 +2949,9 @@
   so organization onboarding and public DID resolution are documented from the
   external integration perspective:
   - `v1.5-tabla-portal-api-gw.md`
-  - `docs/PORTAL_API_TO_GW_CORE.md`
-  - `docs/API_CORE_INTEGRATION.md`
-  - `docs/OPENAPI_PROFILE_MATRIX.md`
+  - `docs-v1/02-API-AND-ENDPOINTS/02.G-PORTAL-API-TO-GW-CORE.md`
+  - `docs-v1/02-API-AND-ENDPOINTS/02.D-API-CORE-INTEGRATION.md`
+  - `docs-v1/02-API-AND-ENDPOINTS/02.F-OPENAPI-PROFILE-MATRIX.md`
 
 ### Changed
 - Updated GW to consume `gdc-common-utils-ts@^2.0.5` and reuse shared
@@ -2971,7 +2976,7 @@
 - Refreshed repository docs and examples to point integrators at the canonical
   live verification flow and contract surface:
   - `README.md`
-  - `docs/90.A-API_INTEGRATORS_GUIDE.md`
+  - `docs-v1/90.A-API_INTEGRATORS_GUIDE.md`
 
 ### Testing
 - `npm test -- --runInBand src/__tests__/unit/managers/HostingManager.verification-transaction.test.ts src/__tests__/unit/utils/swagger-spec.test.ts`
@@ -2991,9 +2996,9 @@
   is explicitly tracked as a pending GW/OpenAPI publication rather than being
   silently implied:
   - `v1.5-tabla-portal-api-gw.md`
-  - `docs/PORTAL_API_TO_GW_CORE.md`
-  - `docs/API_CORE_INTEGRATION.md`
-  - `docs/OPENAPI_PROFILE_MATRIX.md`
+  - `docs-v1/02-API-AND-ENDPOINTS/02.G-PORTAL-API-TO-GW-CORE.md`
+  - `docs-v1/02-API-AND-ENDPOINTS/02.D-API-CORE-INTEGRATION.md`
+  - `docs-v1/02-API-AND-ENDPOINTS/02.F-OPENAPI-PROFILE-MATRIX.md`
 - Bumped the GW package patch version from `1.14.1` to `1.14.2` to publish the
   `gdc-common-utils-ts@^2.0.2` adoption alongside the corresponding image/deploy
   tag lineage.
@@ -3045,7 +3050,7 @@
   individual, tenant, and host purge flows can skip retained `Communication`
   records by default while `COMMUNICATION_RETENTION_DISABLED=false`, and added
   explicit audit/compliance references in:
-  - `docs-v2/16-deactivation-and-purge-lifecycle.md`
+  - `docs-v2/17-deactivation-and-purge.md`
 - Relaxed ICA activation representative validation so `Organization/_activate`
   no longer requires the representative VC `credentialSubject.id` to be a
   `did:web`; non-DID subject ids such as `urn:person:...` now pass while GW
@@ -3104,7 +3109,7 @@
   - `src/database/repositories/vault/confidential-storage-persistence.ts`
 - Added explicit lifecycle and audit documentation for deactivation and purge
   flows in:
-  - `docs-v2/16-deactivation-and-purge-lifecycle.md`
+  - `docs-v2/17-deactivation-and-purge.md`
 - Added host/tenant discovery publication guards so dataspace discovery
   endpoints stop advertising disabled participants while keeping DID material
   resolvable for audit/readback scenarios.
@@ -3241,7 +3246,7 @@
   - `src/utils/payment-confirmation.ts`
 - Added embedded invoice bundle generation for commercial order responses in:
   - `src/utils/invoice-bundle.ts`
-  - `docs/PORTAL_API_TO_GW_CORE.md`
+  - `docs-v1/02-API-AND-ENDPOINTS/02.G-PORTAL-API-TO-GW-CORE.md`
 - Added focused unit coverage for payment confirmation and commercial order
   invoice readback in:
   - `src/__tests__/unit/utils/payment-confirmation.test.ts`
@@ -3604,11 +3609,11 @@
 - Added a canonical `_transaction` alias for `individual/org.schema/Organization` service discovery and Swagger so individual organization flows can be exercised with the same onboarding semantics as the existing batch route.
 - Legal-organization activation/discovery now treats `org.schema.Service.serviceType` as the canonical capability source for tenant DID publication and DCAT3 service offerings, with the docs and examples aligned around mandatory activation capabilities.
 - Regenerated Swagger/OpenAPI profile artifacts and aligned route descriptions, bootstrap scripts, env defaults, and curl examples around canonical `acme-id`, contextualized `org.schema` claims, and the synchronized local example fixtures.
-- Reorganized legacy top-level guides under `docs/`, expanded reading-order/README guidance, and documented the local example-sync workflow so the repo reflects the current source-of-truth layout.
+- Reorganized legacy top-level guides under `docs-v1/`, expanded reading-order/README guidance, and documented the local example-sync workflow so the repo reflects the current source-of-truth layout.
 - Updated the shared dependency target to `gdc-common-utils-ts@^1.7.0`.
 - Added local GW lifecycle documentation for SDK alignment:
-  - `docs/01-OVERVIEW-AND-GUIDES/101-01.I-LIFECYCLE.md`
-  - `docs/90.L-LIFECYCLE_CURRENT_VS_TARGET.md`
+  - `docs-v1/01-OVERVIEW-AND-GUIDES/01.I-LIFECYCLE.md`
+  - `docs-v1/90.L-LIFECYCLE_CURRENT_VS_TARGET.md`
 - Clarified current GW CORE lifecycle semantics:
   - `individual/org.schema/Organization/_disable` disables the hosted individual/family record without releasing licenses
   - `individual/org.schema/Organization/_purge` requires prior inactive status, releases or disassociates licenses, and preserves the record for traceability
@@ -3751,7 +3756,7 @@
 - Documentation alignment clarified for cross-service namespace consistency:
   - Gateway: `/host/...`
   - ICA: `/ica/...`
-  - DataConv: `/publisher/...`
+  - External publisher service: `/publisher/...`
 
 ### Tests
 - Added unit coverage for VP-based organization credential extraction in hosting activation flow.
@@ -3857,10 +3862,10 @@
 
 -   **Unit Tests:** Added a comprehensive suite of unit tests for the new batch discovery logic in `CustomerManager.test.ts`.
 -   **End-to-End Test:** Added a new test case (`Part 8`) to the main integration test suite (`end-to-end-flow.test.ts`). This test verifies the full, asynchronous submit-and-poll flow for the `_discovery` endpoint using a real, encrypted JWE payload.
--   **Documentation:** Created a new, detailed architecture document for the discovery feature at `docs/03-IDENTITY-AND-TRUST/03.E-PERSON-DISCOVERY-ACTION-ARCHITECTURE.md`, which includes a Mermaid sequence diagram illustrating the entire flow, and ``.
+-   **Documentation:** Created a new, detailed architecture document for the discovery feature at `docs-v1/03-IDENTITY-AND-TRUST/03.B-PERSON-DISCOVERY-ACTION-ARCHITECTURE.md`, which includes a Mermaid sequence diagram illustrating the entire flow, and ``.
 -   **Code Cleanup:** Removed the obsolete `CustomerDiscoveryManager` and its test file, as its logic was consolidated into `CustomerManager`. Disabled verbose cryptographic logs to improve test readability.
 -   **Integration Suite Hardening:** Updated Jest config and integration tests to avoid sandbox-incompatible e2e/firestore runs and to use in-memory Express invocation.
--   **Docs:** Updated `docs/API_INTEGRATORS_GUIDE.md` with contextualized claims normalization rules and license gating notes.
+-   **Docs:** Updated `docs-v1/API_INTEGRATORS_GUIDE.md` with contextualized claims normalization rules and license gating notes.
 
 ## Legacy notes: DocumentReference and onboarding
 
@@ -3900,7 +3905,7 @@
   one config file.
 - Added SHA-256 `manifest.json` publication for generated PKI artifact
   directories so local trust bundles can be inspected and audited offline.
-- Added `docs-v2/25-trust-bundle-and-local-network-runbook.md` and
+- Added `docs-v2/23-trust-bundle-local-network.md` and
   `docs-internal/04-trust-bundle-operator-roles.md` to document the
   reproducible trust bundle, operator roles, and the ownership split between
   `gwtemplate-node-ts`, `dataspace-ica-ts`, and `gdc-sdk-node-ts`.
@@ -4014,7 +4019,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Created Structured Documentation Hub**:
   - Consolidated all architectural and guide markdown files into a new, organized `/docs` directory with a numbered, thematic structure.
-  - Created a new `docs/01-OVERVIEW-AND-GUIDES/01.B-CREDENTIAL-ARCHITECTURE.md` to formally document the mandatory patterns for VC ID generation, subject identification, and issuance formats.
+  - Created a new `docs-v1/01-OVERVIEW-AND-GUIDES/01.B-CREDENTIAL-ARCHITECTURE.md` to formally document the mandatory patterns for VC ID generation, subject identification, and issuance formats.
 
 
 ### Changed

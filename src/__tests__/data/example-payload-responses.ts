@@ -11,10 +11,9 @@
  * The script writes the full redacted report to:
  *   `artifacts/api-integrators-guide.flow-report.json`
  *
- * These exports are meant to be used by docs/tests/Swagger as example responses.
+ * These exports are meant to be used by documentation, tests and Swagger as example responses.
  */
 
 export type ExampleResponse = Record<string, any>;
 
 export const EXAMPLE_RESPONSES: Record<string, ExampleResponse> = {};
-

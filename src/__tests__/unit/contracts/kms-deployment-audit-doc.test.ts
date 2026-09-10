@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 describe('KMS deployment audit documentation', () => {
-  const document = readFileSync(resolve(process.cwd(), 'docs/90.K-KMS_MLKEM_RESPONSIBILITY_MATRIX.md'), 'utf8');
+  const document = readFileSync(resolve(process.cwd(), 'docs-v1/04-DEEP-DIVES/04.H-KMS-MLKEM-RESPONSIBILITY-MATRIX.md'), 'utf8');
   const awsSection = (document.match(/### AWS deployment configuration[\s\S]*?(?=\n### |\n## )/)?.[0] ?? '')
     .replace(/\s+/g, ' ');
   const section = (document.match(/## Deployment audit: call volume, cost, and security[\s\S]*?(?=\n## )/)?.[0] ?? '')

@@ -15,8 +15,8 @@ Read the current files in both repositories:
 
 - GW CORE:
   - `AGENTS.md`
-  - `docs/01-OVERVIEW-AND-GUIDES/101-01.I-LIFECYCLE.md`
-  - `docs/90.F-UC_CAPABILITY_MATRIX_SEDIA.md`
+  - `docs-v1/01-OVERVIEW-AND-GUIDES/01.I-LIFECYCLE.md`
+  - `docs-v1/06-AUDIT-AND-EVIDENCE/06.A-SEDIA-CAPABILITY-EVIDENCE-MATRIX.md`
   - `src/utils/consent-storage.ts`
   - `src/utils/digital-twin-secondary-use.ts`
   - `src/utils/digital-twin-research-projection.ts`
@@ -220,7 +220,7 @@ For any contract change, update together:
 - README public-surface inventory and changelogs;
 - this skill in both repository-local copies.
 - Cross-link and synchronize GW CORE
-  `docs/01-OVERVIEW-AND-GUIDES/101-01.N-AUTHENTICATED-CLINICAL-AUTHOR.md`
+  `docs-v1/01-OVERVIEW-AND-GUIDES/01.M-AUTHENTICATED-CLINICAL-AUTHOR.md`
   with Node SDK `docs/101-BFF_CLINICAL_WRITES.md`.
 
 Search for stale claims before finishing, especially `researchOrganizationDid`, `secondaryUseClaimKey`, ODRL in the provider toggle, operational `Composition.subject`, one Composition per section, and portal calls to direct digitaltwin Composition batch.
@@ -237,7 +237,7 @@ Search for stale claims before finishing, especially `researchOrganizationDid`, 
 ## Mandatory release authorization continuity
 
 Fail-fast order is unit and integration with `networkKind=test`, followed by a
-real local UI -> BFF -> SDK -> GW/DataConv Playwright journey without blockchain.
+real local UI -> BFF -> SDK -> service Playwright journey without blockchain.
 An unpublished SDK uses an immutable `npm pack` tarball as temporary
 `--no-save` local input without committing dependency or lockfile changes.
 Publish only after the entire affected local matrix is green; then install the
@@ -256,7 +256,7 @@ local `test` stage with an immutable `npm pack` tarball. Never commit a
 `file:`, Git, workspace or vendored tarball dependency.
 
 Follow the canonical contract in
-[`docs/LOCAL_FIRST_RELEASE_CONTRACT.md`](../../../docs/LOCAL_FIRST_RELEASE_CONTRACT.md):
+[`06.C-LOCAL-FIRST-RELEASE-CONTRACT.md`](../../../docs-v1/06-AUDIT-AND-EVIDENCE/06.C-LOCAL-FIRST-RELEASE-CONTRACT.md):
 
 - Do not attempt `npm publish` until every affected local `test` gate is
   green, including unit, integration, local services, real UI and Playwright.

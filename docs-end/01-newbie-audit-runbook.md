@@ -2,7 +2,7 @@
 
 > 101 note
 > - This file is part of the packaged closeout/audit path in `docs-end`, not the main current integrator/runtime onboarding path.
-> - For the active GW reading order, start in [../docs-v2/101-README.md](../docs-v2/101-README.md).
+> - For the active GW reading order, start in [../docs-v2/26-tutorial-reading-order.md](../docs-v2/26-tutorial-reading-order.md).
 > - Use this runbook when the goal is reproducible local audit evidence.
 
 Status date: 2026-06-28  

@@ -4,7 +4,7 @@ Estado: versión resumida en español, orientada a conversión posterior a Word/
 
 Nota de precedencia: este documento resume un cierre y no redefine la
 arquitectura. La publicación de productos en Pontus-X pertenece al controller de
-la organización a través del portal `globaldatacare.es` y su BFF; GW CORE
+la organización a través del portal/BFF externo; GW CORE
 proporciona el plano FHIR/digital-twin, dataspace ICA acredita participantes y
 Fabric conserva el estado/evidencia asignado a la red permisionada.
 

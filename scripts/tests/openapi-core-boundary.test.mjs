@@ -15,7 +15,7 @@ const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url))
 test('GW CORE does not generate or advertise a product-extension OpenAPI profile', () => {
   const generator = fs.readFileSync(path.join(repositoryRoot, 'scripts/generate-openapi-profiles.mjs'), 'utf8');
   const server = fs.readFileSync(path.join(repositoryRoot, 'src/server.ts'), 'utf8');
-  const extensionArtifact = path.join(repositoryRoot, 'docs/openapi-profiles/openapi-extension.json');
+  const extensionArtifact = path.join(repositoryRoot, 'docs-v1/openapi-profiles/openapi-extension.json');
 
   assert.doesNotMatch(generator, /['"]extension['"]/);
   assert.doesNotMatch(server, /openapi-extension\.json/);

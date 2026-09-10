@@ -7,7 +7,7 @@ export async function generateSwaggerSpec(): Promise<SwaggerSpec> {
   const swaggerConfig = await import('../../swagger.config.cjs');
   const { options, swaggerDefinition } = (swaggerConfig as any).default ?? swaggerConfig;
 
-  // Same source of truth as docs/tests.
+  // Same source of truth as docs-v1/tests.
   const examples = await import('../__tests__/data/example-payloads');
   const apiExamples = await import('../api-examples');
 
