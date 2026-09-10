@@ -2,6 +2,12 @@
 
 Estado: versión resumida en español, orientada a conversión posterior a Word/PDF.
 
+Nota de precedencia: este documento resume un cierre y no redefine la
+arquitectura. La publicación de productos en Pontus-X pertenece al controller de
+la organización a través del portal `globaldatacare.es` y su BFF; GW CORE
+proporciona el plano FHIR/digital-twin, dataspace ICA acredita participantes y
+Fabric conserva el estado/evidencia asignado a la red permisionada.
+
 ## 1. Resumen Ejecutivo
 
 El proyecto ha tenido como finalidad construir y consolidar una plataforma de
@@ -284,10 +290,11 @@ En este punto conviene distinguir entre:
 
 - el perfil interno ya probado, donde la prueba de acceso viaja como `vp_token`
   con la VC de contrato inter-tenant
-- y un perfil externo de investigación, por ejemplo con `data access token`
-  validado desde Pontus-X, cuyo encaje debe tratarse como una variante acotada
-  al endpoint `identity/openid/smart/token` del caso de uso `research access`,
-  no como una regla general del resto de usos de `OpenIdAuthManager`
+- y un perfil externo de investigación en el que el portal/BFF puede aportar la
+  autorización obtenida en su flujo Pontus-X; GW valida únicamente la evidencia
+  de acceso configurada para `identity/openid/smart/token` en el caso de uso
+  `research access`, sin asumir que Pontus-X sea una regla general de
+  `OpenIdAuthManager`
 
 ### 5.4 Soporte para criptografía moderna y evolución post-quantum
 

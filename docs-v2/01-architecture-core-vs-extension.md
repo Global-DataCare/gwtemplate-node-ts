@@ -1,5 +1,22 @@
 # 01 Architecture: Core vs Extension
 
+Status: Canonical current-runtime guide
+
+## SEDIA component boundary
+
+- The organization controller uses the `globaldatacare.es` portal/BFF to
+  publish products, datasets and service offerings in Pontus-X.
+- Pontus-X publication and operational credentials belong to that portal/BFF;
+  they are outside GW CORE and dataspace ICA.
+- GW CORE owns the protected FHIR and digital-twin data plane, including search
+  and authorization.
+- Dataspace ICA owns participant/controller verification, credential/evidence
+  lifecycle and technical trust discovery.
+- Hyperledger Fabric is the permissioned state/evidence plane. It is not the
+  Pontus-X product catalog.
+- The local reproducible host deliverable does not include, reproduce or
+  simulate Pontus-X or the portal/BFF.
+
 Core scope:
 
 - canonical transport and payload contracts,
@@ -14,6 +31,8 @@ Extension scope:
 - sector-specific flows,
 - compatibility helpers,
 - optional adapters that must remain subordinate to the core contract.
+- product-portal and external federated-catalog flows, including the
+  controller-facing Pontus-X publication owned by the portal/BFF.
 
 Rule:
 
@@ -109,7 +128,5 @@ Format rule for materialized twin summaries:
 - [Communication layering 101](https://github.com/Global-DataCare/gdc-common-utils-ts/blob/main/docs/101-COMMUNICATION_LAYERING.md)
 - [SDK package boundaries](https://github.com/Global-DataCare/gdc-sdk-core-ts/blob/main/docs/101-SDK_PACKAGE_BOUNDARIES.md)
 - [GW core integration baseline](../docs/API_CORE_INTEGRATION.md)
-- [20-research-digital-twin-store-and-search-plan.md](./20-research-digital-twin-store-and-search-plan.md)
-  This document now distinguishes the currently implemented tenant-scoped
-  medication twin MVP from the still-proposed separate research-store
-  architecture.
+- [23-digital-twin-composition-search-contract.md](./23-digital-twin-composition-search-contract.md)
+  defines the implemented digital-twin search and materialization boundary.

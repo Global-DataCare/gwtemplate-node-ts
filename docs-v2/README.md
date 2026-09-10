@@ -34,32 +34,14 @@ any individual flow file.
 18. [17-clinical-bundle-readers.md](./17-clinical-bundle-readers.md)
 19. [18-organization-controller-lifecycle.md](./18-organization-controller-lifecycle.md)
 20. [19-key-custody-and-audit-readiness.md](./19-key-custody-and-audit-readiness.md)
-21. [20-research-digital-twin-store-and-search-plan.md](./20-research-digital-twin-store-and-search-plan.md)
-22. [21-research-digital-twin-technical-backlog.md](./21-research-digital-twin-technical-backlog.md)
-23. [22-environment-variables-reference.md](./22-environment-variables-reference.md)
-24. [23-digital-twin-composition-search-contract.md](./23-digital-twin-composition-search-contract.md)
-25. [24-local-audit-fabric-runtime.md](./24-local-audit-fabric-runtime.md)
-26. [25-trust-bundle-and-local-network-runbook.md](./25-trust-bundle-and-local-network-runbook.md)
-27. [27-fabric-authorization-and-ledger-binding.md](./27-fabric-authorization-and-ledger-binding.md)
-28. [99-migration-map-from-docs.md](./99-migration-map-from-docs.md)
+21. [22-environment-variables-reference.md](./22-environment-variables-reference.md)
+22. [23-digital-twin-composition-search-contract.md](./23-digital-twin-composition-search-contract.md)
+23. [24-local-audit-fabric-runtime.md](./24-local-audit-fabric-runtime.md)
+24. [25-trust-bundle-and-local-network-runbook.md](./25-trust-bundle-and-local-network-runbook.md)
+25. [27-fabric-authorization-and-ledger-binding.md](./27-fabric-authorization-and-ledger-binding.md)
 
 ## Research / Digital Twin Map
 
-These documents are related but not duplicates:
-
-- [20-research-digital-twin-store-and-search-plan.md](./20-research-digital-twin-store-and-search-plan.md)
-  - broad architecture and rollout plan for the separate research/digital-twin
-    store
-- [21-research-digital-twin-technical-backlog.md](./21-research-digital-twin-technical-backlog.md)
-  - code-oriented backlog and implementation slicing for that plan
-- [23-digital-twin-composition-search-contract.md](./23-digital-twin-composition-search-contract.md)
-  - concrete public contract for the currently implemented
-    `digitaltwin/.../Composition/_search` route
-
-Practical rule:
-
-- `20` = architecture plan
-- `21` = implementation backlog
-- `23` = current public route contract
-
-So the numbering is fine as-is; the files cover different layers.
+[23-digital-twin-composition-search-contract.md](./23-digital-twin-composition-search-contract.md)
+is the current source for the implemented `digitaltwin/.../Composition/_search`
+route. Superseded plans and backlogs are retained only in Git history.

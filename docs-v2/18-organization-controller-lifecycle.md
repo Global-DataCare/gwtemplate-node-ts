@@ -93,7 +93,7 @@ Expected result:
 - every deduplicated ICA-issued credential in `body.data[0].vc[]`,
 - the complete raw ICA response in
   `body.data[0].resource.icaResponse`,
-- refreshed claims in `body.data[0].meta.claims`, including the controller
+- refreshed claims in `body.data[0].resource.meta.claims`, including the controller
   License activation code in
   `org.schema.IndividualProduct.serialNumber`.
 
@@ -233,4 +233,3 @@ GW owns:
 - [09-api-integrators-guide.md](./09-api-integrators-guide.md)
 - [10-host-organization-activate.md](./10-host-organization-activate.md)
 - [16-deactivation-and-purge-lifecycle.md](./16-deactivation-and-purge-lifecycle.md)
-- [99-migration-map-from-docs.md](./99-migration-map-from-docs.md)

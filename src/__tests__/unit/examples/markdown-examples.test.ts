@@ -1,4 +1,4 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: canonical current markdown examples stay aligned with shared GW fixtures.
 import { readFileSync } from 'fs';
 import path from 'path';
 
@@ -20,12 +20,6 @@ const docExampleMaps = new Map<string, Record<string, unknown>>([
       SMART_TOKEN_REQUEST,
       FAMILY_REGISTRATION_REQUEST,
       FAMILY_ORDER_REQUEST,
-    },
-  ],
-  [
-    path.join(ROOT, 'docs/02-API-AND-ENDPOINTS/02.C-CURL-TESTS.md'),
-    {
-      ORGANIZATION_REGISTRATION_REQUEST,
     },
   ],
 ]);

@@ -35,7 +35,7 @@ Apply strict `red -> green -> refactor`:
 A skip, accepted error, placeholder, pending setup, fixture-only UI or mock that
 replaces the real boundary is never a green result. Unit mocks may isolate code,
 but local service and Playwright proof must exercise the real UI -> BFF ->
-high-level SDK -> GW/DataConv boundary when that journey is affected.
+high-level SDK -> service boundary when that journey is affected.
 
 ## 3. Local-first gates and failure continuation
 

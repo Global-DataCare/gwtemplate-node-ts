@@ -56,11 +56,8 @@ Current GW-aligned transport choice:
 - for research digital twin ingestion, teach
   `digitaltwin/org.hl7.fhir.api/Composition/_batch`,
 - the emitted batch may contain multiple `body.data[]` entries.
-- for the still-missing separate research store and cross-twin search plan, see
-  [20-research-digital-twin-store-and-search-plan.md](./20-research-digital-twin-store-and-search-plan.md)
-  That plan also records the narrower MVP already implemented today:
-  tenant-scoped medication twin mirroring and search by canonical text/code
-  claims.
+- for the implemented twin search and materialization behavior, see
+  [23-digital-twin-composition-search-contract.md](./23-digital-twin-composition-search-contract.md).
 
 ## Why Communication is central
 

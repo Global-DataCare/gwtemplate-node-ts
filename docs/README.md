@@ -48,8 +48,6 @@ docs/
   - [101-BFF_AND_CHANNEL_MESSAGE_FLOW.md](https://github.com/Global-DataCare/gdc-common-utils-ts/blob/main/docs/101-BFF_AND_CHANNEL_MESSAGE_FLOW.md)
 - **IPS communication outbox source of truth**:
   - [101-IPS_COMMUNICATION_OUTBOX.md](https://github.com/Global-DataCare/gdc-sdk-core-ts/blob/main/docs/101-IPS_COMMUNICATION_OUTBOX.md)
-- **Consent access status**: [90.E-TODO_SMART_EHR_COMPAT.md](90.E-TODO_SMART_EHR_COMPAT.md) also records the current live SMART consent-evaluation behavior, including deny precedence and permission-request lookup identifiers.
-- **Tenant identifier migration note**: [90.K-TODO_TENANT_IDENTIFIER_V2.md](90.K-TODO_TENANT_IDENTIFIER_V2.md) tracks the deferred `v2.0` redesign away from `alternateName`-based hosted compatibility.
 - **Legacy representative controller compatibility**: [03.K-LEGACY-REPRESENTATIVE-CONTROLLER-COMPATIBILITY.md](03-IDENTITY-AND-TRUST/03.K-LEGACY-REPRESENTATIVE-CONTROLLER-COMPATIBILITY.md) preserves the historical representative-first controller on explicitly enabled deployments and keeps later service-controller `_issue` independent.
 - **Current GW 101 path**: [../docs-v2/101-README.md](../docs-v2/101-README.md) is the current ordered reading path for active integrator/runtime guidance.
 - **Current GW lifecycle contract**: [../docs-v2/16-deactivation-and-purge-lifecycle.md](../docs-v2/16-deactivation-and-purge-lifecycle.md) is the current lifecycle contract for integrators/auditors.
@@ -59,7 +57,7 @@ docs/
 - **Bridge-only local tutorial boundary note**: [101-01.K-HIGH_LEVEL_TUTORIAL_BOUNDARIES.md](01-OVERVIEW-AND-GUIDES/101-01.K-HIGH_LEVEL_TUTORIAL_BOUNDARIES.md) remains as a local bridge note.
 - **GW clinical bundle reader v2**: [../docs-v2/17-clinical-bundle-readers.md](../docs-v2/17-clinical-bundle-readers.md) is the canonical integrator-facing contract for section-aware read/filter/count/pagination semantics.
 - **GW deactivation/purge lifecycle**: [../docs-v2/16-deactivation-and-purge-lifecycle.md](../docs-v2/16-deactivation-and-purge-lifecycle.md) explains the disable/purge hierarchy for individual, tenant, and host, including blob deletion and discovery unpublication.
-- **GW lifecycle current vs target**: [90.L-LIFECYCLE_CURRENT_VS_TARGET.md](90.L-LIFECYCLE_CURRENT_VS_TARGET.md) separates what is already implemented from the target normalized `PATCH`-based contract for SDK alignment.
+- **SEDIA closure matrix**: [90.F-UC_CAPABILITY_MATRIX_SEDIA.md](90.F-UC_CAPABILITY_MATRIX_SEDIA.md) maps the completed project capabilities to reproducible evidence without duplicating SDK method tables.
 - **Testing guide**: [TESTING.md](TESTING.md) is the canonical test entry point; [TESTING-E2E.md](TESTING-E2E.md) covers live cloud integrations.
 - **Core test summary**: [TEST_CORE.md](TEST_CORE.md) explains what must be considered proved for the GW core baseline across GW + SDK repositories; [TEST_MATRIX.md](TEST_MATRIX.md) lists the test tiers.
 - **OpenAPI profiles**: `npm run build:openapi-profiles` derives:
@@ -139,8 +137,6 @@ Memory aid:
 ### 📂 02-API-AND-ENDPOINTS
 *   **[02.A-API-ENDPOINTS.md](02-API-AND-ENDPOINTS/02.A-API-ENDPOINTS.md)**: A summary of the primary API endpoints available.
 *   **[02.B-ROUTING.md](02-API-AND-ENDPOINTS/02.B-ROUTING.md)**: Explanation of how API requests are routed to the appropriate controllers.
-*   **[02.C-CURL-TESTS.md](02-API-AND-ENDPOINTS/02.C-CURL-TESTS.md)**: A collection of `curl` commands for manual API testing.
-*   **[02.D-USE-CASE-CURL-EXAMPLES.md](02-API-AND-ENDPOINTS/02.D-USE-CASE-CURL-EXAMPLES.md)**: `curl` commands organized by specific use cases.
 *   **[02.E-DATASPACE-DID-SERVICES.md](02-API-AND-ENDPOINTS/02.E-DATASPACE-DID-SERVICES.md)**: DSP/DCP DID `service` publication profile and conformance targets.
 *   **[90.B-API_FAMILY_INTEGRATORS_GUIDE.md](90.B-API_FAMILY_INTEGRATORS_GUIDE.md)**: Family-first integration guide (operator catalog discovery + family onboarding).
 
@@ -150,7 +146,6 @@ Memory aid:
 *   **[03.C-TRUST-POLICY.md](03-IDENTITY-AND-TRUST/03.C-TRUST-POLICY.md)**: Defines the policies for trust levels and identity assurance.
 *   **[03.D-DID-URN-IDENTIFIERS.md](03-IDENTITY-AND-TRUST/03.D-DID-URN-IDENTIFIERS.md)**: Details on the format and use of Decentralized Identifiers (DIDs) and URNs.
 *   **[03.E-PERSON-DISCOVERY-ACTION-ARCHITECTURE.md](03-IDENTITY-AND-TRUST/03.E-PERSON-DISCOVERY-ACTION-ARCHITECTURE.md)**: Provider-only subject resolution followed by synchronous IHE PDQm `Patient/$match`, including FHIR, DIDComm plain and strict transports.
-*   **[03.F-ENTITY-KEY-MANAGEMENT-LIFECYCLE.md](03-IDENTITY-AND-TRUST/03.F-ENTITY-KEY-MANAGEMENT-LIFECYCLE.md)**: Explains how cryptographic keys for entities are managed throughout their lifecycle.
 *   **[03.G-LEGACY-AND-MANAGED-KEYS.md](03-IDENTITY-AND-TRUST/03.G-LEGACY-AND-MANAGED-KEYS.md)**: Discusses strategies for handling both externally managed and system-managed keys.
 *   **[03.H-ICA-CERTIFICATE-ISSUANCE.md](03-IDENTITY-AND-TRUST/03.H-ICA-CERTIFICATE-ISSUANCE.md)**: Documents the split between Fabric operational enrollment and dataspace ICA Host VC issuance, plus the boundary between host certificate bootstrap and host autodiscovery.
 *   **[03.I-HOSTING-OPERATOR-BOOTSTRAP-AUDIT.md](03-IDENTITY-AND-TRUST/03.I-HOSTING-OPERATOR-BOOTSTRAP-AUDIT.md)**: Audit reference for the hosting-operator bootstrap boundary, including `env -> vault -> Fabric bootstrap` resolution order and the separation between hosting validation, operational enrollment, and Host VC issuance.
@@ -159,8 +154,6 @@ Memory aid:
 *   **[03.L-FEDERATED-SMART-CLEARING-HOUSE.md](03-IDENTITY-AND-TRUST/03.L-FEDERATED-SMART-CLEARING-HOUSE.md)**: Cross-custodian SMART authorization, transitional VP placement and tenant-local verification evidence.
 
 ### 📂 04-DEEP-DIVES
-*   **[04.A-VC-ARCHITECTURE-DEEP-DIVE.md](04-DEEP-DIVES/04.A-VC-ARCHITECTURE-DEEP-DIVE.md)**: A deep dive into the Verifiable Credentials architecture.
-*   **[04.B-FABRIC-IMPLEMENTATION-PLAN.md](04-DEEP-DIVES/04.B-FABRIC-IMPLEMENTATION-PLAN.md)**: Technical plan for integrating with Hyperledger Fabric.
 *   **[04.C-ORGANIZATION-REGISTRATION.md](04-DEEP-DIVES/04.C-ORGANIZATION-REGISTRATION.md)**: Detailed flow for the registration of new tenant organizations.
 *   **[04.D-DISCOVERY-SERVICES.md](04-DEEP-DIVES/04.D-DISCOVERY-SERVICES.md)**: In-depth look at the services responsible for discovering entities and data.
 *   **[04.E-NEW-STORAGE-ARCHITECTURE.md](04-DEEP-DIVES/04.E-NEW-STORAGE-ARCHITECTURE.md)**: Plan for refactoring the storage layer to a unified repository pattern.
@@ -168,15 +161,8 @@ Memory aid:
 *   **[04.G-CONVERSATIONAL-AI-ANONYMIZATION-PIPELINE.md](04-DEEP-DIVES/04.G-CONVERSATIONAL-AI-ANONYMIZATION-PIPELINE.md)**: Design for conversation storage, anonymization, and derivation of Observations with ledger-safe tags.
 *   **[04.H-DATASPACE-PUBLICATION-ATTESTATION.md](04-DEEP-DIVES/04.H-DATASPACE-PUBLICATION-ATTESTATION.md)**: Clarifies what is published by link vs anchored on-ledger (hashes/tags), and how attestation/provenance fits.
 *   **[04.I-FABRIC-MULTICLOUD-BLUEPRINT.md](04-DEEP-DIVES/04.I-FABRIC-MULTICLOUD-BLUEPRINT.md)**: Multi-cloud Fabric deployment plan and channel governance.
-*   **[04.J-HOST-OPERATORS-REGISTRY-AND-SECTOR-CATALOGS.md](04-DEEP-DIVES/04.J-HOST-OPERATORS-REGISTRY-AND-SECTOR-CATALOGS.md)**: Separates host operator discovery from tenant sector catalog publication and distinguishes DSP standard paths from GW CORE local catalog bindings.
-*   **[04.K-FABRIC-ADAPTER-INVENTORY-AND-DUAL-NETWORK-TARGET.md](04-DEEP-DIVES/04.K-FABRIC-ADAPTER-INVENTORY-AND-DUAL-NETWORK-TARGET.md)**: Inventories the existing Fabric adapter/codebase and defines the additive dual-network target with Pontus-X.
+*   **[04.K-FABRIC-ADAPTER-INVENTORY-AND-DUAL-NETWORK-TARGET.md](04-DEEP-DIVES/04.K-FABRIC-ADAPTER-INVENTORY-AND-DUAL-NETWORK-TARGET.md)**: Historical filename retained for the current boundary: Fabric remains the GW permissioned ledger while controller-owned Pontus-X publication belongs to the `globaldatacare.es` portal/BFF.
 
 ### 📂 05-USE-CASES
 *   **[05.A-ALICE-BOB-AUTODISCOVERY-SMOKE.md](05-USE-CASES/05.A-ALICE-BOB-AUTODISCOVERY-SMOKE.md)**: Local two-host smoke for host catalogs and normalized provider discovery.
 *   Core use cases only. Legacy/extension use-case docs were moved to transitional `90.*` files.
-
-### 📂 Transitional Scenarios (Not Core Baseline)
-*   **[90.L-LIFECYCLE_CURRENT_VS_TARGET.md](90.L-LIFECYCLE_CURRENT_VS_TARGET.md)**: Transitional mapping between current GW lifecycle endpoints and the target normalized contract for SDK/shared-package alignment.
-*   **[90.N-APPOINTMENT_NOTIFICATION_FLOW_LEGACY.md](90.N-APPOINTMENT_NOTIFICATION_FLOW_LEGACY.md)**: Legacy appointment-notification narrative (not part of current core baseline).
-*   **[90.O-END_TO_END_LEGACY_FLOW.md](90.O-END_TO_END_LEGACY_FLOW.md)**: Legacy end-to-end flow reference (transitional).
-*   **[90.P-HOST_OPERATORS_REGISTRY_BACKLOG.md](90.P-HOST_OPERATORS_REGISTRY_BACKLOG.md)**: Concrete implementation backlog for host provider verification, host DCAT discovery, tenant sector catalog separation, and optional sector-profile work.

@@ -51,7 +51,7 @@ For the cross-repo 101 story order and security narrative, read
 
 Every consuming portal follows `test -> local-network -> test-network -> network`.
 Before publishing a shared package, run unit and integration tests with
-`networkKind=test`, then the real local UI -> BFF -> SDK -> GW/DataConv journey
+`networkKind=test`, then the real local UI -> BFF -> SDK -> service journey
 with Playwright and no blockchain. An unpublished dependency may be installed
 from `npm pack` only as a temporary `--no-save` fail-fast check; restore the
 registry dependency and lockfile before committing. After those gates pass,
@@ -151,7 +151,6 @@ GW starts after upstream profile/runtime unlock and document/Communication autho
 - Example-data and docs-sync guide: [docs/README.md#example-data-and-docs-sync](docs/README.md#example-data-and-docs-sync)
 - Employee bundle/lifecycle contract reference: [gdc-sdk-core-ts/docs/101-EMPLOYEES.md](https://github.com/Global-DataCare/gdc-sdk-core-ts/blob/main/docs/101-EMPLOYEES.md)
 - SDK live local reference before running cross-repo E2E: [gdc-sdk-node-ts/docs/101-LIVE_GW_LOCAL.md](https://github.com/Global-DataCare/gdc-sdk-node-ts/blob/main/docs/101-LIVE_GW_LOCAL.md)
-- Repo briefing: [docs/BRIEFING_DATASPACE_EN.md](docs/BRIEFING_DATASPACE_EN.md)
 - Local environment template: [env.example](env.example)
 - Local demo template: [env.local-demo.example](env.local-demo.example)
 - Firestore demo template: [env.firestore-demo.example](env.firestore-demo.example)
@@ -419,7 +418,7 @@ Canonical payload examples are not maintained separately in Swagger, markdown, a
 - GW shared bundle editor note for `asVitalSign()` vs generic Allergy/Medication/Condition editing: [`docs/01-OVERVIEW-AND-GUIDES/101-01.J-SHARED_BUNDLE_ENTRY_EDITORS.md`](docs/01-OVERVIEW-AND-GUIDES/101-01.J-SHARED_BUNDLE_ENTRY_EDITORS.md)
 - GW canonical v2 clinical bundle reader contract: [`docs-v2/17-clinical-bundle-readers.md`](docs-v2/17-clinical-bundle-readers.md)
 - GW deactivation/purge contract for auditors and integrators: [`docs-v2/16-deactivation-and-purge-lifecycle.md`](docs-v2/16-deactivation-and-purge-lifecycle.md)
-- GW lifecycle current-vs-target note: [`docs/90.L-LIFECYCLE_CURRENT_VS_TARGET.md`](docs/90.L-LIFECYCLE_CURRENT_VS_TARGET.md)
+- GW deactivation/purge lifecycle: [`docs-v2/16-deactivation-and-purge-lifecycle.md`](docs-v2/16-deactivation-and-purge-lifecycle.md)
 - Shared lifecycle `101` guide: [`gdc-common-utils-ts/docs/101-LIFECYCLE.md`](https://github.com/Global-DataCare/gdc-common-utils-ts/blob/main/docs/101-LIFECYCLE.md)
 
 Current rule:
@@ -625,7 +624,7 @@ The server provides a live, interactive Swagger UI that documents all available 
 
 For more advanced testing and scripting, the project includes a comprehensive collection of `curl` commands. These are useful for simulating client requests from the command line and are essential for understanding the data structures.
 
-*   **Location**: You can find these examples in the [cURL Tests Documentation](docs/02-API-AND-ENDPOINTS/02.C-CURL-TESTS.md).
+*   **Location**: Use the current [API integrator guide](docs-v2/09-api-integrators-guide.md) and generated OpenAPI examples.
 
 ## Useful Commands
 

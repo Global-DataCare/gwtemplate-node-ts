@@ -8,8 +8,7 @@ declaration, or no longer contains its stated contract.
 Product repositories keep additional tests separate by responsibility:
 
 - `core`: behavior inherited from GW CORE;
-- `extensions/unid`: UHC UNID behavior only;
-- `extensions/vetchain`: VetChain behavior only;
+- `extensions/<product>`: product-owned behavior only;
 - `journeys`: complete user or SDK journeys across real boundaries.
 
 A product-only test is not evidence that CORE contains the same fix. When a

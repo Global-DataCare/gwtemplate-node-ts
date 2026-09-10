@@ -20,6 +20,20 @@ Use this document when you need to define or review:
 This document is intentionally portal-facing and integration-facing.
 It does not replace lower-level SDK or GW route documentation.
 
+## Pontus-X publication ownership
+
+The organization controller publishes products, datasets and service offerings
+to Pontus-X through the `globaldatacare.es` portal and its BFF. That publication
+is portal infrastructure, not a GW CORE facade and not a dataspace ICA business
+operation.
+
+GW CORE begins at the protected data-plane boundary: it exposes the authorized
+FHIR, digital-twin and related operations referenced by the published offering.
+Dataspace ICA separately verifies participant/controller evidence and exposes
+technical trust/discovery information. Product portals must document their
+concrete Pontus-X routes and custody beside the BFF code; this document must not
+invent or duplicate those deployment-specific routes.
+
 This is a generic facade design, not the route inventory of one deployed
 portal. Each domain adapter must maintain its concrete BFF table beside its
 code and map every row back to this functional contract.

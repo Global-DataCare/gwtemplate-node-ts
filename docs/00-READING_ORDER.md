@@ -7,12 +7,12 @@ Status: Canonical
 1. `docs/README.md`
 2. `docs/DOCS_GOVERNANCE.md`
 3. `docs/01-OVERVIEW-AND-GUIDES/01.A-ARCHITECTURE-OVERVIEW.md`
-4. `docs/01-OVERVIEW-AND-GUIDES/01.I-GW-CORE-CONTRACT-MAP.md`
-5. `docs/02-API-AND-ENDPOINTS/02.A-API-ENDPOINTS.md`
-6. `docs/02-API-AND-ENDPOINTS/02.B-ROUTING.md`
-7. `docs/API_CORE_INTEGRATION.md`
-8. `docs/OPENAPI_PROFILES.md`
-9. `docs/02-API-AND-ENDPOINTS/02.C-CURL-TESTS.md`
+4. `docs/API_CORE_INTEGRATION.md`
+5. `docs-v2/README.md`
+6. `docs/01-OVERVIEW-AND-GUIDES/01.I-GW-CORE-CONTRACT-MAP.md`
+7. `docs/02-API-AND-ENDPOINTS/02.A-API-ENDPOINTS.md`
+8. `docs/02-API-AND-ENDPOINTS/02.B-ROUTING.md`
+9. `docs/OPENAPI_PROFILES.md`
 10. `docs/01-OVERVIEW-AND-GUIDES/101-01.K-HIGH_LEVEL_TUTORIAL_BOUNDARIES.md`
 
 ## Then (by need)
@@ -25,7 +25,8 @@ Recommended audit-specific read:
 
 1. `docs/03-IDENTITY-AND-TRUST/03.I-HOSTING-OPERATOR-BOOTSTRAP-AUDIT.md`
 2. `docs/03-IDENTITY-AND-TRUST/03.H-ICA-CERTIFICATE-ISSUANCE.md`
-3. `docs/04-DEEP-DIVES/04.J-HOST-OPERATORS-REGISTRY-AND-SECTOR-CATALOGS.md`
+3. `docs/02-API-AND-ENDPOINTS/02.E-DATASPACE-DID-SERVICES.md`
+4. `docs/90.F-UC_CAPABILITY_MATRIX_SEDIA.md`
 
 ## Transitional Top-Level Docs (not first-read)
 
@@ -34,11 +35,11 @@ These docs are transitional and should not be used as primary onboarding sequenc
 - `docs/90.A-API_INTEGRATORS_GUIDE.md`
 - `docs/90.B-API_FAMILY_INTEGRATORS_GUIDE.md`
 - `docs/90.C-NEXT_AGENT_HANDOFF.md`
-- `docs/90.D-TODO_COMMUNICATION_ROOT_CHANNEL.md`
-- `docs/90.E-TODO_SMART_EHR_COMPAT.md`
-- `docs/90.F-UC_CAPABILITY_MATRIX_SEDIA.md`
-- `docs/90.G-OPERATORS_REGISTRY.md`
 - `docs/90.H-END_TO_END_DEVICE_FLOW.md`
 - `docs/90.I-IDENTITY-FABRIC.md`
 - `docs/90.J-KEY_CUSTODY_RUNBOOK.md`
-- `docs/90.K-TODO_TENANT_IDENTIFIER_V2.md`
+
+`docs-end/*` is closure/history material and is never a current architecture
+source. `deliverables/*` is evidence packaging and cannot redefine component
+ownership. Superseded notes and examples are removed from the published docs;
+their provenance remains recoverable from Git history.

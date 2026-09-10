@@ -9,16 +9,21 @@ Reference GW backend for asynchronous secure ingestion, indexing, and search acr
 
 Primary references:
 - `README.md`
-- `docs/API_INTEGRATORS_GUIDE.md`
+- `docs/API_CORE_INTEGRATION.md`
+- `docs/PORTAL_API_TO_GW_CORE.md`
 - `docs/02-API-AND-ENDPOINTS/02.A-API-ENDPOINTS.md`
 - `docs/01-OVERVIEW-AND-GUIDES/01.G-TESTING-PATTERNS.md`
-- `docs/UC_CAPABILITY_MATRIX_SEDIA.md`
+- `docs/90.F-UC_CAPABILITY_MATRIX_SEDIA.md`
 - `docs/TESTING.md` / `docs/TESTING-E2E.md`
 
 ## Scope Governance
 1. Keep core GW scope explicit and testable.
 2. Features outside current core narrative must be documented as extension scope, not mixed into core acceptance criteria.
 3. OpenAPI/examples/tests must describe actual behavior, not aspirational behavior.
+4. The organization controller publishes products in Pontus-X through the
+   `globaldatacare.es` portal/BFF. GW CORE owns the protected data plane and
+   must not be documented as reproducing, simulating or directly owning that
+   portal publication flow.
 
 ## Hard Rules
 0. In production each Kubernetes pod/process must unwrap the encrypted service

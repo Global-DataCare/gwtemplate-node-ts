@@ -5,6 +5,18 @@ GW CORE, los chaincodes necesarios, una red Hyperledger Fabric local de dos
 hosts, el chart Helm del host y los flujos E2E. No requiere el repositorio
 operativo privado de la red.
 
+## Límite externo de Pontus-X
+
+Este entregable no incluye, reproduce ni simula Pontus-X. Tampoco incluye el
+portal `globaldatacare.es` ni su BFF. La publicación de productos, datasets y
+servicios en Pontus-X es responsabilidad del controller de la organización a
+través de ese portal/BFF y se acredita, cuando corresponda, con evidencia
+externa separada.
+
+Los catálogos DID, DSP y DCAT levantados por este entregable son superficies
+técnicas de descubrimiento del host, sus tenants, endpoints y capacidades. No
+son una reproducción del catálogo federado de productos de Pontus-X.
+
 El llamado «runner SEDIA» no es Helm, ni una herramienta suministrada u
 homologada por SEDIA. Es el nombre informal del recolector público
 `scripts/collect-open-source-production-readiness-evidence.sh`, ejecutado por

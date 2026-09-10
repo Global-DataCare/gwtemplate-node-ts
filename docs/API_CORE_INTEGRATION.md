@@ -1,11 +1,35 @@
 # API Core Integration (SEDIA UC Baseline)
 
+Status: Canonical
+
 Purpose: canonical, demonstrable integration flow for developers and AI agents.
 
 This document is intentionally narrower than `API_INTEGRATORS_GUIDE.md` and mirrors the live SDK core E2E flow.
 
 Short coverage summary for memory/thesis justification:
 - [`TEST_CORE.md`](TEST_CORE.md)
+
+## External Pontus-X boundary
+
+This document proves the GW CORE and ICA/Fabric part of the SEDIA flow. Product
+publication in Pontus-X is initiated by the organization controller through the
+`globaldatacare.es` portal and its BFF. GW CORE does not publish those products
+directly and the local GW CORE evidence run does not reproduce or simulate
+Pontus-X.
+
+The end-to-end project narrative is therefore:
+
+1. dataspace ICA verifies the participant/controller evidence;
+2. the controller publishes the organization product through the portal/BFF to
+   Pontus-X;
+3. a consumer discovers that product in Pontus-X;
+4. GW CORE authenticates and authorizes the resulting data-plane request;
+5. GW CORE performs the applicable FHIR/digital-twin search;
+6. Fabric records only the governed state or evidence assigned to the
+   permissioned ledger.
+
+Evidence for steps 2 and 3 belongs to the portal/BFF/Pontus-X deployment, not
+to the reproducible GW CORE host package.
 
 ## Source-of-Truth Alignment
 

@@ -91,7 +91,7 @@ legal-organization host onboarding flow:
 `test -> local-network -> test-network -> network`
 
 The first `test` gate runs unit and integration suites with `networkKind=test`,
-then crosses the normal local UI -> BFF -> high-level SDK -> GW/DataConv boundary
+then crosses the normal local UI -> BFF -> high-level SDK -> service boundary
 with real Playwright, in-memory services and no blockchain. Fixture pages, mocked
 routes and API-only Playwright are diagnostics; they never satisfy that gate.
 Every affected package or SDK live E2E must then run against the real local

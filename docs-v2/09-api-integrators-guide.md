@@ -41,8 +41,7 @@ Do not mix these runtime concepts:
   technical wallet/runtime owned by the service, tenant, or BFF for signing,
   encryption, DIDComm/plain wrapping, and confidential storage operations
 - `ChannelBackendPort`
-  product/channel-facing backend API above those runtimes, as used in channel
-  apps such as `uhc-unid-chat-node`
+  application-facing backend API above those runtimes
 
 Strict-mode note:
 

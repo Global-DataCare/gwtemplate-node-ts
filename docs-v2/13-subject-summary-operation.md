@@ -41,8 +41,7 @@ Compatibility alias:
   section/type/date filters.
 - `LifecycleResultReader` owns operation statuses/issues, not document content.
 - GDC Node and Front actor facades expose the same summary result.
-- UHC Node/Front extensions reuse those readers and only add product formats
-  such as FHIR R5.
+- Product extensions may reuse those readers in their own repositories.
 
 ## Payload Source Of Truth
 

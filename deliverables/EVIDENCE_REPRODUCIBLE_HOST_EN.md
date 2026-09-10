@@ -2,6 +2,18 @@
 
 This public repository is the entry point for the deliverable. It contains the GW CORE, the necessary chaincodes, a local two-host Hyperledger Fabric network, the host Helm chart, and E2E flows. It does not require the network's private operational repository.
 
+## External Pontus-X boundary
+
+This deliverable does not include, reproduce or simulate Pontus-X. It also does
+not include the `globaldatacare.es` portal or its BFF. Publication of products,
+datasets and services in Pontus-X is performed by the organization controller
+through that portal/BFF and, where required, is evidenced separately from this
+local host deliverable.
+
+The DID, DSP and DCAT catalogs started by this deliverable are technical
+discovery surfaces for the host, its tenants, endpoints and capabilities. They
+are not a reproduction of the Pontus-X federated product catalog.
+
 The so-called "SEDIA runner" is not Helm, nor a tool supplied or approved by SEDIA. It is the informal name of the public collector `scripts/collect-open-source-production-readiness-evidence.sh`, run by `npm run evidence:open-source-production-readiness`. Its function is to execute tests and gather states, sanitized logs, summary and hashes for memory.
 
 ## Public images used by the deliverable
