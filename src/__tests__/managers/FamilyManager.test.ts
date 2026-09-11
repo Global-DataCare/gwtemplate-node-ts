@@ -11,7 +11,7 @@ import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource
 
 import { randomUUID } from 'crypto';
 import { execFileSync } from 'child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { mock, MockProxy } from 'jest-mock-extended';
 import { tmpdir } from 'os';
 import path from 'path';
@@ -75,6 +75,10 @@ import { mockKmsService } from '../mocks/kms.mock';
 import { buildClaimsFromIndividualFormPdf } from '../../utils/individual-form-pdf';
 import { testDefaultTenantServiceTypeClaim } from '../data/organization.data';
 import { SUBJECT_SECTION_INDIVIDUAL } from '../../constants/domain';
+import {
+  buildSignedIndividualPdfFixture,
+  SIGNED_INDIVIDUAL_PDF_EXPECTED,
+} from '../utils/signed-individual-pdf-fixture';
 
 // ---------------------------------------------------------------------------
 // Shared test data
@@ -162,6 +166,7 @@ function makeTransactionJob(
     sequence: 0,
     createdAtTimestamp: Date.now(),
     tenantId: TENANT_ID,
+    jurisdiction: 'ES',
     sector: SECTOR,
     section: 'individual',
     format: 'org.schema',
@@ -395,8 +400,8 @@ function makeDisableJob(
   };
 }
 
-async function extractPdfFormFieldsFromFixture(pdfPath: string): Promise<Record<string, string>> {
-  const document = await PDFDocument.load(readFileSync(pdfPath), { ignoreEncryption: true, updateMetadata: false });
+async function extractPdfFormFieldsFromFixture(pdfBytes: Buffer): Promise<Record<string, string>> {
+  const document = await PDFDocument.load(pdfBytes, { ignoreEncryption: true, updateMetadata: false });
   const fields: Record<string, string> = {};
   for (const field of document.getForm().getFields()) {
     const name = field.getName()?.trim();
@@ -416,8 +421,7 @@ async function extractPdfFormFieldsFromFixture(pdfPath: string): Promise<Record<
   return fields;
 }
 
-function extractNaturalPersonSignerSubjectFromPdf(pdfPath: string): string {
-  const pdfBytes = readFileSync(pdfPath);
+function extractNaturalPersonSignerSubjectFromPdf(pdfBytes: Buffer): string {
   const pdfAsLatin1 = pdfBytes.toString('latin1');
   const byteRangeRegex = /\/ByteRange\s*\[\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s*\]/g;
   const match = byteRangeRegex.exec(pdfAsLatin1);
@@ -461,53 +465,7 @@ function extractNaturalPersonSignerSubjectFromPdf(pdfPath: string): string {
   throw new Error('Natural-person signer certificate not found in real PDF fixture.');
 }
 
-function getIndividualPdfFixtureConfig(): {
-  pdfPath: string;
-  expectedSignerSubjectDn: string;
-  expectedControllerEmail: string;
-  expectedOrganizationAlternateName: string;
-  expectedControllerBirthDate?: string;
-  expectedControllerGender?: string;
-} | null {
-  const pdfPath = String(process.env.TEST_INDIVIDUAL_FORM_PDF_PATH || '').trim();
-  const cn = String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_CN || '').trim();
-  const sn = String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_SN || '').trim();
-  const gn = String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_GN || '').trim();
-  const serialNumber = String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_SERIALNUMBER || '').trim();
-  const country = String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_COUNTRY || '').trim();
-  const email = String(process.env.TEST_INDIVIDUAL_CONTROLLER_EMAIL || '').trim().toLowerCase();
-  const alternateName = String(process.env.TEST_INDIVIDUAL_ORGANIZATION_ALTNAME || '').trim();
-  const birthDate = String(process.env.TEST_INDIVIDUAL_CONTROLLER_BIRTHDATE || '').trim();
-  const gender = String(process.env.TEST_INDIVIDUAL_CONTROLLER_GENDER || '').trim();
-
-  if (!pdfPath || !cn || !sn || !gn || !serialNumber || !country || !email || !alternateName) {
-    return null;
-  }
-
-  return {
-    pdfPath,
-    expectedSignerSubjectDn: `CN=${cn},SN=${sn},GN=${gn},serialNumber=${serialNumber},C=${country}`,
-    expectedControllerEmail: email,
-    expectedOrganizationAlternateName: alternateName,
-    ...(birthDate ? { expectedControllerBirthDate: birthDate } : {}),
-    ...(gender ? { expectedControllerGender: gender } : {}),
-  };
-}
-
-/** Fails closed if an explicitly enabled signed-PDF fixture becomes incomplete. */
-function requireIndividualPdfFixtureConfig(): NonNullable<ReturnType<typeof getIndividualPdfFixtureConfig>> {
-  const fixture = getIndividualPdfFixtureConfig();
-  if (!fixture || !existsSync(fixture.pdfPath)) {
-    throw new Error('Signed individual PDF fixture is not configured or does not exist.');
-  }
-  return fixture;
-}
-
-const configuredIndividualPdfFixture = getIndividualPdfFixtureConfig();
-const signedIndividualPdfFixtureTest = configuredIndividualPdfFixture
-  && existsSync(configuredIndividualPdfFixture.pdfPath)
-  ? it
-  : it.skip;
+const signedIndividualPdfFixture = buildSignedIndividualPdfFixture();
 
 // ---------------------------------------------------------------------------
 // Suite
@@ -787,14 +745,14 @@ describe('FamilyManager', () => {
       expect(renderedForm.getCheckBox('controllerIsSubject').isChecked()).toBe(false);
     });
 
-    signedIndividualPdfFixtureTest('individual-form-pdf-cert-signed maps the real signed PDF into valid CORE family claims', async () => {
-        const fixture = requireIndividualPdfFixtureConfig();
+    it('individual-form-pdf-cert-signed maps the real signed PDF into valid CORE family claims', async () => {
+        const pdfBytes = await signedIndividualPdfFixture;
 
         mockVaultRepository.query.mockResolvedValue([]);
         mockVaultRepository.put.mockResolvedValue(true);
 
-        const pdfFields = await extractPdfFormFieldsFromFixture(fixture.pdfPath);
-        const signerSubjectDn = extractNaturalPersonSignerSubjectFromPdf(fixture.pdfPath);
+        const pdfFields = await extractPdfFormFieldsFromFixture(pdfBytes);
+        const signerSubjectDn = extractNaturalPersonSignerSubjectFromPdf(pdfBytes);
         const mapped = buildClaimsFromIndividualFormPdf(pdfFields, signerSubjectDn);
 
         const response = await manager.process(makeBatchJob({
@@ -804,48 +762,44 @@ describe('FamilyManager', () => {
         const body = response.body as BundleJsonApi;
         const entry = body.data[0] as BundleEntry;
 
-        expect(pdfFields.email).toBe(fixture.expectedControllerEmail);
-        expect(pdfFields.alternateName).toBe(fixture.expectedOrganizationAlternateName);
-        expect(signerSubjectDn).toBe(fixture.expectedSignerSubjectDn);
+        expect(entry.response?.status).toBe('201');
+        expect(pdfFields.controllerEmail).toBe(SIGNED_INDIVIDUAL_PDF_EXPECTED.controllerEmail);
+        expect(pdfFields.controllerAlternateName).toBe(SIGNED_INDIVIDUAL_PDF_EXPECTED.organizationAlternateName);
+        expect(signerSubjectDn).toBe(SIGNED_INDIVIDUAL_PDF_EXPECTED.signerSubjectDn);
 
         expect(mapped).toEqual(expect.objectContaining({
           '@context': 'org.schema',
-          [ClaimsOrganizationSchemaorg.alternateName]: fixture.expectedOrganizationAlternateName,
-          [ClaimsOrganizationSchemaorg.ownerAlternateName]: fixture.expectedOrganizationAlternateName,
-          [ClaimsOrganizationSchemaorg.ownerEmail]: fixture.expectedControllerEmail,
-          [ClaimsOrganizationSchemaorg.ownerIdentifierValue]: String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_SERIALNUMBER || '').trim(),
-          [ClaimsPersonSchemaorg.identifierValue]: String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_SERIALNUMBER || '').trim(),
-          [ClaimsOrganizationSchemaorg.addressCountry]: String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_COUNTRY || '').trim(),
+          [ClaimsOrganizationSchemaorg.alternateName]: SIGNED_INDIVIDUAL_PDF_EXPECTED.organizationAlternateName,
+          [ClaimsOrganizationSchemaorg.ownerAlternateName]: SIGNED_INDIVIDUAL_PDF_EXPECTED.organizationAlternateName,
+          [ClaimsOrganizationSchemaorg.ownerEmail]: SIGNED_INDIVIDUAL_PDF_EXPECTED.controllerEmail,
+          [ClaimsOrganizationSchemaorg.ownerIdentifierValue]: SIGNED_INDIVIDUAL_PDF_EXPECTED.signerSerialNumber,
+          [ClaimsPersonSchemaorg.identifierValue]: SIGNED_INDIVIDUAL_PDF_EXPECTED.signerSerialNumber,
+          [ClaimsOrganizationSchemaorg.addressCountry]: SIGNED_INDIVIDUAL_PDF_EXPECTED.signerCountry,
         }));
-        expect(mapped[ClaimsPersonSchemaorg.givenName]).toBe(String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_GN || '').trim());
-        expect(mapped[ClaimsPersonSchemaorg.familyName]).toBe(String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_SN || '').trim());
+        expect(mapped[ClaimsPersonSchemaorg.givenName]).toBe(SIGNED_INDIVIDUAL_PDF_EXPECTED.signerGivenName);
+        expect(mapped[ClaimsPersonSchemaorg.familyName]).toBe(SIGNED_INDIVIDUAL_PDF_EXPECTED.signerSurname);
         expect(mapped[ClaimsPersonSchemaorg.name]).toBe(
-          `${String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_GN || '').trim()} ${String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_SN || '').trim()}`.trim(),
+          `${SIGNED_INDIVIDUAL_PDF_EXPECTED.signerGivenName} ${SIGNED_INDIVIDUAL_PDF_EXPECTED.signerSurname}`,
         );
-        if (fixture.expectedControllerBirthDate) {
-          expect(mapped[ClaimsPersonSchemaorg.birthDate]).toBe(fixture.expectedControllerBirthDate);
-        }
-        if (fixture.expectedControllerGender) {
-          expect(mapped[ClaimsPersonSchemaorg.gender]).toBe(fixture.expectedControllerGender);
-        }
 
         expect(entry.resource?.meta?.claims).toEqual(expect.objectContaining({
           'org.schema.FamilyRegistration.status': 'new_created',
-          [ClaimsOrganizationSchemaorg.alternateName]: fixture.expectedOrganizationAlternateName,
-          [ClaimsOrganizationSchemaorg.ownerAlternateName]: fixture.expectedOrganizationAlternateName,
-          [ClaimsOrganizationSchemaorg.ownerEmail]: fixture.expectedControllerEmail,
-          [ClaimsOrganizationSchemaorg.ownerIdentifierValue]: String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_SERIALNUMBER || '').trim(),
-          [ClaimsPersonSchemaorg.identifierValue]: String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_SERIALNUMBER || '').trim(),
+          [ClaimsOrganizationSchemaorg.alternateName]: SIGNED_INDIVIDUAL_PDF_EXPECTED.organizationAlternateName,
+          [ClaimsOrganizationSchemaorg.ownerAlternateName]: SIGNED_INDIVIDUAL_PDF_EXPECTED.organizationAlternateName,
+          [ClaimsOrganizationSchemaorg.ownerEmail]: SIGNED_INDIVIDUAL_PDF_EXPECTED.controllerEmail,
+          [ClaimsPersonSchemaorg.identifierValue]: SIGNED_INDIVIDUAL_PDF_EXPECTED.signerSerialNumber,
         }));
+        expect(entry.resource?.meta?.claims?.[ClaimsOrganizationSchemaorg.ownerIdentifierValue])
+          .toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
       });
 
-    signedIndividualPdfFixtureTest('individual-form-pdf attachment flow accepts _transaction alias and completes claims from signed PDF', async () => {
-        const fixture = requireIndividualPdfFixtureConfig();
+    it('individual-form-pdf attachment flow accepts _transaction alias and completes claims from signed PDF', async () => {
+        const pdfBytes = await signedIndividualPdfFixture;
 
         mockVaultRepository.query.mockResolvedValue([]);
         mockVaultRepository.put.mockResolvedValue(true);
 
-        const pdfBase64 = readFileSync(fixture.pdfPath).toString('base64');
+        const pdfBase64 = pdfBytes.toString('base64');
         const response = await manager.process(makeTransactionJob(
           {
             [ClaimsOrganizationSchemaorg.ownerTelephone]: '',
@@ -864,23 +818,24 @@ describe('FamilyManager', () => {
         const entry = body.data[0] as BundleEntry;
 
         expect(body.type).toBe('transaction-response');
+        expect(entry.response?.status).toBe('201');
         expect(entry.resource?.meta?.claims).toEqual(expect.objectContaining({
           'org.schema.FamilyRegistration.status': 'new_created',
-          [ClaimsOrganizationSchemaorg.alternateName]: fixture.expectedOrganizationAlternateName,
-          [ClaimsOrganizationSchemaorg.ownerAlternateName]: fixture.expectedOrganizationAlternateName,
-          [ClaimsOrganizationSchemaorg.ownerEmail]: fixture.expectedControllerEmail,
-          [ClaimsOrganizationSchemaorg.ownerIdentifierValue]: String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_SERIALNUMBER || '').trim(),
-          [ClaimsPersonSchemaorg.identifierValue]: String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_SERIALNUMBER || '').trim(),
+          [ClaimsOrganizationSchemaorg.alternateName]: SIGNED_INDIVIDUAL_PDF_EXPECTED.organizationAlternateName,
+          [ClaimsOrganizationSchemaorg.ownerAlternateName]: SIGNED_INDIVIDUAL_PDF_EXPECTED.organizationAlternateName,
+          [ClaimsOrganizationSchemaorg.ownerEmail]: SIGNED_INDIVIDUAL_PDF_EXPECTED.controllerEmail,
+          [ClaimsPersonSchemaorg.identifierValue]: SIGNED_INDIVIDUAL_PDF_EXPECTED.signerSerialNumber,
         }));
+        expect(entry.resource?.meta?.claims?.[ClaimsOrganizationSchemaorg.ownerIdentifierValue])
+          .toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
       });
 
-    signedIndividualPdfFixtureTest('individual-form-pdf attachment flow also accepts HTTPS links[] and downloads the PDF before extracting claims', async () => {
-        const fixture = requireIndividualPdfFixtureConfig();
+    it('individual-form-pdf attachment flow also accepts HTTPS links[] and downloads the PDF before extracting claims', async () => {
+        const pdfBytes = await signedIndividualPdfFixture;
 
         mockVaultRepository.query.mockResolvedValue([]);
         mockVaultRepository.put.mockResolvedValue(true);
 
-        const pdfBytes = readFileSync(fixture.pdfPath);
         const fetchSpy = jest.spyOn(globalThis, 'fetch' as any).mockResolvedValue({
           ok: true,
           status: 200,
@@ -909,14 +864,16 @@ describe('FamilyManager', () => {
             'https://www.dropbox.com/scl/fi/example/signed-individual-form.pdf?dl=1',
             { redirect: 'follow' },
           );
+          expect(entry.response?.status).toBe('201');
           expect(entry.resource?.meta?.claims).toEqual(expect.objectContaining({
             'org.schema.FamilyRegistration.status': 'new_created',
-            [ClaimsOrganizationSchemaorg.alternateName]: fixture.expectedOrganizationAlternateName,
-            [ClaimsOrganizationSchemaorg.ownerAlternateName]: fixture.expectedOrganizationAlternateName,
-            [ClaimsOrganizationSchemaorg.ownerEmail]: fixture.expectedControllerEmail,
-            [ClaimsOrganizationSchemaorg.ownerIdentifierValue]: String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_SERIALNUMBER || '').trim(),
-            [ClaimsPersonSchemaorg.identifierValue]: String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_SERIALNUMBER || '').trim(),
+            [ClaimsOrganizationSchemaorg.alternateName]: SIGNED_INDIVIDUAL_PDF_EXPECTED.organizationAlternateName,
+            [ClaimsOrganizationSchemaorg.ownerAlternateName]: SIGNED_INDIVIDUAL_PDF_EXPECTED.organizationAlternateName,
+            [ClaimsOrganizationSchemaorg.ownerEmail]: SIGNED_INDIVIDUAL_PDF_EXPECTED.controllerEmail,
+            [ClaimsPersonSchemaorg.identifierValue]: SIGNED_INDIVIDUAL_PDF_EXPECTED.signerSerialNumber,
           }));
+          expect(entry.resource?.meta?.claims?.[ClaimsOrganizationSchemaorg.ownerIdentifierValue])
+            .toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
         } finally {
           fetchSpy.mockRestore();
         }
