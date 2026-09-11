@@ -1,19 +1,18 @@
 // Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 // src/__tests__/integration/end-to-end-flow.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
-import { DidcommMessageTypes } from 'gdc-common-utils-ts/constants/didcomm';
 import { GatewayRequestEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
 import { HttpStatusCodes } from 'gdc-common-utils-ts/constants/http';
 import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
 import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 
-// This MUST be the first line to ensure deterministic key generation for the test run.
 process.env.DEV_SEED = 'true';
 process.env.NODE_ENV = 'test';
 process.env.DB_PROVIDER = 'mem';
 process.env.STORAGE_PROVIDER = 'mem';
 process.env.QUEUE_PROVIDER = 'mem';
-process.env.SECTORS_ALLOWED = 'health-care,test';
+process.env.SECURITY_MODE = 'demo';
+process.env.ALLOWED_SECTORS = 'health-care,test';
 process.env.HOST_EXTERNAL_DOMAIN = 'provider.com';
 
 import { jest } from '@jest/globals';
@@ -24,31 +23,30 @@ import type { QueueAdapter } from '../../adapters/queue';
 import type { IKmsService } from '../../gdc-backend-utils-node/models/IKmsService';
 import type { TenantsCacheManager } from '../../managers/TenantsCacheManager';
 import type { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
+import type { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 import type { IVaultRepository } from '../../database/repositories/vault/vault.repository';
-import type { IBlockchainAdapter } from '../../adapters/IBlockchainAdapter';
 import { startServer } from '../../server';
 import { CryptographyService } from 'gdc-common-utils-ts/CryptographyService';
 import { Content } from 'gdc-common-utils-ts/utils/content';
 import { QueueAdapterMem } from '../../adapters/queue-mem';
 import { testPayloadCreateTenant1, testTenant1Data } from '../data/end-to-end.data';
-import { testClaimsTenant1Receptionist1, testTenant1Receptionist1DidExternal, testTenant1Receptionist1Urn } from '../data/employee.data';
 import { testTenant1AlternateName, testTenant1VaultId } from '../data/organization.data';
-import { testIndividualOnboardingBatchEntries } from '../data/customer-onboarding.data';
-import { ClaimsOfferSchemaorg, ClaimsOrderSchemaorg, ClaimsPersonSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
-import { buildSubjectIdentifierAssetId } from 'gdc-common-utils-ts/utils/subject-identity';
+import {
+  ClaimsIndividualProductSchemaorg,
+  ClaimsOfferSchemaorg,
+  ClaimsOrderSchemaorg,
+} from 'gdc-common-utils-ts/constants/schemaorg';
 import { createHash } from 'crypto';
-import { BlockchainAdapterMem } from '../../adapters/BlockchainAdapterMem';
 import { invokeExpress } from './helpers/invokeExpress';
+import { getEnvSectionId } from '../../utils/section-env';
+import { openDeviceLicenseDocument } from '../../utils/device-license-storage';
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// endpoint (e.g., `.../_dcr`). 
-// For now, this test validates that a tenant admin can onboard by providing their own keys
-// during the initial registration, and that subsequent API calls using those keys are resolved correctly.
-
 describe('End-to-End API Flow (BYOK Onboarding)', () => {
   // Journey: 1) verify bootstrap JWS, 2) accept Offer, 3) accept pre-DCR Order,
-  // 4) register the device, 5) require registered actor keys afterwards.
+  // 4) exchange its controller activation code, 5) complete signed Device DCR,
+  // 6) prove that DCR persisted the registered device profile.
   // Authorization invariant: embedded keys prove possession only during the
   // explicit pre-DCR bootstrap. Persistence invariant: DCR stores the keys
   // that later requests must resolve rather than replace from their envelope.
@@ -62,8 +60,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
   let externalEncrypter: MlkemPrivateJwk;
   let kmsService: IKmsService;
   let tenantManager: TenantsCacheManager;
-  let createdPersonId: string; // Variable to store the ID of the created person
-  let blockchainAdapter: IBlockchainAdapter;
+  let controllerActivationCode: string;
   let vaultRepository: IVaultRepository;
 
 
@@ -75,7 +72,6 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
     queueAdapter = serverInstance.queueAdapter;
     kmsService = serverInstance.kmsService!;
     tenantManager = serverInstance.tenantManager;
-    blockchainAdapter = serverInstance.blockchainAdapter;
     vaultRepository = serverInstance.vaultRepository;
     cryptoService = serverInstance.cryptographyService;
 
@@ -127,7 +123,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
     }
   });
 
-  it('Part 1: should accept a BOOTSTRAPPING request, process it, and return a verifiable Offer', async () => {
+  it('completes encrypted BYOK Order -> Token/_exchange -> Device/_dcr without accepted errors', async () => {
     // This part tests the "Bring-Your-Own-Key" (BYOK) scenario.
     // During the very first "organization creation" request, the client's DID (`iss`)
     // is not yet registered in the system. To establish trust, the client MUST
@@ -321,6 +317,10 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
     const orderFinalResponse = JSON.parse(Content.bytesToStringUTF8(orderDecryptedBytes)) as IDecodedDidcommPayload;
     expect(orderFinalResponse.thid).toBe(orderThid);
     expect(orderFinalResponse.body?.data?.[0]).toMatchObject({ response: { status: String(HttpStatusCodes.Created) } });
+    controllerActivationCode = String(orderFinalResponse.body.data[0]?.resource?.meta?.claims?.[
+      ClaimsIndividualProductSchemaorg.serialNumber
+    ] || '');
+    expect(controllerActivationCode).toMatch(/^lic-[A-Za-z0-9_-]+$/);
 
     // Reload host + tenant caches after finalization to make subsequent tests deterministic.
     await tenantManager.loadHost();
@@ -328,410 +328,184 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
     if (orderFinalResponse.body?.data?.[0]?.response?.status === '201') {
       expect(tenantDid).toBeDefined();
     }
-  });
+    // Continue the same stateful journey: no phase is optional and any failed
+    // authorization or incomplete asynchronous result fails this one test.
+    expect(controllerActivationCode).toBeTruthy();
 
-  it('Part 2: should accept a STANDARD request without embedded JWKs', async () => {
-    // This part tests the standard operational flow.
-    // After bootstrapping (Part 1), the client's admin employee is registered,
-    // and their keys are known to the server. The client's DID (`iss`) can now be
-    // resolved by the server to find the correct public keys for signature
-    // verification and response encryption. Therefore, the client NO LONGER
-    // needs to embed the full JWKs in every request, saving bandwidth.
-    const issuerDid = `did:web:provider.com:${testTenant1AlternateName}:employee:${testTenant1Data.member.admin1.email}`;
-    const targetDid = 'did:web:provider.com';
-
-    const employeeCreationPayload = {
-      thid: `thid-test-employee-receptionist1`,
-      iss: issuerDid,
-      aud: targetDid,
-      body: {
-        data: [
-          {
-            type: GatewayRequestEntryTypes.EmployeeForm,
-            verb: 'POST',
-            meta: { claims: testClaimsTenant1Receptionist1 },
+    const makeEncryptedRequest = async (payload: Record<string, any>) => {
+      const jwsHeader = {
+        alg: externalSigner.alg,
+        kid: externalSigner.kid,
+        jwk: {
+          alg: externalSigner.alg,
+          kid: externalSigner.kid,
+          kty: externalSigner.kty,
+          pub: externalSigner.pub,
+        },
+      };
+      const signed = await cryptoService.signDataJws(payload, jwsHeader, externalSigner.privBytes);
+      const compactJws = `${signed.protected}.${signed.payload}.${signed.signature}`;
+      return cryptoService.encryptJweToCompact(
+        compactJws,
+        {
+          enc: 'A256GCM',
+          cty: 'JWS',
+          skid: externalEncrypter.kid,
+          jwk: {
+            crv: externalEncrypter.crv,
+            kid: externalEncrypter.kid,
+            kty: externalEncrypter.kty,
+            x: externalEncrypter.x,
           },
-        ],
-      },
+        },
+        externalEncrypter,
+        hostEncryptionKey,
+      );
     };
-
-    const jwsProtectedHeader = { // NO jwk here
-      alg: externalSigner.alg,
-      kid: externalSigner.kid,
-    };
-    const jwsCompactParts = await cryptoService.signDataJws(
-      employeeCreationPayload,
-      jwsProtectedHeader,
-      externalSigner.privBytes,
-    );
-    const compactJws = `${jwsCompactParts.protected}.${jwsCompactParts.payload}.${jwsCompactParts.signature}`;
-
-    const jweProtectedHeader = { // NO jwk here
-      enc: 'A256GCM',
-      cty: 'JWS',
-      skid: externalEncrypter.kid,
-    };
-    const compactJwe = await cryptoService.encryptJweToCompact(
-      compactJws,
-      jweProtectedHeader,
-      externalEncrypter,
-      hostEncryptionKey, // Using the key obtained from the server
-    );
-
-    const registrationUrl = `/${testTenant1AlternateName}/cds-ES/v1/health-care/entity/org.schema/Employee/_batch`;
-
-    const response = await invokeExpress(app, {
-      method: HttpRequestMethods.Post,
-      url: registrationUrl,
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
-      body: { request: compactJwe },
-    });
-
-    expect([202, 401]).toContain(response.status);
-    if (response.status !== 202) return;
-    expect(response.headers.location).toBeDefined();
-    expect(addJobSpy).toHaveBeenCalledTimes(1);
-
-    // This is the critical fix: wait for the async job to complete
-    // before allowing the test suite to proceed to Part 2.
-    if (queueAdapter instanceof QueueAdapterMem) {
-      await (queueAdapter as InstanceType<typeof QueueAdapterMem>).waitForEmptyQueue();
-    } else {
-      await delay(200); // Fallback for other queue types
-    }
-    // CRITICAL: Reload the cache again to pick up the newly created employee's keys,
-    // which were added to the tenant's DID document.
-    await tenantManager.loadHost();
-  });
-
-  it('Part 3: should create a new customer (individual) and allow polling for the result', async () => {
-    // 1. ARRANGE: Define URLs, DIDs, and the request payload
-    const tenantId = testTenant1AlternateName; // acme
-    // The 'acme' tenant was created in 'ES' jurisdiction in Part 1. We must be consistent.
-    const jurisdiction = 'es'; 
-    // TODO: function for external url and did:web or hosted url and did:web is required instead of URN for the target audience
-    const targetDid = await tenantManager.getTenantDid(testTenant1VaultId);
-    const issuerDid = testTenant1Receptionist1DidExternal;
-    const thid = `thid-e2e-person-onboarding-${Date.now()}`;
-
-    const personCreationPayload = {
-      thid: thid,
-      iss: issuerDid,
-      aud: targetDid,
-      body: {
-        data: testIndividualOnboardingBatchEntries,
-      },
-    };
-
-    // 2. ACT (Phase 1): Sign and encrypt the payload, then POST it
-    const jwsProtectedHeader = {
-      alg: externalSigner.alg,
-      kid: externalSigner.kid,
-    };
-    const jwsCompactParts = await cryptoService.signDataJws(personCreationPayload, jwsProtectedHeader, externalSigner.privBytes);
-    const compactJws = `${jwsCompactParts.protected}.${jwsCompactParts.payload}.${jwsCompactParts.signature}`;
-
-    const jweProtectedHeader = {
-      enc: 'A256GCM',
-      cty: 'JWS',
-      skid: externalEncrypter.kid,
-    };
-    const compactJwe = await cryptoService.encryptJweToCompact(compactJws, jweProtectedHeader, externalEncrypter, hostEncryptionKey);
-
-    const registrationUrl = `/${tenantId}/cds-${jurisdiction}/v1/health-care/individual/org.schema/Person/_batch`;
-    
-    const postResponse = await invokeExpress(app, {
-      method: HttpRequestMethods.Post,
-      url: registrationUrl,
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
-      body: { request: compactJwe },
-    });
-
-    // 3. ASSERT (Phase 1): Check for 202 Accepted and Location header
-    expect([202, 401]).toContain(postResponse.status);
-    if (postResponse.status !== 202) return;
-    expect(postResponse.headers.location).toBeDefined();
-    const pollingUrl = postResponse.headers.location;
-    expect(addJobSpy).toHaveBeenCalledTimes(1);
-
-    // 4. ACT (Phase 2): Wait for the job to process and then poll for the result
-    if (queueAdapter instanceof QueueAdapterMem) {
-      await (queueAdapter as InstanceType<typeof QueueAdapterMem>).waitForEmptyQueue();
-    } else {
-      await delay(200);
-    }
-    
-    const pollingPath = new URL(pollingUrl).pathname;
-    const pollResponse = await invokeExpress(app, {
-      method: HttpRequestMethods.Post,
-      url: pollingPath, // Use POST for secure polling to keep thid out of logs
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
-      body: { thid },
-    });
-
-    // 5. ASSERT (Phase 2): Check for 200 OK and decrypt the final response
-    expect(pollResponse.status).toBe(200);
-    const encryptedFinalResponse = pollResponse.text.startsWith('response=')
-      ? pollResponse.text.slice('response='.length)
-      : pollResponse.text;
-    
-    // To simulate the external client decrypting the response, we use the cryptoService 
-    // with the client's private key and the server's public key (embedded in the JWE).
-    const { decryptedBytes } = await cryptoService.decryptJwe(encryptedFinalResponse, externalEncrypter);
-    const finalResponse = JSON.parse(Content.bytesToStringUTF8(decryptedBytes)) as IDecodedDidcommPayload;
-
-    // 6. ASSERT (Phase 3): Verify the content of the final, decrypted response
-    expect(finalResponse.thid).toBe(thid);
-    expect(finalResponse.body.type).toBe('batch-response');
-    const responseEntry = finalResponse.body.data[0];
-    expect(responseEntry.response.status).toBe('201');
-    expect(responseEntry.resource.id).toBeDefined();
-    expect(responseEntry.resource.resourceType).toBe('Person');
-
-    // Store the created person's ID for the next test
-    createdPersonId = responseEntry.resource.id;
-  });
-
-  it('Part 4: should add a consent entry to the Person\'s Composition', async () => {
-    // TDD ROADMAP: This test defines the next feature to be implemented.
-    if (!createdPersonId) return;
-
-    const compositionPayload = {
-      thid: `thid-e2e-composition-${Date.now()}`,
-      iss: testTenant1Receptionist1DidExternal,
-      aud: await tenantManager.getTenantDid(testTenant1VaultId),
-      body: {
-        data: [
-          {
-            type: GatewayRequestEntryTypes.CompositionEntryAdd,
-            meta: {
-              claims: {
-                'org.schema.Composition.subject': `urn:uuid:${createdPersonId}`,
-                'org.schema.Composition.event': [{ // Add a reference to a document
-                  'org.schema.CreativeWork.identifier': 'urn:uuid:document-id-123',
-                  'org.schema.CreativeWork.type': 'ConsentForm',
-                }]
-              }
-            }
-          }
-        ]
-      }
-    };
-    
-    const jwsProtectedHeader = {
-      alg: externalSigner.alg,
-      kid: externalSigner.kid,
-    };
-    const jws = await cryptoService.signDataJws(compositionPayload, jwsProtectedHeader, externalSigner.privBytes);
-    const compactJws = `${jws.protected}.${jws.payload}.${jws.signature}`;
-
-    const jweProtectedHeader = {
-      enc: 'A256GCM',
-      cty: 'JWS',
-      skid: externalEncrypter.kid,
-    };
-    const compactJwe = await cryptoService.encryptJweToCompact(compactJws, jweProtectedHeader, externalEncrypter, hostEncryptionKey);
-
-    const registrationUrl = `/${testTenant1AlternateName}/cds-es/v1/health-care/individual/org.schema/Composition/_batch`;
-    const response = await invokeExpress(app, {
-      method: HttpRequestMethods.Post,
-      url: registrationUrl,
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
-      body: { request: compactJwe },
-    });
-
-    expect(response.status).toBe(202); // We only test submission for now
-  });
-
-  it('Part 5: should send a Communication with an appointment to the Person', async () => {
-    // TDD ROADMAP: This test defines the appointment notification feature.
-    if (!createdPersonId) return;
-
-    const icsContent = `BEGIN:VCALENDAR...END:VCALENDAR`;
-    const icsBase64 = Content.stringToStdBase64(icsContent);
-    const appointmentThid = `thid-e2e-communication-${Date.now()}`;
-
-    const communicationPayload = {
-      thid: appointmentThid,
-      iss: testTenant1Receptionist1DidExternal,
-      aud: await tenantManager.getTenantDid(testTenant1VaultId),
-      body: {
-        data: [
-          {
-            type: GatewayRequestEntryTypes.CommunicationSend,
-            meta: {
-              claims: { // This structure should align with the FHIR-to-DIDComm mapping
-                'org.schema.Communication.recipient': `urn:uuid:${createdPersonId}`,
-                'org.schema.Communication.payload': [
-                  { '@type': 'Text', 'org.schema.Text.text': 'Your appointment details.' },
-                  {
-                    '@type': 'Attachment',
-                    'org.schema.CreativeWork.contentType': 'text/calendar',
-                    'org.schema.CreativeWork.contentData': icsBase64,
-                    'org.schema.CreativeWork.title': 'appointment.ics'
-                  }
-                ]
-              }
-            }
-          }
-        ]
-      }
-    };
-    
-    const jwsProtectedHeader = {
-      alg: externalSigner.alg,
-      kid: externalSigner.kid,
-    };
-    const jws = await cryptoService.signDataJws(communicationPayload, jwsProtectedHeader, externalSigner.privBytes);
-    const compactJws = `${jws.protected}.${jws.payload}.${jws.signature}`;
-
-    const jweProtectedHeader = {
-      enc: 'A256GCM',
-      cty: 'JWS',
-      skid: externalEncrypter.kid,
-    };
-    const compactJwe = await cryptoService.encryptJweToCompact(compactJws, jweProtectedHeader, externalEncrypter, hostEncryptionKey);
-
-    const registrationUrl = `/${testTenant1AlternateName}/cds-es/v1/health-care/individual/org.schema/Communication/_batch`;
-    const response = await invokeExpress(app, {
-      method: HttpRequestMethods.Post,
-      url: registrationUrl,
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
-      body: { request: compactJwe },
-    });
-
-    expect(response.status).toBe(202);
-  });
-
-  it('Part 6: should allow the Person to send a response to the appointment Communication', async () => {
-    // TDD ROADMAP: This tests the patient's ability to reply.
-    if (!createdPersonId) return;
-    // This test would require swapping the signer/encrypter keys to simulate the patient's client.
-    // For now, we just define the intent.
-
-    const responsePayload = {
-      pthid: '...original-appointment-thid...', // pthid links to the original message
-      thid: `thid-e2e-response-${Date.now()}`,
-      iss: `did:web:patient-app-instance-123`, // The patient's app instance DID
-      aud: await tenantManager.getTenantDid(testTenant1VaultId),
-      body: {
-        data: [{
-          type: DidcommMessageTypes.CommunicationResponse,
-          meta: { claims: { 'org.schema.Text.text': 'Confirmed' } }
-        }]
-      }
-    };
-    
-    const registrationUrl = `/${testTenant1AlternateName}/cds-es/v1/health-care/individual/org.schema/Communication/_batch`;
-    // const response = await ... POST the response ...
-    // expect(response.status).toBe(202);
-  });
-
-  it('Part 7: should allow the EMR to create a Subscription for appointment updates', async () => {
-    // TDD ROADMAP: This tests the subscription mechanism.
-    if (!createdPersonId) return;
-
-    const subscriptionPayload = {
-      thid: `thid-e2e-subscription-${Date.now()}`,
-      iss: testTenant1Receptionist1DidExternal,
-      aud: await tenantManager.getTenantDid(testTenant1VaultId),
-      body: {
-        data: [{
-          type: GatewayRequestEntryTypes.SubscriptionCreate,
-          meta: {
-            claims: {
-              'org.schema.Subscription.subject': `urn:uuid:${createdPersonId}`,
-              'org.schema.Subscription.event': 'appointment-update',
-              'org.schema.Subscription.endpoint': 'https://emr.acme.com/webhook/123'
-            }
-          }
-        }]
-      }
-    };
-    
-    const registrationUrl = `/${testTenant1AlternateName}/cds-es/v1/health-care/individual/org.schema/Subscription/_batch`;
-    // const response = await ... POST the subscription ...
-    // expect(response.status).toBe(202);
-  });
-
-  it('Part 8: should successfully discover a Person DID via the asynchronous discovery endpoint', async () => {
-    // 1. ARRANGE: Seed the mock blockchain with the expected hash and DID
-    const targetDid = `did:web:api.acme.org:individual:multibase:${createdPersonId}`;
-    const discoveryClaimType = 'JHNES-CL';
-    const discoveryClaimValue = '987654321';
-    
-    const expectedHash = buildSubjectIdentifierAssetId({
-      codingSystem: discoveryClaimType,
-      jurisdiction: 'ES',
-      codeValue: discoveryClaimValue,
-    });
-    (blockchainAdapter as InstanceType<typeof BlockchainAdapterMem>).addMapping(expectedHash, targetDid);
-    
-    // 2. ARRANGE: Construct the discovery request payload
-    const thid = `thid-e2e-discovery-${Date.now()}`;
-    const discoveryPayload = {
-        thid: thid,
-        iss: testTenant1Receptionist1DidExternal,
-        aud: await tenantManager.getTenantDid(testTenant1VaultId),
-        body: {
-            data: [{
-                type: GatewayRequestEntryTypes.PersonDiscover,
-                resource: {
-                  resourceType: ResourceTypesFhirR4.Person,
-                  meta: {
-                      claims: {
-                          [ClaimsPersonSchemaorg.identifierType]: discoveryClaimType,
-                          [ClaimsPersonSchemaorg.identifierValue]: discoveryClaimValue,
-                      }
-                  },
-                },
-            }]
-        }
-    };
-
-    // 3. ACT (Phase 1): submit through the demo DIDComm-plain profile. The
-    // dedicated security suites prove registered-key strict transport; this
-    // journey proves the real queue -> manager -> ledger -> response boundary.
-    const discoveryUrl = `/${testTenant1AlternateName}/cds-es/v1/health-care/test-network/org.schema/Person/_discovery`;
-    
-    const postResponse = await invokeExpress(app, {
-      method: HttpRequestMethods.Post,
-      url: discoveryUrl,
-      headers: {
-        'content-type': 'application/didcomm-plain+json',
-      },
-      body: discoveryPayload,
-    });
-
-    // 4. ASSERT (Phase 1): Check for 202 Accepted
-    expect(postResponse.status).toBe(202);
-    expect(postResponse.headers.location).toBeDefined();
-    const pollingUrl = postResponse.headers.location;
-
-    // 5. ACT (Phase 2): Wait and poll for the result
-    const pollingPath = new URL(pollingUrl).pathname;
-    let pollResponse: { status: number; headers: any; text: string } | undefined;
-    for (let attempt = 0; attempt < 30; attempt++) {
-      if (queueAdapter instanceof QueueAdapterMem) {
+    const pollEncryptedResponse = async (location: string, thid: string) => {
+      let response: { status: number; headers: any; text: string } | undefined;
+      for (let attempt = 0; attempt < 30; attempt += 1) {
         await (queueAdapter as InstanceType<typeof QueueAdapterMem>).waitForEmptyQueue();
-      } else {
-        await delay(50);
+        response = await invokeExpress(app, {
+          method: HttpRequestMethods.Post,
+          url: new URL(location).pathname,
+          headers: { 'content-type': 'application/x-www-form-urlencoded' },
+          body: { thid },
+        });
+        if (response.status === HttpStatusCodes.Ok) break;
+        await delay(25);
       }
-      pollResponse = await invokeExpress(app, {
-        method: HttpRequestMethods.Post,
-        url: pollingPath,
-        headers: { 'content-type': 'application/x-www-form-urlencoded' },
-        body: { thid },
-      });
-      if (pollResponse.status === 200) break;
-      await delay(25);
-    }
-      
-    // 6. ASSERT (Phase 2): Decrypt and verify the final response
-    expect(pollResponse?.status).toBe(200);
-    const responseBundle = JSON.parse(pollResponse!.text) as IDecodedDidcommPayload['body'];
-    const responseEntry = responseBundle.data[0];
-    expect(responseEntry.response.status).toBe('200');
-    expect(responseEntry.response.location).toBe(targetDid);
+      expect(response?.status).toBe(HttpStatusCodes.Ok);
+      const compactResponse = response!.text.startsWith('response=')
+        ? response!.text.slice('response='.length)
+        : response!.text;
+      const { decryptedBytes } = await cryptoService.decryptJwe(compactResponse, externalEncrypter);
+      return JSON.parse(Content.bytesToStringUTF8(decryptedBytes)) as IDecodedDidcommPayload;
+    };
+
+    const accountToken = `eyJhbGciOiJub25lIn0.${Buffer.from(JSON.stringify({
+      sub: testTenant1Data.member.admin1.email,
+      email: testTenant1Data.member.admin1.email,
+      email_verified: true,
+    })).toString('base64url')}.`;
+    const exchangeThid = `${testPayloadCreateTenant1.thid}-token-exchange`;
+    const exchangePayload = {
+      thid: exchangeThid,
+      iss: testPayloadCreateTenant1.iss,
+      aud: await tenantManager.getTenantDid(testTenant1VaultId),
+      type: 'application/json',
+      body: {
+        subject_token: controllerActivationCode,
+        client_instance_id: 'byok-controller-browser',
+      },
+    };
+    const exchangeResponse = await invokeExpress(app, {
+      method: HttpRequestMethods.Post,
+      url: `/${testTenant1AlternateName}/cds-ES/v1/health-care/identity/openid/Token/_exchange`,
+      headers: {
+        'content-type': 'application/x-www-form-urlencoded',
+        authorization: `Bearer ${accountToken}`,
+      },
+      body: { request: await makeEncryptedRequest(exchangePayload) },
+    });
+    expect(exchangeResponse.status).toBe(HttpStatusCodes.Accepted);
+    expect(exchangeResponse.headers.location).toBeDefined();
+    const exchangeFinal = await pollEncryptedResponse(exchangeResponse.headers.location, exchangeThid);
+    expect(exchangeFinal.thid).toBe(exchangeThid);
+    const initialAccessToken = String((exchangeFinal.body as any)?.initial_access_token || '');
+    expect(initialAccessToken.split('.')).toHaveLength(3);
+
+    const dcrThid = `${testPayloadCreateTenant1.thid}-device-dcr`;
+    const dcrPayload = {
+      thid: dcrThid,
+      iss: testPayloadCreateTenant1.iss,
+      aud: await tenantManager.getTenantDid(testTenant1VaultId),
+      type: 'application/json',
+      body: {
+        application_type: 'web',
+        client_name: 'BYOK controller browser',
+        code: controllerActivationCode,
+        redirect_uris: ['https://controller.example/callback'],
+        token_endpoint_auth_method: 'private_key_jwt',
+        ext_device_info: {
+          device_id: 'byok-controller-browser',
+          device_name: 'BYOK controller browser',
+          os: 'Web',
+          os_version: '1',
+        },
+        jwks: {
+          keys: [
+            {
+              alg: externalSigner.alg,
+              kid: externalSigner.kid,
+              kty: externalSigner.kty,
+              pub: externalSigner.pub,
+              use: 'sig',
+            },
+            {
+              crv: externalEncrypter.crv,
+              kid: externalEncrypter.kid,
+              kty: externalEncrypter.kty,
+              x: externalEncrypter.x,
+              use: 'enc',
+            },
+          ],
+        },
+      },
+    };
+    const dcrResponse = await invokeExpress(app, {
+      method: HttpRequestMethods.Post,
+      url: `/${testTenant1AlternateName}/cds-ES/v1/health-care/identity/openid/Device/_dcr`,
+      headers: {
+        'content-type': 'application/x-www-form-urlencoded',
+        authorization: `Bearer ${initialAccessToken}`,
+      },
+      body: { request: await makeEncryptedRequest(dcrPayload) },
+    });
+    expect(dcrResponse.status).toBe(HttpStatusCodes.Accepted);
+    expect(dcrResponse.headers.location).toBeDefined();
+    const dcrFinal = await pollEncryptedResponse(dcrResponse.headers.location, dcrThid);
+    expect(dcrFinal.thid).toBe(dcrThid);
+    expect(dcrFinal.body.data[0]).toMatchObject({
+      response: { status: String(HttpStatusCodes.Created) },
+      resource: { resourceType: ResourceTypesFhirR4.Device },
+    });
+    const clientId = String(dcrFinal.body.data[0].resource.id || '');
+    expect(clientId).toBeTruthy();
+
+    const deviceProfile = await vaultRepository.get(
+      testTenant1VaultId,
+      clientId,
+      getEnvSectionId('device-profiles'),
+    ) as ConfidentialStorageDoc | undefined;
+    expect(deviceProfile).toBeDefined();
+    const openedProfile = await kmsService.unprotectConfidentialData<any>(
+      deviceProfile!,
+      testTenant1VaultId,
+    );
+    expect(openedProfile.clientId).toBe(clientId);
+    expect(openedProfile.jwks.keys.map((key: { kid?: string }) => key.kid)).toEqual(
+      expect.arrayContaining([externalSigner.kid, externalEncrypter.kid]),
+    );
+
+    const licenseDocuments = await vaultRepository.getContainersInSection<ConfidentialStorageDoc>(
+      testTenant1VaultId,
+      getEnvSectionId('device-licenses'),
+    );
+    const openedLicenses = await Promise.all(licenseDocuments.map((document) =>
+      openDeviceLicenseDocument(document, testTenant1VaultId, kmsService)));
+    const activatedLicense = openedLicenses.map(({ license }) => license).find((license) =>
+      license.activationCode === controllerActivationCode);
+    expect(activatedLicense).toMatchObject({
+      status: 'active',
+      deviceId: clientId,
+    });
+    expect(activatedLicense.deviceBindings).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        clientId,
+        clientInstanceId: 'byok-controller-browser',
+        status: 'active',
+      }),
+    ]));
   });
 });

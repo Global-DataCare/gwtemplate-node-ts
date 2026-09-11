@@ -220,14 +220,12 @@ describe('HostingManager - Offer/Order Flow', () => {
 
     // Assert the final response
     const finalEntry = finalResponse.body.data[0];
-    expect(['201', '404']).toContain(finalEntry.response.status);
+    expect(finalEntry.response.status).toBe('201');
     expect([GatewayResponseEntryTypes.OrganizationOrder, GatewayRequestEntryTypes.OrganizationOrder]).toContain(finalEntry.type);
-    if (finalEntry.response.status === '201') {
-      const finalClaims = finalEntry.resource?.meta?.claims || finalEntry.meta?.claims;
-      expect(
-        finalClaims?.[ClaimsOrderSchemaorg.acceptedOfferIdentifier],
-      ).toBe(offerId);
-    }
+    const finalClaims = finalEntry.resource?.meta?.claims || finalEntry.meta?.claims;
+    expect(
+      finalClaims?.[ClaimsOrderSchemaorg.acceptedOfferIdentifier],
+    ).toBe(offerId);
 
     // Assert the state of the finalized tenant record in the host's vault
     const regClaims = registrationJob.content!.body!.data[0]!.resource!.meta!.claims;
@@ -244,14 +242,12 @@ describe('HostingManager - Offer/Order Flow', () => {
       tenantVaultId,
       getEnvSectionId('tenants'),
     )) as ConfidentialStorageDoc;
-    if (finalEntry.response.status === '201') {
-      expect(finalDoc).toBeDefined();
-      expect(finalDoc.content).toBeDefined();
-      expect(finalDoc.sequence).toBe(1);
-      expect(finalDoc.content!.status).toBe('active');
-      expect(finalDoc.content!.networkStatus[0].status).toBe('active');
-      expect(finalDoc.content!.didDocument).toBeDefined();
-    }
+    expect(finalDoc).toBeDefined();
+    expect(finalDoc.content).toBeDefined();
+    expect(finalDoc.sequence).toBe(1);
+    expect(finalDoc.content!.status).toBe('active');
+    expect(finalDoc.content!.networkStatus[0].status).toBe('active');
+    expect(finalDoc.content!.didDocument).toBeDefined();
 
     // Assert that the tenant's own vault and resources were created
     const tenantCollectionName =
@@ -261,25 +257,21 @@ describe('HostingManager - Offer/Order Flow', () => {
       'legal-participant.vc.json',
       getEnvSectionId('.well-known'),
     );
-    if (finalEntry.response.status === '201') {
-      expect(legalParticipantDoc).toBeDefined();
-      const controllerDocs = await vaultRepository.getContainersInSection(
-        tenantCollectionName,
-        getEnvSectionId('employees'),
-      );
-      expect(controllerDocs).toHaveLength(1);
-      expect(finalDoc.content!.didDocument.controller).toEqual([
-        (controllerDocs[0] as any).content?.didDocument?.id,
-      ]);
-    }
+    expect(legalParticipantDoc).toBeDefined();
+    const controllerDocs = await vaultRepository.getContainersInSection(
+      tenantCollectionName,
+      getEnvSectionId('employees'),
+    );
+    expect(controllerDocs).toHaveLength(1);
+    expect(finalDoc.content!.didDocument.controller).toEqual([
+      (controllerDocs[0] as any).content?.didDocument?.id,
+    ]);
 
     const communications = await vaultRepository.getContainersInSection(
       hostCollectionName,
       getEnvSectionId('communications'),
     );
-    if (finalEntry.response.status === '201') {
-      expect(communications.length).toBeGreaterThan(0);
-    }
+    expect(communications.length).toBeGreaterThan(0);
   });
 
   it('should accept one portal-managed commercial Order and emit extra employee seats for an active tenant', async () => {

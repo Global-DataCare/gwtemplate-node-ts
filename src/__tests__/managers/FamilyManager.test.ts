@@ -184,7 +184,27 @@ function makeTransactionJob(
   };
 }
 
-function makeSearchJob(overrideClaims: Record<string, unknown> = {}): JobRequest {
+function makeVerifiedOwnerBearerPayload(claims: Record<string, unknown>): Record<string, unknown> {
+  const email = String(claims[ClaimsOrganizationSchemaorg.ownerEmail] || '').trim();
+  const phone = String(claims[ClaimsOrganizationSchemaorg.ownerTelephone] || '').trim();
+  return {
+    sub: 'verified-owner-account',
+    ...(email ? { email, email_verified: true } : {}),
+    ...(phone ? { phone_number: phone, phone_number_verified: true } : {}),
+  };
+}
+
+function makeSearchJob(
+  overrideClaims: Record<string, unknown> = {},
+  bearerPayload?: Record<string, unknown>,
+): JobRequest {
+  const claims = {
+    [ClaimsOrganizationSchemaorg.ownerTelephone]: EXAMPLE_FAMILY_REGISTRATION_OWNER_TELEPHONE,
+    [ClaimsOrganizationSchemaorg.ownerEmail]: String(BASE_CLAIMS[ClaimsOrganizationSchemaorg.ownerEmail]),
+    [ClaimsOrganizationSchemaorg.alternateName]: String(BASE_CLAIMS[ClaimsOrganizationSchemaorg.alternateName]),
+    [ClaimsServiceSchemaorg.category]: SECTOR,
+    ...overrideClaims,
+  };
   return {
     id: randomUUID(),
     status: JobStatus.DRAFT,
@@ -202,17 +222,12 @@ function makeSearchJob(overrideClaims: Record<string, unknown> = {}): JobRequest
       iss: 'did:web:client.example.com',
       aud: `did:web:${TENANT_ID}.example.com`,
       type: 'application/api+json',
+      meta: { bearer: { jwt: { payload: bearerPayload || makeVerifiedOwnerBearerPayload(claims) } } } as any,
       body: {
         data: [{
           type: GatewayResponseEntryTypes.FamilySearch,
           meta: {
-            claims: {
-              [ClaimsOrganizationSchemaorg.ownerTelephone]: EXAMPLE_FAMILY_REGISTRATION_OWNER_TELEPHONE,
-              [ClaimsOrganizationSchemaorg.ownerEmail]: String(BASE_CLAIMS[ClaimsOrganizationSchemaorg.ownerEmail]),
-              [ClaimsOrganizationSchemaorg.alternateName]: String(BASE_CLAIMS[ClaimsOrganizationSchemaorg.alternateName]),
-              [ClaimsServiceSchemaorg.category]: SECTOR,
-              ...overrideClaims,
-            },
+            claims,
           },
         }],
       },
@@ -298,7 +313,17 @@ function makePdfDraftJob(input: {
   };
 }
 
-function makePurgeJob(overrideClaims: Record<string, unknown> = {}): JobRequest {
+function makePurgeJob(
+  overrideClaims: Record<string, unknown> = {},
+  bearerPayload?: Record<string, unknown>,
+): JobRequest {
+  const claims = {
+    [ClaimsOrganizationSchemaorg.ownerTelephone]: EXAMPLE_FAMILY_REGISTRATION_OWNER_TELEPHONE,
+    [ClaimsOrganizationSchemaorg.ownerEmail]: String(BASE_CLAIMS[ClaimsOrganizationSchemaorg.ownerEmail]),
+    [ClaimsOrganizationSchemaorg.alternateName]: String(BASE_CLAIMS[ClaimsOrganizationSchemaorg.alternateName]),
+    [ClaimsServiceSchemaorg.category]: SECTOR,
+    ...overrideClaims,
+  };
   return {
     id: randomUUID(),
     status: JobStatus.DRAFT,
@@ -316,17 +341,12 @@ function makePurgeJob(overrideClaims: Record<string, unknown> = {}): JobRequest 
       iss: 'did:web:client.example.com',
       aud: `did:web:${TENANT_ID}.example.com`,
       type: 'application/api+json',
+      meta: { bearer: { jwt: { payload: bearerPayload || makeVerifiedOwnerBearerPayload(claims) } } } as any,
       body: {
         data: [{
           type: GatewayRequestEntryTypes.FamilyPurge,
           meta: {
-            claims: {
-              [ClaimsOrganizationSchemaorg.ownerTelephone]: EXAMPLE_FAMILY_REGISTRATION_OWNER_TELEPHONE,
-              [ClaimsOrganizationSchemaorg.ownerEmail]: String(BASE_CLAIMS[ClaimsOrganizationSchemaorg.ownerEmail]),
-              [ClaimsOrganizationSchemaorg.alternateName]: String(BASE_CLAIMS[ClaimsOrganizationSchemaorg.alternateName]),
-              [ClaimsServiceSchemaorg.category]: SECTOR,
-              ...overrideClaims,
-            },
+            claims,
           },
         }],
       },
@@ -334,7 +354,17 @@ function makePurgeJob(overrideClaims: Record<string, unknown> = {}): JobRequest 
   };
 }
 
-function makeDisableJob(overrideClaims: Record<string, unknown> = {}): JobRequest {
+function makeDisableJob(
+  overrideClaims: Record<string, unknown> = {},
+  bearerPayload?: Record<string, unknown>,
+): JobRequest {
+  const claims = {
+    [ClaimsOrganizationSchemaorg.ownerTelephone]: EXAMPLE_FAMILY_REGISTRATION_OWNER_TELEPHONE,
+    [ClaimsOrganizationSchemaorg.ownerEmail]: String(BASE_CLAIMS[ClaimsOrganizationSchemaorg.ownerEmail]),
+    [ClaimsOrganizationSchemaorg.alternateName]: String(BASE_CLAIMS[ClaimsOrganizationSchemaorg.alternateName]),
+    [ClaimsServiceSchemaorg.category]: SECTOR,
+    ...overrideClaims,
+  };
   return {
     id: randomUUID(),
     status: JobStatus.DRAFT,
@@ -352,17 +382,12 @@ function makeDisableJob(overrideClaims: Record<string, unknown> = {}): JobReques
       iss: 'did:web:client.example.com',
       aud: `did:web:${TENANT_ID}.example.com`,
       type: 'application/api+json',
+      meta: { bearer: { jwt: { payload: bearerPayload || makeVerifiedOwnerBearerPayload(claims) } } } as any,
       body: {
         data: [{
           type: LifecycleRequestType.IndividualOrganizationDisable,
           meta: {
-            claims: {
-              [ClaimsOrganizationSchemaorg.ownerTelephone]: EXAMPLE_FAMILY_REGISTRATION_OWNER_TELEPHONE,
-              [ClaimsOrganizationSchemaorg.ownerEmail]: String(BASE_CLAIMS[ClaimsOrganizationSchemaorg.ownerEmail]),
-              [ClaimsOrganizationSchemaorg.alternateName]: String(BASE_CLAIMS[ClaimsOrganizationSchemaorg.alternateName]),
-              [ClaimsServiceSchemaorg.category]: SECTOR,
-              ...overrideClaims,
-            },
+            claims,
           },
         }],
       },
@@ -469,6 +494,21 @@ function getIndividualPdfFixtureConfig(): {
   };
 }
 
+/** Fails closed if an explicitly enabled signed-PDF fixture becomes incomplete. */
+function requireIndividualPdfFixtureConfig(): NonNullable<ReturnType<typeof getIndividualPdfFixtureConfig>> {
+  const fixture = getIndividualPdfFixtureConfig();
+  if (!fixture || !existsSync(fixture.pdfPath)) {
+    throw new Error('Signed individual PDF fixture is not configured or does not exist.');
+  }
+  return fixture;
+}
+
+const configuredIndividualPdfFixture = getIndividualPdfFixtureConfig();
+const signedIndividualPdfFixtureTest = configuredIndividualPdfFixture
+  && existsSync(configuredIndividualPdfFixture.pdfPath)
+  ? it
+  : it.skip;
+
 // ---------------------------------------------------------------------------
 // Suite
 // ---------------------------------------------------------------------------
@@ -519,6 +559,21 @@ describe('FamilyManager', () => {
       expect(entry.resource?.meta?.claims?.['org.schema.FamilyRegistration.status']).toBe('new_created');
       expect(entry.response?.status).toBe('201');
       expect(mockVaultRepository.put).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns the exact persisted individual id when registration did not supply one', async () => {
+      mockVaultRepository.query.mockResolvedValue([]);
+      mockVaultRepository.put.mockResolvedValue(true);
+      const job = makeBatchJob();
+      const claims = job.content?.body?.data?.[0]?.meta?.claims as Record<string, unknown>;
+      delete claims[ClaimsOrganizationSchemaorg.identifierValue];
+
+      const response = await manager.process(job);
+      const body = response.body as BundleJsonApi;
+      const entry = body.data[0] as BundleEntry;
+      const protectedDoc = mockKmsService.protectConfidentialData.mock.calls[0]?.[0] as ConfidentialStorageDoc;
+
+      expect(entry.resource?.id).toBe(protectedDoc.id);
     });
 
     it('already_exists: returns status already_exists without inserting when Active record is found', async () => {
@@ -598,13 +653,15 @@ describe('FamilyManager', () => {
       const entry = body.data[0] as BundleEntry;
       const protectedDoc = mockKmsService.protectConfidentialData.mock.calls[0]?.[0] as ConfidentialStorageDoc;
       const persistedClaims = (protectedDoc.content as any).claims as Record<string, unknown>;
+      const controllerIdentifier = String(
+        entry.resource?.meta?.claims?.[ClaimsOrganizationSchemaorg.ownerIdentifierValue] || '',
+      );
 
       expect(entry.resource?.meta?.claims).toEqual(expect.objectContaining({
         [ClaimsOrganizationSchemaorg.alternateName]: EXAMPLE_REGISTERED_SUBJECT_ALTERNATE_NAME,
         [ClaimsOrganizationSchemaorg.ownerAlternateName]: EXAMPLE_REGISTERED_SUBJECT_ALTERNATE_NAME,
         [ClaimsOrganizationSchemaorg.ownerEmail]: EXAMPLE_SELF_REGISTERED_INDIVIDUAL_EMAIL_NORMALIZED,
         [ClaimsOrganizationSchemaorg.ownerTelephone]: EXAMPLE_KYC_CONTROLLER_TELEPHONE,
-        [ClaimsOrganizationSchemaorg.ownerIdentifierValue]: EXAMPLE_KYC_CONTROLLER_IDENTIFIER,
         [ClaimsOrganizationSchemaorg.addressCountry]: EXAMPLE_KYC_CONTROLLER_COUNTRY,
         [ClaimsPersonSchemaorg.givenName]: EXAMPLE_KYC_CONTROLLER_GIVEN_NAME.toUpperCase(),
         [ClaimsPersonSchemaorg.familyName]: EXAMPLE_KYC_CONTROLLER_FAMILY_NAME.toUpperCase(),
@@ -614,9 +671,10 @@ describe('FamilyManager', () => {
         [ClaimsOrganizationSchemaorg.ownerAlternateName]: EXAMPLE_REGISTERED_SUBJECT_ALTERNATE_NAME,
         [ClaimsOrganizationSchemaorg.ownerEmail]: EXAMPLE_SELF_REGISTERED_INDIVIDUAL_EMAIL_NORMALIZED,
         [ClaimsOrganizationSchemaorg.ownerTelephone]: EXAMPLE_KYC_CONTROLLER_TELEPHONE,
-        [ClaimsOrganizationSchemaorg.ownerIdentifierValue]: EXAMPLE_KYC_CONTROLLER_IDENTIFIER,
         [ClaimsPersonSchemaorg.birthDate]: EXAMPLE_KYC_CONTROLLER_BIRTHDATE.slice(0, 4),
       }));
+      expect(controllerIdentifier).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+      expect(persistedClaims[ClaimsOrganizationSchemaorg.ownerIdentifierValue]).toBe(controllerIdentifier);
     });
 
     it('renders a filled onboarding PDF draft from template + formFields + KYC and returns it as DocumentReference claims', async () => {
@@ -729,11 +787,8 @@ describe('FamilyManager', () => {
       expect(renderedForm.getCheckBox('controllerIsSubject').isChecked()).toBe(false);
     });
 
-    it('individual-form-pdf-cert-signed maps the real signed PDF into valid CORE family claims', async () => {
-        const fixture = getIndividualPdfFixtureConfig();
-        if (!fixture?.pdfPath || !existsSync(fixture.pdfPath)) {
-          return;
-        }
+    signedIndividualPdfFixtureTest('individual-form-pdf-cert-signed maps the real signed PDF into valid CORE family claims', async () => {
+        const fixture = requireIndividualPdfFixtureConfig();
 
         mockVaultRepository.query.mockResolvedValue([]);
         mockVaultRepository.put.mockResolvedValue(true);
@@ -784,11 +839,8 @@ describe('FamilyManager', () => {
         }));
       });
 
-    it('individual-form-pdf attachment flow accepts _transaction alias and completes claims from signed PDF', async () => {
-        const fixture = getIndividualPdfFixtureConfig();
-        if (!fixture?.pdfPath || !existsSync(fixture.pdfPath)) {
-          return;
-        }
+    signedIndividualPdfFixtureTest('individual-form-pdf attachment flow accepts _transaction alias and completes claims from signed PDF', async () => {
+        const fixture = requireIndividualPdfFixtureConfig();
 
         mockVaultRepository.query.mockResolvedValue([]);
         mockVaultRepository.put.mockResolvedValue(true);
@@ -822,11 +874,8 @@ describe('FamilyManager', () => {
         }));
       });
 
-    it('individual-form-pdf attachment flow also accepts HTTPS links[] and downloads the PDF before extracting claims', async () => {
-        const fixture = getIndividualPdfFixtureConfig();
-        if (!fixture?.pdfPath || !existsSync(fixture.pdfPath)) {
-          return;
-        }
+    signedIndividualPdfFixtureTest('individual-form-pdf attachment flow also accepts HTTPS links[] and downloads the PDF before extracting claims', async () => {
+        const fixture = requireIndividualPdfFixtureConfig();
 
         mockVaultRepository.query.mockResolvedValue([]);
         mockVaultRepository.put.mockResolvedValue(true);
@@ -879,6 +928,39 @@ describe('FamilyManager', () => {
   // -------------------------------------------------------------------------
 
   describe('_search / processFamilySearchEntry', () => {
+    it('rejects an authenticated individual that requests another owner directory', async () => {
+      const response = await manager.process(makeSearchJob({
+        [ClaimsOrganizationSchemaorg.ownerTelephone]: '',
+        [ClaimsOrganizationSchemaorg.ownerEmail]: 'victim@example.org',
+        [ClaimsOrganizationSchemaorg.alternateName]: '',
+      }, {
+        sub: 'attacker-account',
+        email: 'attacker@example.org',
+        email_verified: true,
+      }));
+      const entry = (response.body as BundleJsonApi).data[0] as BundleEntry;
+
+      expect(entry.response?.status).toBe('403');
+      expect(mockVaultRepository.query).not.toHaveBeenCalled();
+    });
+
+    it('allows the authenticated target-tenant RESPRSN controller to review an owner directory', async () => {
+      const controllerDid = 'did:web:gateway.example:acme:cds-es:v1:health-care:employee:zController:RESPRSN';
+      const job = makeSearchJob({
+        [ClaimsOrganizationSchemaorg.ownerTelephone]: '',
+        [ClaimsOrganizationSchemaorg.ownerEmail]: 'reviewed-owner@example.org',
+        [ClaimsOrganizationSchemaorg.alternateName]: '',
+      }, { sub: controllerDid });
+      job.content!.iss = controllerDid;
+      mockVaultRepository.query.mockResolvedValue([]);
+
+      const response = await manager.process(job);
+      const entry = (response.body as BundleJsonApi).data[0] as BundleEntry;
+
+      expect(entry.response?.status).toBe('200');
+      expect(mockVaultRepository.query).toHaveBeenCalledTimes(1);
+    });
+
     it('returns every card owned by an exact indexed email when nickname is omitted', async () => {
       const ownerEmail = 'controller@example.org';
       mockVaultRepository.query.mockResolvedValue([
@@ -971,6 +1053,26 @@ describe('FamilyManager', () => {
   });
 
   describe('_purge / processFamilyPurgeEntry', () => {
+    it.each([
+      ['_disable', makeDisableJob],
+      ['_purge', makePurgeJob],
+    ])('rejects an authenticated individual that attempts %s for another owner', async (_action, makeJob) => {
+      const response = await manager.process(makeJob({
+        [ClaimsOrganizationSchemaorg.ownerTelephone]: '',
+        [ClaimsOrganizationSchemaorg.ownerEmail]: 'victim@example.org',
+      }, {
+        sub: 'attacker-account',
+        email: 'attacker@example.org',
+        email_verified: true,
+      }));
+      const entry = (response.body as BundleJsonApi).data[0] as BundleEntry;
+
+      expect(entry.response?.status).toBe('403');
+      expect(mockVaultRepository.query).not.toHaveBeenCalled();
+      expect(mockVaultRepository.put).not.toHaveBeenCalled();
+      expect(mockVaultRepository.delete).not.toHaveBeenCalled();
+    });
+
     it('disabled: marks the family registration inactive without touching licenses', async () => {
       const existingContent = buildExampleFamilyRegistrationContent({
         status: EntityLifecycleStatus.Active,

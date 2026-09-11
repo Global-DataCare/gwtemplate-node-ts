@@ -1076,10 +1076,8 @@ describe('Organization Registration API', () => {
 
       const responseEntry = finalVcResponse.body.data[0];
       expect(responseEntry.type).toBe(GatewayResponseEntryTypes.OrganizationOrder);
-      expect(['201', '404']).toContain(responseEntry.response.status);
-      if (responseEntry.meta?.claims) {
-        expect(responseEntry.resource.meta.claims[ClaimsOrderSchemaorg.acceptedOfferIdentifier] || offerId).toBeDefined();
-      }
+      expect(responseEntry.response.status).toBe('201');
+      expect(responseEntry.resource?.meta?.claims?.[ClaimsOrderSchemaorg.acceptedOfferIdentifier]).toBe(offerId);
     });
   });
 });

@@ -65,6 +65,7 @@ import {
   type ClinicalCreatorBinding,
 } from 'gdc-common-utils-ts/utils/fhir-ips-creator-identity';
 import { normalizeUuid } from 'gdc-common-utils-ts/utils/normalize-uuid';
+import { getHealthcareRoleByClaim } from 'gdc-common-utils-ts/constants/healthcare';
 import { getClinicalCreatorBindingsSectionId } from '../utils/clinical-creator-binding';
 import { registerProfessionalAssignmentOnLedger } from '../utils/professional-assignment-ledger';
 import { resolveRoleLicenseOrganizationOfficialId } from '../utils/ledger-organization-registration-helpers';
@@ -1190,7 +1191,25 @@ function sameStableClinicalCreatorBinding(
     && left.actorIdentifier === right.actorIdentifier
     && left.authorIdentifier === right.authorIdentifier
     && left.ownerIdentifier === right.ownerIdentifier
-    && left.role === right.role;
+    && sameGovernedClinicalRole(left.role, right.role);
+}
+
+function sameGovernedClinicalRole(left: string, right: string): boolean {
+  if (left === right) return true;
+  const leftRole = getHealthcareRoleByClaim(left);
+  const rightRole = getHealthcareRoleByClaim(right);
+  if (leftRole && rightRole) {
+    return leftRole.codingSystem === rightRole.codingSystem
+      && leftRole.code === rightRole.code;
+  }
+  const [leftSystem, leftCode] = String(left || '').trim().split('|', 2);
+  const [rightSystem, rightCode] = String(right || '').trim().split('|', 2);
+  return Boolean((leftRole
+    && leftRole.codingSystem === rightSystem
+    && leftRole.code === rightCode)
+    || (rightRole
+      && rightRole.codingSystem === leftSystem
+      && rightRole.code === leftCode));
 }
 
 function uniqueText(values: readonly string[]): string[] {

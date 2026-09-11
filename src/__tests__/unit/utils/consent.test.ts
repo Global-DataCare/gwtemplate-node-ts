@@ -1,4 +1,9 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: Consent actor roles normalize to the shared canonical healthcare vocabulary before authorization comparison.
+import {
+  getHealthcareRoleByClaim,
+  HealthcareActorRoles,
+  ISCO08_CODING_SYSTEM,
+} from 'gdc-common-utils-ts/constants/healthcare';
 import {
   buildConsentRuleKey,
   expandConsentActorRoles,
@@ -36,10 +41,13 @@ describe('consent utils', () => {
     })).toBe('s|health-care|tel:+34600111222|permit|TREAT');
   });
 
-  it('normalizes professional role formats to canonical ISCO-08', () => {
-    expect(normalizeConsentActorRole('221', 'professional')).toBe('org.ilo.isco-08|221');
-    expect(normalizeConsentActorRole('ISCO-08|221', 'professional')).toBe('org.ilo.isco-08|221');
-    expect(normalizeConsentActorRole('org.ilo.isco-08|221', 'professional')).toBe('org.ilo.isco-08|221');
+  it('normalizes professional role formats to the shared canonical ISCO-08 descriptor', () => {
+    const veterinarian = getHealthcareRoleByClaim(HealthcareActorRoles.Veterinarian);
+    expect(veterinarian).toBeDefined();
+    const canonicalRole = `${veterinarian!.codingSystem}|${veterinarian!.code}`;
+
+    expect(normalizeConsentActorRole(HealthcareActorRoles.Veterinarian, 'professional')).toBe(canonicalRole);
+    expect(normalizeConsentActorRole(canonicalRole, 'professional')).toBe(canonicalRole);
   });
 
   it('validates ISCO and FHIR role codes', () => {
@@ -54,7 +62,7 @@ describe('consent utils', () => {
 
   it('expands comma-separated actor roles into canonical values', () => {
     expect(expandConsentActorRoles('ISCO-08|221,RESPRSN', 'auto')).toEqual([
-      'org.ilo.isco-08|221',
+      `${ISCO08_CODING_SYSTEM}|221`,
       'v3-RoleCode|RESPRSN',
     ]);
   });

@@ -47,7 +47,10 @@ import {
   EXAMPLE_EMPLOYEE_ACTIVE_DEVICE_BINDINGS,
   EXAMPLE_LICENSE_ACTIVE_RECORD,
 } from 'gdc-common-utils-ts/examples/license';
-import { HealthcareActorRoles } from 'gdc-common-utils-ts/constants/healthcare';
+import {
+  getHealthcareRoleByClaim,
+  HealthcareActorRoles,
+} from 'gdc-common-utils-ts/constants/healthcare';
 import { createEmployeeUrn } from '../../utils/urn';
 import { URN_NAMESPACE, URN_NETWORK, URN_ORGANIZATION_ID_TYPE, URN_VERSION } from '../data/urn.data';
 import { testIndividualControllerDcrIdentity } from '../data/identity.data';
@@ -185,6 +188,8 @@ describe('DeviceRegistrationManager', () => {
         ownerIdentifier: 'did:web:clinic.example',
         role: HealthcareActorRoles.Veterinarian,
       };
+      const governedRole = getHealthcareRoleByClaim(binding.role);
+      expect(governedRole).toBeDefined();
       Object.assign(body, {
         [IdentityDcrMetadataFields.ActorDid]: actorDid,
         [IdentityDcrMetadataFields.ProfileDid]: actorDid,
@@ -193,7 +198,9 @@ describe('DeviceRegistrationManager', () => {
           actorIdentifier: binding.actorIdentifier,
           authorIdentifier: binding.authorIdentifier,
           ownerIdentifier: binding.ownerIdentifier,
-          role: binding.role,
+          // The high-level SDK emits the governed canonical coding system,
+          // while older employee records retain the accepted ISCO-08 alias.
+          role: `${governedRole!.codingSystem}|${governedRole!.code}`,
         },
       });
       await vaultRepository.put(vaultId, [{
