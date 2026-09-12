@@ -1633,9 +1633,16 @@ export class CommunicationManager implements IJobProcessor {
         IssueType.Security,
       );
     }
+    const claimsResource = isMinimalIndexProjection
+      ? {
+          resourceType: input.resource.resourceType,
+          id: input.resource.id,
+          meta: { tag: input.resource.meta.tag },
+        }
+      : input.resource;
     const claims = this.extractProjectedResourceClaims(
       input.resourceType,
-      input.resource,
+      claimsResource,
       input.communicationSubject,
       input.fhirResource,
       input.creatorDid,
@@ -1851,13 +1858,10 @@ export class CommunicationManager implements IJobProcessor {
     return { recordId, versionId, created: true, evidence };
   }
 
-  /** True only for reference rows whose payload is identity plus `meta.tag`. */
+  /** True for document index rows carrying `meta.tag`; all other input fields are non-authoritative. */
   private isMinimalDocumentIndexResource(resource: Record<string, any>): boolean {
     if (!resource || typeof resource !== 'object' || Array.isArray(resource)) return false;
-    const resourceKeys = Object.keys(resource).filter((name) => !['resourceType', 'id', 'meta'].includes(name));
-    if (resourceKeys.length > 0 || !Array.isArray(resource?.meta?.tag)) return false;
-    const metaKeys = Object.keys(resource.meta).filter((name) => !['tag', 'claims'].includes(name));
-    return metaKeys.length === 0;
+    return Array.isArray(resource?.meta?.tag);
   }
 
   /**

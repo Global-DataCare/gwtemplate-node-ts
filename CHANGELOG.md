@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Release GW CORE `1.25.18` with document-index input sanitization at the
+  Communication boundary.
 - Canonicalize consent actor-role claims before deriving the ledger rule CID so
   GW writes and SMART authorization consumers address the same on-chain asset.
 - Generate local-Fabric env files with one effective assignment per key so
@@ -14,9 +16,11 @@
 - Accept canonical `individual:multibase:<hash>` member DIDs during
   controller DCR while retaining read compatibility for legacy
   `individual:UUID:<hash>` subjects; tests now exercise the canonical form.
-- Accept Composition document index entries containing only `resourceType`,
-  `id` and `meta.tag`; derive the allowlisted searchable claims and ignore
-  every other tag instead of rejecting the document.
+- Accept Composition document index entries containing `resourceType`, `id`
+  and `meta.tag` even when callers include arbitrary additional resource or
+  meta fields. Project only the identity and allowlisted tag claims, silently
+  discard every other incoming field/tag, and preserve existing private
+  clinical state.
 - Merge metadata-only index claims into existing clinical state without
   replacing private resource claims or triggering a Digital Twin projection.
 - Keep consent-enabled digital-twin projections stable when a same-id clinical
