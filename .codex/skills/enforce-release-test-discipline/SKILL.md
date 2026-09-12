@@ -94,6 +94,12 @@ description: Enforce branch, TDD, canonical FHIR and schema.org vocabulary, fixt
   Ship dual-read plus alias resolution and a tested backfill before switching
   writers. Preserve the stored canonical identifier for existing records;
   never reconstruct and overwrite it from current rules.
+- For new versioned formats, use SHA3-256 for personal identifiers and lookup
+  aliases, and SHA3-384 or stronger for documents, artifacts and evidence.
+  Hash private UUIDs; compact a UUID without hashing only when its governing
+  contract explicitly classifies it as public. A public deterministic hash of
+  email or telephone still requires an enumeration-resistant tokenization or
+  equivalent privacy boundary; a longer digest does not add source entropy.
 - Distinguish plain multibase encoding, multihash and CID explicitly. Decode a
   fixed vector and verify its multicodec and digest length before classifying
   an older identifier as SHA-2, SHA3 or unhashed bytes.
