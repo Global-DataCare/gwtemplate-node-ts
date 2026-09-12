@@ -75,6 +75,14 @@ import {
 import { FhirIpsCreatorKinds } from 'gdc-common-utils-ts/utils/fhir-ips-creator-identity';
 import { getClinicalCreatorBindingsSectionId } from '../../../utils/ips-bundle';
 import type { IBlockchainAdapter } from '../../../adapters/IBlockchainAdapter';
+import { applyDigitalTwinSecondaryUseDecision } from '../../../utils/digital-twin-secondary-use';
+import { buildDemoResearchPermitByRoleConsent } from '../../data/demo-smart-access-local-network.data';
+import { getOrCreateDigitalTwinSubjectId } from '../../../utils/digital-twin-research-projection';
+import { VitalSignsCodes, VitalSignsUnits } from 'gdc-common-utils-ts/constants/vital-signs';
+import {
+  EXAMPLE_VITAL_SIGNS_EFFECTIVE_DATE_TIME,
+  EXAMPLE_VITAL_SIGN_VALUE_BODY_TEMPERATURE,
+} from 'gdc-common-utils-ts/examples/shared';
 
 describe('CommunicationManager Unit Tests', () => {
   let communicationManager: CommunicationManager;
@@ -361,6 +369,110 @@ describe('CommunicationManager Unit Tests', () => {
         [expect.objectContaining({ id: EXAMPLE_OBSERVATION_IDENTIFIER, audit: { creatorDid } })],
         expect.any(String),
       );
+    });
+
+    it('replaces a same-id Observation and its enabled digital-twin projection from native PUT fields even when meta.claims is stale', async () => {
+      const tenantVaultId = 'animal-care_acme';
+      mockTenantsCacheManager.getTenantDid.mockResolvedValue(testServerDid as any);
+      mockVaultRepository.listContainersInSection.mockImplementation(async (vaultId, sectionId) =>
+        Array.from(storedRecords.entries())
+          .filter(([key]) => key.startsWith(`${vaultId}|${sectionId}|`))
+          .map(([, record]) => record) as any);
+      mockVaultRepository.query.mockImplementation(async (vaultId, query) => {
+        const sectionId = String(query?.sectionId || '');
+        return Array.from(storedRecords.entries())
+          .filter(([key]) => key.startsWith(`${vaultId}|${sectionId}|`))
+          .map(([, record]) => record)
+          .filter((record) => (query?.where || []).every((condition: any) =>
+            record.indexed?.attributes?.some((attribute: any) =>
+              attribute.name === condition.name && attribute.value === condition.value))) as any;
+      });
+      await applyDigitalTwinSecondaryUseDecision({
+        vaultRepository: mockVaultRepository,
+        tenantVaultId,
+        claims: { ...buildDemoResearchPermitByRoleConsent({ subjectDid }) },
+      });
+      const twinSubjectId = await getOrCreateDigitalTwinSubjectId({
+        vaultRepository: mockVaultRepository,
+        tenantVaultId,
+        sourceSubject: subjectDid,
+      });
+
+      const recordId = 'observation-same-id';
+      await communicationManager.process(buildClinicalBatchJob([{
+        type: GatewayRequestEntryTypes.ObservationCreate,
+        request: { method: HttpRequestMethods.Post, url: ResourceTypesFhirR4.Observation },
+        resource: {
+          resourceType: ResourceTypesFhirR4.Observation, id: recordId,
+          subject: { reference: subjectDid }, status: ObservationStatuses.Preliminary,
+          code: { text: 'Telephone assistant observation' },
+        },
+      }]));
+      const sourceSectionId = getSubjectScopedSectionId(subjectDid, 'individual', 'observations');
+      const initialSource = storedRecords.get(`${tenantVaultId}|${sourceSectionId}|${recordId}`);
+      const initialVersion = initialSource?.['Observation.meta.versionId'];
+      expect(initialVersion).toBeDefined();
+      const twinSectionId = getSubjectScopedSectionId(twinSubjectId, 'digitaltwin', 'observations');
+      const initialTwinEntry = Array.from(storedRecords.entries())
+        .find(([key, record]) => key.startsWith(`${tenantVaultId}|${twinSectionId}|`)
+          && record?.audit?.sourceRecordId === recordId);
+      expect(initialTwinEntry).toBeDefined();
+      const initialTwinId = String(initialTwinEntry?.[1]?.id);
+      const legacyTwinId = 'legacy-version-derived-projection';
+      storedRecords.set(`${tenantVaultId}|${twinSectionId}|${legacyTwinId}`, {
+        ...initialTwinEntry?.[1], id: legacyTwinId,
+      });
+
+      const updateResponse = await communicationManager.process(buildClinicalBatchJob([{
+        request: {
+          method: HttpRequestMethods.Put,
+          url: `${ResourceTypesFhirR4.Observation}/${recordId}`,
+          ifMatch: `W/"${initialVersion}"`,
+        },
+        resource: {
+          resourceType: ResourceTypesFhirR4.Observation, id: recordId,
+          meta: { claims: {
+            '@context': Format.FHIR_API,
+            'Observation.subject': subjectDid,
+            'Observation.status': 'preliminary',
+            'Observation.code-text': 'Telephone assistant observation',
+            'Observation.meta.versionId': initialVersion,
+          } },
+          subject: { reference: subjectDid }, status: ObservationStatuses.Final,
+          code: { coding: [VitalSignsCodes.BodyTemperature] },
+          valueQuantity: {
+            value: EXAMPLE_VITAL_SIGN_VALUE_BODY_TEMPERATURE,
+            unit: VitalSignsUnits.Celsius.display,
+            system: VitalSignsUnits.Celsius.system,
+            code: VitalSignsUnits.Celsius.code,
+          },
+          effectiveDateTime: EXAMPLE_VITAL_SIGNS_EFFECTIVE_DATE_TIME,
+        },
+      }]));
+
+      expect((updateResponse.body as any).data[0].response.status).toBe('200');
+      const updatedSource = storedRecords.get(`${tenantVaultId}|${sourceSectionId}|${recordId}`);
+      const sourceClaim = (suffix: string) => updatedSource[
+        Object.keys(updatedSource).find((key) => key.endsWith(suffix)) as string
+      ];
+      expect(sourceClaim('Observation.code')).toBe(VitalSignsCodes.BodyTemperature.claim);
+      expect(sourceClaim('Observation.value-quantity-number'))
+        .toBe(String(EXAMPLE_VITAL_SIGN_VALUE_BODY_TEMPERATURE));
+      expect(sourceClaim('Observation.effective-datetime')).toBe(EXAMPLE_VITAL_SIGNS_EFFECTIVE_DATE_TIME);
+      expect(sourceClaim('Observation.meta.versionId')).not.toBe(initialVersion);
+
+      const updatedTwinEntry = Array.from(storedRecords.entries())
+        .find(([key, record]) => key.startsWith(`${tenantVaultId}|${twinSectionId}|`)
+          && record?.audit?.sourceRecordId === recordId);
+      expect(updatedTwinEntry?.[1]?.id).toBe(initialTwinId);
+      expect(storedRecords.has(`${tenantVaultId}|${twinSectionId}|${legacyTwinId}`)).toBe(false);
+      const twinClaim = (suffix: string) => updatedTwinEntry?.[1]?.[
+        Object.keys(updatedTwinEntry?.[1] || {}).find((key) => key.endsWith(suffix)) as string
+      ];
+      expect(twinClaim('Observation.code')).toBe(VitalSignsCodes.BodyTemperature.claim);
+      expect(twinClaim('Observation.value-quantity-number'))
+        .toBe(String(EXAMPLE_VITAL_SIGN_VALUE_BODY_TEMPERATURE));
+      expect(twinClaim('Observation.effective-datetime')).toBe(EXAMPLE_VITAL_SIGNS_EFFECTIVE_DATE_TIME);
     });
 
     it('removes the correlated digital-twin projection when the creator deletes an erroneous record', async () => {

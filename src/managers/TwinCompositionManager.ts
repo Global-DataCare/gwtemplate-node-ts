@@ -316,6 +316,15 @@ export class TwinCompositionManager {
     return String(value || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
   }
 
+  private searchableProjectionText(record: Record<string, any>, resourceType: string): string {
+    const derived = String(record?.[DIGITAL_TWIN_SEARCH_TEXT_CLAIM] || '').trim();
+    if (derived) return derived;
+    return [
+      getClaimValue<string>(record, `${resourceType}.code`),
+      getClaimValue<string>(record, `${resourceType}.code-display`),
+    ].map((value) => String(value || '').trim()).filter(Boolean).join('\u001f');
+  }
+
   private async searchBasicAcrossSections(params: {
     tenantVaultId: string;
     requiredSections: string[];
@@ -335,7 +344,7 @@ export class TwinCompositionManager {
           for (const sectionId of allSections.filter((candidate) => String(candidate || '').startsWith(prefix))) {
             const records = await this.vaultRepository.listContainersInSection<any>(params.tenantVaultId, sectionId);
             for (const record of records) {
-              const searchText = this.normalizeSearchText(String(record?.[DIGITAL_TWIN_SEARCH_TEXT_CLAIM] || ''));
+              const searchText = this.normalizeSearchText(this.searchableProjectionText(record, config.resourceType));
               const dateMs = Date.parse(String(record?.[DIGITAL_TWIN_SEARCH_DATE_CLAIM] || ''));
               if (!searchText.includes(params.basicSearch.text)) continue;
               if (Number.isNaN(dateMs) || dateMs < params.basicSearch.fromMs || dateMs > params.basicSearch.toMs) continue;

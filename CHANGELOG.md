@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Keep consent-enabled digital-twin projections stable when a same-id clinical
+  resource is updated, prefer the new native PUT fields over stale embedded
+  claims, and retain canonical code search compatibility for existing
+  projections. This does not add retrospective projection when consent is
+  enabled after the clinical resource was stored.
 - Make onboarding test terminals fail closed: SMART token submissions require
   202, demo credential issuance requires 200, and Organization Orders require
   201 with their persistence assertions always executed. Signed individual
