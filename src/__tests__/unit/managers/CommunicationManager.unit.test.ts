@@ -1896,7 +1896,7 @@ describe('CommunicationManager Unit Tests', () => {
       )).toBe(false);
     });
 
-    it('indexes only resource-qualified meta tags from a minimal Composition document', async () => {
+    it('indexes only resource-qualified meta tags from a document index entry with arbitrary extra fields', async () => {
       mockTenantsCacheManager.getTenantDid.mockResolvedValue(testServerDid as any);
       mockVaultRepository.vaultExists.mockResolvedValue(true as any);
       const resourceId = '77777777-7777-4777-8777-777777777777';
@@ -1916,14 +1916,21 @@ describe('CommunicationManager Unit Tests', () => {
           fullUrl: reference,
           resource: {
             resourceType: ResourceTypesFhirR4.Immunization, id: resourceId,
-            meta: { tag: [
-              { system: 'Immunization.date', code: '2026-09-11T11:30:00.000Z' },
-              { system: 'Immunization.reason-code', code: 'rabies' },
-              { system: 'Immunization.reason-code', code: 'travel' },
-              { system: 'Observation.status', code: 'ignored-wrong-resource' },
-              { system: 'Immunization.secret', code: 'ignored-not-allowlisted' },
-              { system: 'Immunization.note', display: 'ignored-malformed' },
-            ] },
+            status: 'completed',
+            occurrenceDateTime: '2026-09-11T11:30:00.000Z',
+            arbitraryPrivatePayload: { mustBeDiscarded: true },
+            meta: {
+              profile: ['https://example.org/StructureDefinition/non-authoritative-index-input'],
+              claims: { 'Immunization.status': 'must-not-enter-index' },
+              tag: [
+                { system: 'Immunization.date', code: '2026-09-11T11:30:00.000Z' },
+                { system: 'Immunization.reason-code', code: 'rabies' },
+                { system: 'Immunization.reason-code', code: 'travel' },
+                { system: 'Observation.status', code: 'ignored-wrong-resource' },
+                { system: 'Immunization.secret', code: 'ignored-not-allowlisted' },
+                { system: 'Immunization.note', display: 'ignored-malformed' },
+              ],
+            },
           },
         }],
       };
@@ -1978,6 +1985,11 @@ describe('CommunicationManager Unit Tests', () => {
       expect(record['Observation.status']).toBeUndefined();
       expect(record['Immunization.secret']).toBeUndefined();
       expect(record['Immunization.note']).toBeUndefined();
+      expect(record['Immunization.status'] || record['org.hl7.fhir.api.Immunization.status'])
+        .toBeUndefined();
+      expect(record['Immunization.occurrence'] || record['org.hl7.fhir.api.Immunization.occurrence'])
+        .toBeUndefined();
+      expect(record.arbitraryPrivatePayload).toBeUndefined();
       expect(record['org.hl7.fhir.api.Immunization.vaccine-code-text'])
         .toBe('Private clinical vaccine detail');
     });
