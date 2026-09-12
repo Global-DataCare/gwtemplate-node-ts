@@ -37,9 +37,9 @@ export const testExamplesIndividualUrn = {
 
 /** Reusable verified individual-controller tuple used by DCR manager contracts. */
 export const testIndividualControllerDcrIdentity = Object.freeze({
-  subjectDid: EXAMPLE_HOSTED_INDIVIDUAL_DID,
+  subjectDid: EXAMPLE_HOSTED_INDIVIDUAL_DID.replace(':individual:UUID:', ':individual:multibase:'),
   authenticatedSubject: EXAMPLE_ACCOUNT_OWNER_ID,
   role: `${EXAMPLE_INDIVIDUAL_CONTROLLER_ROLE_TYPE}|${EXAMPLE_INDIVIDUAL_CONTROLLER_ROLE_VALUE}`,
   scope: 'dcr:register',
-  actorDid: EXAMPLE_HOSTED_INDIVIDUAL_CONTROLLER_DID,
+  actorDid: EXAMPLE_HOSTED_INDIVIDUAL_CONTROLLER_DID.replace(':individual:UUID:', ':individual:multibase:'),
 } as const);

@@ -551,19 +551,23 @@ export class DeviceRegistrationManager implements IJobProcessor {
     }
     if (!authorizedSubjectDid) {
       const subjectId = String(params.license.subjectId || params.license.ownerOrganizationId || '').trim();
-      let expectedSubjectSuffix = '';
+      let expectedSubjectSuffixes: string[] = [];
       try {
-        expectedSubjectSuffix = `:individual:${SecureIdTypesIndividual.Uuid}:${buildSecureIdValueIndividual({
+        const secureSubjectId = buildSecureIdValueIndividual({
           secureIdTypeIndividual: SecureIdTypesIndividual.Uuid,
           privateIdValueIndividual: subjectId,
-        })}`;
+        });
+        expectedSubjectSuffixes = [
+          `:individual:multibase:${secureSubjectId}`,
+          `:individual:${SecureIdTypesIndividual.Uuid}:${secureSubjectId}`,
+        ];
       } catch {
         throw new ManagerError(
           'Individual-controller license is missing a valid subject binding.',
           IssueType.Forbidden,
         );
       }
-      if (!parsedActor.individualDidWeb.endsWith(expectedSubjectSuffix)) {
+      if (!expectedSubjectSuffixes.some((suffix) => parsedActor.individualDidWeb.endsWith(suffix))) {
         throw new ManagerError('Individual-controller actor does not belong to the licensed subject.', IssueType.Forbidden);
       }
       authorizedSubjectDid = parsedActor.individualDidWeb;

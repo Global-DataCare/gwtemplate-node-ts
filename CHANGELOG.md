@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Accept canonical `individual:multibase:<hash>` member DIDs during
+  controller DCR while retaining read compatibility for legacy
+  `individual:UUID:<hash>` subjects; tests now exercise the canonical form.
 - Accept Composition document index entries containing only `resourceType`,
   `id` and `meta.tag`; derive the allowlisted searchable claims and ignore
   every other tag instead of rejecting the document.
