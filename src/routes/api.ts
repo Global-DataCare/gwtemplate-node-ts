@@ -1951,8 +1951,13 @@ export function createApiRouter(
    *   post:
    *     tags:
    *       - 7. Composition
-   *     summary: Update the Unified Health Index (FHIR Composition)
-   *     description: Submits an async job to update the individual's index using a FHIR Composition bundle entry.
+   *     deprecated: true
+   *     x-contract-level: compatibility-deprecated
+   *     summary: Deprecated compatibility update of the individual index (FHIR Composition)
+   *     description: |
+   *       Deprecated compatibility route retained without behavioral changes for existing integrations.
+   *       New integrations submit complete FHIR documents or typed section changes through `Communication/_batch`,
+   *       normally via the SDK `updateClinicalSummary(...)` or `updateSubjectSection(...)` facades.
    *     parameters:
    *       - $ref: '#/components/parameters/AppId'
    *       - $ref: '#/components/parameters/AppVersion'
@@ -1994,7 +1999,9 @@ export function createApiRouter(
    *   post:
    *     tags:
    *       - 7. Composition
-   *     summary: Poll the Composition job result
+   *     deprecated: true
+   *     x-contract-level: compatibility-deprecated
+   *     summary: Poll a deprecated compatibility Composition job
    *     parameters:
    *       - $ref: '#/components/parameters/AppId'
    *       - $ref: '#/components/parameters/AppVersion'

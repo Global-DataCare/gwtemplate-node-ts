@@ -17,7 +17,12 @@ import {
 /** Implemented by the individual-controller, individual-member and professional facades. */
 type ClinicalSummaryWriter = Pick<IndividualControllerSdk, 'updateClinicalSummary'>;
 
-/** Import one IPS while preserving its declared external author provenance. */
+/**
+ * Import one IPS while preserving its declared external author provenance.
+ *
+ * @deprecated Compatibility example only. New integrations use
+ * `updateClinicalSummary(...)` so the document travels through Communication.
+ */
 export function importIps(
   sdk: IndividualControllerSdk,
   route: RouteContext,

@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+- Require the standard root `Bundle.meta.tag` coding
+  `http://terminology.hl7.org/CodeSystem/v3-ObservationValue|SUBSETTED` before
+  treating tagged resources inside a FHIR document as metadata-only index
+  projections. Resource tags in ordinary full documents no longer discard
+  their clinical fields.
+- Mark the individual `Composition/_batch` and `_batch-response` operations as
+  deprecated compatibility endpoints in OpenAPI and integrator documentation;
+  their runtime behavior remains unchanged.
 - Release GW CORE `1.25.19` with document-index input sanitization at the
   Communication boundary.
 - Derive local-Fabric smoke rule IDs from the same canonical actor-role

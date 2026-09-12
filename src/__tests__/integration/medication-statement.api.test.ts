@@ -500,6 +500,10 @@ describe('MedicationStatement API (integration)', () => {
               medicationCodeableConcept: { text: 'Paracetamol 500mg cada 8 horas' },
               note: [{ text: 'Frecuencia reportada por paciente: cada 8 horas' }],
               identifier: [{ system: 'urn:ietf:rfc:3986', value: 'urn:uuid:medication-001' }],
+              // A resource tag inside a normal document is ordinary FHIR
+              // metadata. It does not opt the whole Bundle into a partial
+              // metadata-only index projection.
+              meta: { tag: [{ system: 'MedicationStatement.status', code: 'active' }] },
             },
           },
         ],
@@ -679,6 +683,10 @@ describe('MedicationStatement API (integration)', () => {
           ?.filter((entry: any) => entry?.resource?.resourceType === 'MedicationStatement')
           ?.length,
       ).toBe(1);
+      const importedMedication = ipsSearchPayload?.data?.[0]?.resource?.entry
+        ?.find((entry: any) => entry?.resource?.resourceType === 'MedicationStatement')?.resource;
+      expect(importedMedication?.identifier?.[0]?.value).toBe('urn:uuid:medication-001');
+      expect(importedMedication?.medicationCodeableConcept?.text).toBe('Paracetamol 500mg cada 8 horas');
 
       const thidCommunicationSearch = 'communication-ips-search-001';
       const communicationSearchResp = await invokeExpress(app, {

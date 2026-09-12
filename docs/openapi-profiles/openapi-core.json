@@ -4452,8 +4452,10 @@
         "tags": [
           "Core Flow (SDK E2E Use Cases)"
         ],
-        "summary": "[Step 7.3] Update the Unified Health Index (FHIR Composition)",
-        "description": "[Step 7.3]\n\nSubmits an async job to update the individual's index using a FHIR Composition bundle entry.",
+        "deprecated": true,
+        "x-contract-level": "compatibility-deprecated",
+        "summary": "[Step 7.3] Deprecated compatibility update of the individual index (FHIR Composition)",
+        "description": "[Step 7.3]\n\nDeprecated compatibility route retained without behavioral changes for existing integrations.\nNew integrations submit complete FHIR documents or typed section changes through `Communication/_batch`,\nnormally via the SDK `updateClinicalSummary(...)` or `updateSubjectSection(...)` facades.",
         "parameters": [
           {
             "$ref": "#/components/parameters/AppId"
@@ -4522,7 +4524,9 @@
         "tags": [
           "Core Flow (SDK E2E Use Cases)"
         ],
-        "summary": "[Step 7.4] Poll the Composition job result",
+        "deprecated": true,
+        "x-contract-level": "compatibility-deprecated",
+        "summary": "[Step 7.4] Poll a deprecated compatibility Composition job",
         "parameters": [
           {
             "$ref": "#/components/parameters/AppId"
