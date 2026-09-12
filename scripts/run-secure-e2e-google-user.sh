@@ -62,12 +62,20 @@ for command_name in curl npm node; do
 done
 
 RUN_ID="${LIVE_GW_RUN_ID:-$(date -u +%Y%m%dt%H%M%S)}"
+HOST_ID_TYPE="${HOST_ID_TYPE:-TAX}"
 HOST_ID_VALUE="${HOST_ID_VALUE:-livee2e-${RUN_ID}-host}"
+HOST_LEGAL_NAME="${HOST_LEGAL_NAME:-Gateway Host E2E}"
+HOST_JURISDICTION="${HOST_JURISDICTION:-EU}"
+HOST_ADMIN_EMAIL="${HOST_ADMIN_EMAIL:-host-admin@example.com}"
+HOST_ADMIN_UID="${HOST_ADMIN_UID:-host-admin-e2e}"
+HOST_ADMIN_ROLE="${HOST_ADMIN_ROLE:-ISCO-08|1111}"
+HOST_TERMS_URL="${HOST_TERMS_URL:-https://example.com/terms}"
 TENANT_ID="${TENANT_ID:-livee2e-${RUN_ID}}"
 TENANT_ROUTE_ID="${TENANT_ROUTE_ID:-${TENANT_ID}}"
 BASE_URL="${BASE_URL:-http://127.0.0.1:3000}"
 ICA_PORT="${ICA_PORT:-3310}"
 ICA_BASE_URL="${ICA_BASE_URL:-http://127.0.0.1:${ICA_PORT}}"
+ICA_JURISDICTION="${ICA_JURISDICTION:-ES}"
 GW_API_SCRIPT="${LIVE_GW_API_SCRIPT:-api:local-demo}"
 RESULTS_DIR="${LIVE_GW_RESULTS_DIR:-${GW_PROJECT_ROOT}/test-results}"
 GW_LOG_FILE_BASE="${LIVE_GW_LOG_FILE:-${RESULTS_DIR}/gw-secure-e2e-${RUN_ID}.log}"
@@ -143,7 +151,27 @@ run_e2e_pass() {
   (cd "$GW_PROJECT_ROOT" && bash ./scripts/local-close.sh)
   (
     cd "$GW_PROJECT_ROOT"
+    NODE_ENV=demo \
+    SECURITY_MODE=demo \
+    NETWORK_MODE=test \
+    DEV_SEED=true \
+    DEMO_ALLOW_INSECURE_BEARER=true \
+    AUTH_TOKEN_VERIFIER=demo \
+    DB_PROVIDER=mem \
+    STORAGE_PROVIDER=mem \
+    QUEUE_PROVIDER=mem \
+    ALLOWED_SECTORS=health-care,health-research,health-index,test \
+    HOST_INTERNAL_IP=127.0.0.1 \
+    HOST_INTERNAL_PORT=3000 \
+    HOST_LEGAL_NAME="$HOST_LEGAL_NAME" \
+    HOST_JURISDICTION="$HOST_JURISDICTION" \
+    HOST_ID_TYPE="$HOST_ID_TYPE" \
     HOST_ID_VALUE="$pass_host_id" \
+    HOST_ADMIN_EMAIL="$HOST_ADMIN_EMAIL" \
+    HOST_ADMIN_UID="$HOST_ADMIN_UID" \
+    HOST_ADMIN_ROLE="$HOST_ADMIN_ROLE" \
+    HOST_TERMS_URL="$HOST_TERMS_URL" \
+    ICA_JURISDICTION="$ICA_JURISDICTION" \
     ICA_URL_INTERNAL="$ICA_BASE_URL" \
     ICA_URL_EXTERNAL="$ICA_BASE_URL" \
     npm run "$GW_API_SCRIPT"
@@ -177,7 +205,9 @@ run_e2e_pass() {
     LIVE_GW_ALLOW_HOST_TEARDOWN="$host_teardown_enabled" \
     LIVE_GW_E2E_SUITE="$suite_profile" \
     LIVE_GW_E2E_TRANSPORT=all \
+    HOST_ID_TYPE="$HOST_ID_TYPE" \
     HOST_ID_VALUE="$pass_host_id" \
+    ICA_JURISDICTION="$ICA_JURISDICTION" \
     TENANT_ID="$pass_tenant_id" \
     TENANT_ROUTE_ID="$pass_tenant_route_id" \
     BASE_URL="$BASE_URL" \

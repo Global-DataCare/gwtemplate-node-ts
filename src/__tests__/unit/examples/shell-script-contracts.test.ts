@@ -68,6 +68,13 @@ describe('shell script payload contracts', () => {
     expect(liveRunner).toContain('test:e2e:live-gw');
     expect(liveRunner).toContain('LIVE_GW_ALLOW_HOST_TEARDOWN=0');
     expect(liveRunner).toContain('RUN_LIVE_GW_E2E_PROFILE_RUNTIME=0');
+    expect(liveRunner).toContain('HOST_ID_TYPE="${HOST_ID_TYPE:-TAX}"');
+    expect(liveRunner).toContain('HOST_ID_TYPE="$HOST_ID_TYPE"');
+    expect(liveRunner).toContain('HOST_LEGAL_NAME="${HOST_LEGAL_NAME:-Gateway Host E2E}"');
+    expect(liveRunner).toContain('NETWORK_MODE=test');
+    expect(liveRunner).toContain('DB_PROVIDER=mem');
+    expect(liveRunner).toContain('ICA_JURISDICTION="${ICA_JURISDICTION:-ES}"');
+    expect(liveRunner).toContain('ICA_JURISDICTION="$ICA_JURISDICTION"');
     expect(liveRunner).toContain('RUN_LIVE_GW_E2E_INDIVIDUAL_LIFECYCLE="$individual_lifecycle_enabled"');
     expect(liveRunner).toContain('RUN_LIVE_GW_E2E_HOST_VERIFICATION_TRANSACTION="$host_verification_enabled"');
     expect(liveRunner).toContain('LIVE_GW_E2E_SUITE=individual');

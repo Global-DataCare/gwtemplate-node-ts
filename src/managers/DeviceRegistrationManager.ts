@@ -69,6 +69,8 @@ import { getHealthcareRoleByClaim } from 'gdc-common-utils-ts/constants/healthca
 import { getClinicalCreatorBindingsSectionId } from '../utils/clinical-creator-binding';
 import { registerProfessionalAssignmentOnLedger } from '../utils/professional-assignment-ledger';
 import { resolveRoleLicenseOrganizationOfficialId } from '../utils/ledger-organization-registration-helpers';
+import { encodeMultibase58btc } from 'gdc-common-utils-ts/utils/multibase58';
+import { uuidToBytes } from '../utils/uuid';
 
 /**
  * Manages the business logic for a single device registration (DCR) request,
@@ -558,6 +560,7 @@ export class DeviceRegistrationManager implements IJobProcessor {
           privateIdValueIndividual: subjectId,
         });
         expectedSubjectSuffixes = [
+          `:individual:multibase:${encodeMultibase58btc(uuidToBytes(subjectId))}`,
           `:individual:multibase:${secureSubjectId}`,
           `:individual:${SecureIdTypesIndividual.Uuid}:${secureSubjectId}`,
         ];

@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+- Preserve DCR authorization for historical individual DIDs whose `multibase`
+  segment is the base58btc encoding of the UUID bytes. Legacy-seat repair now
+  accepts that exact persisted subject alongside the current SHA3-384
+  multihash formats instead of silently reconstructing another identity.
+- Require identity-format changes to retain fixed historical vectors, dual-read
+  compatibility and real pre-change identifier E2E evidence in the repository
+  release-discipline skill.
+- Make the canonical secure local E2E runner provide the host identifier type
+  to both GW CORE and the SDK journey, so a clean checkout reaches the real
+  flow instead of failing bootstrap with an undefined host identity type.
 - Require the standard root `Bundle.meta.tag` coding
   `http://terminology.hl7.org/CodeSystem/v3-ObservationValue|SUBSETTED` before
   treating tagged resources inside a FHIR document as metadata-only index
