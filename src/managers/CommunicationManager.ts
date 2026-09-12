@@ -206,6 +206,9 @@ const MINIMAL_DOCUMENT_INDEX_TAG_CLAIMS: Partial<Record<SupportedProjectedResour
   ]),
 };
 
+const FHIR_SUBSETTED_TAG_SYSTEM = 'http://terminology.hl7.org/CodeSystem/v3-ObservationValue';
+const FHIR_SUBSETTED_TAG_CODE = 'SUBSETTED';
+
 interface CommunicationManagerOptions {
   tenantsCacheManager: ITenantsManager;
   vaultRepository: IVaultRepository;
@@ -1182,6 +1185,7 @@ export class CommunicationManager implements IJobProcessor {
     for (const resolved of this.resolveCommunicationAttachments(entry, fhirResource)) {
       const attachment = resolved.documentAttachment;
       const parsedAttachment = this.parseAttachmentJson(attachment);
+      const isSubsettedDocumentIndex = this.isSubsettedDocumentBundle(parsedAttachment);
       const documentProvenance = resolveClinicalDocumentAuthorOrganization(parsedAttachment);
       const compositionResource = this.asDocumentBundle(parsedAttachment)?.entry
         ?.map((bundleEntry: any) => bundleEntry?.resource)
@@ -1249,6 +1253,7 @@ export class CommunicationManager implements IJobProcessor {
           creatorDid: clinicalAuthorDid,
           documentProvenance,
           documentClaims,
+          isSubsettedDocumentIndex,
         });
         evidence.push(persisted.evidence);
       }
@@ -1593,6 +1598,7 @@ export class CommunicationManager implements IJobProcessor {
     creatorDid?: string;
     documentProvenance?: ClinicalDocumentAuthorOrganization;
     documentClaims?: Record<string, unknown>;
+    isSubsettedDocumentIndex?: boolean;
   }): Promise<{
     recordId: string;
     versionId: string;
@@ -1603,7 +1609,10 @@ export class CommunicationManager implements IJobProcessor {
     // identity. Generated content may name the registered owner or creator;
     // transport identity remains separate and must resolve an authorized path.
     const config = PROJECTED_RESOURCE_CONFIG[input.resourceType];
-    const isMinimalIndexProjection = this.isMinimalDocumentIndexResource(input.resource);
+    const isMinimalIndexProjection = this.isMinimalDocumentIndexResource(
+      input.resource,
+      input.isSubsettedDocumentIndex === true,
+    );
     const ledgerSafeTags = extractLedgerSafeResearchTags({ resource: input.resource });
     const authenticatedActorDid = getAuthenticatedJobActorIdentifiers(input.job)
       .find((identifier) => identifier.startsWith('did:web:'));
@@ -1858,10 +1867,25 @@ export class CommunicationManager implements IJobProcessor {
     return { recordId, versionId, created: true, evidence };
   }
 
-  /** True for document index rows carrying `meta.tag`; all other input fields are non-authoritative. */
-  private isMinimalDocumentIndexResource(resource: Record<string, any>): boolean {
+  /** True only for tagged rows inside an explicitly SUBSETTED document index projection. */
+  private isMinimalDocumentIndexResource(
+    resource: Record<string, any>,
+    isSubsettedDocumentIndex: boolean,
+  ): boolean {
     if (!resource || typeof resource !== 'object' || Array.isArray(resource)) return false;
-    return Array.isArray(resource?.meta?.tag);
+    return isSubsettedDocumentIndex && Array.isArray(resource?.meta?.tag);
+  }
+
+  /**
+   * Uses the standard FHIR SUBSETTED tag on the Bundle itself as the explicit
+   * operation-mode marker. Child `resource.meta.tag` values remain ordinary
+   * resource metadata unless the enclosing document carries this marker.
+   */
+  private isSubsettedDocumentBundle(parsed: any): boolean {
+    const documentBundle = this.asDocumentBundle(parsed);
+    if (!documentBundle || !Array.isArray(documentBundle?.meta?.tag)) return false;
+    return documentBundle.meta.tag.some((tag: any) =>
+      tag?.system === FHIR_SUBSETTED_TAG_SYSTEM && tag?.code === FHIR_SUBSETTED_TAG_CODE);
   }
 
   /**

@@ -1903,6 +1903,13 @@ describe('CommunicationManager Unit Tests', () => {
       const reference = `Immunization/${resourceId}`;
       const documentBundle = {
         resourceType: ResourceTypesFhirR4.Bundle, type: BundleTypes.document,
+        // Exact HL7 Coding under test: this root marker, rather than a child
+        // resource tag, opts the document into metadata-only index projection.
+        meta: { tag: [{
+          system: 'http://terminology.hl7.org/CodeSystem/v3-ObservationValue',
+          code: 'SUBSETTED',
+          display: 'subsetted',
+        }] },
         entry: [{
           fullUrl: 'Composition/44444444-4444-4444-8444-444444444444',
           resource: {
@@ -2053,6 +2060,10 @@ describe('CommunicationManager Unit Tests', () => {
                 }],
               },
               identifier: [{ value: 'urn:uuid:medication-001' }],
+              // Resource-level tags are ordinary FHIR metadata. Without the
+              // Bundle-level SUBSETTED marker they must not discard the full
+              // imported clinical resource.
+              meta: { tag: [{ system: 'MedicationStatement.status', code: 'active' }] },
             },
           },
           {

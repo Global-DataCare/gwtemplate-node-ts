@@ -37,6 +37,14 @@ describe('Swagger Spec Generation', () => {
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.schema/Organization/_transaction-response']).toBeDefined();
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.schema/Order/_batch']).toBeDefined();
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.schema/Order/_batch-response']).toBeDefined();
+    expect(
+      spec.paths['/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.r4/Composition/_batch']
+        ?.post?.deprecated,
+    ).toBe(true);
+    expect(
+      spec.paths['/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.r4/Composition/_batch-response']
+        ?.post?.deprecated,
+    ).toBe(true);
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/v1/{sector}/digitaltwin/org.hl7.fhir.api/Composition/_batch']).toBeDefined();
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/v1/{sector}/digitaltwin/org.hl7.fhir.api/Composition/_batch-response']).toBeDefined();
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/v1/{sector}/digitaltwin/org.hl7.fhir.api/ResearchSubject/_search']).toBeDefined();
