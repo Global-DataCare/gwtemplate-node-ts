@@ -1896,6 +1896,92 @@ describe('CommunicationManager Unit Tests', () => {
       )).toBe(false);
     });
 
+    it('indexes only resource-qualified meta tags from a minimal Composition document', async () => {
+      mockTenantsCacheManager.getTenantDid.mockResolvedValue(testServerDid as any);
+      mockVaultRepository.vaultExists.mockResolvedValue(true as any);
+      const resourceId = '77777777-7777-4777-8777-777777777777';
+      const reference = `Immunization/${resourceId}`;
+      const documentBundle = {
+        resourceType: ResourceTypesFhirR4.Bundle, type: BundleTypes.document,
+        entry: [{
+          fullUrl: 'Composition/44444444-4444-4444-8444-444444444444',
+          resource: {
+            resourceType: ResourceTypesFhirR4.Composition, id: '44444444-4444-4444-8444-444444444444',
+            status: 'final', type: { coding: [{ system: 'http://loinc.org', code: '60591-5' }] },
+            subject: { reference: subjectDid }, date: '2026-09-11T12:00:00.000Z',
+            author: [{ reference: 'did:web:sender.example' }], title: 'Document index',
+            section: [{ entry: [{ reference }] }],
+          },
+        }, {
+          fullUrl: reference,
+          resource: {
+            resourceType: ResourceTypesFhirR4.Immunization, id: resourceId,
+            meta: { tag: [
+              { system: 'Immunization.date', code: '2026-09-11T11:30:00.000Z' },
+              { system: 'Immunization.reason-code', code: 'rabies' },
+              { system: 'Immunization.reason-code', code: 'travel' },
+              { system: 'Observation.status', code: 'ignored-wrong-resource' },
+              { system: 'Immunization.secret', code: 'ignored-not-allowlisted' },
+              { system: 'Immunization.note', display: 'ignored-malformed' },
+            ] },
+          },
+        }],
+      };
+      const decoded: IDecodedDidcommPayload = {
+        jti: randomUUID(), thid: 'thread-minimal-index-document-001',
+        iss: 'did:web:sender.example', aud: 'did:web:receiver.example',
+        exp: Math.floor(Date.now() / 1000) + 300, type: 'org.hl7.fhir.r4.Bundle',
+        body: {
+          resourceType: ResourceTypesFhirR4.Bundle, type: BundleTypes.batch, data: [{
+            type: ResourceTypesFhirR4.Communication,
+            meta: { claims: {
+              '@context': 'org.hl7.fhir.r4',
+              'Communication.identifier': 'comm-minimal-index-document-001',
+              'Communication.subject': subjectDid,
+              'Communication.sent': '2026-09-11T12:00:00.000Z',
+            } },
+            resource: {
+              resourceType: ResourceTypesFhirR4.Communication, status: 'completed',
+              subject: { reference: subjectDid },
+              payload: [{ contentAttachment: {
+                contentType: 'application/fhir+json', title: 'private-document-index.json',
+                data: Buffer.from(JSON.stringify(documentBundle), 'utf8').toString('base64'),
+              } }],
+            },
+          }],
+        } as any,
+      };
+      const job: JobRequest = {
+        id: randomUUID(), status: JobStatus.DRAFT, sequence: 0, createdAtTimestamp: Date.now(),
+        tenantId: 'acme', jurisdiction: 'es', sector: 'health-care', section: 'individual',
+        format: 'org.hl7.fhir.r4' as any,
+        resourceType: ResourceTypesFhirR4.Communication, action: '_batch', content: decoded,
+      };
+      const sectionId = getSubjectScopedSectionId(subjectDid, 'individual', 'immunizations');
+      storedRecords.set(`health-care_acme|${sectionId}|${resourceId}`, {
+        id: resourceId, '@context': 'org.hl7.fhir.api',
+        'org.hl7.fhir.api.Immunization.subject': subjectDid,
+        'org.hl7.fhir.api.Immunization.vaccine-code-text': 'Private clinical vaccine detail',
+        [CompositionClaim.Author]: decoded.iss, audit: { creatorDid: decoded.iss },
+        indexed: { attributes: [] },
+      });
+
+      await communicationManager.process(job);
+
+      const put = mockVaultRepository.put.mock.calls.find((args) => args[2] === sectionId);
+      expect(put).toBeDefined();
+      const record = (put?.[1] as any[])[0];
+      expect(record['Immunization.date'] || record['org.hl7.fhir.api.Immunization.date'])
+        .toBe('2026-09-11T11:30:00.000Z');
+      expect(record['Immunization.reason-code'] || record['org.hl7.fhir.api.Immunization.reason-code'])
+        .toBe('rabies,travel');
+      expect(record['Observation.status']).toBeUndefined();
+      expect(record['Immunization.secret']).toBeUndefined();
+      expect(record['Immunization.note']).toBeUndefined();
+      expect(record['org.hl7.fhir.api.Immunization.vaccine-code-text'])
+        .toBe('Private clinical vaccine detail');
+    });
+
     it('projects IPS resources from an attached document bundle with indexed claims', async () => {
       mockTenantsCacheManager.getTenantDid.mockResolvedValue(testServerDid as any);
       mockVaultRepository.vaultExists.mockResolvedValue(true as any);

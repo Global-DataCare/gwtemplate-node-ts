@@ -184,6 +184,28 @@ const PROJECTED_RESOURCE_CONFIG: Record<SupportedProjectedResourceType, Projecti
   },
 };
 
+/** Search-only tags accepted from a metadata-only document projection. */
+const MINIMAL_DOCUMENT_INDEX_TAG_CLAIMS: Partial<Record<SupportedProjectedResourceType, ReadonlySet<string>>> = {
+  Immunization: new Set([
+    'Immunization.date', 'Immunization.status', 'Immunization.language',
+    'Immunization.reason-code', 'Immunization.vaccine-code',
+  ]),
+  Observation: new Set(['Observation.date', 'Observation.status', 'Observation.language']),
+  AllergyIntolerance: new Set([
+    'AllergyIntolerance.onset-date', 'AllergyIntolerance.criticality',
+    'AllergyIntolerance.clinical-status', 'AllergyIntolerance.category',
+    'AllergyIntolerance.code', 'AllergyIntolerance.language',
+  ]),
+  Condition: new Set([
+    'Condition.onset-date', 'Condition.abatement-date', 'Condition.clinical-status',
+    'Condition.severity', 'Condition.code', 'Condition.language',
+  ]),
+  MedicationStatement: new Set([
+    'MedicationStatement.effective', 'MedicationStatement.status',
+    'MedicationStatement.medication', 'MedicationStatement.language',
+  ]),
+};
+
 interface CommunicationManagerOptions {
   tenantsCacheManager: ITenantsManager;
   vaultRepository: IVaultRepository;
@@ -1581,6 +1603,7 @@ export class CommunicationManager implements IJobProcessor {
     // identity. Generated content may name the registered owner or creator;
     // transport identity remains separate and must resolve an authorized path.
     const config = PROJECTED_RESOURCE_CONFIG[input.resourceType];
+    const isMinimalIndexProjection = this.isMinimalDocumentIndexResource(input.resource);
     const ledgerSafeTags = extractLedgerSafeResearchTags({ resource: input.resource });
     const authenticatedActorDid = getAuthenticatedJobActorIdentifiers(input.job)
       .find((identifier) => identifier.startsWith('did:web:'));
@@ -1711,16 +1734,24 @@ export class CommunicationManager implements IJobProcessor {
       }
     }
 
-    const consentStatus = this.getFirstClaimValue(claims, [ClaimConsent.status]);
+    const persistedClaims = isMinimalIndexProjection && existing
+      ? {
+          ...Object.fromEntries(Object.entries(existing).filter(([name]) =>
+            !['id', 'audit', 'indexed', 'status', 'sequence', 'contentType', 'content'].includes(name))),
+          ...claims,
+        }
+      : claims;
+
+    const consentStatus = this.getFirstClaimValue(persistedClaims, [ClaimConsent.status]);
     const isConsentRule = input.resourceType === 'Consent'
       && (!consentStatus || consentStatus === ConsentStatuses.Active)
-      && Boolean(this.getFirstClaimValue(claims, [ClaimConsent.decision]));
+      && Boolean(this.getFirstClaimValue(persistedClaims, [ClaimConsent.decision]));
     if (isConsentRule) {
       await persistConsentRuleAndAttachment({
         vaultRepository: this.vaultRepository,
         tenantVaultId: input.tenantVaultId,
         sector: String(input.job.sector || ''),
-        claims,
+        claims: persistedClaims,
       });
       return { recordId, versionId, created: true, evidence };
     }
@@ -1741,11 +1772,11 @@ export class CommunicationManager implements IJobProcessor {
     } : undefined;
     const record: Record<string, any> = {
       id: recordId,
-      ...claims,
+      ...persistedClaims,
       ...(audit ? { audit } : {}),
       indexed: {
         attributes: buildConfidentialDocumentIndexedAttributes({
-          claims,
+          claims: persistedClaims,
           sector: String(input.job.sector || ''),
           audit,
         }),
@@ -1753,7 +1784,8 @@ export class CommunicationManager implements IJobProcessor {
     };
     await this.vaultRepository.put(input.tenantVaultId, [record as any], sectionId);
     if (
-      isDigitalTwinResearchResourceType(input.resourceType)
+      !isMinimalIndexProjection
+      && isDigitalTwinResearchResourceType(input.resourceType)
       && await isDigitalTwinSecondaryUseEnabled({
         vaultRepository: this.vaultRepository,
         tenantVaultId: input.tenantVaultId,
@@ -1766,7 +1798,7 @@ export class CommunicationManager implements IJobProcessor {
         sourceSubject: subjectRef,
       });
       const researchClaims = projectClaimsForDigitalTwin({
-        claims,
+        claims: persistedClaims,
         resourceType: input.resourceType,
         twinSubjectId,
       });
@@ -1817,6 +1849,15 @@ export class CommunicationManager implements IJobProcessor {
       }
     }
     return { recordId, versionId, created: true, evidence };
+  }
+
+  /** True only for reference rows whose payload is identity plus `meta.tag`. */
+  private isMinimalDocumentIndexResource(resource: Record<string, any>): boolean {
+    if (!resource || typeof resource !== 'object' || Array.isArray(resource)) return false;
+    const resourceKeys = Object.keys(resource).filter((name) => !['resourceType', 'id', 'meta'].includes(name));
+    if (resourceKeys.length > 0 || !Array.isArray(resource?.meta?.tag)) return false;
+    const metaKeys = Object.keys(resource.meta).filter((name) => !['tag', 'claims'].includes(name));
+    return metaKeys.length === 0;
   }
 
   /**
@@ -2144,10 +2185,11 @@ export class CommunicationManager implements IJobProcessor {
       }) as Record<string, any>;
     const definedNativeClaims = Object.fromEntries(Object.entries(nativeClaims)
       .filter(([, value]) => value !== undefined && value !== null && String(value).trim() !== ''));
+    const indexTagClaims = this.extractMinimalDocumentIndexTagClaims(resourceType, resource);
     const embeddedVersionId = getClaimValue<string>(embeddedClaims, `${resourceType}.meta.versionId`);
     const baseClaims = normalizeContextualizedClaims(embeddedVersionId
-      ? { ...embeddedClaims, ...definedNativeClaims }
-      : { ...definedNativeClaims, ...embeddedClaims });
+      ? { ...indexTagClaims, ...embeddedClaims, ...definedNativeClaims }
+      : { ...indexTagClaims, ...definedNativeClaims, ...embeddedClaims });
     baseClaims['@context'] = baseClaims['@context'] || 'org.hl7.fhir.api';
     if (authorDid) baseClaims[CompositionClaim.Author] = authorDid;
     for (const claimName of [
@@ -2238,6 +2280,28 @@ export class CommunicationManager implements IJobProcessor {
       normalizedClaims[CompositionClaim.Author] = authorDid;
     }
     return normalizedClaims;
+  }
+
+  /**
+   * Converts allowlisted FHIR `meta.tag` codings into flat searchable claims.
+   * Extra, malformed, or cross-resource tags are intentionally ignored.
+   */
+  private extractMinimalDocumentIndexTagClaims(
+    resourceType: SupportedProjectedResourceType,
+    resource: Record<string, any>,
+  ): Record<string, string> {
+    const allowed = MINIMAL_DOCUMENT_INDEX_TAG_CLAIMS[resourceType];
+    if (!allowed || !Array.isArray(resource?.meta?.tag)) return {};
+    const grouped = new Map<string, string[]>();
+    for (const candidate of resource.meta.tag) {
+      const system = typeof candidate?.system === 'string' ? candidate.system.trim() : '';
+      const code = typeof candidate?.code === 'string' ? candidate.code.trim() : '';
+      if (!system || !code || !allowed.has(system) || !system.startsWith(`${resourceType}.`)) continue;
+      const values = grouped.get(system) || [];
+      if (!values.includes(code)) values.push(code);
+      grouped.set(system, values);
+    }
+    return Object.fromEntries(Array.from(grouped, ([claim, values]) => [claim, values.join(',')]));
   }
 
   private buildIndexedAttributesFromClaims(

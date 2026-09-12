@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Accept Composition document index entries containing only `resourceType`,
+  `id` and `meta.tag`; derive the allowlisted searchable claims and ignore
+  every other tag instead of rejecting the document.
+- Merge metadata-only index claims into existing clinical state without
+  replacing private resource claims or triggering a Digital Twin projection.
 - Keep consent-enabled digital-twin projections stable when a same-id clinical
   resource is updated, prefer the new native PUT fields over stale embedded
   claims, and retain canonical code search compatibility for existing
