@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Canonicalize consent actor-role claims before deriving the ledger rule CID so
+  GW writes and SMART authorization consumers address the same on-chain asset.
 - Generate local-Fabric env files with one effective assignment per key so
   base demo values cannot silently override `local-network` ledger routing in
   Docker image smoke tests.

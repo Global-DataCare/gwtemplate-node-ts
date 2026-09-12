@@ -10,7 +10,7 @@ import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
 import { createOperationOutcome } from '../utils/outcome';
 import { IssueLevel, IssueType } from 'gdc-common-utils-ts/models/issue';
 import { RecordBase } from 'gdc-common-utils-ts/models/resource-document';
-import { buildConsentRuleKey, hashConsentRuleId } from '../utils/consent';
+import { buildConsentRuleKey, expandConsentActorRoles, hashConsentRuleId } from '../utils/consent';
 import { getClaimValue, normalizeContextualizedClaims } from '../utils/claims';
 import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 import { getTenantVaultId } from '../utils/tenant';
@@ -198,11 +198,22 @@ function buildConsentBlockchainEntry(
   entry: BundleEntryRequest,
   claims: Record<string, unknown>,
 ): BundleEntryRequest {
+  const blockchainClaims = { ...claims };
+  const actorRoles = getClaimValue<string>(blockchainClaims, ClaimConsent.actorRole);
+  if (actorRoles) {
+    const context = String(blockchainClaims['@context'] || '').replace(/\.$/, '');
+    const contextualizedKey = context ? `${context}.${ClaimConsent.actorRole}` : ClaimConsent.actorRole;
+    const targetKey = blockchainClaims[contextualizedKey] !== undefined
+      ? contextualizedKey
+      : ClaimConsent.actorRole;
+    blockchainClaims[targetKey] = expandConsentActorRoles(actorRoles, 'auto').join(',');
+  }
+
   const normalizedResource = {
     ...((entry.resource as Record<string, unknown> | undefined) || {}),
     meta: {
       ...((((entry.resource as Record<string, unknown> | undefined)?.meta as Record<string, unknown> | undefined) || {})),
-      claims,
+      claims: blockchainClaims,
     },
   };
 

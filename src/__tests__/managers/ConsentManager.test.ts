@@ -11,7 +11,7 @@ import { BundleJsonApi, BundleEntryRequest, BundleEntryMeta, BundleEntryResponse
 import { OperationOutcome } from 'gdc-common-utils-ts/models/operation-outcome';
 import { ConsentRule, ClaimConsent } from 'gdc-common-utils-ts/models/consent-rule';
 import { CONSENT_CREATION_MESSAGE } from '../data/example-payloads';
-import { buildConsentRuleStorageKey, hashConsentRuleId } from '../../utils/consent';
+import { buildConsentRuleStorageKey, expandConsentActorRoles, hashConsentRuleId } from '../../utils/consent';
 import { getClaimValue } from '../../utils/claims';
 import { knownDomainsReversed, knownDomainsReversedEnum } from 'gdc-common-utils-ts/models/urlPath';
 import { getTenantVaultId } from '../../utils/tenant';
@@ -406,8 +406,21 @@ describe('ConsentManager', () => {
 
     const lifecycleCalls = (mockBlockchainAdapter.registerConsentAccessBundle as jest.Mock).mock.calls.map((call) => call[0]);
 
+    const canonicalClaims = {
+      ...activeClaims,
+      [ClaimConsent.actorRole]: expandConsentActorRoles(
+        String(activeClaims[ClaimConsent.actorRole]),
+        'auto',
+      ).join(','),
+    };
+    const canonicalAssetId = buildConsentRulePrimaryDocument([{
+      ...activeEntry,
+      resource: { ...activeEntry.resource, meta: { claims: canonicalClaims } },
+    }]).data[0].id;
+
     expect(lifecycleCalls).toHaveLength(3);
     expect(new Set(lifecycleCalls.map((call) => call.assetId)).size).toBe(1);
+    expect(lifecycleCalls[0].assetId).toBe(canonicalAssetId);
     expect(lifecycleCalls.map((call) => call.payload.status)).toEqual(['active', 'revoked', 'active']);
   });
 
