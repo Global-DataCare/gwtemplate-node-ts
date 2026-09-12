@@ -4,9 +4,15 @@ import { ClaimsOrganizationSchemaorg } from 'gdc-common-utils-ts/constants/schem
 import {
   buildLedgerOrganizationId,
   resolveLedgerOrganizationId,
+  resolveRoleLicenseOrganizationOfficialId,
 } from '../../../utils/ledger-organization-registration-helpers';
 
 describe('ledger organization registration helpers', () => {
+  it('extracts the bare official identifier from canonical CDS and legacy organization URNs', () => {
+    expect(resolveRoleLicenseOrganizationOfficialId('urn:cds-es:v1:organization:tax:acme-id')).toBe('acme-id');
+    expect(resolveRoleLicenseOrganizationOfficialId('urn:org:tax:A12345678')).toBe('A12345678');
+  });
+
   it('builds the canonical ledger organization id as urn:org:*', () => {
     expect(buildLedgerOrganizationId('TAX', 'VATES-B12345678'))
       .toBe('urn:org:tax:VATES-B12345678');

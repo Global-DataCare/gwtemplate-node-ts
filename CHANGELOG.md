@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Pin `gdc-common-utils-ts` 2.9.14 so freshly issued individual licences and
+  SDK controller actors use the same canonical `individual:multibase` DID;
+  role-licence derivation also extracts the bare legal id from CDS organization
+  URNs before hashing.
 - Accept canonical `individual:multibase:<hash>` member DIDs during
   controller DCR while retaining read compatibility for legacy
   `individual:UUID:<hash>` subjects; tests now exercise the canonical form.

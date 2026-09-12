@@ -323,7 +323,7 @@ describe('FamilyManager - Offer/Order Flow', () => {
         ClaimsOrganizationSchemaorg.ownerIdentifierValue
       ],
       authorizedSubjectDid: expect.stringMatching(
-        /:individual:UUID:z[1-9A-HJ-NP-Za-km-z]+$/,
+        /:individual:multibase:z[1-9A-HJ-NP-Za-km-z]+$/,
       ),
     }));
 
