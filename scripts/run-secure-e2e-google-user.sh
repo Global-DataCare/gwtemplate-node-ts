@@ -62,6 +62,7 @@ for command_name in curl npm node; do
 done
 
 RUN_ID="${LIVE_GW_RUN_ID:-$(date -u +%Y%m%dt%H%M%S)}"
+HOST_ID_TYPE="${HOST_ID_TYPE:-TAX}"
 HOST_ID_VALUE="${HOST_ID_VALUE:-livee2e-${RUN_ID}-host}"
 TENANT_ID="${TENANT_ID:-livee2e-${RUN_ID}}"
 TENANT_ROUTE_ID="${TENANT_ROUTE_ID:-${TENANT_ID}}"
@@ -143,6 +144,7 @@ run_e2e_pass() {
   (cd "$GW_PROJECT_ROOT" && bash ./scripts/local-close.sh)
   (
     cd "$GW_PROJECT_ROOT"
+    HOST_ID_TYPE="$HOST_ID_TYPE" \
     HOST_ID_VALUE="$pass_host_id" \
     ICA_URL_INTERNAL="$ICA_BASE_URL" \
     ICA_URL_EXTERNAL="$ICA_BASE_URL" \
@@ -177,6 +179,7 @@ run_e2e_pass() {
     LIVE_GW_ALLOW_HOST_TEARDOWN="$host_teardown_enabled" \
     LIVE_GW_E2E_SUITE="$suite_profile" \
     LIVE_GW_E2E_TRANSPORT=all \
+    HOST_ID_TYPE="$HOST_ID_TYPE" \
     HOST_ID_VALUE="$pass_host_id" \
     TENANT_ID="$pass_tenant_id" \
     TENANT_ROUTE_ID="$pass_tenant_route_id" \
