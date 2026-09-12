@@ -124,3 +124,47 @@ Use "Contract" when referring to the FHIR `Contract` resource, "smart
 contract" for ledger code, or "API/schema contract" only when a formal
 interface guarantee is actually meant.
 
+## Mandatory Release Authorization Continuity
+
+Fail-fast order is unit and integration with `networkKind=test`, followed by a
+real local UI -> BFF -> SDK -> GW/DataConv Playwright journey without blockchain.
+An unpublished SDK uses an immutable `npm pack` tarball as temporary
+`--no-save` local input without committing dependency or lockfile changes.
+Publish only after the entire affected local matrix is green; then install the
+exact registry version and run the minimal artifact smoke before
+`local-network` and staging. After a failure, resume at the smallest failed gate.
+Rerun predecessor gates only when they create required state, the fix
+changes an earlier boundary, or environment state is no longer trustworthy.
+
+For npm authorization, make at most three attempts and keep each command
+session and browser window alive for up to five minutes. After all three
+attempts fail, keep the release unpublished and continue the local `test` stage
+with an immutable `npm pack` tarball. Never commit a `file:`, Git, workspace or
+vendored tarball dependency.
+
+- Do not attempt `npm publish` until every affected local `test` gate is green,
+  including unit, integration, local services, real UI and Playwright.
+- The `npm pack` tarball is temporary: install it `--no-save`, then restore the
+  registry dependency and lockfile before committing dependency state.
+- After a failure, resume only the smallest failed gate; do not repeat a green
+  gate unless the earlier boundary changed or its state is untrustworthy.
+- After publication, install the exact registry version and run only the minimal
+  install/export smoke; do not repeat the green local matrix unless the artifact
+  differs from the tested tarball.
+- Missing exact registry publication blocks consumer merge, image build and
+  deploy.
+- A gateway consumer installs the exact registry version before its merge,
+  image build and `local-network`. A portal consumer may retain the immutable
+  tarball on its pushed, unmerged branch throughout `local-network`; after
+  `local-network` is green, it installs the exact registry version and runs
+  only the artifact smoke before its merge and staging.
+- Publish only after the local matrix is green, install the exact registry
+  version in the gateway before `local-network`, and in portals before staging.
+- Registry order is dependency publish and verification, consumer install and
+  lockfile pin, package merge, consumer merge, image build and deploy.
+- Reuse HL7/FHIR, LOINC, SNOMED CT, ICD-10, WHO ATC and Schema.org before
+  inventing vocabulary.
+- Put missing reusable types in the versioned domain data package or
+  `common-utils`, with tests in the owning shared package.
+- Reuse the versioned domain data package and common-utils shared package
+  instead of duplicating governed literals.

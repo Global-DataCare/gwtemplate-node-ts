@@ -25,6 +25,7 @@ import { IssueLevel, IssueType } from 'gdc-common-utils-ts/models/issue';
 import { IncludedResource } from 'gdc-common-utils-ts/models/jsonapi';
 import { ClaimsRecord } from 'gdc-common-utils-ts/models/resource-document';
 import { ClaimsIndividualProductSchemaorg, ClaimsOfferSchemaorg, ClaimsOrderSchemaorg, ClaimsOrganizationSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { buildStableActorIdentifier, StableActorContactKinds } from 'gdc-common-utils-ts/utils/actor-identifier';
 import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { BundleType, getBundleResponseTypeForAction } from '../utils/bundle';
 import { getClaimValue, normalizeContextualizedClaims } from '../utils/claims';
@@ -38,7 +39,7 @@ import {
 } from '../utils/offer-order-read-model';
 import { createOperationOutcome } from '../utils/outcome';
 import { determineResourceId } from '../utils/resource';
-import { getTenantVaultId } from '../utils/tenant';
+import { getTenantVaultId, getTenantVaultIdFromIss } from '../utils/tenant';
 import { generateLicenseOffer } from '../utils/offer';
 import { getEnvSectionId } from '../utils/section-env';
 import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
@@ -73,6 +74,7 @@ import { RelatedPersonClaim } from 'gdc-common-utils-ts/models/interoperable-cla
 import { getSubjectScopedSectionId } from '../utils/individual-sections';
 import { normalizeIndexedPhone } from '../utils/indexed-contact';
 import { validateFhirPayloadByVersion } from '../utils/fhir-ingestion';
+import { getAuthenticatedJobActorIdentifiers } from '../utils/authenticated-job-actor';
 
 type FamilyRegistrationContent = {
   status: EntityLifecycleStatus;
@@ -167,6 +169,52 @@ export class FamilyManager {
     if (!isTenantOperational) {
       throw new ManagerError(TENANT_DISABLED_HOSTED_INDIVIDUAL_MESSAGE, IssueType.Forbidden);
     }
+  }
+
+  /**
+   * Authorizes owner-scoped individual discovery and lifecycle mutations.
+   *
+   * Verified bearer contacts are converted to the same privacy-preserving
+   * identifiers as the requested owner contacts. A tenant RESPRSN employee is
+   * also allowed because its registered DIDComm key was resolved in the target
+   * tenant before the job was queued; an ordinary member or employee cannot
+   * gain this authority from request claims.
+   */
+  private assertOwnerDirectoryAuthorization(
+    job: JobRequest,
+    tenantVaultId: string,
+    ownerPhones: string[],
+    ownerEmails: string[],
+  ): void {
+    const authenticatedIdentifiers = new Set(getAuthenticatedJobActorIdentifiers(job));
+    const requestedOwnerIdentifiers = [
+      ...ownerEmails.map(email => buildStableActorIdentifier({
+        contactKind: StableActorContactKinds.Email,
+        contact: email,
+      })),
+      ...ownerPhones.map(phone => buildStableActorIdentifier({
+        contactKind: StableActorContactKinds.Phone,
+        contact: phone,
+      })),
+    ];
+    if (requestedOwnerIdentifiers.length === 0) return;
+    if (requestedOwnerIdentifiers.some(identifier => authenticatedIdentifiers.has(identifier))) {
+      return;
+    }
+
+    const actorDid = String(job.content?.iss || '').trim();
+    if (actorDid && actorDid.includes(':employee:') && actorDid.split(':').includes(HealthcareActorRoleCodes.Controller)) {
+      try {
+        if (getTenantVaultIdFromIss(actorDid) === tenantVaultId) return;
+      } catch {
+        // Unsupported or cross-tenant DIDs carry no administrative authority.
+      }
+    }
+
+    throw new ManagerError(
+      'Owner directory and individual lifecycle operations require a verified owner contact or the target tenant controller.',
+      IssueType.Forbidden,
+    );
   }
 
   private async processFamilyOfferSearchEntry(job: JobRequest, entry: BundleEntry): Promise<BundleEntry[]> {
@@ -377,9 +425,6 @@ export class FamilyManager {
       '@type': 'receipt',
     };
 
-    const familyDocId =
-      (processedClaims[`${ClaimsOrganizationSchemaorg.identifierValue}`] as string | undefined) || uuidv4();
-
     const indexedPhones = ownerPhones.map(phone => ({ name: 'org.schema.Organization.owner.telephone', value: phone }));
     const indexedEmails = ownerEmails.map(email => ({ name: 'org.schema.Organization.owner.email', value: email }));
 
@@ -413,7 +458,7 @@ export class FamilyManager {
 
     return {
       type: GatewayResponseEntryTypes.FamilyRegistrationOffer,
-      resource: { resourceType: ResourceTypesFhirR4.Organization, id: familyDocId, meta: { claims: { ...processedClaims, [GatewayClaim.FamilyRegistrationStatus]: FamilyRegistrationStatus.Created } } },
+      resource: { resourceType: ResourceTypesFhirR4.Organization, id: individualDocId, meta: { claims: { ...processedClaims, [GatewayClaim.FamilyRegistrationStatus]: FamilyRegistrationStatus.Created } } },
       response: { status: String(HttpStatusCodes.Created) },
     };
   }
@@ -573,6 +618,16 @@ export class FamilyManager {
     const secureDoc = results[0] as ConfidentialStorageDoc;
     const decryptedContent = await this.kmsService.unprotectConfidentialData<FamilyRegistrationContent>(secureDoc, tenantVaultId);
     if (decryptedContent?.status !== EntityLifecycleStatus.Pending) {
+      if (decryptedContent?.status === EntityLifecycleStatus.Active) {
+        return this.repairActiveFamilyOrderController({
+          job,
+          offerId,
+          tenantVaultId,
+          tenantCollectionName,
+          secureDocument: secureDoc,
+          content: decryptedContent,
+        });
+      }
       throw new ManagerError(`Found family registration for offerId '${offerId}', but it is not in 'pending' state.`, IssueType.Conflict);
     }
 
@@ -753,6 +808,179 @@ export class FamilyManager {
   }
 
   /**
+   * Authenticated migration path for an Order completed before the controller
+   * RelatedPerson contract existed. Replays reuse any governed UUID already in
+   * the Organization or seat; only a record with neither receives one UUID.
+   */
+  private async repairActiveFamilyOrderController(input: Readonly<{
+    job: JobRequest;
+    offerId: string;
+    tenantVaultId: string;
+    tenantCollectionName: string;
+    secureDocument: ConfidentialStorageDoc;
+    content: FamilyRegistrationContent;
+  }>): Promise<(BundleEntry | ErrorEntry)[]> {
+    const controllerEmail = String(
+      input.content.claims[ClaimsOrganizationSchemaorg.ownerEmail]
+      || input.content.claims[ClaimsPersonSchemaorg.email]
+      || '',
+    ).trim();
+    const controllerTelephone = String(
+      input.content.claims[ClaimsOrganizationSchemaorg.ownerTelephone]
+      || input.content.claims[ClaimsPersonSchemaorg.telephone]
+      || '',
+    ).trim();
+    const authorizedControllerIdentifiers = [
+      controllerEmail ? buildStableActorIdentifier({
+        contactKind: StableActorContactKinds.Email,
+        contact: controllerEmail,
+      }) : '',
+      controllerTelephone ? buildStableActorIdentifier({
+        contactKind: StableActorContactKinds.Phone,
+        contact: controllerTelephone,
+      }) : '',
+    ].filter(Boolean);
+    const authenticatedIdentifiers = new Set(getAuthenticatedJobActorIdentifiers(input.job));
+    if (!authorizedControllerIdentifiers.some((identifier) => authenticatedIdentifiers.has(identifier))) {
+      throw new ManagerError(
+        'Only the verified individual controller may replay an active family Order.',
+        IssueType.Security,
+      );
+    }
+
+    const activationCode = String(
+      input.content.claims[ClaimsIndividualProductSchemaorg.serialNumber] || '',
+    ).trim();
+    if (!activationCode) {
+      throw new ManagerError(
+        'The active family Order is missing its original controller activation code.',
+        IssueType.Conflict,
+      );
+    }
+    const licenseDocuments = await this.vaultRepository.getContainersInSection<ConfidentialStorageDoc>(
+      input.tenantVaultId,
+      DEVICE_LICENSE_SECTION,
+    );
+    let controllerLicenseDocument: ConfidentialStorageDoc | undefined;
+    let controllerLicense: DeviceLicense & Record<string, any> | undefined;
+    for (const document of licenseDocuments) {
+      const license = document.content
+        ? document.content as DeviceLicense & Record<string, any>
+        : await this.kmsService.unprotectConfidentialData<DeviceLicense & Record<string, any>>(
+            document,
+            input.tenantVaultId,
+          );
+      if (String(license?.activationCode || '').trim() === activationCode
+        && String(license?.ownerOrganizationId || license?.subjectId || '').trim() === input.secureDocument.id) {
+        controllerLicenseDocument = document;
+        controllerLicense = license;
+        break;
+      }
+    }
+    if (!controllerLicenseDocument || !controllerLicense) {
+      throw new ManagerError(
+        'The active family Order is missing its licensed individual controller seat.',
+        IssueType.Conflict,
+      );
+    }
+
+    const assignmentIdentifier = canonicalControllerUuidOrNew(
+      normalizeUuid(input.content.claims[ClaimsOrganizationSchemaorg.ownerIdentifierValue])
+      || normalizeUuid(controllerLicense.relatedPersonId),
+    );
+    const subjectDid = String(controllerLicense.authorizedSubjectDid || '').trim() || buildIndividualDidWeb({
+      providerDidWeb: String(input.content.claims[ClaimsOfferSchemaorg.offeredBy] || '').trim(),
+      secureIdTypeIndividual: SecureIdTypesIndividual.Uuid,
+      secureIdValueIndividual: buildSecureIdValueIndividual({
+        secureIdTypeIndividual: SecureIdTypesIndividual.Uuid,
+        privateIdValueIndividual: input.secureDocument.id,
+      }),
+    });
+    const controllerRole = String(controllerLicense.issuedToRole || '').trim()
+      || `${HL7_CODING_SYSTEM_V3_ROLE_CODE}|${HealthcareActorRoleCodes.Controller}`;
+    const organizationNeedsRepair =
+      input.content.claims[ClaimsOrganizationSchemaorg.ownerIdentifierValue] !== assignmentIdentifier;
+    if (organizationNeedsRepair) {
+      const repairedClaims = {
+        ...input.content.claims,
+        [ClaimsOrganizationSchemaorg.ownerIdentifierValue]: assignmentIdentifier,
+      };
+      const repairedDocument: ConfidentialStorageDoc & { meta?: Record<string, unknown> } = {
+        ...input.secureDocument,
+        sequence: Number(input.secureDocument.sequence || 0) + 1,
+        meta: { claims: repairedClaims },
+        content: { ...input.content, claims: repairedClaims },
+      };
+      const protectedDocument = await this.kmsService.protectConfidentialData(
+        repairedDocument,
+        input.tenantVaultId,
+      );
+      await this.vaultRepository.put(
+        input.tenantCollectionName,
+        [protectedDocument],
+        INDIVIDUAL_SECTION,
+      );
+      input.content.claims = repairedClaims;
+    }
+
+    const licenseNeedsRepair = controllerLicense.relatedPersonId !== assignmentIdentifier
+      || controllerLicense.subjectId !== input.secureDocument.id
+      || controllerLicense.authorizedSubjectDid !== subjectDid;
+    if (licenseNeedsRepair) {
+      const protectedLicense = await this.kmsService.protectConfidentialData({
+        ...controllerLicenseDocument,
+        sequence: Number(controllerLicenseDocument.sequence || 0) + 1,
+        content: {
+          ...controllerLicense,
+          relatedPersonId: assignmentIdentifier,
+          subjectId: input.secureDocument.id,
+          authorizedSubjectDid: subjectDid,
+        },
+      }, input.tenantVaultId);
+      await this.vaultRepository.put(
+        input.tenantVaultId,
+        [protectedLicense],
+        DEVICE_LICENSE_SECTION,
+      );
+    }
+
+    const assignmentSectionId = getSubjectScopedSectionId(
+      subjectDid,
+      SUBJECT_SECTION_INDIVIDUAL,
+      'related-persons',
+    );
+    const assignmentExists = Boolean(await this.vaultRepository.get(
+      input.tenantVaultId,
+      assignmentIdentifier,
+      assignmentSectionId,
+    ));
+    const assignmentEntry = await this.materializePrimaryControllerAssignment({
+      tenantVaultId: input.tenantVaultId,
+      subjectDid,
+      assignmentIdentifier,
+      controllerRole,
+      controllerEmail,
+      controllerTelephone: controllerEmail ? undefined : controllerTelephone,
+      persist: !assignmentExists,
+    });
+    const replayClaims: ClaimsRecord = {
+      ...input.content.claims,
+      [ClaimsOrderSchemaorg.acceptedOfferIdentifier]: input.offerId,
+      [ClaimsIndividualProductSchemaorg.serialNumber]: activationCode,
+      [ClaimsIndividualProductSchemaorg.category]: LICENSE_CATEGORY_INDIVIDUAL,
+    };
+    return [{
+      type: GatewayResponseEntryTypes.FamilyOrder,
+      resource: {
+        resourceType: ResourceTypesFhirR4.Organization,
+        id: input.secureDocument.id,
+        meta: { claims: replayClaims },
+      },
+      response: { status: String(HttpStatusCodes.Ok) },
+    }, assignmentEntry];
+  }
+
+  /**
    * Materializes the principal owner/controller as one claims-first FHIR-like
    * RelatedPerson assignment. The authoritative source remains the validated
    * individual Organization owner plus its issued RESPRSN seat; portals never
@@ -765,6 +993,7 @@ export class FamilyManager {
     controllerRole: string;
     controllerEmail?: string;
     controllerTelephone?: string;
+    persist?: boolean;
   }>): Promise<BundleEntry> {
     const telecom = input.controllerEmail
       ? `mailto:${normalizeIndexedEmail(input.controllerEmail)}`
@@ -783,19 +1012,21 @@ export class FamilyManager {
       meta: { claims },
     } as BundleEntry['resource'];
     validateFhirPayloadByVersion(Format.FHIR_API, ResourceTypesFhirR4.RelatedPerson, { resource });
-    await this.vaultRepository.put(input.tenantVaultId, [{
-      id: input.assignmentIdentifier,
-      status: EntityLifecycleStatus.Active,
-      ...claims,
-    } as ConfidentialStorageDoc], getSubjectScopedSectionId(
-      input.subjectDid,
-      SUBJECT_SECTION_INDIVIDUAL,
-      'related-persons',
-    ));
+    if (input.persist !== false) {
+      await this.vaultRepository.put(input.tenantVaultId, [{
+        id: input.assignmentIdentifier,
+        status: EntityLifecycleStatus.Active,
+        ...claims,
+      } as ConfidentialStorageDoc], getSubjectScopedSectionId(
+        input.subjectDid,
+        SUBJECT_SECTION_INDIVIDUAL,
+        'related-persons',
+      ));
+    }
     return {
       type: ResourceTypesFhirR4.RelatedPerson,
       resource,
-      response: { status: String(HttpStatusCodes.Created) },
+      response: { status: String(input.persist === false ? HttpStatusCodes.Ok : HttpStatusCodes.Created) },
     };
   }
 
@@ -973,6 +1204,7 @@ export class FamilyManager {
 
     const ownerPhones = splitIndexedPhones(claims['org.schema.Organization.owner.telephone'] as string | undefined);
     const ownerEmails = splitIndexedEmails(claims['org.schema.Organization.owner.email'] as string | undefined);
+    this.assertOwnerDirectoryAuthorization(job, tenantVaultId, ownerPhones, ownerEmails);
     const nickname = claims[ClaimsOrganizationSchemaorg.alternateName] as string | undefined;
     if (!nickname && (ownerPhones.length > 0 || ownerEmails.length > 0)) {
       return this.buildOwnedFamilyDirectoryResult(
@@ -1034,6 +1266,7 @@ export class FamilyManager {
 
     const ownerPhones = splitIndexedPhones(claims['org.schema.Organization.owner.telephone'] as string | undefined);
     const ownerEmails = splitIndexedEmails(claims['org.schema.Organization.owner.email'] as string | undefined);
+    this.assertOwnerDirectoryAuthorization(job, tenantVaultId, ownerPhones, ownerEmails);
     const nickname = claims[ClaimsOrganizationSchemaorg.alternateName] as string | undefined;
     if ((ownerPhones.length === 0 && ownerEmails.length === 0) || !nickname) {
       throw new ManagerError(
@@ -1215,6 +1448,7 @@ export class FamilyManager {
 
     const ownerPhones = splitIndexedPhones(claims['org.schema.Organization.owner.telephone'] as string | undefined);
     const ownerEmails = splitIndexedEmails(claims['org.schema.Organization.owner.email'] as string | undefined);
+    this.assertOwnerDirectoryAuthorization(job, tenantVaultId, ownerPhones, ownerEmails);
     const nickname = claims[ClaimsOrganizationSchemaorg.alternateName] as string | undefined;
     if ((ownerPhones.length === 0 && ownerEmails.length === 0) || !nickname) {
       throw new ManagerError(

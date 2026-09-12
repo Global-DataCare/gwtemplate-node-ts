@@ -2,6 +2,41 @@
 
 ## [Unreleased]
 
+- Keep consent-enabled digital-twin projections stable when a same-id clinical
+  resource is updated, prefer the new native PUT fields over stale embedded
+  claims, and retain canonical code search compatibility for existing
+  projections. This does not add retrospective projection when consent is
+  enabled after the clinical resource was stored.
+- Make onboarding test terminals fail closed: SMART token submissions require
+  202, demo credential issuance requires 200, and Organization Orders require
+  201 with their persistence assertions always executed. Signed individual
+  PDF cases without their external certificate fixture are now reported as
+  explicit skips instead of zero-assertion passing tests.
+- Remove pending Jest placeholders for unimplemented connection-channel and
+  future shared-lifecycle surfaces; the suite now reports only executable
+  contracts for behavior shipped by GW CORE.
+- Bind individual owner-directory search, disable, and purge requests to the
+  authenticated bearer email/telephone, while retaining explicit same-tenant
+  `RESPRSN` controller authority; another authenticated owner now fails with
+  403 before any vault query or lifecycle mutation.
+- Replace the historical BYOK integration false positives with one mandatory
+  encrypted journey from Organization Order through `Token/_exchange` and
+  signed `Device/_dcr`, including persisted device-key and active-seat proof;
+  authorization errors and incomplete phases are no longer accepted as green.
+- Normalize Consent professional roles to the shared canonical ISCO-08 coding
+  system so authorization compares the same descriptor used by SDK profiles.
+- Return the exact persisted individual Organization UUID from registration
+  when the caller omitted an identifier. Order licensing and the SDK therefore
+  derive the same subject DID, so the contact-bound `RESPRSN` member DID can
+  complete individual-controller DCR instead of failing the licensed-subject
+  check.
+- Compare clinical creator roles by their governed coding system and code when
+  DCR receives the canonical SDK form while an existing assignment retains its
+  accepted claim alias.
+- Allow only the verified individual controller to replay an active legacy
+  Order, backfill its missing controller UUID into the Organization and issued
+  seat, and materialize the matching RelatedPerson exactly once. Replaying an
+  already complete Order returns the same assignment without rewriting it.
 - Make individual Organization Order confirmation materialize the principal
   owner/controller RelatedPerson automatically while issuing the same bare
   `RESPRSN` licence seat. Reuse the exact

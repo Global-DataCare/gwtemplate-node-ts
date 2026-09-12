@@ -1773,16 +1773,23 @@ export class CommunicationManager implements IJobProcessor {
       const researchVersionId = claimsToContentCid(this.clinicalContentVersionClaims(researchClaims)).cid;
       researchClaims[`${input.resourceType}.meta.versionId`] = researchVersionId;
       researchClaims[`org.hl7.fhir.r4.${input.resourceType}.meta.versionId`] = researchVersionId;
-      const researchRecordId = String(
-        researchClaims[`${input.resourceType}.identifier`]
-        || researchClaims[`org.hl7.fhir.r4.${input.resourceType}.identifier`]
-        || researchVersionId
-      );
       const digitalTwinSectionId = getSubjectScopedSectionId(
         twinSubjectId,
         SUBJECT_SECTION_DIGITAL_TWIN,
         config.collectionId,
       );
+      const researchRecordId = createHash('sha256')
+        .update(`${input.resourceType}|${recordId}`, 'utf8')
+        .digest('hex');
+      const priorResearchRecords = await this.vaultRepository.listContainersInSection<any>(
+        input.tenantVaultId,
+        digitalTwinSectionId,
+      );
+      const legacyResearchRecordIds = priorResearchRecords
+        .filter((priorResearchRecord) =>
+          this.normalizeOptionalString(priorResearchRecord?.audit?.sourceRecordId) === recordId
+          && this.normalizeOptionalString(priorResearchRecord?.id) !== researchRecordId)
+        .map((priorResearchRecord) => String(priorResearchRecord.id));
       const researchAudit = input.creatorDid ? {
         creatorDid: authenticatedActorDid || input.creatorDid,
         sourceRecordId: recordId,
@@ -1801,6 +1808,13 @@ export class CommunicationManager implements IJobProcessor {
           }),
         },
       } as any], digitalTwinSectionId);
+      for (const legacyResearchRecordId of legacyResearchRecordIds) {
+        await this.vaultRepository.delete(
+          input.tenantVaultId,
+          legacyResearchRecordId,
+          digitalTwinSectionId,
+        );
+      }
     }
     return { recordId, versionId, created: true, evidence };
   }
@@ -2118,11 +2132,22 @@ export class CommunicationManager implements IJobProcessor {
     authorDid?: string,
     documentClaims?: Record<string, unknown>,
   ): Record<string, any> {
-    const baseClaims = normalizeContextualizedClaims(
-      normalizeClaimsFromFhirResource(resource as any, {
+    const embeddedClaims = resource?.meta?.claims && typeof resource.meta.claims === 'object'
+      ? normalizeContextualizedClaims(resource.meta.claims as Record<string, any>)
+      : {};
+    const nativeResource = {
+      ...resource,
+      ...(resource?.meta ? { meta: { ...resource.meta, claims: undefined } } : {}),
+    };
+    const nativeClaims = normalizeClaimsFromFhirResource(nativeResource as any, {
         identifierClaimKey: `${resourceType}.identifier`,
-      }) as Record<string, any>,
-    );
+      }) as Record<string, any>;
+    const definedNativeClaims = Object.fromEntries(Object.entries(nativeClaims)
+      .filter(([, value]) => value !== undefined && value !== null && String(value).trim() !== ''));
+    const embeddedVersionId = getClaimValue<string>(embeddedClaims, `${resourceType}.meta.versionId`);
+    const baseClaims = normalizeContextualizedClaims(embeddedVersionId
+      ? { ...embeddedClaims, ...definedNativeClaims }
+      : { ...definedNativeClaims, ...embeddedClaims });
     baseClaims['@context'] = baseClaims['@context'] || 'org.hl7.fhir.api';
     if (authorDid) baseClaims[CompositionClaim.Author] = authorDid;
     for (const claimName of [

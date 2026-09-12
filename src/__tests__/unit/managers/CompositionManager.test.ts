@@ -762,6 +762,50 @@ describe('CompositionManager', () => {
     }))).rejects.toThrow('date-to must be on or after date-from');
   });
 
+  it('searches an existing anonymous projection by its retained canonical code when the derived text index is absent', async () => {
+    const subjectDid = REGISTERED_TWIN_SUBJECT;
+    const resultSection = HealthcareBasicSections.Results.attributeValue;
+    const observationSectionId = getSubjectScopedSectionId(subjectDid, 'digitaltwin', 'observations');
+    const compositionSectionId = getSubjectScopedSectionId(subjectDid, 'digitaltwin', 'composition');
+    mockVaultRepository.getAllSections.mockResolvedValue([
+      observationSectionId,
+      compositionSectionId,
+    ] as any);
+    mockVaultRepository.listContainersInSection.mockImplementation(async (_vaultId: string, sectionId: string) => {
+      if (sectionId === observationSectionId) return [{
+        id: 'anonymous-observation-without-derived-text',
+        'Observation.subject': subjectDid,
+        'Observation.code': 'http://loinc.org|8310-5',
+        'Observation.code-display': 'Body temperature:Temp:Pt:^Patient:Qn',
+        '__digitalTwinSearch.date': '2026-09-11',
+      }] as any;
+      if (sectionId === compositionSectionId) return [{
+        id: 'composition-existing-projection',
+        'Composition.subject': subjectDid,
+        'Composition.section': resultSection,
+      }] as any;
+      return [] as any;
+    });
+
+    const response = await new TwinCompositionManager(mockVaultRepository).process(createJob({
+      action: '_search',
+      resourceType: ResourceTypesFhirR4.ResearchSubject,
+      content: {
+        ...(createJob().content as any),
+        body: {
+          resourceType: ResourceTypesFhirR4.Parameters,
+          parameter: [
+            { name: 'section', valueString: resultSection },
+            { name: 'date-from', valueDate: '2026-01-01' },
+            { name: 'text', valueString: '8310-5' },
+          ],
+        },
+      } as any,
+    }));
+
+    expect(extractBundleSearchResources(response)).toHaveLength(1);
+  });
+
   const searchableSectionFixtures = [
     {
       title: 'History of Medication Use / MedicationStatement',

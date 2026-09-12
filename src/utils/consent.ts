@@ -1,6 +1,7 @@
 // src/utils/consent.ts
 
 import { createHash } from 'crypto';
+import { ISCO08_CODING_SYSTEM } from 'gdc-common-utils-ts/constants/healthcare';
 
 export type ConsentRuleKeyParts = {
   subjectId: string;
@@ -11,7 +12,6 @@ export type ConsentRuleKeyParts = {
 };
 
 const ISO_3166_FHIR_SYSTEM = 'urn:iso:std:iso:3166';
-const ISCO_08_CANONICAL_SYSTEM = 'org.ilo.isco-08';
 const V3_ROLE_CODE_CANONICAL_SYSTEM = 'v3-RoleCode';
 
 export type ConsentRoleContext = 'professional' | 'family' | 'auto';
@@ -38,14 +38,14 @@ function normalizeTarget(target: string): string {
 
 function normalizeRoleSystem(inputSystem: string): string {
   const normalized = inputSystem.trim().toLowerCase();
-  if (normalized.includes('isco-08')) return ISCO_08_CANONICAL_SYSTEM;
+  if (normalized.includes('isco-08') || normalized === ISCO08_CODING_SYSTEM) return ISCO08_CODING_SYSTEM;
   if (normalized.endsWith('v3-rolecode') || normalized.includes('/v3-rolecode')) return V3_ROLE_CODE_CANONICAL_SYSTEM;
   return inputSystem.trim();
 }
 
 function inferRoleSystemFromCode(code: string, context: ConsentRoleContext): string {
-  if (/^[0-9]+$/.test(code)) return ISCO_08_CANONICAL_SYSTEM;
-  if (context === 'professional') return ISCO_08_CANONICAL_SYSTEM;
+  if (/^[0-9]+$/.test(code)) return ISCO08_CODING_SYSTEM;
+  if (context === 'professional') return ISCO08_CODING_SYSTEM;
   if (context === 'family') return V3_ROLE_CODE_CANONICAL_SYSTEM;
   return V3_ROLE_CODE_CANONICAL_SYSTEM;
 }
@@ -55,7 +55,7 @@ export function isValidIsco08RoleCode(rawRole: string): boolean {
   if (!value || value === '*') return false;
   const normalized = normalizeConsentActorRole(value, 'professional');
   const [system, code] = normalized.split('|', 2);
-  return system === ISCO_08_CANONICAL_SYSTEM && /^[0-9]+$/.test(code || '');
+  return system === ISCO08_CODING_SYSTEM && /^[0-9]+$/.test(code || '');
 }
 
 export function isValidFhirRoleCode(rawRole: string): boolean {
@@ -76,12 +76,12 @@ export function normalizeConsentActorRole(rawRole: string, context: ConsentRoleC
   if (sep > 0) {
     const system = normalizeRoleSystem(value.slice(0, sep));
     const rawCode = value.slice(sep + 1).trim();
-    const code = system === ISCO_08_CANONICAL_SYSTEM ? rawCode : rawCode.toUpperCase();
+    const code = system === ISCO08_CODING_SYSTEM ? rawCode : rawCode.toUpperCase();
     return `${system}|${code}`;
   }
 
   const inferredSystem = inferRoleSystemFromCode(value, context);
-  const code = inferredSystem === ISCO_08_CANONICAL_SYSTEM ? value : value.toUpperCase();
+  const code = inferredSystem === ISCO08_CODING_SYSTEM ? value : value.toUpperCase();
   return `${inferredSystem}|${code}`;
 }
 

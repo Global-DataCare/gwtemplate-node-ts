@@ -167,8 +167,7 @@ describe('SMART token issuance (integration)', () => {
         },
       },
     });
-      expect([202, 415]).toContain(submitResp.status);
-      if (submitResp.status !== 202) return;
+      expect(submitResp.status).toBe(202);
 
       // Poll for decrypted response
       let finalPayload: any;
@@ -293,8 +292,7 @@ describe('SMART token issuance (integration)', () => {
           },
         },
       });
-      expect([202, 415]).toContain(submitResp.status);
-      if (submitResp.status !== 202) return;
+      expect(submitResp.status).toBe(202);
 
       let finalPayload: any;
       for (let i = 0; i < 50; i++) {
@@ -421,8 +419,7 @@ describe('SMART token issuance (integration)', () => {
           },
         },
       });
-      expect([202, 415]).toContain(submitResp.status);
-      if (submitResp.status !== 202) return;
+      expect(submitResp.status).toBe(202);
 
       let finalPayload: any;
       for (let i = 0; i < 50; i++) {
@@ -548,8 +545,7 @@ describe('SMART token issuance (integration)', () => {
           },
         },
       });
-      expect([202, 415]).toContain(submitResp.status);
-      if (submitResp.status !== 202) return;
+      expect(submitResp.status).toBe(202);
 
       let finalPayload: any;
       for (let i = 0; i < 50; i++) {

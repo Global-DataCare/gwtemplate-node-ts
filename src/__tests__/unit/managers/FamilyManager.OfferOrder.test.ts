@@ -51,11 +51,13 @@ import { EntityLifecycleStatus } from '../../../gdc-backend-utils-node/models/en
 import {
   EXAMPLE_LICENSE_INVOICE_ID,
   EXAMPLE_LICENSE_PAYMENT_METHOD_STRIPE,
+  EXAMPLE_ACCOUNT_OWNER_ID,
   EXAMPLE_INDIVIDUAL_CONTROLLER_ROLE_TYPE,
   EXAMPLE_INDIVIDUAL_CONTROLLER_ROLE_VALUE,
   EXAMPLE_KYC_CONTROLLER_UUID,
   EXAMPLE_REGISTERED_SUBJECT_ALTERNATE_NAME,
 } from 'gdc-common-utils-ts/examples/shared';
+import { testExamplesDidWeb } from '../../data/identity.data';
 
 
 const mockStorageAdapter: jest.Mocked<IStorageAdapter> = {
@@ -362,6 +364,162 @@ describe('FamilyManager - Offer/Order Flow', () => {
         [`${Format.FHIR_API}.${RelatedPersonClaim.Relationship}`]: `${EXAMPLE_INDIVIDUAL_CONTROLLER_ROLE_TYPE}|${EXAMPLE_INDIVIDUAL_CONTROLLER_ROLE_VALUE}`,
       }),
     ]);
+  });
+
+  it('authenticates and idempotently backfills a legacy active Order controller assignment', async () => {
+    const tenantId = testTenant1TenantId;
+    const registration = await familyManager.process({
+      id: 'job-family-legacy-backfill-registration',
+      status: JobStatus.DRAFT,
+      sequence: 0,
+      createdAtTimestamp: Date.now(),
+      tenantId,
+      jurisdiction: 'ES',
+      sector: Sector.HEALTH_CARE,
+      section: 'individual',
+      format: 'org.schema',
+      action: '_batch',
+      resourceType: ResourceTypesFhirR4.Organization,
+      content: buildFamilyRegistrationRequestWithoutPdfAttachment(),
+    });
+    const individualEntry = registration.body.data[0];
+    const offerId = individualEntry.resource.meta.claims[ClaimsOfferSchemaorg.identifier] as string;
+    const orderContent = structuredClone(FAMILY_ORDER_REQUEST) as any;
+    orderContent.body.data[0].resource.meta.claims[ClaimsOrderSchemaorg.acceptedOfferIdentifier] = offerId;
+    const orderJob: JobRequest = {
+      id: 'job-family-legacy-backfill-order',
+      status: JobStatus.DRAFT,
+      sequence: 0,
+      createdAtTimestamp: Date.now(),
+      tenantId,
+      sector: Sector.HEALTH_CARE,
+      section: 'individual',
+      format: 'org.schema',
+      action: '_batch',
+      resourceType: 'Order',
+      content: orderContent,
+    };
+    const confirmed = await familyManager.process(orderJob);
+    const activationCode = confirmed.body.data[0].resource.meta.claims[
+      ClaimsIndividualProductSchemaorg.serialNumber
+    ] as string;
+    const tenantVaultId = tenantUtils.getTenantVaultId(Sector.HEALTH_CARE, tenantId);
+    const tenantCollectionName = (await tenantsCacheManager.getCollectionName(tenantVaultId))!;
+    const individualDocument = (await vaultRepository.get<ConfidentialStorageDoc>(
+      tenantCollectionName,
+      individualEntry.resource.id,
+      getEnvSectionId('individual'),
+    ))!;
+    const individualContent = await mockKmsService.unprotectConfidentialData<any>(
+      individualDocument,
+      tenantVaultId,
+    );
+    delete individualContent.claims[ClaimsOrganizationSchemaorg.ownerIdentifierValue];
+    const legacyIndividualDocument = await mockKmsService.protectConfidentialData({
+      ...individualDocument,
+      sequence: Number(individualDocument.sequence || 0) + 1,
+      meta: { claims: individualContent.claims },
+      content: individualContent,
+    }, tenantVaultId);
+    await vaultRepository.put(
+      tenantCollectionName,
+      [legacyIndividualDocument],
+      getEnvSectionId('individual'),
+    );
+
+    const licenseDocuments = await vaultRepository.getContainersInSection<ConfidentialStorageDoc>(
+      tenantVaultId,
+      getEnvSectionId('device-licenses'),
+    );
+    const controllerLicenseDocument = licenseDocuments.find((document) =>
+      String((document.content as any)?.activationCode || '') === activationCode)!;
+    const legacyLicense = { ...(controllerLicenseDocument.content as any) };
+    const oldAssignmentIdentifier = String(legacyLicense.relatedPersonId);
+    const originalSubjectDid = String(legacyLicense.authorizedSubjectDid);
+    const subjectDid = testExamplesDidWeb.individual;
+    delete legacyLicense.relatedPersonId;
+    legacyLicense.authorizedSubjectDid = subjectDid;
+    await vaultRepository.put(tenantVaultId, [{
+      ...controllerLicenseDocument,
+      sequence: Number(controllerLicenseDocument.sequence || 0) + 1,
+      content: legacyLicense,
+    }], getEnvSectionId('device-licenses'));
+    await vaultRepository.delete(
+      tenantVaultId,
+      oldAssignmentIdentifier,
+      getSubjectScopedSectionId(originalSubjectDid, 'individual', 'related-persons'),
+    );
+
+    const denied = await familyManager.process(orderJob);
+    expect(denied.body.data[0].response.status).toBe('403');
+
+    orderJob.content!.meta = { bearer: { jwt: { payload: {
+      sub: EXAMPLE_ACCOUNT_OWNER_ID,
+      email: individualContent.claims[ClaimsOrganizationSchemaorg.ownerEmail],
+      email_verified: true,
+    } } } } as any;
+    const repaired = await familyManager.process(orderJob);
+    expect(repaired.body.data.map((entry: any) => entry.response.status)).toEqual(['200', '201']);
+    const repairedAssignment = repaired.body.data[1];
+    const repairedIdentifier = String(repairedAssignment.resource.id);
+    expect(repairedIdentifier).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+    expect(repairedAssignment.resource.meta.claims[
+      `${Format.FHIR_API}.${RelatedPersonClaim.Patient}`
+    ]).toBe(subjectDid);
+
+    const storedAssignment = await vaultRepository.get(
+      tenantVaultId,
+      repairedIdentifier,
+      getSubjectScopedSectionId(subjectDid, 'individual', 'related-persons'),
+    );
+    expect(storedAssignment).toEqual(expect.objectContaining({ id: repairedIdentifier }));
+    const repairedIndividualDocument = (await vaultRepository.get<ConfidentialStorageDoc>(
+      tenantCollectionName,
+      individualEntry.resource.id,
+      getEnvSectionId('individual'),
+    ))!;
+    const repairedIndividual = await mockKmsService.unprotectConfidentialData<any>(
+      repairedIndividualDocument,
+      tenantVaultId,
+    );
+    expect(repairedIndividual.claims[ClaimsOrganizationSchemaorg.ownerIdentifierValue])
+      .toBe(repairedIdentifier);
+
+    const completeIndividualSequence = repairedIndividualDocument.sequence;
+    const completeLicenseDocument = (await vaultRepository.get<ConfidentialStorageDoc>(
+      tenantVaultId,
+      controllerLicenseDocument.id,
+      getEnvSectionId('device-licenses'),
+    ))!;
+    const completeLicense = await mockKmsService.unprotectConfidentialData<any>(
+      completeLicenseDocument,
+      tenantVaultId,
+    );
+    expect(completeLicense).toEqual(expect.objectContaining({
+      relatedPersonId: repairedIdentifier,
+      subjectId: individualEntry.resource.id,
+      authorizedSubjectDid: subjectDid,
+    }));
+    const completeLicenseSequence = completeLicenseDocument.sequence;
+    const putSpy = jest.spyOn(vaultRepository, 'put');
+    const replayed = await familyManager.process(orderJob);
+    expect(replayed.body.data[1].resource.id).toBe(repairedIdentifier);
+    expect(replayed.body.data.map((entry: any) => entry.response.status)).toEqual(['200', '200']);
+    expect(replayed.body.data[1].resource.meta.claims[
+      `${Format.FHIR_API}.${RelatedPersonClaim.Patient}`
+    ]).toBe(subjectDid);
+    expect((await vaultRepository.get<ConfidentialStorageDoc>(
+      tenantCollectionName,
+      individualEntry.resource.id,
+      getEnvSectionId('individual'),
+    ))?.sequence).toBe(completeIndividualSequence);
+    expect((await vaultRepository.get<ConfidentialStorageDoc>(
+      tenantVaultId,
+      completeLicenseDocument.id,
+      getEnvSectionId('device-licenses'),
+    ))?.sequence).toBe(completeLicenseSequence);
+    expect(putSpy).not.toHaveBeenCalled();
+    putSpy.mockRestore();
   });
 
   it('does not activate a family Order when its controller activation code cannot be issued', async () => {

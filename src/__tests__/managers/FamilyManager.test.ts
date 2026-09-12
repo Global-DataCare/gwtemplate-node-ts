@@ -11,7 +11,7 @@ import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource
 
 import { randomUUID } from 'crypto';
 import { execFileSync } from 'child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { mock, MockProxy } from 'jest-mock-extended';
 import { tmpdir } from 'os';
 import path from 'path';
@@ -75,6 +75,10 @@ import { mockKmsService } from '../mocks/kms.mock';
 import { buildClaimsFromIndividualFormPdf } from '../../utils/individual-form-pdf';
 import { testDefaultTenantServiceTypeClaim } from '../data/organization.data';
 import { SUBJECT_SECTION_INDIVIDUAL } from '../../constants/domain';
+import {
+  buildSignedIndividualPdfFixture,
+  SIGNED_INDIVIDUAL_PDF_EXPECTED,
+} from '../utils/signed-individual-pdf-fixture';
 
 // ---------------------------------------------------------------------------
 // Shared test data
@@ -162,6 +166,7 @@ function makeTransactionJob(
     sequence: 0,
     createdAtTimestamp: Date.now(),
     tenantId: TENANT_ID,
+    jurisdiction: 'ES',
     sector: SECTOR,
     section: 'individual',
     format: 'org.schema',
@@ -184,7 +189,27 @@ function makeTransactionJob(
   };
 }
 
-function makeSearchJob(overrideClaims: Record<string, unknown> = {}): JobRequest {
+function makeVerifiedOwnerBearerPayload(claims: Record<string, unknown>): Record<string, unknown> {
+  const email = String(claims[ClaimsOrganizationSchemaorg.ownerEmail] || '').trim();
+  const phone = String(claims[ClaimsOrganizationSchemaorg.ownerTelephone] || '').trim();
+  return {
+    sub: 'verified-owner-account',
+    ...(email ? { email, email_verified: true } : {}),
+    ...(phone ? { phone_number: phone, phone_number_verified: true } : {}),
+  };
+}
+
+function makeSearchJob(
+  overrideClaims: Record<string, unknown> = {},
+  bearerPayload?: Record<string, unknown>,
+): JobRequest {
+  const claims = {
+    [ClaimsOrganizationSchemaorg.ownerTelephone]: EXAMPLE_FAMILY_REGISTRATION_OWNER_TELEPHONE,
+    [ClaimsOrganizationSchemaorg.ownerEmail]: String(BASE_CLAIMS[ClaimsOrganizationSchemaorg.ownerEmail]),
+    [ClaimsOrganizationSchemaorg.alternateName]: String(BASE_CLAIMS[ClaimsOrganizationSchemaorg.alternateName]),
+    [ClaimsServiceSchemaorg.category]: SECTOR,
+    ...overrideClaims,
+  };
   return {
     id: randomUUID(),
     status: JobStatus.DRAFT,
@@ -202,17 +227,12 @@ function makeSearchJob(overrideClaims: Record<string, unknown> = {}): JobRequest
       iss: 'did:web:client.example.com',
       aud: `did:web:${TENANT_ID}.example.com`,
       type: 'application/api+json',
+      meta: { bearer: { jwt: { payload: bearerPayload || makeVerifiedOwnerBearerPayload(claims) } } } as any,
       body: {
         data: [{
           type: GatewayResponseEntryTypes.FamilySearch,
           meta: {
-            claims: {
-              [ClaimsOrganizationSchemaorg.ownerTelephone]: EXAMPLE_FAMILY_REGISTRATION_OWNER_TELEPHONE,
-              [ClaimsOrganizationSchemaorg.ownerEmail]: String(BASE_CLAIMS[ClaimsOrganizationSchemaorg.ownerEmail]),
-              [ClaimsOrganizationSchemaorg.alternateName]: String(BASE_CLAIMS[ClaimsOrganizationSchemaorg.alternateName]),
-              [ClaimsServiceSchemaorg.category]: SECTOR,
-              ...overrideClaims,
-            },
+            claims,
           },
         }],
       },
@@ -298,7 +318,17 @@ function makePdfDraftJob(input: {
   };
 }
 
-function makePurgeJob(overrideClaims: Record<string, unknown> = {}): JobRequest {
+function makePurgeJob(
+  overrideClaims: Record<string, unknown> = {},
+  bearerPayload?: Record<string, unknown>,
+): JobRequest {
+  const claims = {
+    [ClaimsOrganizationSchemaorg.ownerTelephone]: EXAMPLE_FAMILY_REGISTRATION_OWNER_TELEPHONE,
+    [ClaimsOrganizationSchemaorg.ownerEmail]: String(BASE_CLAIMS[ClaimsOrganizationSchemaorg.ownerEmail]),
+    [ClaimsOrganizationSchemaorg.alternateName]: String(BASE_CLAIMS[ClaimsOrganizationSchemaorg.alternateName]),
+    [ClaimsServiceSchemaorg.category]: SECTOR,
+    ...overrideClaims,
+  };
   return {
     id: randomUUID(),
     status: JobStatus.DRAFT,
@@ -316,17 +346,12 @@ function makePurgeJob(overrideClaims: Record<string, unknown> = {}): JobRequest 
       iss: 'did:web:client.example.com',
       aud: `did:web:${TENANT_ID}.example.com`,
       type: 'application/api+json',
+      meta: { bearer: { jwt: { payload: bearerPayload || makeVerifiedOwnerBearerPayload(claims) } } } as any,
       body: {
         data: [{
           type: GatewayRequestEntryTypes.FamilyPurge,
           meta: {
-            claims: {
-              [ClaimsOrganizationSchemaorg.ownerTelephone]: EXAMPLE_FAMILY_REGISTRATION_OWNER_TELEPHONE,
-              [ClaimsOrganizationSchemaorg.ownerEmail]: String(BASE_CLAIMS[ClaimsOrganizationSchemaorg.ownerEmail]),
-              [ClaimsOrganizationSchemaorg.alternateName]: String(BASE_CLAIMS[ClaimsOrganizationSchemaorg.alternateName]),
-              [ClaimsServiceSchemaorg.category]: SECTOR,
-              ...overrideClaims,
-            },
+            claims,
           },
         }],
       },
@@ -334,7 +359,17 @@ function makePurgeJob(overrideClaims: Record<string, unknown> = {}): JobRequest 
   };
 }
 
-function makeDisableJob(overrideClaims: Record<string, unknown> = {}): JobRequest {
+function makeDisableJob(
+  overrideClaims: Record<string, unknown> = {},
+  bearerPayload?: Record<string, unknown>,
+): JobRequest {
+  const claims = {
+    [ClaimsOrganizationSchemaorg.ownerTelephone]: EXAMPLE_FAMILY_REGISTRATION_OWNER_TELEPHONE,
+    [ClaimsOrganizationSchemaorg.ownerEmail]: String(BASE_CLAIMS[ClaimsOrganizationSchemaorg.ownerEmail]),
+    [ClaimsOrganizationSchemaorg.alternateName]: String(BASE_CLAIMS[ClaimsOrganizationSchemaorg.alternateName]),
+    [ClaimsServiceSchemaorg.category]: SECTOR,
+    ...overrideClaims,
+  };
   return {
     id: randomUUID(),
     status: JobStatus.DRAFT,
@@ -352,17 +387,12 @@ function makeDisableJob(overrideClaims: Record<string, unknown> = {}): JobReques
       iss: 'did:web:client.example.com',
       aud: `did:web:${TENANT_ID}.example.com`,
       type: 'application/api+json',
+      meta: { bearer: { jwt: { payload: bearerPayload || makeVerifiedOwnerBearerPayload(claims) } } } as any,
       body: {
         data: [{
           type: LifecycleRequestType.IndividualOrganizationDisable,
           meta: {
-            claims: {
-              [ClaimsOrganizationSchemaorg.ownerTelephone]: EXAMPLE_FAMILY_REGISTRATION_OWNER_TELEPHONE,
-              [ClaimsOrganizationSchemaorg.ownerEmail]: String(BASE_CLAIMS[ClaimsOrganizationSchemaorg.ownerEmail]),
-              [ClaimsOrganizationSchemaorg.alternateName]: String(BASE_CLAIMS[ClaimsOrganizationSchemaorg.alternateName]),
-              [ClaimsServiceSchemaorg.category]: SECTOR,
-              ...overrideClaims,
-            },
+            claims,
           },
         }],
       },
@@ -370,8 +400,8 @@ function makeDisableJob(overrideClaims: Record<string, unknown> = {}): JobReques
   };
 }
 
-async function extractPdfFormFieldsFromFixture(pdfPath: string): Promise<Record<string, string>> {
-  const document = await PDFDocument.load(readFileSync(pdfPath), { ignoreEncryption: true, updateMetadata: false });
+async function extractPdfFormFieldsFromFixture(pdfBytes: Buffer): Promise<Record<string, string>> {
+  const document = await PDFDocument.load(pdfBytes, { ignoreEncryption: true, updateMetadata: false });
   const fields: Record<string, string> = {};
   for (const field of document.getForm().getFields()) {
     const name = field.getName()?.trim();
@@ -391,8 +421,7 @@ async function extractPdfFormFieldsFromFixture(pdfPath: string): Promise<Record<
   return fields;
 }
 
-function extractNaturalPersonSignerSubjectFromPdf(pdfPath: string): string {
-  const pdfBytes = readFileSync(pdfPath);
+function extractNaturalPersonSignerSubjectFromPdf(pdfBytes: Buffer): string {
   const pdfAsLatin1 = pdfBytes.toString('latin1');
   const byteRangeRegex = /\/ByteRange\s*\[\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s*\]/g;
   const match = byteRangeRegex.exec(pdfAsLatin1);
@@ -436,38 +465,7 @@ function extractNaturalPersonSignerSubjectFromPdf(pdfPath: string): string {
   throw new Error('Natural-person signer certificate not found in real PDF fixture.');
 }
 
-function getIndividualPdfFixtureConfig(): {
-  pdfPath: string;
-  expectedSignerSubjectDn: string;
-  expectedControllerEmail: string;
-  expectedOrganizationAlternateName: string;
-  expectedControllerBirthDate?: string;
-  expectedControllerGender?: string;
-} | null {
-  const pdfPath = String(process.env.TEST_INDIVIDUAL_FORM_PDF_PATH || '').trim();
-  const cn = String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_CN || '').trim();
-  const sn = String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_SN || '').trim();
-  const gn = String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_GN || '').trim();
-  const serialNumber = String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_SERIALNUMBER || '').trim();
-  const country = String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_COUNTRY || '').trim();
-  const email = String(process.env.TEST_INDIVIDUAL_CONTROLLER_EMAIL || '').trim().toLowerCase();
-  const alternateName = String(process.env.TEST_INDIVIDUAL_ORGANIZATION_ALTNAME || '').trim();
-  const birthDate = String(process.env.TEST_INDIVIDUAL_CONTROLLER_BIRTHDATE || '').trim();
-  const gender = String(process.env.TEST_INDIVIDUAL_CONTROLLER_GENDER || '').trim();
-
-  if (!pdfPath || !cn || !sn || !gn || !serialNumber || !country || !email || !alternateName) {
-    return null;
-  }
-
-  return {
-    pdfPath,
-    expectedSignerSubjectDn: `CN=${cn},SN=${sn},GN=${gn},serialNumber=${serialNumber},C=${country}`,
-    expectedControllerEmail: email,
-    expectedOrganizationAlternateName: alternateName,
-    ...(birthDate ? { expectedControllerBirthDate: birthDate } : {}),
-    ...(gender ? { expectedControllerGender: gender } : {}),
-  };
-}
+const signedIndividualPdfFixture = buildSignedIndividualPdfFixture();
 
 // ---------------------------------------------------------------------------
 // Suite
@@ -519,6 +517,21 @@ describe('FamilyManager', () => {
       expect(entry.resource?.meta?.claims?.['org.schema.FamilyRegistration.status']).toBe('new_created');
       expect(entry.response?.status).toBe('201');
       expect(mockVaultRepository.put).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns the exact persisted individual id when registration did not supply one', async () => {
+      mockVaultRepository.query.mockResolvedValue([]);
+      mockVaultRepository.put.mockResolvedValue(true);
+      const job = makeBatchJob();
+      const claims = job.content?.body?.data?.[0]?.meta?.claims as Record<string, unknown>;
+      delete claims[ClaimsOrganizationSchemaorg.identifierValue];
+
+      const response = await manager.process(job);
+      const body = response.body as BundleJsonApi;
+      const entry = body.data[0] as BundleEntry;
+      const protectedDoc = mockKmsService.protectConfidentialData.mock.calls[0]?.[0] as ConfidentialStorageDoc;
+
+      expect(entry.resource?.id).toBe(protectedDoc.id);
     });
 
     it('already_exists: returns status already_exists without inserting when Active record is found', async () => {
@@ -598,13 +611,15 @@ describe('FamilyManager', () => {
       const entry = body.data[0] as BundleEntry;
       const protectedDoc = mockKmsService.protectConfidentialData.mock.calls[0]?.[0] as ConfidentialStorageDoc;
       const persistedClaims = (protectedDoc.content as any).claims as Record<string, unknown>;
+      const controllerIdentifier = String(
+        entry.resource?.meta?.claims?.[ClaimsOrganizationSchemaorg.ownerIdentifierValue] || '',
+      );
 
       expect(entry.resource?.meta?.claims).toEqual(expect.objectContaining({
         [ClaimsOrganizationSchemaorg.alternateName]: EXAMPLE_REGISTERED_SUBJECT_ALTERNATE_NAME,
         [ClaimsOrganizationSchemaorg.ownerAlternateName]: EXAMPLE_REGISTERED_SUBJECT_ALTERNATE_NAME,
         [ClaimsOrganizationSchemaorg.ownerEmail]: EXAMPLE_SELF_REGISTERED_INDIVIDUAL_EMAIL_NORMALIZED,
         [ClaimsOrganizationSchemaorg.ownerTelephone]: EXAMPLE_KYC_CONTROLLER_TELEPHONE,
-        [ClaimsOrganizationSchemaorg.ownerIdentifierValue]: EXAMPLE_KYC_CONTROLLER_IDENTIFIER,
         [ClaimsOrganizationSchemaorg.addressCountry]: EXAMPLE_KYC_CONTROLLER_COUNTRY,
         [ClaimsPersonSchemaorg.givenName]: EXAMPLE_KYC_CONTROLLER_GIVEN_NAME.toUpperCase(),
         [ClaimsPersonSchemaorg.familyName]: EXAMPLE_KYC_CONTROLLER_FAMILY_NAME.toUpperCase(),
@@ -614,9 +629,10 @@ describe('FamilyManager', () => {
         [ClaimsOrganizationSchemaorg.ownerAlternateName]: EXAMPLE_REGISTERED_SUBJECT_ALTERNATE_NAME,
         [ClaimsOrganizationSchemaorg.ownerEmail]: EXAMPLE_SELF_REGISTERED_INDIVIDUAL_EMAIL_NORMALIZED,
         [ClaimsOrganizationSchemaorg.ownerTelephone]: EXAMPLE_KYC_CONTROLLER_TELEPHONE,
-        [ClaimsOrganizationSchemaorg.ownerIdentifierValue]: EXAMPLE_KYC_CONTROLLER_IDENTIFIER,
         [ClaimsPersonSchemaorg.birthDate]: EXAMPLE_KYC_CONTROLLER_BIRTHDATE.slice(0, 4),
       }));
+      expect(controllerIdentifier).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+      expect(persistedClaims[ClaimsOrganizationSchemaorg.ownerIdentifierValue]).toBe(controllerIdentifier);
     });
 
     it('renders a filled onboarding PDF draft from template + formFields + KYC and returns it as DocumentReference claims', async () => {
@@ -730,16 +746,13 @@ describe('FamilyManager', () => {
     });
 
     it('individual-form-pdf-cert-signed maps the real signed PDF into valid CORE family claims', async () => {
-        const fixture = getIndividualPdfFixtureConfig();
-        if (!fixture?.pdfPath || !existsSync(fixture.pdfPath)) {
-          return;
-        }
+        const pdfBytes = await signedIndividualPdfFixture;
 
         mockVaultRepository.query.mockResolvedValue([]);
         mockVaultRepository.put.mockResolvedValue(true);
 
-        const pdfFields = await extractPdfFormFieldsFromFixture(fixture.pdfPath);
-        const signerSubjectDn = extractNaturalPersonSignerSubjectFromPdf(fixture.pdfPath);
+        const pdfFields = await extractPdfFormFieldsFromFixture(pdfBytes);
+        const signerSubjectDn = extractNaturalPersonSignerSubjectFromPdf(pdfBytes);
         const mapped = buildClaimsFromIndividualFormPdf(pdfFields, signerSubjectDn);
 
         const response = await manager.process(makeBatchJob({
@@ -749,51 +762,44 @@ describe('FamilyManager', () => {
         const body = response.body as BundleJsonApi;
         const entry = body.data[0] as BundleEntry;
 
-        expect(pdfFields.email).toBe(fixture.expectedControllerEmail);
-        expect(pdfFields.alternateName).toBe(fixture.expectedOrganizationAlternateName);
-        expect(signerSubjectDn).toBe(fixture.expectedSignerSubjectDn);
+        expect(entry.response?.status).toBe('201');
+        expect(pdfFields.controllerEmail).toBe(SIGNED_INDIVIDUAL_PDF_EXPECTED.controllerEmail);
+        expect(pdfFields.controllerAlternateName).toBe(SIGNED_INDIVIDUAL_PDF_EXPECTED.organizationAlternateName);
+        expect(signerSubjectDn).toBe(SIGNED_INDIVIDUAL_PDF_EXPECTED.signerSubjectDn);
 
         expect(mapped).toEqual(expect.objectContaining({
           '@context': 'org.schema',
-          [ClaimsOrganizationSchemaorg.alternateName]: fixture.expectedOrganizationAlternateName,
-          [ClaimsOrganizationSchemaorg.ownerAlternateName]: fixture.expectedOrganizationAlternateName,
-          [ClaimsOrganizationSchemaorg.ownerEmail]: fixture.expectedControllerEmail,
-          [ClaimsOrganizationSchemaorg.ownerIdentifierValue]: String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_SERIALNUMBER || '').trim(),
-          [ClaimsPersonSchemaorg.identifierValue]: String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_SERIALNUMBER || '').trim(),
-          [ClaimsOrganizationSchemaorg.addressCountry]: String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_COUNTRY || '').trim(),
+          [ClaimsOrganizationSchemaorg.alternateName]: SIGNED_INDIVIDUAL_PDF_EXPECTED.organizationAlternateName,
+          [ClaimsOrganizationSchemaorg.ownerAlternateName]: SIGNED_INDIVIDUAL_PDF_EXPECTED.organizationAlternateName,
+          [ClaimsOrganizationSchemaorg.ownerEmail]: SIGNED_INDIVIDUAL_PDF_EXPECTED.controllerEmail,
+          [ClaimsOrganizationSchemaorg.ownerIdentifierValue]: SIGNED_INDIVIDUAL_PDF_EXPECTED.signerSerialNumber,
+          [ClaimsPersonSchemaorg.identifierValue]: SIGNED_INDIVIDUAL_PDF_EXPECTED.signerSerialNumber,
+          [ClaimsOrganizationSchemaorg.addressCountry]: SIGNED_INDIVIDUAL_PDF_EXPECTED.signerCountry,
         }));
-        expect(mapped[ClaimsPersonSchemaorg.givenName]).toBe(String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_GN || '').trim());
-        expect(mapped[ClaimsPersonSchemaorg.familyName]).toBe(String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_SN || '').trim());
+        expect(mapped[ClaimsPersonSchemaorg.givenName]).toBe(SIGNED_INDIVIDUAL_PDF_EXPECTED.signerGivenName);
+        expect(mapped[ClaimsPersonSchemaorg.familyName]).toBe(SIGNED_INDIVIDUAL_PDF_EXPECTED.signerSurname);
         expect(mapped[ClaimsPersonSchemaorg.name]).toBe(
-          `${String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_GN || '').trim()} ${String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_SN || '').trim()}`.trim(),
+          `${SIGNED_INDIVIDUAL_PDF_EXPECTED.signerGivenName} ${SIGNED_INDIVIDUAL_PDF_EXPECTED.signerSurname}`,
         );
-        if (fixture.expectedControllerBirthDate) {
-          expect(mapped[ClaimsPersonSchemaorg.birthDate]).toBe(fixture.expectedControllerBirthDate);
-        }
-        if (fixture.expectedControllerGender) {
-          expect(mapped[ClaimsPersonSchemaorg.gender]).toBe(fixture.expectedControllerGender);
-        }
 
         expect(entry.resource?.meta?.claims).toEqual(expect.objectContaining({
           'org.schema.FamilyRegistration.status': 'new_created',
-          [ClaimsOrganizationSchemaorg.alternateName]: fixture.expectedOrganizationAlternateName,
-          [ClaimsOrganizationSchemaorg.ownerAlternateName]: fixture.expectedOrganizationAlternateName,
-          [ClaimsOrganizationSchemaorg.ownerEmail]: fixture.expectedControllerEmail,
-          [ClaimsOrganizationSchemaorg.ownerIdentifierValue]: String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_SERIALNUMBER || '').trim(),
-          [ClaimsPersonSchemaorg.identifierValue]: String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_SERIALNUMBER || '').trim(),
+          [ClaimsOrganizationSchemaorg.alternateName]: SIGNED_INDIVIDUAL_PDF_EXPECTED.organizationAlternateName,
+          [ClaimsOrganizationSchemaorg.ownerAlternateName]: SIGNED_INDIVIDUAL_PDF_EXPECTED.organizationAlternateName,
+          [ClaimsOrganizationSchemaorg.ownerEmail]: SIGNED_INDIVIDUAL_PDF_EXPECTED.controllerEmail,
+          [ClaimsPersonSchemaorg.identifierValue]: SIGNED_INDIVIDUAL_PDF_EXPECTED.signerSerialNumber,
         }));
+        expect(entry.resource?.meta?.claims?.[ClaimsOrganizationSchemaorg.ownerIdentifierValue])
+          .toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
       });
 
     it('individual-form-pdf attachment flow accepts _transaction alias and completes claims from signed PDF', async () => {
-        const fixture = getIndividualPdfFixtureConfig();
-        if (!fixture?.pdfPath || !existsSync(fixture.pdfPath)) {
-          return;
-        }
+        const pdfBytes = await signedIndividualPdfFixture;
 
         mockVaultRepository.query.mockResolvedValue([]);
         mockVaultRepository.put.mockResolvedValue(true);
 
-        const pdfBase64 = readFileSync(fixture.pdfPath).toString('base64');
+        const pdfBase64 = pdfBytes.toString('base64');
         const response = await manager.process(makeTransactionJob(
           {
             [ClaimsOrganizationSchemaorg.ownerTelephone]: '',
@@ -812,26 +818,24 @@ describe('FamilyManager', () => {
         const entry = body.data[0] as BundleEntry;
 
         expect(body.type).toBe('transaction-response');
+        expect(entry.response?.status).toBe('201');
         expect(entry.resource?.meta?.claims).toEqual(expect.objectContaining({
           'org.schema.FamilyRegistration.status': 'new_created',
-          [ClaimsOrganizationSchemaorg.alternateName]: fixture.expectedOrganizationAlternateName,
-          [ClaimsOrganizationSchemaorg.ownerAlternateName]: fixture.expectedOrganizationAlternateName,
-          [ClaimsOrganizationSchemaorg.ownerEmail]: fixture.expectedControllerEmail,
-          [ClaimsOrganizationSchemaorg.ownerIdentifierValue]: String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_SERIALNUMBER || '').trim(),
-          [ClaimsPersonSchemaorg.identifierValue]: String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_SERIALNUMBER || '').trim(),
+          [ClaimsOrganizationSchemaorg.alternateName]: SIGNED_INDIVIDUAL_PDF_EXPECTED.organizationAlternateName,
+          [ClaimsOrganizationSchemaorg.ownerAlternateName]: SIGNED_INDIVIDUAL_PDF_EXPECTED.organizationAlternateName,
+          [ClaimsOrganizationSchemaorg.ownerEmail]: SIGNED_INDIVIDUAL_PDF_EXPECTED.controllerEmail,
+          [ClaimsPersonSchemaorg.identifierValue]: SIGNED_INDIVIDUAL_PDF_EXPECTED.signerSerialNumber,
         }));
+        expect(entry.resource?.meta?.claims?.[ClaimsOrganizationSchemaorg.ownerIdentifierValue])
+          .toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
       });
 
     it('individual-form-pdf attachment flow also accepts HTTPS links[] and downloads the PDF before extracting claims', async () => {
-        const fixture = getIndividualPdfFixtureConfig();
-        if (!fixture?.pdfPath || !existsSync(fixture.pdfPath)) {
-          return;
-        }
+        const pdfBytes = await signedIndividualPdfFixture;
 
         mockVaultRepository.query.mockResolvedValue([]);
         mockVaultRepository.put.mockResolvedValue(true);
 
-        const pdfBytes = readFileSync(fixture.pdfPath);
         const fetchSpy = jest.spyOn(globalThis, 'fetch' as any).mockResolvedValue({
           ok: true,
           status: 200,
@@ -860,14 +864,16 @@ describe('FamilyManager', () => {
             'https://www.dropbox.com/scl/fi/example/signed-individual-form.pdf?dl=1',
             { redirect: 'follow' },
           );
+          expect(entry.response?.status).toBe('201');
           expect(entry.resource?.meta?.claims).toEqual(expect.objectContaining({
             'org.schema.FamilyRegistration.status': 'new_created',
-            [ClaimsOrganizationSchemaorg.alternateName]: fixture.expectedOrganizationAlternateName,
-            [ClaimsOrganizationSchemaorg.ownerAlternateName]: fixture.expectedOrganizationAlternateName,
-            [ClaimsOrganizationSchemaorg.ownerEmail]: fixture.expectedControllerEmail,
-            [ClaimsOrganizationSchemaorg.ownerIdentifierValue]: String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_SERIALNUMBER || '').trim(),
-            [ClaimsPersonSchemaorg.identifierValue]: String(process.env.TEST_INDIVIDUAL_CONTROLLER_CERT_SERIALNUMBER || '').trim(),
+            [ClaimsOrganizationSchemaorg.alternateName]: SIGNED_INDIVIDUAL_PDF_EXPECTED.organizationAlternateName,
+            [ClaimsOrganizationSchemaorg.ownerAlternateName]: SIGNED_INDIVIDUAL_PDF_EXPECTED.organizationAlternateName,
+            [ClaimsOrganizationSchemaorg.ownerEmail]: SIGNED_INDIVIDUAL_PDF_EXPECTED.controllerEmail,
+            [ClaimsPersonSchemaorg.identifierValue]: SIGNED_INDIVIDUAL_PDF_EXPECTED.signerSerialNumber,
           }));
+          expect(entry.resource?.meta?.claims?.[ClaimsOrganizationSchemaorg.ownerIdentifierValue])
+            .toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
         } finally {
           fetchSpy.mockRestore();
         }
@@ -879,6 +885,39 @@ describe('FamilyManager', () => {
   // -------------------------------------------------------------------------
 
   describe('_search / processFamilySearchEntry', () => {
+    it('rejects an authenticated individual that requests another owner directory', async () => {
+      const response = await manager.process(makeSearchJob({
+        [ClaimsOrganizationSchemaorg.ownerTelephone]: '',
+        [ClaimsOrganizationSchemaorg.ownerEmail]: 'victim@example.org',
+        [ClaimsOrganizationSchemaorg.alternateName]: '',
+      }, {
+        sub: 'attacker-account',
+        email: 'attacker@example.org',
+        email_verified: true,
+      }));
+      const entry = (response.body as BundleJsonApi).data[0] as BundleEntry;
+
+      expect(entry.response?.status).toBe('403');
+      expect(mockVaultRepository.query).not.toHaveBeenCalled();
+    });
+
+    it('allows the authenticated target-tenant RESPRSN controller to review an owner directory', async () => {
+      const controllerDid = 'did:web:gateway.example:acme:cds-es:v1:health-care:employee:zController:RESPRSN';
+      const job = makeSearchJob({
+        [ClaimsOrganizationSchemaorg.ownerTelephone]: '',
+        [ClaimsOrganizationSchemaorg.ownerEmail]: 'reviewed-owner@example.org',
+        [ClaimsOrganizationSchemaorg.alternateName]: '',
+      }, { sub: controllerDid });
+      job.content!.iss = controllerDid;
+      mockVaultRepository.query.mockResolvedValue([]);
+
+      const response = await manager.process(job);
+      const entry = (response.body as BundleJsonApi).data[0] as BundleEntry;
+
+      expect(entry.response?.status).toBe('200');
+      expect(mockVaultRepository.query).toHaveBeenCalledTimes(1);
+    });
+
     it('returns every card owned by an exact indexed email when nickname is omitted', async () => {
       const ownerEmail = 'controller@example.org';
       mockVaultRepository.query.mockResolvedValue([
@@ -971,6 +1010,26 @@ describe('FamilyManager', () => {
   });
 
   describe('_purge / processFamilyPurgeEntry', () => {
+    it.each([
+      ['_disable', makeDisableJob],
+      ['_purge', makePurgeJob],
+    ])('rejects an authenticated individual that attempts %s for another owner', async (_action, makeJob) => {
+      const response = await manager.process(makeJob({
+        [ClaimsOrganizationSchemaorg.ownerTelephone]: '',
+        [ClaimsOrganizationSchemaorg.ownerEmail]: 'victim@example.org',
+      }, {
+        sub: 'attacker-account',
+        email: 'attacker@example.org',
+        email_verified: true,
+      }));
+      const entry = (response.body as BundleJsonApi).data[0] as BundleEntry;
+
+      expect(entry.response?.status).toBe('403');
+      expect(mockVaultRepository.query).not.toHaveBeenCalled();
+      expect(mockVaultRepository.put).not.toHaveBeenCalled();
+      expect(mockVaultRepository.delete).not.toHaveBeenCalled();
+    });
+
     it('disabled: marks the family registration inactive without touching licenses', async () => {
       const existingContent = buildExampleFamilyRegistrationContent({
         status: EntityLifecycleStatus.Active,

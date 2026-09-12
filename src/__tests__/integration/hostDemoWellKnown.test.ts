@@ -70,11 +70,9 @@ describe('Host well-known endpoints (demo, mem)', () => {
         headers: { authorization: 'Bearer demo', 'content-type': 'application/json' },
         body: { format: 'jwt_vc_json', type: 'gx:LegalParticipant' },
       });
-      expect([200, 401]).toContain(issuedVc.status);
-      if (issuedVc.status === 200) {
-        const issuedVcJson = JSON.parse(issuedVc.text);
-        expect(issuedVcJson.issuer).toBe(HOST_DID);
-      }
+      expect(issuedVc.status).toBe(200);
+      const issuedVcJson = JSON.parse(issuedVc.text);
+      expect(issuedVcJson.issuer).toBe(HOST_DID);
     } finally {
       queueAdapter.stop();
     }
