@@ -57,6 +57,7 @@ import {
   EXAMPLE_KYC_CONTROLLER_UUID,
   EXAMPLE_REGISTERED_SUBJECT_ALTERNATE_NAME,
 } from 'gdc-common-utils-ts/examples/shared';
+import { testExamplesDidWeb } from '../../data/identity.data';
 
 
 const mockStorageAdapter: jest.Mocked<IStorageAdapter> = {
@@ -434,8 +435,10 @@ describe('FamilyManager - Offer/Order Flow', () => {
       String((document.content as any)?.activationCode || '') === activationCode)!;
     const legacyLicense = { ...(controllerLicenseDocument.content as any) };
     const oldAssignmentIdentifier = String(legacyLicense.relatedPersonId);
-    const subjectDid = String(legacyLicense.authorizedSubjectDid);
+    const originalSubjectDid = String(legacyLicense.authorizedSubjectDid);
+    const subjectDid = testExamplesDidWeb.individual;
     delete legacyLicense.relatedPersonId;
+    legacyLicense.authorizedSubjectDid = subjectDid;
     await vaultRepository.put(tenantVaultId, [{
       ...controllerLicenseDocument,
       sequence: Number(controllerLicenseDocument.sequence || 0) + 1,
@@ -444,7 +447,7 @@ describe('FamilyManager - Offer/Order Flow', () => {
     await vaultRepository.delete(
       tenantVaultId,
       oldAssignmentIdentifier,
-      getSubjectScopedSectionId(subjectDid, 'individual', 'related-persons'),
+      getSubjectScopedSectionId(originalSubjectDid, 'individual', 'related-persons'),
     );
 
     const denied = await familyManager.process(orderJob);
@@ -460,6 +463,9 @@ describe('FamilyManager - Offer/Order Flow', () => {
     const repairedAssignment = repaired.body.data[1];
     const repairedIdentifier = String(repairedAssignment.resource.id);
     expect(repairedIdentifier).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+    expect(repairedAssignment.resource.meta.claims[
+      `${Format.FHIR_API}.${RelatedPersonClaim.Patient}`
+    ]).toBe(subjectDid);
 
     const storedAssignment = await vaultRepository.get(
       tenantVaultId,
@@ -499,6 +505,9 @@ describe('FamilyManager - Offer/Order Flow', () => {
     const replayed = await familyManager.process(orderJob);
     expect(replayed.body.data[1].resource.id).toBe(repairedIdentifier);
     expect(replayed.body.data.map((entry: any) => entry.response.status)).toEqual(['200', '200']);
+    expect(replayed.body.data[1].resource.meta.claims[
+      `${Format.FHIR_API}.${RelatedPersonClaim.Patient}`
+    ]).toBe(subjectDid);
     expect((await vaultRepository.get<ConfidentialStorageDoc>(
       tenantCollectionName,
       individualEntry.resource.id,

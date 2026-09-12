@@ -6,6 +6,7 @@ import cloneDeep from 'lodash.clonedeep';
 import { validate as uuidValidate } from 'uuid';
 import { BundleEntryResponse, BundleJsonApi, ErrorEntry } from 'gdc-common-utils-ts/models/bundle';
 import { DeviceRegistrationManager } from '../../managers/DeviceRegistrationManager';
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 import { DCR_REGISTRATION_JOB } from '../data/example-jobs';
 import { VaultMemRepository } from '../../database/repositories/vault/vault.mem.repository';
 import { mockKmsService } from '../mocks/kms.mock';
@@ -327,6 +328,96 @@ describe('DeviceRegistrationManager', () => {
         kind: FhirIpsCreatorKinds.IndividualMember,
         actorDids: [testIndividualControllerDcrIdentity.actorDid],
       }));
+    });
+
+    it('does not promote a non-controller individual role into DCR controller authority', async () => {
+      const job = cloneDeep(DCR_REGISTRATION_JOB);
+      // CHILD is deliberately the non-controller role whose rejection is the contract under test.
+      const actorDid = testIndividualControllerDcrIdentity.actorDid.replace(/:[^:]+$/, ':CHILD');
+      const activationCode = String((job.content?.body as any)?.[IdentityAuthRequestFields.Code]);
+      Object.assign(job.content!.body as any, {
+        [IdentityDcrMetadataFields.ActorDid]: actorDid,
+        [IdentityDcrMetadataFields.ProfileDid]: actorDid,
+      });
+      job.content!.meta = {
+        bearer: { jwt: { payload: {
+          sub: testIndividualControllerDcrIdentity.authenticatedSubject,
+          act_code: activationCode,
+          scope: testIndividualControllerDcrIdentity.scope,
+        } } },
+      } as any;
+      const vaultId = getTenantVaultId(job.sector as any, job.tenantId as string);
+      const license = {
+        ...EXAMPLE_LICENSE_ACTIVE_RECORD,
+        tenantId: job.tenantId,
+        orderId: EXAMPLE_LICENSE_ACTIVE_RECORD.id,
+        activationCode,
+        userClass: DeviceUserClasses.Individual,
+        type: DeviceAppTypes.Mobile,
+        status: LicenseStatuses.Active,
+        issuedToEmail: EXAMPLE_EMAIL_CONTROLLER_INDIVIDUAL,
+        issuedToRole: 'v3-RoleCode|CHILD',
+        authorizedSubjectDid: testIndividualControllerDcrIdentity.subjectDid,
+      } as unknown as DeviceLicense & Record<string, any>;
+      await vaultRepository.put(vaultId, [{
+        id: license.id,
+        status: license.status,
+        sequence: 0,
+        content: license,
+      }], getEnvSectionId('device-licenses'));
+
+      const result = await manager.process(job);
+      const entry = (result.body as BundleJsonApi).data[0] as ErrorEntry;
+
+      expect(entry.response.status).toBe(String(HttpStatusCodes.Forbidden));
+      expect(entry.response.outcome?.issue[0]?.diagnostics).toContain('controller role');
+    });
+
+    it('rejects DCR instead of persisting a phantom client when the licensed controller entity is missing', async () => {
+      const job = cloneDeep(DCR_REGISTRATION_JOB);
+      const activationCode = String((job.content?.body as any)?.[IdentityAuthRequestFields.Code]);
+      const vaultId = getTenantVaultId(job.sector as any, job.tenantId as string);
+      const physicalCollectionName = 'physical-tenant-collection';
+      manager = new DeviceRegistrationManager(
+        TEST_API_BASE_URL,
+        vaultRepository,
+        mockKmsService,
+        { getCollectionName: jest.fn(async () => physicalCollectionName) },
+      );
+      const license: DeviceLicense = {
+        id: 'controller-license-without-entity',
+        tenantId: job.tenantId as string,
+        orderId: 'order-1',
+        activationCode,
+        userClass: DeviceUserClasses.Employee,
+        type: DeviceAppTypes.Mobile,
+        status: LicenseStatuses.Issued,
+        plan: 'default',
+        renewalCycle: '12m',
+        reactivationEnabled: false,
+        exp: Math.floor(Date.now() / 1000) + 3600,
+        subjectId: 'missing-controller-entity',
+        activatedBy: 'urn:multibase:zNeutralControllerActor',
+      } as any;
+      const protectedLicense = await mockKmsService.protectConfidentialData({
+        id: license.id,
+        status: license.status,
+        sequence: 0,
+        content: license,
+      }, vaultId);
+      await vaultRepository.put(vaultId, [protectedLicense], getEnvSectionId('device-licenses'));
+
+      const result = await manager.process(job);
+      const responseEntry = (result.body as BundleJsonApi).data[0] as ErrorEntry;
+
+      expect(responseEntry.response.status).toBe(String(HttpStatusCodes.Conflict));
+      expect(responseEntry.response.outcome).toEqual(expect.objectContaining({
+        resourceType: ResourceTypesFhirR4.OperationOutcome,
+      }));
+      expect(await vaultRepository.getContainersInSection(
+        vaultId,
+        getEnvSectionId('device-profiles'),
+      )).toHaveLength(0);
     });
 
     it('decrypts and updates the protected seat selected by its activation-code index', async () => {
