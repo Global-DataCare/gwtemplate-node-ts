@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Generate local-Fabric env files with one effective assignment per key so
+  base demo values cannot silently override `local-network` ledger routing in
+  Docker image smoke tests.
 - Pin `gdc-common-utils-ts` 2.9.14 so freshly issued individual licences and
   SDK controller actors use the same canonical `individual:multibase` DID;
   role-licence derivation also extracts the bare legal id from CDS organization

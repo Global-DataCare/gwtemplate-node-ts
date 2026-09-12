@@ -32,6 +32,24 @@ function to_env_one_line_pem() {
   perl -0pe 's/\n/\\n/g' "$1"
 }
 
+# Docker accepts duplicate --env-file assignments and silently keeps the last
+# one. Keep that last-value contract explicit in the generated file itself so
+# a demo/base value cannot override the local-network Fabric values below.
+function deduplicate_env_assignments() {
+  local env_file="$1"
+  local deduplicated_file
+  deduplicated_file="$(mktemp "${env_file}.deduplicated.XXXXXX")"
+  awk -F= '
+    FNR == NR {
+      if ($0 ~ /^[A-Za-z_][A-Za-z0-9_]*=/) last[$1] = FNR
+      next
+    }
+    $0 ~ /^[A-Za-z_][A-Za-z0-9_]*=/ && last[$1] != FNR { next }
+    { print }
+  ' "${env_file}" "${env_file}" > "${deduplicated_file}"
+  mv "${deduplicated_file}" "${env_file}"
+}
+
 [[ -d "${DEVNET_ROOT}" ]] || fail "Missing devnet directory: ${DEVNET_ROOT}"
 [[ -f "${BASE_ENV}" ]] || fail "Missing base env file: ${BASE_ENV}"
 [[ -f "${ENSURE_DEVNET_ENV_SCRIPT}" ]] || fail "Missing helper script: ${ENSURE_DEVNET_ENV_SCRIPT}"
@@ -96,6 +114,13 @@ DEFAULT_SECTOR=${SECTOR_VALUE}
 HOST_LEGACY_REPRESENTATIVE_CONTROLLER=${LEGACY_REPRESENTATIVE_CONTROLLER_VALUE}
 TENANT_SERVICE_ROUTES_JSON=${TENANT_SERVICE_ROUTES_JSON_VALUE}
 EOF
+
+deduplicate_env_assignments "${OUT_ENV}"
+duplicate_keys="$(awk -F= '
+  /^[A-Za-z_][A-Za-z0-9_]*=/ { count[$1]++ }
+  END { for (key in count) if (count[key] > 1) print key }
+' "${OUT_ENV}")"
+[[ -z "${duplicate_keys}" ]] || fail "Generated local Fabric env contains duplicate keys: ${duplicate_keys}"
 
 cat <<EOF
 Wrote ${OUT_ENV}

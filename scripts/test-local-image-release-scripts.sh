@@ -265,6 +265,8 @@ grep -Fq 'identity-eu' ./scripts/build-open-source-evidence-manifest.mjs
 grep -Fq 'identity-global' ./scripts/build-open-source-evidence-manifest.mjs
 grep -Fq 'FABRIC_PEER_ENDPOINT_VALUE="${FABRIC_PEER_ENDPOINT_VALUE:-localhost:7051}"' \
   ./scripts/prepare-consentaccess-local-fabric-env.sh
+grep -Fq 'deduplicate_env_assignments "${OUT_ENV}"' \
+  ./scripts/prepare-consentaccess-local-fabric-env.sh
 if rg -n '^(LEDGER_DATA_CHANNEL_DEFAULT|FHIR_VERSION_LEDGER_CHAINCODE|CONSENT_ACCESS_LEDGER_CHAINCODE)=' \
   ./scripts/prepare-consentaccess-local-fabric-env.sh ./scripts/prepare-test-network-env.sh; then
   echo 'ERROR: manager-owned ledger routing leaked into a runtime profile.' >&2
