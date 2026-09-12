@@ -54,7 +54,11 @@ import {
 } from 'gdc-common-utils-ts/constants/healthcare';
 import { createEmployeeUrn } from '../../utils/urn';
 import { URN_NAMESPACE, URN_NETWORK, URN_ORGANIZATION_ID_TYPE, URN_VERSION } from '../data/urn.data';
-import { testIndividualControllerDcrIdentity } from '../data/identity.data';
+import {
+  INDIVIDUAL_UUID,
+  testExamplesDidWeb,
+  testIndividualControllerDcrIdentity,
+} from '../data/identity.data';
 import { DeviceAppTypes, DeviceUserClasses } from 'gdc-common-utils-ts/constants/device';
 import { LicenseStatuses } from 'gdc-common-utils-ts/utils/license';
 import { HttpStatusCodes } from 'gdc-common-utils-ts/constants/http';
@@ -62,6 +66,11 @@ import { FhirIpsCreatorKinds } from 'gdc-common-utils-ts/utils/fhir-ips-creator-
 import { buildOrganizationRoleLicenseId } from 'gdc-common-utils-ts/utils/organization-role-license';
 import { getClinicalCreatorBindingsSectionId } from '../../utils/clinical-creator-binding';
 import { buildClinicalLedgerReferenceId } from '../../utils/fhir-versioning';
+import {
+  buildIndividualMemberDidWeb,
+  buildSecureIdValueMember,
+} from 'gdc-common-utils-ts/utils/did';
+import { SecureIdTypesIndividual } from 'gdc-common-utils-ts/constants/identity-identifiers';
 
 const TEST_API_BASE_URL = 'http://localhost:3001';
 const FABRIC_LEDGER_TEST_ENV = {
@@ -327,6 +336,78 @@ describe('DeviceRegistrationManager', () => {
       expect(creatorBinding).toEqual(expect.objectContaining({
         kind: FhirIpsCreatorKinds.IndividualMember,
         actorDids: [testIndividualControllerDcrIdentity.actorDid],
+      }));
+    });
+
+    it('preserves the historical UUID-bytes multibase DID when repairing a legacy individual seat', async () => {
+      const job = cloneDeep(DCR_REGISTRATION_JOB);
+      const activationCode = String((job.content?.body as any)?.[IdentityAuthRequestFields.Code]);
+      const [roleType, roleValue] = testIndividualControllerDcrIdentity.role.split('|');
+      const legacySubjectDid = testExamplesDidWeb.individual;
+      const legacyActorDid = buildIndividualMemberDidWeb({
+        individualDidWeb: legacySubjectDid,
+        memberId: buildSecureIdValueMember({
+          secureIdTypeMember: SecureIdTypesIndividual.Email,
+          privateIdValueMember: EXAMPLE_EMAIL_CONTROLLER_INDIVIDUAL,
+        }),
+        roleType,
+        roleValue,
+      });
+      Object.assign(job.content!.body as any, {
+        [IdentityDcrMetadataFields.ActorDid]: legacyActorDid,
+        [IdentityDcrMetadataFields.ProfileDid]: legacyActorDid,
+        [IdentityDcrMetadataFields.ClinicalCreatorBinding]: {
+          kind: FhirIpsCreatorKinds.IndividualMember,
+          actorIdentifier: `urn:uuid:${EXAMPLE_KYC_CONTROLLER_USER_UUID}`,
+          authorIdentifier: `urn:uuid:${EXAMPLE_KYC_CONTROLLER_UUID}`,
+          ownerIdentifier: `urn:uuid:${INDIVIDUAL_UUID}`,
+          role: testIndividualControllerDcrIdentity.role,
+        },
+      });
+      job.content!.meta = {
+        bearer: { jwt: { payload: {
+          sub: testIndividualControllerDcrIdentity.authenticatedSubject,
+          act_code: activationCode,
+          scope: testIndividualControllerDcrIdentity.scope,
+        } } },
+      } as any;
+      const vaultId = getTenantVaultId(job.sector as any, job.tenantId as string);
+      const license = {
+        ...EXAMPLE_LICENSE_ACTIVE_RECORD,
+        tenantId: job.tenantId,
+        orderId: EXAMPLE_LICENSE_ACTIVE_RECORD.id,
+        activationCode,
+        userClass: DeviceUserClasses.Individual,
+        type: DeviceAppTypes.Mobile,
+        status: LicenseStatuses.Active,
+        subjectId: undefined,
+        ownerOrganizationId: INDIVIDUAL_UUID,
+        issuedToEmail: EXAMPLE_EMAIL_CONTROLLER_INDIVIDUAL,
+        issuedToRole: testIndividualControllerDcrIdentity.role,
+      } as unknown as DeviceLicense & Record<string, any>;
+      await vaultRepository.put(vaultId, [{
+        id: license.id,
+        status: license.status,
+        sequence: 0,
+        content: license,
+      }], getEnvSectionId('device-licenses'));
+
+      const result = await manager.process(job);
+
+      const entry = (result.body as BundleJsonApi).data[0] as BundleEntryResponse;
+      expect(entry.response.status).toBe(String(HttpStatusCodes.Created));
+      const repairedLicenseDocument = await vaultRepository.get<ConfidentialStorageDoc>(
+        vaultId,
+        license.id,
+        getEnvSectionId('device-licenses'),
+      );
+      const repairedLicense = await mockKmsService.unprotectConfidentialData<any>(
+        repairedLicenseDocument!,
+        vaultId,
+      );
+      expect(repairedLicense).toEqual(expect.objectContaining({
+        subjectId: INDIVIDUAL_UUID,
+        authorizedSubjectDid: legacySubjectDid,
       }));
     });
 
