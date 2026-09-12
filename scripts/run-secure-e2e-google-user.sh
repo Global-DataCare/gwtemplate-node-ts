@@ -64,6 +64,12 @@ done
 RUN_ID="${LIVE_GW_RUN_ID:-$(date -u +%Y%m%dt%H%M%S)}"
 HOST_ID_TYPE="${HOST_ID_TYPE:-TAX}"
 HOST_ID_VALUE="${HOST_ID_VALUE:-livee2e-${RUN_ID}-host}"
+HOST_LEGAL_NAME="${HOST_LEGAL_NAME:-Gateway Host E2E}"
+HOST_JURISDICTION="${HOST_JURISDICTION:-EU}"
+HOST_ADMIN_EMAIL="${HOST_ADMIN_EMAIL:-host-admin@example.com}"
+HOST_ADMIN_UID="${HOST_ADMIN_UID:-host-admin-e2e}"
+HOST_ADMIN_ROLE="${HOST_ADMIN_ROLE:-ISCO-08|1111}"
+HOST_TERMS_URL="${HOST_TERMS_URL:-https://example.com/terms}"
 TENANT_ID="${TENANT_ID:-livee2e-${RUN_ID}}"
 TENANT_ROUTE_ID="${TENANT_ROUTE_ID:-${TENANT_ID}}"
 BASE_URL="${BASE_URL:-http://127.0.0.1:3000}"
@@ -144,8 +150,26 @@ run_e2e_pass() {
   (cd "$GW_PROJECT_ROOT" && bash ./scripts/local-close.sh)
   (
     cd "$GW_PROJECT_ROOT"
+    NODE_ENV=demo \
+    SECURITY_MODE=demo \
+    NETWORK_MODE=test \
+    DEV_SEED=true \
+    DEMO_ALLOW_INSECURE_BEARER=true \
+    AUTH_TOKEN_VERIFIER=demo \
+    DB_PROVIDER=mem \
+    STORAGE_PROVIDER=mem \
+    QUEUE_PROVIDER=mem \
+    ALLOWED_SECTORS=health-care,health-research,health-index,test \
+    HOST_INTERNAL_IP=127.0.0.1 \
+    HOST_INTERNAL_PORT=3000 \
+    HOST_LEGAL_NAME="$HOST_LEGAL_NAME" \
+    HOST_JURISDICTION="$HOST_JURISDICTION" \
     HOST_ID_TYPE="$HOST_ID_TYPE" \
     HOST_ID_VALUE="$pass_host_id" \
+    HOST_ADMIN_EMAIL="$HOST_ADMIN_EMAIL" \
+    HOST_ADMIN_UID="$HOST_ADMIN_UID" \
+    HOST_ADMIN_ROLE="$HOST_ADMIN_ROLE" \
+    HOST_TERMS_URL="$HOST_TERMS_URL" \
     ICA_URL_INTERNAL="$ICA_BASE_URL" \
     ICA_URL_EXTERNAL="$ICA_BASE_URL" \
     npm run "$GW_API_SCRIPT"
