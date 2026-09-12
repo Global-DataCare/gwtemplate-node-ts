@@ -9,6 +9,8 @@ import {
 import { ClaimConsent, type ConsentRule } from 'gdc-common-utils-ts/models/consent-rule';
 import { buildConsentRulePrimaryDocument } from 'gdc-common-utils-ts/utils/permission-templates';
 import type { BundleEntry } from 'gdc-common-utils-ts/models/bundle';
+import { getClaimValue } from '../src/utils/claims.ts';
+import { expandConsentActorRoles } from '../src/utils/consent.ts';
 
 type RenderMode =
   | 'CONSENT_BATCH_REQUEST'
@@ -99,6 +101,29 @@ function buildConsentEntry(rule: ConsentRule): BundleEntry {
   } as BundleEntry;
 }
 
+function buildProjectedConsentEntry(rule: ConsentRule): BundleEntry {
+  const entry = buildConsentEntry(rule);
+  const claims = {
+    ...((entry.resource?.meta?.claims as Record<string, unknown> | undefined) || {}),
+  };
+  const actorRoles = getClaimValue<string>(claims, ClaimConsent.actorRole);
+  if (actorRoles) {
+    const context = String(claims['@context'] || '').replace(/\.$/, '');
+    const contextualizedKey = context ? `${context}.${ClaimConsent.actorRole}` : ClaimConsent.actorRole;
+    const targetKey = claims[contextualizedKey] !== undefined
+      ? contextualizedKey
+      : ClaimConsent.actorRole;
+    claims[targetKey] = expandConsentActorRoles(actorRoles, 'auto').join(',');
+  }
+  return {
+    ...entry,
+    resource: {
+      ...entry.resource,
+      meta: { ...entry.resource?.meta, claims },
+    },
+  } as BundleEntry;
+}
+
 function buildConsentEntries(): BundleEntry[] {
   return EXAMPLE_LOCAL_SMOKE_CONSENT_RULES.map((rule) => buildConsentEntry(rule));
 }
@@ -123,14 +148,18 @@ const rendered = (() => {
         data: buildConsentEntries(),
       };
     case 'RULE_ID_LIST':
-      return buildConsentRulePrimaryDocument(buildConsentEntries()).data.map((entry) => entry.id);
+      return buildConsentRulePrimaryDocument(
+        EXAMPLE_LOCAL_SMOKE_CONSENT_RULES.map(buildProjectedConsentEntry),
+      ).data.map((entry) => entry.id);
     case 'CONSENT_BATCH_REQUEST_DUPLICATE':
       return {
         thid: process.env.THID || DEFAULT_DUPLICATE_THID,
         data: buildDuplicateConsentEntries(),
       };
     case 'RULE_ID_LIST_DUPLICATE':
-      return buildConsentRulePrimaryDocument(buildDuplicateConsentEntries()).data.map((entry) => entry.id);
+      return buildConsentRulePrimaryDocument(
+        EXAMPLE_LOCAL_SMOKE_CONSENT_RULES_WITH_DUPLICATE.map(buildProjectedConsentEntry),
+      ).data.map((entry) => entry.id);
     case 'CONSENT_LIFECYCLE_ACTIVATE_REQUEST':
       return {
         thid: process.env.THID || `${DEFAULT_THID}-lifecycle-activate`,
@@ -147,7 +176,9 @@ const rendered = (() => {
         data: buildLifecycleConsentEntries().reactivate,
       };
     case 'RULE_ID_LIST_LIFECYCLE':
-      return buildConsentRulePrimaryDocument(buildLifecycleConsentEntries().activate).data.map((entry) => entry.id);
+      return buildConsentRulePrimaryDocument([
+        buildProjectedConsentEntry(EXAMPLE_LOCAL_SMOKE_CONSENT_RULE_LIFECYCLE.activate),
+      ]).data.map((entry) => entry.id);
     default:
       throw new Error(`Unknown payload '${payloadName}'.`);
   }

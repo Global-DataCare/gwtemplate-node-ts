@@ -2,8 +2,11 @@
 
 ## [Unreleased]
 
-- Release GW CORE `1.25.18` with document-index input sanitization at the
+- Release GW CORE `1.25.19` with document-index input sanitization at the
   Communication boundary.
+- Derive local-Fabric smoke rule IDs from the same canonical actor-role
+  projection written by `ConsentManager`, preventing stale fixture hashes from
+  hiding or falsely reporting a failed on-chain write.
 - Canonicalize consent actor-role claims before deriving the ledger rule CID so
   GW writes and SMART authorization consumers address the same on-chain asset.
 - Generate local-Fabric env files with one effective assignment per key so

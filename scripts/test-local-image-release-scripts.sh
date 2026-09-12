@@ -15,6 +15,10 @@ bash -n ./docker_build_local.sh ./docker_run_local.sh ./cloud_deploy.sh \
   ./chaincode/scripts/consentaccess-local-devnet.sh
 
 node --test ./scripts/tests/openapi-core-boundary.test.mjs
+TS_NODE_TRANSPILE_ONLY=1 TS_NODE_SKIP_IGNORE=1 \
+  TS_NODE_COMPILER_OPTIONS='{"module":"NodeNext","moduleResolution":"NodeNext","allowImportingTsExtensions":true}' \
+  node --loader ts-node/esm --experimental-specifier-resolution=node \
+  --test ./scripts/tests/render-demo-consentaccess-payload.test.mts
 bash ./scripts/tests/consentaccess-multi-host-lifecycle.test.sh
 bash ./scripts/tests/public-gw-core-image-docs.test.sh
 
