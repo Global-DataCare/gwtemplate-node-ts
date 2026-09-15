@@ -911,15 +911,32 @@ Guardrail:
 
 - `SECURITY_MODE=demo` is blocked when `NODE_ENV=production`.
 
-Recommended staging profile:
+Recommended protected first-party staging profile after DCR:
+
+```bash
+SECURITY_MODE=strict
+FHIR_LEGACY=false
+JSON_LEGACY=false
+DIDCOMM_PLAIN=disabled
+DEMO_ALLOW_INSECURE_BEARER=false
+```
+
+An interoperability or pre-DCR bootstrap deployment that must accept native
+FHIR or DIDComm plain uses the authenticated compatibility profile instead:
 
 ```bash
 SECURITY_MODE=compat
 FHIR_LEGACY=true
-JSON_LEGACY=true
-DIDCOMM_PLAIN=disabled
+JSON_LEGACY=false
+DIDCOMM_PLAIN=true
 DEMO_ALLOW_INSECURE_BEARER=false
 ```
+
+Compatibility does not mean unauthenticated. Bearer verification and every
+manager authorization rule remain mandatory. Prefer a dedicated GW deployment
+or tenant/client allowlist when only selected external EHR/BFF clients need
+compatibility; never enable generic JSON merely to make one integration pass.
+See `docs-v1/02-API-AND-ENDPOINTS/02.H-BFF-TRANSPORT-INITIALIZATION.md`.
 
 For a deterministic Fabric v3 devnet (DEMO single-host or multi-org), see:
 - `infra/fabric/local-network/README.md`
@@ -959,11 +976,12 @@ Notes:
 
 | SECURITY_MODE | FHIR_LEGACY / JSON_LEGACY | DIDCOMM_PLAIN                    | DEMO_ALLOW_INSECURE_BEARER |
 |--------------|---------------------------|-----------------------------------|----------------------------|
-| strict       | ❌                        | Only if `DIDCOMM_PLAIN=true`      | ❌                         |
+| strict       | ❌                        | ❌                                | ❌                         |
 | compat       | Only if `=true`           | Only if `=true`                   | ❌                         |
 | demo         | Always allowed            | Always allowed                    | Only if `=true`            |
 
-- In `strict`, didcomm-plain is only allowed if you set `DIDCOMM_PLAIN=true`.
+- In `strict`, every plaintext representation is rejected; compatibility flags
+  are ignored.
 - In `compat`, you can enable legacy and didcomm-plain with the corresponding variables.
 - In `demo`, all legacy and plaintext types are allowed by default.
 - In production, `SECURITY_MODE=demo` is blocked.
