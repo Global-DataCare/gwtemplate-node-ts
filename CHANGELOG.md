@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+- Add explicit AWS IAM Roles Anywhere support to the portable `gdc-host` chart
+  for Kubernetes clusters hosted outside AWS. The chart runs AWS's official
+  credential helper by immutable digest, mounts the workload X.509 Secret only
+  in that sidecar and exposes renewable temporary credentials to GW CORE over
+  the pod-local IMDSv2-compatible endpoint without static AWS access keys.
+- Release GW CORE `1.25.23` together with `gdc-host` chart `0.3.3` so the
+  already integrated AWS KMS adapter and the external-Kubernetes credential
+  path can be published as immutable deployment artifacts.
+
 - Stop synthesizing `MedicationStatement.user-selected=true` during document
   ingestion. GW now preserves the marker only when the source supplied it, so
   terminology selection cannot be mistaken for authorship or edit authority.

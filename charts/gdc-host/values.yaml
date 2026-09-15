@@ -46,6 +46,28 @@ gw:
     create: true
     name: ""
     annotations: {}
+  # AWS SDK credentials are resolved outside GW CORE. `default-chain` leaves
+  # the standard SDK chain untouched (for example EKS Pod Identity/IRSA).
+  # `roles-anywhere` adds the official AWS credential-helper sidecar for a
+  # Kubernetes cluster hosted outside AWS.
+  awsCredentials:
+    mode: default-chain
+    rolesAnywhere:
+      image: public.ecr.aws/rolesanywhere/credential-helper@sha256:d06f1c35dd683d6f67c950fec3e39b3599bca5471acf05d8554650299d1029d7
+      imagePullPolicy: IfNotPresent
+      existingSecret: ""
+      certificateKey: tls.crt
+      privateKeyKey: tls.key
+      intermediatesKey: ""
+      trustAnchorArn: ""
+      profileArn: ""
+      roleArn: ""
+      region: ""
+      sessionDurationSeconds: 3600
+      port: 9911
+      resources:
+        requests: { cpu: 10m, memory: 32Mi }
+        limits: { cpu: 100m, memory: 128Mi }
   service:
     type: ClusterIP
     port: 80

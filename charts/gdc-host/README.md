@@ -164,6 +164,49 @@ Para `gcp` y `aws`, `gw.existingSecret` debe aportar `KMS_KEY_ID`,
 `KMS_REGION` y asocie a la ServiceAccount un rol de pod/IRSA con `kms:Decrypt`
 sobre la clave exacta; no guarde access keys estáticas en el Secret.
 
+### AWS KMS desde Kubernetes fuera de AWS
+
+GW CORE no implementa autenticación específica de EKS, IONOS u otro proveedor:
+el cliente oficial de AWS resuelve credenciales mediante su cadena estándar.
+Para un clúster externo sin un issuer OIDC público y estable, el chart ofrece
+`roles-anywhere`. Este modo añade al mismo pod la imagen oficial de AWS IAM
+Roles Anywhere. El contenedor auxiliar usa un certificado X.509 para obtener y
+renovar credenciales temporales; GW solo consulta su endpoint local compatible
+con IMDSv2. No cambia el código de aplicación ni almacena access keys estáticas.
+
+```yaml
+gw:
+  providers:
+    kms: aws
+  awsCredentials:
+    mode: roles-anywhere
+    rolesAnywhere:
+      image: public.ecr.aws/rolesanywhere/credential-helper@sha256:d06f1c35dd683d6f67c950fec3e39b3599bca5471acf05d8554650299d1029d7
+      existingSecret: gw-aws-workload-x509
+      certificateKey: tls.crt
+      privateKeyKey: tls.key
+      trustAnchorArn: arn:aws:rolesanywhere:<region>:<account>:trust-anchor/<id>
+      profileArn: arn:aws:rolesanywhere:<region>:<account>:profile/<id>
+      roleArn: arn:aws:iam::<account>:role/<role>
+      region: <region>
+```
+
+El Secret X.509 se crea o sincroniza por un canal privado y solo se monta en el
+contenedor auxiliar:
+
+```bash
+kubectl -n <namespace> create secret tls gw-aws-workload-x509 \
+  --cert=/secure/aws/workload.crt \
+  --key=/secure/aws/workload.key
+```
+
+El rol indicado debe confiar en `rolesanywhere.amazonaws.com` y limitarse a
+`kms:Decrypt` sobre la clave exacta. `gw.existingSecret` aporta además
+`KMS_PROVIDER=aws`, `KMS_REGION`, `KMS_KEY_ID`, `KMS_RUNTIME_KEK_ID` y
+`KMS_RUNTIME_KEK_CIPHERTEXT`; no debe contener `AWS_ACCESS_KEY_ID` ni
+`AWS_SECRET_ACCESS_KEY`. Use `mode: default-chain` únicamente cuando el clúster
+ya proporcione una identidad temporal compatible, por ejemplo IRSA en EKS.
+
 ## Perfiles
 
 | Entorno | `environment` | `networkMode` | Uso |

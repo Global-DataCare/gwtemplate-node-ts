@@ -190,4 +190,6 @@ if helm template invalid "${CHART}" -f "${TMP_DIR}/invalid-staging-http.yaml" >/
   exit 1
 fi
 
+bash "${ROOT}/scripts/tests/helm-aws-roles-anywhere-contract.test.sh"
+
 echo "portable host Helm contract passed"

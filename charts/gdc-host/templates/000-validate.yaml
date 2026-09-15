@@ -37,6 +37,27 @@
 {{- if and (eq .Values.environment "production") (or (eq .Values.gw.providers.kms "local") (eq .Values.gw.providers.kms "memory")) -}}
 {{- fail "production requires external KEK custody: gcp, aws or hashicorp-transit" -}}
 {{- end -}}
+{{- if eq .Values.gw.awsCredentials.mode "roles-anywhere" -}}
+{{- if ne .Values.gw.providers.kms "aws" -}}
+{{- fail "gw.awsCredentials.mode=roles-anywhere requires gw.providers.kms=aws" -}}
+{{- end -}}
+{{- $rolesAnywhere := .Values.gw.awsCredentials.rolesAnywhere -}}
+{{- if empty $rolesAnywhere.existingSecret -}}
+{{- fail "gw.awsCredentials.mode=roles-anywhere requires gw.awsCredentials.rolesAnywhere.existingSecret" -}}
+{{- end -}}
+{{- if empty $rolesAnywhere.trustAnchorArn -}}
+{{- fail "gw.awsCredentials.mode=roles-anywhere requires a trustAnchorArn" -}}
+{{- end -}}
+{{- if empty $rolesAnywhere.profileArn -}}
+{{- fail "gw.awsCredentials.mode=roles-anywhere requires a profileArn" -}}
+{{- end -}}
+{{- if empty $rolesAnywhere.roleArn -}}
+{{- fail "gw.awsCredentials.mode=roles-anywhere requires a roleArn" -}}
+{{- end -}}
+{{- if empty $rolesAnywhere.region -}}
+{{- fail "gw.awsCredentials.mode=roles-anywhere requires a region" -}}
+{{- end -}}
+{{- end -}}
 {{- if and (eq .Values.environment "production") (ne (int .Values.gw.replicas) 1) -}}
 {{- fail "production currently requires gw.replicas=1 because GW CORE queue processing is process-local" -}}
 {{- end -}}
