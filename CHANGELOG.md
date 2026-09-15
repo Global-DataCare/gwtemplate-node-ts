@@ -10,6 +10,8 @@
 - Release GW CORE `1.25.23` together with `gdc-host` chart `0.3.3` so the
   already integrated AWS KMS adapter and the external-Kubernetes credential
   path can be published as immutable deployment artifacts.
+- Rebuild the shared CCAAS host runtime on Node.js 24 and describe its complete
+  ten-contract inventory consistently in release evidence and operator docs.
 
 - Stop synthesizing `MedicationStatement.user-selected=true` during document
   ingestion. GW now preserves the marker only when the source supplied it, so

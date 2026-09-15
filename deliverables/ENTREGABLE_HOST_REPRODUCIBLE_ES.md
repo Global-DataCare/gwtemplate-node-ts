@@ -21,7 +21,7 @@ GitHub Container Registry:
 - [Runtime CCAAS](https://github.com/orgs/Global-DataCare/packages/container/package/host-runtime):
   `ghcr.io/global-datacare/host-runtime@sha256:0742ce44f2c56b8a559ed872620c779adaac64c6e1b476d3fda1762f0d2fe510`.
 
-La primera ejecuta GW CORE. La segunda contiene los nueve servidores de
+La primera ejecuta GW CORE. La segunda contiene los diez servidores de
 chaincode y selecciona cada contrato mediante `CHAINCODE_NAME`. No sustituye
 los paquetes CCAAS: sus package IDs dependen de los Services exactos del
 release y se generan después de fijar el nombre y namespace Helm.
@@ -37,7 +37,7 @@ La evidencia se divide en dos puertas complementarias:
    recuperación persistente.
 2. **Helm/Kubernetes**, prueba de portabilidad. Crea un clúster `kind` aislado,
    carga la misma imagen GW por digest, instala un peer con identidad exclusiva
-   del `Host2MSP` recién admitido, CouchDB, GW CORE, PostgreSQL, IPFS y nueve runtimes CCAAS, y une
+   del `Host2MSP` recién admitido, CouchDB, GW CORE, PostgreSQL, IPFS y diez runtimes CCAAS, y une
    el peer a los canales de la Fabric Docker `local-network`. Instala en ese
    peer los paquetes CCAAS exactos, actualiza la aprobación de `Host2MSP` y el
    GW repite los flujos E2E endosando exclusivamente mediante el peer kind.
@@ -74,7 +74,7 @@ MSP/TLS y del certificado cliente vinculada al SHA-256 del identificador de esa
 VC, la admisión dinámica por
 el reconciliador, los Secrets, la instalación Helm,
 el arranque del peer y CouchDB, la unión real del peer Kubernetes a los canales
-externos, el lifecycle de los nueve CCAAS y el E2E del GW, que firma como
+externos, el lifecycle de los diez CCAAS y el E2E del GW, que firma como
 `Host2MSP`, contra ese mismo peer.
 Docker mantiene la ICA de Fabric, el orderer y el peer de referencia que
 representan la red externa; no endosa las operaciones del GW durante la puerta

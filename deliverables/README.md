@@ -74,6 +74,6 @@ del repositorio.
 - [Runtime CCAAS](https://github.com/orgs/Global-DataCare/packages/container/package/host-runtime):
   `ghcr.io/global-datacare/host-runtime@sha256:0742ce44f2c56b8a559ed872620c779adaac64c6e1b476d3fda1762f0d2fe510`
 
-GW CORE y CCAAS son artefactos independientes. El segundo contiene los nueve
+GW CORE y CCAAS son artefactos independientes. El segundo contiene los diez
 servidores de chaincode, pero sus package IDs se generan para el nombre,
 namespace y Services exactos de cada release Helm.

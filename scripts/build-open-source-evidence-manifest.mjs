@@ -142,7 +142,7 @@ export function buildEvidenceManifest({
       fabricMsp: 'Host1MSP',
       joinedChannels: ['identity-local', 'health-care-local'],
       endorsementPeer: 'kubernetes',
-      ccaasLifecycle: 'nine exact packages installed and approved on Host1MSP',
+      ccaasLifecycle: 'ten exact packages installed and approved on Host1MSP',
       persistence: 'peer channels, PostgreSQL documents and IPFS JWE blobs survive pod restart',
     },
     repositories,

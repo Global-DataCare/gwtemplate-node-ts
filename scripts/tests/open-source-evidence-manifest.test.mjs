@@ -45,7 +45,7 @@ test('manifest separates host MSP membership from VAT-addressed tenants', () => 
     'health-care-local',
   ]);
   assert.equal(manifest.kubernetesProof.endorsementPeer, 'kubernetes');
-  assert.equal(manifest.kubernetesProof.ccaasLifecycle, 'nine exact packages installed and approved on Host1MSP');
+  assert.equal(manifest.kubernetesProof.ccaasLifecycle, 'ten exact packages installed and approved on Host1MSP');
   assert.equal('pending' in manifest.kubernetesProof, false);
   assert.match(manifest.artifacts[0].sha256, /^[a-f0-9]{64}$/);
   assert.equal('privateKey' in manifest, false);

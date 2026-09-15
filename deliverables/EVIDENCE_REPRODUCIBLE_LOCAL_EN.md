@@ -11,7 +11,7 @@ a VC Host without PDF or temporary DID;
 2. Root CA e Fabric ICA disposable;
 3. admission of `Host2MSP` into a network initially formed by `Host1MSP`;
 4. installation using the `gdc-host` chart on kind;
-5. peer, CouchDB, GW CORE, PostgreSQL, IPFS and nine CCAAS;
+5. peer, CouchDB, GW CORE, PostgreSQL, IPFS and ten CCAAS;
 6. write, read, deny and persist after reboot.
 
 ## Execution

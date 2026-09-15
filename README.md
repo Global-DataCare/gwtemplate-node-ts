@@ -34,7 +34,7 @@ ghcr.io/global-datacare/host-runtime@sha256:0742ce44f2c56b8a559ed872620c779adaac
 ```
 
 GW CORE and the CCAAS host runtime are separate artifacts. The latter contains
-the nine public chaincode servers selected through `CHAINCODE_NAME`; its
+the ten public chaincode servers selected through `CHAINCODE_NAME`; its
 deployment-specific package IDs must still be generated for the exact Helm
 release, namespace and Service addresses.
 

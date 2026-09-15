@@ -147,7 +147,7 @@ as the newly admitted MSP. A GW that points at Host2 while signing with Host1
 does not satisfy the portability gate.
 
 Keep the Kubernetes peer proof and application endorsement proof explicit. The
-local Helm gate must install and approve the nine exact CCAAS packages on the
+local Helm gate must install and approve the ten exact CCAAS packages on the
 kind peer before enabling GW, point GW at that peer, exercise Consent and SMART
 through it, and repeat readiness after restarting GW, peer and CCAAS. The
 Docker peer is only the external-network gossip/bootstrap route during this
@@ -163,7 +163,7 @@ not sufficient. Require the Host VC in local, test and production. PDF-free
 local preauthorization still emits a VC and never means controller-only Fabric
 enrollment. Package only `msp.tgz`, `tls.tgz`, sanitized authorization and
 hashes for Helm; the grant and raw VC-JWT stay outside runtime Secrets.
-Generate all nine CCAAS packages deterministically from the exact Helm fullname
+Generate all ten CCAAS packages deterministically from the exact Helm fullname
 and namespace. Never copy example package IDs: a Service, release, port or TLS
 change requires new archives, hashes, values and governed approvals.
 

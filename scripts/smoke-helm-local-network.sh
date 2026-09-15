@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Flujo contractual Helm/Kubernetes para local-network:
 # 1. Crea un clúster kind aislado y carga la imagen GW ya validada por Docker.
-# 2. Empaqueta y carga los nueve runtimes CCAAS usados por GW CORE.
+# 2. Empaqueta y carga los diez runtimes CCAAS usados por GW CORE.
 # 3. Despliega por Helm un peer Host2MSP ya admitido, CouchDB, GW CORE, PostgreSQL, IPFS y CCAAS.
 # 4. Enrola una identidad exclusiva para el peer kind y lo une a la Fabric Docker.
 # 5. Instala los paquetes CCAAS en el peer kind y actualiza la aprobación Host2MSP.

@@ -230,7 +230,7 @@ fi
 node --test ./scripts/onboarding/tests/host-credential-bootstrap.test.mjs
 grep -Fq 'HOME_PLACEHOLDER' ./scripts/collect-open-source-production-readiness-evidence.sh
 grep -Fq 'absolute user-home path' ./scripts/collect-open-source-production-readiness-evidence.sh
-grep -Fq 'instala y aprueba los nueve paquetes CCAAS' \
+grep -Fq 'instala y aprueba los diez paquetes CCAAS' \
   ./scripts/collect-open-source-production-readiness-evidence.sh
 if grep -Fq 'fabric-multicloud' ./scripts/collect-open-source-production-readiness-evidence.sh; then
   echo 'ERROR: the public evidence runner must not require a private Fabric repository.' >&2
@@ -341,6 +341,10 @@ if [[ "$(grep -Ec '^RUN npm ci($| )' ./Dockerfile)" -ne 2 ]]; then
 fi
 if [[ "$(grep -Ec '^FROM node:24-alpine($| AS )' ./Dockerfile)" -ne 2 ]]; then
   echo 'ERROR: builder and runtime Docker stages must use the workspace Node.js 24 line.' >&2
+  exit 1
+fi
+if [[ "$(grep -Ec '^FROM node:24-alpine$' ./chaincode/Dockerfile.ccaas)" -ne 1 ]]; then
+  echo 'ERROR: the shared CCAAS host runtime must use the workspace Node.js 24 line.' >&2
   exit 1
 fi
 

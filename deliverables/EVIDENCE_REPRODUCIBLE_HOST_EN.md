@@ -13,7 +13,7 @@ The two verified `linux/amd64` images are publicly available on GitHub Container
 - [Runtime CCAAS](https://github.com/orgs/Global-DataCare/packages/container/package/host-runtime):
 `ghcr.io/global-datacare/host-runtime@sha256:0742ce44f2c56b8a559ed872620c779adaac64c6e1b476d3fda1762f0d2fe510`.
 
-The first one runs GW CORE. The second contains the nine chaincode servers and selects each contract using `CHAINCODE_NAME`. It does not replace CCAAS packages: their package IDs depend on the exact Services in the release and are generated after setting the Helm name and namespace.
+The first one runs GW CORE. The second contains the ten chaincode servers and selects each contract using `CHAINCODE_NAME`. It does not replace CCAAS packages: their package IDs depend on the exact Services in the release and are generated after setting the Helm name and namespace.
 
 ## What it demonstrates
 
@@ -26,7 +26,7 @@ of the tenant, Consent, SMART access allowed and denied, reboot and
 persistent recovery.
 2. **Helm/Kubernetes**, portability test. Create an isolated `kind` cluster,
 load the same GW image by digest, install a peer with unique identity
-of the newly supported `Host2MSP`, CouchDB, GW CORE, PostgreSQL, IPFS and nine CCAAS runtimes, and joins
+of the newly supported `Host2MSP`, CouchDB, GW CORE, PostgreSQL, IPFS and ten CCAAS runtimes, and joins
 the peer to the channels of the Fabric Docker `local-network`. Install on that
 peer the exact CCAAS packets, update the approval of `Host2MSP` and the
 GW repeats E2E flows endorsing exclusively through the peer kind.
@@ -55,7 +55,7 @@ Peer + CouchDB + GW CORE + PostgreSQL + IPFS + CCAAS
 Channel and chaincode reconciliation, write, read and restart
 ```
 
-The evidence links the verified Host VC to the MSP administrator safeguarded by the entity authorized to administer Fabric, the sanitized public MSP definition, the two-use peer enrollment grant, the independent one-use GW client grant, and the resulting MSP/TLS and client certificates. The certificate evidence records the SHA-256 identifier of the Host VC. It then covers reconciler admission, Kubernetes Secrets, Helm installation, peer and CouchDB startup, the Kubernetes peer joining the external channels, lifecycle of the nine CCAAS packages and GW E2E operations signed as `Host2MSP` through that peer. Docker retains the Fabric ICA, reference orderer and reference peer that represent the external network; the Docker peer does not endorse GW operations during the Kubernetes gate. After restarting GW, the peer and CCAAS runtimes, the test verifies channels, reads, authorization and PostgreSQL/IPFS persistence again.
+The evidence links the verified Host VC to the MSP administrator safeguarded by the entity authorized to administer Fabric, the sanitized public MSP definition, the two-use peer enrollment grant, the independent one-use GW client grant, and the resulting MSP/TLS and client certificates. The certificate evidence records the SHA-256 identifier of the Host VC. It then covers reconciler admission, Kubernetes Secrets, Helm installation, peer and CouchDB startup, the Kubernetes peer joining the external channels, lifecycle of the ten CCAAS packages and GW E2E operations signed as `Host2MSP` through that peer. Docker retains the Fabric ICA, reference orderer and reference peer that represent the external network; the Docker peer does not endorse GW operations during the Kubernetes gate. After restarting GW, the peer and CCAAS runtimes, the test verifies channels, reads, authorization and PostgreSQL/IPFS persistence again.
 
 ## Authorities that should not be confused
 

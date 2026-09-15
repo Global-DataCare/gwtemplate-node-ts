@@ -25,7 +25,7 @@ values privado de cada release.
 - [Runtime CCAAS](https://github.com/orgs/Global-DataCare/packages/container/package/host-runtime):
   `ghcr.io/global-datacare/host-runtime@sha256:0742ce44f2c56b8a559ed872620c779adaac64c6e1b476d3fda1762f0d2fe510`
 
-El runtime CCAAS contiene los nueve contratos públicos, pero cada entrada del
+El runtime CCAAS contiene los diez contratos públicos, pero cada entrada del
 chart conserva un package ID distinto y calculado para el Service exacto del
 release. No configure la imagen de GW CORE como runtime CCAAS.
 
@@ -247,7 +247,7 @@ IMAGE_NAME="gw-core:<version-commit>" npm run helm:smoke:local-network
 
 El script crea un `kind` aislado, carga la imagen ya probada y obtiene su digest
 local, enrola una identidad exclusiva, instala peer/CouchDB/GW/PostgreSQL/IPFS
-y nueve runtimes CCAAS, une el peer a los canales locales, instala y aprueba en
+y diez runtimes CCAAS, une el peer a los canales locales, instala y aprueba en
 él los paquetes CCAAS exactos, ejecuta los E2E y reinicia GW, peer y CCAAS.
 Todos los comandos usan un contexto explícito para no tocar otro clúster
 configurado.
@@ -287,7 +287,7 @@ Helm arranca el runtime CCAAS. La instalación del paquete en el peer, la
 aprobación de organizaciones y el commit son operaciones auditadas del
 reconciliador de la red.
 
-Los nueve paquetes y sus IDs se generan de forma determinista para el Service
+Los diez paquetes y sus IDs se generan de forma determinista para el Service
 exacto del release:
 
 ```bash
