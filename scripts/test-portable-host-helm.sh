@@ -21,7 +21,7 @@ helm lint "${CHART}" -f "${CHART}/ci/local-host1-values.yaml"
 helm lint "${CHART}" -f "${CHART}/ci/local-host2-values.yaml"
 helm lint "${CHART}" -f "${CHART}/ci/local-evidence-values.yaml"
 [[ "$(yq '.chaincodes | length' "${CHART}/ci/production-values.yaml")" == "10" ]] || {
-  echo 'production example must enumerate all nine CCAAS runtimes' >&2
+  echo 'production example must enumerate all ten CCAAS runtimes' >&2
   exit 1
 }
 [[ "$(yq -o=json -I=0 '.peer.channels' "${CHART}/ci/production-values.yaml")" == \
@@ -189,5 +189,7 @@ if helm template invalid "${CHART}" -f "${TMP_DIR}/invalid-staging-http.yaml" >/
   echo "chart accepted a non-HTTPS staging host URL" >&2
   exit 1
 fi
+
+bash "${ROOT}/scripts/tests/helm-aws-roles-anywhere-contract.test.sh"
 
 echo "portable host Helm contract passed"

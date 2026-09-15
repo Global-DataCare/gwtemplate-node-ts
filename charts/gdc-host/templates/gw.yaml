@@ -44,6 +44,14 @@ spec:
                 configMapKeyRef:
                   name: {{ include "gdc-host.fullname" . }}-gw
                   key: {{ printf "HLF_CONNECTION_PEER_%s" .Values.peer.mspId }}
+            {{- if eq .Values.gw.awsCredentials.mode "roles-anywhere" }}
+            - name: AWS_EC2_METADATA_SERVICE_ENDPOINT
+              value: {{ printf "http://127.0.0.1:%v" .Values.gw.awsCredentials.rolesAnywhere.port | quote }}
+            - name: AWS_EC2_METADATA_DISABLED
+              value: "false"
+            - name: AWS_EC2_METADATA_V1_DISABLED
+              value: "true"
+            {{- end }}
           ports:
             - { name: http, containerPort: 3000 }
           readinessProbe:
@@ -56,6 +64,54 @@ spec:
             periodSeconds: 20
           resources:
             {{- toYaml .Values.gw.resources | nindent 12 }}
+        {{- if eq .Values.gw.awsCredentials.mode "roles-anywhere" }}
+        - name: aws-roles-anywhere
+          image: {{ .Values.gw.awsCredentials.rolesAnywhere.image | quote }}
+          imagePullPolicy: {{ .Values.gw.awsCredentials.rolesAnywhere.imagePullPolicy }}
+          args:
+            - serve
+            - --certificate
+            - {{ printf "/var/run/secrets/aws-roles-anywhere/%s" .Values.gw.awsCredentials.rolesAnywhere.certificateKey | quote }}
+            - --private-key
+            - {{ printf "/var/run/secrets/aws-roles-anywhere/%s" .Values.gw.awsCredentials.rolesAnywhere.privateKeyKey | quote }}
+            {{- if .Values.gw.awsCredentials.rolesAnywhere.intermediatesKey }}
+            - --intermediates
+            - {{ printf "/var/run/secrets/aws-roles-anywhere/%s" .Values.gw.awsCredentials.rolesAnywhere.intermediatesKey | quote }}
+            {{- end }}
+            - --trust-anchor-arn
+            - {{ .Values.gw.awsCredentials.rolesAnywhere.trustAnchorArn | quote }}
+            - --profile-arn
+            - {{ .Values.gw.awsCredentials.rolesAnywhere.profileArn | quote }}
+            - --role-arn
+            - {{ .Values.gw.awsCredentials.rolesAnywhere.roleArn | quote }}
+            - --region
+            - {{ .Values.gw.awsCredentials.rolesAnywhere.region | quote }}
+            - --session-duration
+            - {{ .Values.gw.awsCredentials.rolesAnywhere.sessionDurationSeconds | quote }}
+            - --port
+            - {{ .Values.gw.awsCredentials.rolesAnywhere.port | quote }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+          readinessProbe:
+            tcpSocket: { port: {{ .Values.gw.awsCredentials.rolesAnywhere.port }} }
+            initialDelaySeconds: 1
+            periodSeconds: 5
+          resources:
+            {{- toYaml .Values.gw.awsCredentials.rolesAnywhere.resources | nindent 12 }}
+          volumeMounts:
+            - name: aws-roles-anywhere-x509
+              mountPath: /var/run/secrets/aws-roles-anywhere
+              readOnly: true
+        {{- end }}
+      {{- if eq .Values.gw.awsCredentials.mode "roles-anywhere" }}
+      volumes:
+        - name: aws-roles-anywhere-x509
+          secret:
+            secretName: {{ .Values.gw.awsCredentials.rolesAnywhere.existingSecret }}
+      {{- end }}
 ---
 apiVersion: v1
 kind: Service

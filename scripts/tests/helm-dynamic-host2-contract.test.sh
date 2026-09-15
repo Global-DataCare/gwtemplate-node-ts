@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Flow contract:
 # 1. the Helm peer belongs to dynamically admitted Host2MSP, not bootstrap Host1MSP;
-# 2. Host2 installs and approves all nine local CCAAS packages;
+# 2. Host2 installs and approves all ten local CCAAS packages;
 # 3. GW targets that Kubernetes Host2 peer for the E2E and restart proof.
 # 4. kind imports only images used by Kubernetes workloads, while Fabric tools
 #    remain in the external Docker network used for governance operations.

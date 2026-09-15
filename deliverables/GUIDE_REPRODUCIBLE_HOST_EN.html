@@ -26,7 +26,7 @@
       <code>ghcr.io/global-datacare/host-runtime@sha256:0742ce44f2c56b8a559ed872620c779adaac64c6e1b476d3fda1762f0d2fe510</code>.</li>
   </ul>
   <p>GW CORE and CCAAS are different OCI artifacts. The CCAAS runtime contains
-  all nine chaincode servers, but the package IDs are generated for the
+  all ten chaincode servers, but the package IDs are generated for the
   exact name, namespace and Services of each Helm release.</p>
 
  <h2>1. What is the evidence collector</h2>
@@ -60,7 +60,7 @@ Channels, write, read, denial and restart</pre>
     <li>Data-space ICA and Host VC JSON/VC-JWT without a PDF for a preauthorized host.</li>
     <li>Fabric ICA, MSP/TLS certificates, Host1MSP, Host2MSP, channels and chaincodes.</li>
     <li>GW CORE, PostgreSQL and IPFS with write, read and recovery after reboot.</li>
-    <li>Actual kind and Helm installation of a newly admitted Host2MSP peer, CouchDB, GW CORE, PostgreSQL, IPFS and nine CCAAS runtimes.</li>
+    <li>Actual kind and Helm installation of a newly admitted Host2MSP peer, CouchDB, GW CORE, PostgreSQL, IPFS and ten CCAAS runtimes.</li>
     <li>Joining the Kubernetes peer to the local channels and installing and approving the exact CCAAS packages.</li>
     <li>The Host VC SHA-256 identifier is linked to the peer and GW client certificates. The GW signs as Host2MSP through that MSP's Kubernetes peer, with persistence and endorsement capability verified again after restarting the GW, peer and CCAAS runtimes.</li>
     <li>Consented access and negative controls for unauthorized access.</li>
@@ -78,7 +78,7 @@ Channels, write, read, denial and restart</pre>
   isolated kind cluster, namespace and Secrets; loads the approved image; runs
   <code>helm upgrade --install</code>; waits for rollout; performs E2E
   operations; checks channels and CouchDB; queries PostgreSQL and IPFS inside
-  the pods; installs and approves the nine CCAAS packages on the Kubernetes
+  the pods; installs and approves the ten CCAAS packages on the Kubernetes
   peer; executes Consent and SMART through that peer; restarts the GW, peer and
   CCAAS runtimes; and verifies recovery. <code>helm template</code> remains a
   supplementary static check.</p>

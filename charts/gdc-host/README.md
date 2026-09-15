@@ -3,7 +3,7 @@
 Distribución pública OCI:
 
 ```bash
-helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.3.2
+helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.3.3
 ```
 
 `gdc-host` empaqueta un límite de host reutilizable en cualquier Kubernetes:
@@ -25,7 +25,7 @@ values privado de cada release.
 - [Runtime CCAAS](https://github.com/orgs/Global-DataCare/packages/container/package/host-runtime):
   `ghcr.io/global-datacare/host-runtime@sha256:0742ce44f2c56b8a559ed872620c779adaac64c6e1b476d3fda1762f0d2fe510`
 
-El runtime CCAAS contiene los nueve contratos públicos, pero cada entrada del
+El runtime CCAAS contiene los diez contratos públicos, pero cada entrada del
 chart conserva un package ID distinto y calculado para el Service exacto del
 release. No configure la imagen de GW CORE como runtime CCAAS.
 
@@ -164,6 +164,49 @@ Para `gcp` y `aws`, `gw.existingSecret` debe aportar `KMS_KEY_ID`,
 `KMS_REGION` y asocie a la ServiceAccount un rol de pod/IRSA con `kms:Decrypt`
 sobre la clave exacta; no guarde access keys estáticas en el Secret.
 
+### AWS KMS desde Kubernetes fuera de AWS
+
+GW CORE no implementa autenticación específica de EKS, IONOS u otro proveedor:
+el cliente oficial de AWS resuelve credenciales mediante su cadena estándar.
+Para un clúster externo sin un issuer OIDC público y estable, el chart ofrece
+`roles-anywhere`. Este modo añade al mismo pod la imagen oficial de AWS IAM
+Roles Anywhere. El contenedor auxiliar usa un certificado X.509 para obtener y
+renovar credenciales temporales; GW solo consulta su endpoint local compatible
+con IMDSv2. No cambia el código de aplicación ni almacena access keys estáticas.
+
+```yaml
+gw:
+  providers:
+    kms: aws
+  awsCredentials:
+    mode: roles-anywhere
+    rolesAnywhere:
+      image: public.ecr.aws/rolesanywhere/credential-helper@sha256:d06f1c35dd683d6f67c950fec3e39b3599bca5471acf05d8554650299d1029d7
+      existingSecret: gw-aws-workload-x509
+      certificateKey: tls.crt
+      privateKeyKey: tls.key
+      trustAnchorArn: arn:aws:rolesanywhere:<region>:<account>:trust-anchor/<id>
+      profileArn: arn:aws:rolesanywhere:<region>:<account>:profile/<id>
+      roleArn: arn:aws:iam::<account>:role/<role>
+      region: <region>
+```
+
+El Secret X.509 se crea o sincroniza por un canal privado y solo se monta en el
+contenedor auxiliar:
+
+```bash
+kubectl -n <namespace> create secret tls gw-aws-workload-x509 \
+  --cert=/secure/aws/workload.crt \
+  --key=/secure/aws/workload.key
+```
+
+El rol indicado debe confiar en `rolesanywhere.amazonaws.com` y limitarse a
+`kms:Decrypt` sobre la clave exacta. `gw.existingSecret` aporta además
+`KMS_PROVIDER=aws`, `KMS_REGION`, `KMS_KEY_ID`, `KMS_RUNTIME_KEK_ID` y
+`KMS_RUNTIME_KEK_CIPHERTEXT`; no debe contener `AWS_ACCESS_KEY_ID` ni
+`AWS_SECRET_ACCESS_KEY`. Use `mode: default-chain` únicamente cuando el clúster
+ya proporcione una identidad temporal compatible, por ejemplo IRSA en EKS.
+
 ## Perfiles
 
 | Entorno | `environment` | `networkMode` | Uso |
@@ -204,7 +247,7 @@ IMAGE_NAME="gw-core:<version-commit>" npm run helm:smoke:local-network
 
 El script crea un `kind` aislado, carga la imagen ya probada y obtiene su digest
 local, enrola una identidad exclusiva, instala peer/CouchDB/GW/PostgreSQL/IPFS
-y nueve runtimes CCAAS, une el peer a los canales locales, instala y aprueba en
+y diez runtimes CCAAS, une el peer a los canales locales, instala y aprueba en
 él los paquetes CCAAS exactos, ejecuta los E2E y reinicia GW, peer y CCAAS.
 Todos los comandos usan un contexto explícito para no tocar otro clúster
 configurado.
@@ -244,7 +287,7 @@ Helm arranca el runtime CCAAS. La instalación del paquete en el peer, la
 aprobación de organizaciones y el commit son operaciones auditadas del
 reconciliador de la red.
 
-Los nueve paquetes y sus IDs se generan de forma determinista para el Service
+Los diez paquetes y sus IDs se generan de forma determinista para el Service
 exacto del release:
 
 ```bash

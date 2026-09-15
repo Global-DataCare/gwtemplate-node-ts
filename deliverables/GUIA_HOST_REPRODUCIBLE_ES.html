@@ -26,7 +26,7 @@
       <code>ghcr.io/global-datacare/host-runtime@sha256:0742ce44f2c56b8a559ed872620c779adaac64c6e1b476d3fda1762f0d2fe510</code>.</li>
   </ul>
   <p>GW CORE y CCAAS son artefactos OCI distintos. El runtime CCAAS contiene
-  los nueve servidores de chaincode, pero los package IDs se generan para el
+  los diez servidores de chaincode, pero los package IDs se generan para el
   nombre, namespace y Services exactos de cada release Helm.</p>
 
   <h2>1. Qué es el recolector de evidencias</h2>
@@ -60,7 +60,7 @@ Canales, escritura, lectura, denegación y reinicio</pre>
     <li>ICA del espacio de datos y Host VC JSON/VC-JWT sin PDF para un host preautorizado.</li>
     <li>ICA de Fabric, certificados MSP/TLS, Host1MSP, Host2MSP, canales y chaincodes.</li>
     <li>GW CORE, PostgreSQL e IPFS con escritura, lectura y recuperación tras reinicio.</li>
-    <li>Instalación real mediante kind y Helm de un peer del Host2MSP recién admitido, CouchDB, GW CORE, PostgreSQL, IPFS y nueve runtimes CCAAS.</li>
+    <li>Instalación real mediante kind y Helm de un peer del Host2MSP recién admitido, CouchDB, GW CORE, PostgreSQL, IPFS y diez runtimes CCAAS.</li>
     <li>Unión del peer Kubernetes a los canales locales, instalación y aprobación de los paquetes CCAAS exactos.</li>
     <li>El SHA-256 del identificador de la misma Host VC queda vinculado a los certificados del peer y del cliente GW; GW firma como Host2MSP y se dirige al peer Kubernetes de ese MSP, con persistencia y nueva capacidad de endoso tras reiniciar GW, peer y CCAAS.</li>
     <li>Acceso consentido y controles negativos de acceso no autorizado.</li>
@@ -78,7 +78,7 @@ Canales, escritura, lectura, denegación y reinicio</pre>
   kind aislado, namespace y Secrets; carga la imagen aprobada; ejecuta
   <code>helm upgrade --install</code>; espera el rollout; realiza operaciones
   E2E; comprueba canales y CouchDB; consulta PostgreSQL e IPFS dentro de los
-  pods; instala y aprueba los nueve paquetes CCAAS en el peer Kubernetes;
+  pods; instala y aprueba los diez paquetes CCAAS en el peer Kubernetes;
   ejecuta Consent y SMART mediante ese peer; reinicia GW, peer y CCAAS y
   comprueba la recuperación. <code>helm
   template</code> permanece como comprobación estática complementaria.</p>

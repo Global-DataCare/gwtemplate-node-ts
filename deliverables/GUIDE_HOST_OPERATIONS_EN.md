@@ -56,7 +56,7 @@ LOCAL_IMAGE_NAME="${IMAGE_NAME}" ./docker_build_local.sh
 npm run evidence:open-source-production-readiness
 ```
 
-The computer running the validation keeps the directory advertised under `artifacts/open-source-production-readiness/`, verifies that all files in `gates/` contain `PASS`, and verifies the hashes. The collector tests disposable CAs and ICA, Fabric Docker with `Host1MSP`/`Host2MSP`, PostgreSQL/IPFS, and a kind cluster where Helm installs peer, CouchDB, GW, and nine CCAAS. Runs Consent/SMART, negative checks and resets.
+The computer running the validation keeps the directory advertised under `artifacts/open-source-production-readiness/`, verifies that all files in `gates/` contain `PASS`, and verifies the hashes. The collector tests disposable CAs and ICA, Fabric Docker with `Host1MSP`/`Host2MSP`, PostgreSQL/IPFS, and a kind cluster where Helm installs peer, CouchDB, GW, and ten CCAAS. Runs Consent/SMART, negative checks and resets.
 
 The same collector runs the ICA public migration gate from Firestore/GCS to PostgreSQL/IPFS. Only use synthetic fixtures; signed PDFs, credentials and actual keys remain outside the repository and public evidence.
 
@@ -233,7 +233,7 @@ shasum -a 256 -c manifest.sha256
 
 ## 8. OCI images and CCAAS package IDs
 
-GW CORE is not published on npm. The verified version is available on the [GW CORE package public page](https://github.com/orgs/Global-DataCare/packages/container/package/gw-core). The common runtime for all nine chaincodes is available on the [CCAAS package public page](https://github.com/orgs/Global-DataCare/packages/container/package/host-runtime).
+GW CORE is not published on npm. The verified version is available on the [GW CORE package public page](https://github.com/orgs/Global-DataCare/packages/container/package/gw-core). The common runtime for all ten chaincodes is available on the [CCAAS package public page](https://github.com/orgs/Global-DataCare/packages/container/package/host-runtime).
 
 GW CORE and CCAAS are different OCI artifacts. Always use the approved digests:
 

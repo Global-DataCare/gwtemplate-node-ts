@@ -354,7 +354,7 @@ shasum -a 256 -c manifest.sha256
 
 GW CORE no se publica en npm. La versión verificada está disponible en la
 [página pública del paquete GW CORE](https://github.com/orgs/Global-DataCare/packages/container/package/gw-core).
-El runtime común de los nueve chaincodes está disponible en la
+El runtime común de los diez chaincodes está disponible en la
 [página pública del paquete CCAAS](https://github.com/orgs/Global-DataCare/packages/container/package/host-runtime).
 
 GW CORE y CCAAS son artefactos OCI distintos. Use siempre sus digests:
@@ -374,7 +374,7 @@ El values de GW usa `GW_PUBLIC_IMAGE`. Cada entrada CCAAS usa la misma
 es `<label>:<sha256 del .tgz>`. Cambiar release, nombre completo, Service,
 puerto o TLS obliga a regenerarlo.
 
-Genere los nueve paquetes y el fragmento de values después de fijar el nombre
+Genere los diez paquetes y el fragmento de values después de fijar el nombre
 completo que Helm usará para los Services:
 
 ```bash
@@ -387,7 +387,7 @@ CCAAS_OUTPUT_DIR=/secure/onboarding/ccaas \
 shasum -a 256 -c /secure/onboarding/ccaas/manifest.sha256
 ```
 
-El resultado enumera los nueve package IDs en `manifest.tsv` y produce
+El resultado enumera los diez package IDs en `manifest.tsv` y produce
 `chaincodes.values.yaml`. Para el perfil predeterminado, organizaciones y
 empleados usan `identity-eu`, personas `identity-global` y el contrato de
 consentimiento `health-care-eu`; cualquier cambio debe proceder del inventario
