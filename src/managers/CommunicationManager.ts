@@ -2281,11 +2281,9 @@ export class CommunicationManager implements IJobProcessor {
       baseClaims[`${resourceType}.user-selected`] = String(userSelectedRaw);
     }
 
-    if (resourceType === 'MedicationStatement') {
-      if (!baseClaims['MedicationStatement.user-selected']) {
-        baseClaims['MedicationStatement.user-selected'] = 'true';
-      }
-    }
+    // Preserve Coding.userSelected only when the source actually supplied it.
+    // It records terminology selection, not authorship or edit authority; GW
+    // must never synthesize it merely because the resource is medication.
 
     const normalizedClaims = normalizeContextualizedClaims(baseClaims);
     for (const claimName of [

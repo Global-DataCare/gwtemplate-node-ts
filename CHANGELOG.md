@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Stop synthesizing `MedicationStatement.user-selected=true` during document
+  ingestion. GW now preserves the marker only when the source supplied it, so
+  terminology selection cannot be mistaken for authorship or edit authority.
+
 - Preserve DCR authorization for historical individual DIDs whose `multibase`
   segment is the base58btc encoding of the UUID bytes. Legacy-seat repair now
   accepts that exact persisted subject alongside the current SHA3-384

@@ -2056,7 +2056,6 @@ describe('CommunicationManager Unit Tests', () => {
                   system: 'http://www.nlm.nih.gov/research/umls/rxnorm',
                   code: '161',
                   display: 'Paracetamol 500 MG Oral Tablet',
-                  userSelected: true,
                 }],
               },
               identifier: [{ value: 'urn:uuid:medication-001' }],
@@ -2203,10 +2202,13 @@ describe('CommunicationManager Unit Tests', () => {
         medicationRecord['MedicationStatement.language']
         || medicationRecord['org.hl7.fhir.api.MedicationStatement.language'],
       ).toBe('es');
+      // The imported code has no Coding.userSelected marker. GW must not
+      // invent one: terminology selection and clinical authorship/edit
+      // authority are separate provenance axes.
       expect(
         medicationRecord['MedicationStatement.user-selected']
         || medicationRecord['org.hl7.fhir.api.MedicationStatement.user-selected'],
-      ).toBe('true');
+      ).toBeUndefined();
       expect(medicationRecord.indexed?.attributes).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ name: 'org.hl7.fhir.api.MedicationStatement.subject', value: subjectDid }),
@@ -2214,7 +2216,6 @@ describe('CommunicationManager Unit Tests', () => {
           expect.objectContaining({ name: 'org.hl7.fhir.api.MedicationStatement.code-display', value: 'Paracetamol 500 MG Oral Tablet' }),
           expect.objectContaining({ name: 'org.hl7.fhir.api.MedicationStatement.code-text', value: 'Paracetamol 500mg' }),
           expect.objectContaining({ name: 'org.hl7.fhir.api.MedicationStatement.language', value: 'es' }),
-          expect.objectContaining({ name: 'org.hl7.fhir.api.MedicationStatement.user-selected', value: 'true' }),
           expect.objectContaining({ name: ConfidentialDocumentIndex.Sector, value: job.sector }),
           expect.objectContaining({ name: CompositionClaim.Identifier, value: EXAMPLE_IPS_COMPOSITION_IDENTIFIER }),
           expect.objectContaining({ name: CompositionClaim.Author, value: EXAMPLE_PROVIDER_ORGANIZATION_DID }),
@@ -2222,6 +2223,11 @@ describe('CommunicationManager Unit Tests', () => {
           expect.objectContaining({ name: CompositionClaim.Attester, value: `urn:uuid:${EXAMPLE_KYC_CONTROLLER_UUID}` }),
           expect.objectContaining({ name: CompositionClaim.Attester, value: `urn:uuid:${EXAMPLE_KYC_CONTROLLER_USER_UUID}` }),
           expect.objectContaining({ name: ConfidentialDocumentIndex.SigningKeyId, value: EXAMPLE_CONTROLLER_SIGN_KEY.kid }),
+        ]),
+      );
+      expect(medicationRecord.indexed?.attributes).not.toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ name: 'org.hl7.fhir.api.MedicationStatement.user-selected' }),
         ]),
       );
 
