@@ -239,20 +239,18 @@ GW CORE and CCAAS are different OCI artifacts. Always use the approved digests:
 
 ```bash
 export GW_PUBLIC_IMAGE="ghcr.io/global-datacare/gw-core@sha256:e08eb3482e8e6df812269ba72c14d7831c2cdc331fe7bc6836a606b4e2e96a71"
-export CCAAS_PUBLIC_IMAGE="ghcr.io/global-datacare/host-runtime@sha256:0742ce44f2c56b8a559ed872620c779adaac64c6e1b476d3fda1762f0d2fe510"
+export CCAAS_PUBLIC_IMAGE="ghcr.io/global-datacare/host-runtime@sha256:f5d45cebaa5e7443ebf70aac85f33794d3d366dcb5370ab7921e9bc56336c0fa"
 docker buildx imagetools inspect "${GW_PUBLIC_IMAGE}"
 docker buildx imagetools inspect "${CCAAS_PUBLIC_IMAGE}"
 docker pull "${GW_PUBLIC_IMAGE}"
 docker pull "${CCAAS_PUBLIC_IMAGE}"
 ```
 
-The GW values use `GW_PUBLIC_IMAGE`. Each CCAAS entry uses the same `CCAAS_PUBLIC_IMAGE` but requires its own `ccaas` package; `connection.json.address` must name the exact Service for the release. The package ID is `<label>:<sha256-of-tgz>`. A change to the release, full name, Service, port or TLS configuration requires regeneration.
+The GW values use `GW_PUBLIC_IMAGE`. Each CCAAS entry uses the same `CCAAS_PUBLIC_IMAGE` but requires its own `ccaas` package. Every isolated host namespace uses `gdc-cc-<contract>:9999`; for example, `gdc-cc-organization-sc:9999`. The package ID is `<label>:<sha256-of-tgz>`. Only a change to that Service contract, port or TLS requires regeneration; changing the host, Helm release or namespace does not.
 
-Build the nine packages and values fragment after setting the fully qualified name that Helm will use for the Services:
+Build the ten reusable packages and values fragment once:
 
 ```bash
-HOST_FULLNAME="${HELM_RELEASE}" \
-KUBE_NAMESPACE="${KUBE_NAMESPACE}" \
 CCAAS_IMAGE="${CCAAS_PUBLIC_IMAGE}" \
 CCAAS_OUTPUT_DIR=/secure/onboarding/ccaas \
   bash scripts/onboarding/prepare-ccaas-packages.sh
@@ -260,7 +258,7 @@ CCAAS_OUTPUT_DIR=/secure/onboarding/ccaas \
 shasum -a 256 -c /secure/onboarding/ccaas/manifest.sha256
 ```
 
-The result lists the nine package IDs in `manifest.tsv` and produces `chaincodes.values.yaml`. For the default profile, organizations and employees use `identity-eu`, people `identity-global`, and consent agreement `health-care-eu`; any changes must come from the governed inventory, not Node Operator DevOps team.
+The result lists the ten package IDs in `manifest.tsv` and produces `chaincodes.values.yaml`. For the default profile, organizations and employees use `identity-eu`, people `identity-global`, and consent agreement `health-care-eu`; any changes must come from the governed inventory, not Node Operator DevOps team.
 
 The values also declare every Fabric channel approved for the peer. Do not confuse this list with `host.allowedSectors`:
 
@@ -312,8 +310,8 @@ helm template "${HELM_RELEASE}" charts/gdc-host \
   --namespace "${KUBE_NAMESPACE}" \
   --values /secure/inventory/host.values.yaml > /secure/onboarding/rendered.yaml
 
-helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.3.2
-tar -xzf gdc-host-0.3.2.tgz -C /secure/onboarding
+helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.3.4
+tar -xzf gdc-host-0.3.4.tgz -C /secure/onboarding
 
 helm upgrade --install "${HELM_RELEASE}" /secure/onboarding/gdc-host \
   --kube-context "${KUBE_CONTEXT}" --namespace "${KUBE_NAMESPACE}" \

@@ -44,8 +44,8 @@ infrastructure has already been migrated or deployed.
 The same chart validated in `local-network` is distributed through OCI:
 
 ```bash
-helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.3.2
-helm show chart oci://ghcr.io/global-datacare/gdc-host --version 0.3.2
+helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.3.4
+helm show chart oci://ghcr.io/global-datacare/gdc-host --version 0.3.4
 ```
 
 Package: [gdc-host on GHCR](https://github.com/orgs/Global-DataCare/packages/container/package/gdc-host).
@@ -54,16 +54,17 @@ Published OCI manifest digest:
 
 The Node Operator DevOps team may use the OCI artifact or the
 `charts/gdc-host` directory from the delivered commit. `values`, Secrets, VC,
-enrollment grants, MSP/TLS material, endpoints and package IDs are specific to
-each environment and remain outside the repository.
+enrollment grants, MSP/TLS material and endpoints are specific to each
+environment and remain outside the repository. CCAAS package IDs are
+deterministic and shared by hosts using the standard Services.
 
 ## Verified public OCI images
 
 - [GW CORE](https://github.com/orgs/Global-DataCare/packages/container/package/gw-core):
   `ghcr.io/global-datacare/gw-core@sha256:e08eb3482e8e6df812269ba72c14d7831c2cdc331fe7bc6836a606b4e2e96a71`
 - [CCAAS runtime](https://github.com/orgs/Global-DataCare/packages/container/package/host-runtime):
-  `ghcr.io/global-datacare/host-runtime@sha256:0742ce44f2c56b8a559ed872620c779adaac64c6e1b476d3fda1762f0d2fe510`
+  `ghcr.io/global-datacare/host-runtime@sha256:f5d45cebaa5e7443ebf70aac85f33794d3d366dcb5370ab7921e9bc56336c0fa`
 
-GW CORE and CCAAS are independent artifacts. The latter contains the nine
-chaincode servers, but their package IDs are generated for the exact name,
-namespace and Services of each Helm release.
+GW CORE and CCAAS are independent artifacts. The latter contains the ten
+chaincode servers and uses the stable `gdc-cc-<contract>:9999` Services,
+isolated by each host namespace.

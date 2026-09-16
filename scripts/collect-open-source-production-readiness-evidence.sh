@@ -209,6 +209,8 @@ reset_fabric_devnet() {
   done
   local volume
   for volume in \
+    "${COMPOSE_PROJECT_NAME}_root-ca-db" \
+    "${COMPOSE_PROJECT_NAME}_ica-db" \
     "${COMPOSE_PROJECT_NAME}_orderer-data" \
     "${COMPOSE_PROJECT_NAME}_peer0-host1-data" \
     "${COMPOSE_PROJECT_NAME}_peer0-host2-data"; do

@@ -152,6 +152,8 @@ grep -Fq 'kind load image-archive' ./scripts/smoke-helm-local-network.sh
 grep -Fq 'HOST_RUNTIME_IMAGE_ARCHIVE=' ./scripts/smoke-helm-local-network.sh
 grep -Fq 'DOCKER_CONFIG="${PUBLIC_DOCKER_CONFIG}" docker pull' ./scripts/smoke-helm-local-network.sh
 grep -Fq 'normalize_kind_peer_identity' ./scripts/smoke-helm-local-network.sh
+grep -Fq '"${COMPOSE_PROJECT_NAME}_root-ca-db"' ./scripts/collect-open-source-production-readiness-evidence.sh
+grep -Fq '"${COMPOSE_PROJECT_NAME}_ica-db"' ./scripts/collect-open-source-production-readiness-evidence.sh
 grep -Fq 'COPYFILE_DISABLE=1 tar -C "${KIND_PEER_DIR}/msp"' ./scripts/smoke-helm-local-network.sh
 grep -Fq 'peer channel join' ./scripts/smoke-helm-local-network.sh
 grep -Fq 'peer node status' ./scripts/smoke-helm-local-network.sh
@@ -165,6 +167,11 @@ grep -Fq 'peer lifecycle chaincode approveformyorg' ./scripts/install-kind-ccaas
 grep -Fq 'touch -t 198001010000' ./scripts/install-kind-ccaas-chaincodes.sh
 grep -Fq 'tar --format ustar --uid 0 --gid 0' ./scripts/install-kind-ccaas-chaincodes.sh
 grep -Fq 'gzip -n' ./scripts/install-kind-ccaas-chaincodes.sh
+grep -Fq 'service_address="gdc-cc-${name}:9999"' ./scripts/install-kind-ccaas-chaincodes.sh
+if grep -Fq 'host-evidence-cc-${name}:9999' ./scripts/install-kind-ccaas-chaincodes.sh; then
+  echo 'local-network must exercise the release-neutral CCAAS Service contract' >&2
+  exit 1
+fi
 grep -Fq '.source.Type.LocalPackage.package_id == $package_id' ./scripts/install-kind-ccaas-chaincodes.sh
 grep -Fq '.version == $version and .sequence == $sequence and .approvals[$msp] == true' \
   ./scripts/install-kind-ccaas-chaincodes.sh

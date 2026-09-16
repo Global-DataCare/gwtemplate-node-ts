@@ -58,7 +58,7 @@ prepare_kind_ccaas_chaincodes() {
   for spec in "${KIND_CCAAS_SPECS[@]}"; do
     IFS='|' read -r name channel <<< "${spec}"
     label="${name}-kind-v1"
-    service_address="host-evidence-cc-${name}:9999"
+    service_address="gdc-cc-${name}:9999"
     package_root="${TEMP_DIR}/package-${name}"
     archive="${TEMP_DIR}/${name}-caas.tgz"
     rm -rf "${package_root}"
@@ -122,26 +122,32 @@ docker_peer_exec() {
 ensure_kind_package_installed() {
   local remote_archive="$1"
   local package_id="$2"
-  if kind_peer_exec peer lifecycle chaincode queryinstalled | grep -Fq "${package_id}"; then
+  local installed
+  installed="$(kind_peer_exec peer lifecycle chaincode queryinstalled)"
+  if grep -Fq "${package_id}" <<< "${installed}"; then
     return 0
   fi
   kind_peer_exec peer lifecycle chaincode install "${remote_archive}"
-  kind_peer_exec peer lifecycle chaincode queryinstalled | grep -Fq "${package_id}"
+  installed="$(kind_peer_exec peer lifecycle chaincode queryinstalled)"
+  grep -Fq "${package_id}" <<< "${installed}"
 }
 
 ensure_docker_host2_package_installed() {
   local archive="$1"
   local docker_archive="$2"
   local package_id="$3"
-  if docker_peer_exec Host2MSP peer0-host2:7051 host2.example.com \
-    peer lifecycle chaincode queryinstalled | grep -Fq "${package_id}"; then
+  local installed
+  installed="$(docker_peer_exec Host2MSP peer0-host2:7051 host2.example.com \
+    peer lifecycle chaincode queryinstalled)"
+  if grep -Fq "${package_id}" <<< "${installed}"; then
     return 0
   fi
   docker cp "${archive}" "${FABRIC_TOOLS_CONTAINER}:${docker_archive}"
   docker_peer_exec Host2MSP peer0-host2:7051 host2.example.com \
     peer lifecycle chaincode install "${docker_archive}"
-  docker_peer_exec Host2MSP peer0-host2:7051 host2.example.com \
-    peer lifecycle chaincode queryinstalled | grep -Fq "${package_id}"
+  installed="$(docker_peer_exec Host2MSP peer0-host2:7051 host2.example.com \
+    peer lifecycle chaincode queryinstalled)"
+  grep -Fq "${package_id}" <<< "${installed}"
 }
 
 wait_for_kind_chaincode_commit() {

@@ -3,7 +3,7 @@
 Distribución pública OCI:
 
 ```bash
-helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.3.3
+helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.3.4
 ```
 
 `gdc-host` empaqueta un límite de host reutilizable en cualquier Kubernetes:
@@ -23,11 +23,12 @@ values privado de cada release.
 - [GW CORE](https://github.com/orgs/Global-DataCare/packages/container/package/gw-core):
   `ghcr.io/global-datacare/gw-core@sha256:e08eb3482e8e6df812269ba72c14d7831c2cdc331fe7bc6836a606b4e2e96a71`
 - [Runtime CCAAS](https://github.com/orgs/Global-DataCare/packages/container/package/host-runtime):
-  `ghcr.io/global-datacare/host-runtime@sha256:0742ce44f2c56b8a559ed872620c779adaac64c6e1b476d3fda1762f0d2fe510`
+  `ghcr.io/global-datacare/host-runtime@sha256:f5d45cebaa5e7443ebf70aac85f33794d3d366dcb5370ab7921e9bc56336c0fa`
 
-El runtime CCAAS contiene los diez contratos públicos, pero cada entrada del
-chart conserva un package ID distinto y calculado para el Service exacto del
-release. No configure la imagen de GW CORE como runtime CCAAS.
+El runtime CCAAS contiene los diez contratos públicos. Todos los hosts usan los
+mismos Services `gdc-cc-<contrato>:9999` dentro de su namespace aislado y, por
+tanto, los mismos paquetes y package IDs. No configure la imagen de GW CORE
+como runtime CCAAS.
 
 ## Límite de responsabilidad
 
@@ -279,26 +280,27 @@ local al proceso.
 ## CCAAS y package ID
 
 Cada entrada `chaincodes[]` necesita imagen por digest, nombre, versión,
-secuencia, canal, política y `packageId`. El package ID depende del paquete de
-conexión y por tanto de la dirección exacta del Service del release. Cambiar el
-nombre completo, el Service o el contrato TLS requiere regenerar el paquete.
+secuencia, canal, política y `packageId`. El paquete de conexión usa siempre
+`gdc-cc-<contrato>:9999`; el aislamiento lo proporciona el namespace del host.
+Cambiar ese contrato de Service, el puerto o TLS requiere regenerar el paquete.
 
 Helm arranca el runtime CCAAS. La instalación del paquete en el peer, la
 aprobación de organizaciones y el commit son operaciones auditadas del
 reconciliador de la red.
 
-Los diez paquetes y sus IDs se generan de forma determinista para el Service
-exacto del release:
+Los diez paquetes y sus IDs se generan de forma determinista y son reutilizables
+por cualquier host que siga el chart:
 
 ```bash
-HOST_FULLNAME=<fullname-helm> KUBE_NAMESPACE=<namespace> \
 CCAAS_IMAGE=<registro>/host-runtime@sha256:<digest> \
 CCAAS_OUTPUT_DIR=/secure/onboarding/ccaas \
   bash scripts/onboarding/prepare-ccaas-packages.sh
 ```
 
 Para la entrega verificada, sustituya `CCAAS_IMAGE` por
-`ghcr.io/global-datacare/host-runtime@sha256:0742ce44f2c56b8a559ed872620c779adaac64c6e1b476d3fda1762f0d2fe510`.
+`ghcr.io/global-datacare/host-runtime@sha256:f5d45cebaa5e7443ebf70aac85f33794d3d366dcb5370ab7921e9bc56336c0fa`.
+Por ejemplo, `organization-sc` se anuncia como
+`gdc-cc-organization-sc:9999` en todos los namespaces de host.
 
 El fragmento `chaincodes.values.yaml` se combina con los values privados y el
 `manifest.tsv` se entrega al reconciliador para instalación/aprobación.

@@ -4,15 +4,9 @@
 # public Service address; they never contain credentials.
 set -euo pipefail
 
-for variable in HOST_FULLNAME KUBE_NAMESPACE CCAAS_IMAGE CCAAS_OUTPUT_DIR; do
+for variable in CCAAS_IMAGE CCAAS_OUTPUT_DIR; do
   [[ -n "${!variable:-}" ]] || {
     echo "Missing ${variable}" >&2
-    exit 1
-  }
-done
-for label in "${HOST_FULLNAME}" "${KUBE_NAMESPACE}"; do
-  [[ "${label}" =~ ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$ ]] || {
-    echo "HOST_FULLNAME and KUBE_NAMESPACE must be DNS labels" >&2
     exit 1
   }
 done
@@ -48,7 +42,9 @@ printf 'chaincodes:\n' > "${CCAAS_OUTPUT_DIR}/chaincodes.values.yaml"
 for spec in "${specs[@]}"; do
   IFS='|' read -r name channels <<< "${spec}"
   label="${name}-v1"
-  address="${HOST_FULLNAME}-cc-${name}.${KUBE_NAMESPACE}.svc.cluster.local:9999"
+  # Every host is isolated in its own namespace, so the stable short DNS name
+  # makes one deterministic package reusable by every governed host peer.
+  address="gdc-cc-${name}:9999"
   package_root="${CCAAS_OUTPUT_DIR}/packages/${name}"
   archive="${CCAAS_OUTPUT_DIR}/packages/${name}.tgz"
   mkdir -p "${package_root}/code"

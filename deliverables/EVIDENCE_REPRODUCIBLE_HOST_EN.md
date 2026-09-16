@@ -11,9 +11,9 @@ The two verified `linux/amd64` images are publicly available on GitHub Container
 - [GW CORE](https://github.com/orgs/Global-DataCare/packages/container/package/gw-core):
 `ghcr.io/global-datacare/gw-core@sha256:e08eb3482e8e6df812269ba72c14d7831c2cdc331fe7bc6836a606b4e2e96a71`.
 - [Runtime CCAAS](https://github.com/orgs/Global-DataCare/packages/container/package/host-runtime):
-`ghcr.io/global-datacare/host-runtime@sha256:0742ce44f2c56b8a559ed872620c779adaac64c6e1b476d3fda1762f0d2fe510`.
+`ghcr.io/global-datacare/host-runtime@sha256:f5d45cebaa5e7443ebf70aac85f33794d3d366dcb5370ab7921e9bc56336c0fa`.
 
-The first one runs GW CORE. The second contains the ten chaincode servers and selects each contract using `CHAINCODE_NAME`. It does not replace CCAAS packages: their package IDs depend on the exact Services in the release and are generated after setting the Helm name and namespace.
+The first one runs GW CORE. The second contains the ten chaincode servers and selects each contract using `CHAINCODE_NAME`. It does not replace CCAAS packages: they use the stable `gdc-cc-<contract>:9999` Services and their package IDs are reusable across isolated host namespaces.
 
 ## What it demonstrates
 
@@ -112,7 +112,7 @@ To verify or reuse already published artifacts without rebuilding them:
 
 ```bash
 export GW_PUBLIC_IMAGE="ghcr.io/global-datacare/gw-core@sha256:e08eb3482e8e6df812269ba72c14d7831c2cdc331fe7bc6836a606b4e2e96a71"
-export CCAAS_PUBLIC_IMAGE="ghcr.io/global-datacare/host-runtime@sha256:0742ce44f2c56b8a559ed872620c779adaac64c6e1b476d3fda1762f0d2fe510"
+export CCAAS_PUBLIC_IMAGE="ghcr.io/global-datacare/host-runtime@sha256:f5d45cebaa5e7443ebf70aac85f33794d3d366dcb5370ab7921e9bc56336c0fa"
 docker buildx imagetools inspect "${GW_PUBLIC_IMAGE}"
 docker buildx imagetools inspect "${CCAAS_PUBLIC_IMAGE}"
 docker pull "${GW_PUBLIC_IMAGE}"
@@ -146,8 +146,8 @@ independent of a use for the GW client, both within its window;
 - MSP, TLS and GW client identity generated locally by Node Operator;
 - Kubernetes secrets for GW, peer, CouchDB, PostgreSQL and authorization;
 - DNS, TLS, StorageClass, IngressClass and KMS from Node Operator;
-- CCAAS images per digest and package IDs calculated for the address
-specific service of the release;
+- CCAAS images per digest and deterministic package IDs for the stable
+  `gdc-cc-<contract>:9999` Services;
 - approved reconciliation of MSP, channels and chaincode lifecycle.
 
 Helm does not have registration credentials, does not decide which MSP enters the network, and does not modify channels. Install the authorized runtime. Fabric DevOps team performs privileged pre- and post-installation operations through the reconciler.

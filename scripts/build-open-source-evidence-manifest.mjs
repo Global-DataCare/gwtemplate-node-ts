@@ -139,10 +139,10 @@ export function buildEvidenceManifest({
     },
     kubernetesProof: {
       components: ['peer', 'couchdb', 'gw-core', 'postgresql', 'ipfs', 'ccaas'],
-      fabricMsp: 'Host1MSP',
+      fabricMsp: 'Host2MSP',
       joinedChannels: ['identity-local', 'health-care-local'],
       endorsementPeer: 'kubernetes',
-      ccaasLifecycle: 'ten exact packages installed and approved on Host1MSP',
+      ccaasLifecycle: 'ten exact packages installed and approved on Host2MSP',
       persistence: 'peer channels, PostgreSQL documents and IPFS JWE blobs survive pod restart',
     },
     repositories,

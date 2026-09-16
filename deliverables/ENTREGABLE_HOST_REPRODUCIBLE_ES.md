@@ -19,12 +19,13 @@ GitHub Container Registry:
 - [GW CORE](https://github.com/orgs/Global-DataCare/packages/container/package/gw-core):
   `ghcr.io/global-datacare/gw-core@sha256:e08eb3482e8e6df812269ba72c14d7831c2cdc331fe7bc6836a606b4e2e96a71`.
 - [Runtime CCAAS](https://github.com/orgs/Global-DataCare/packages/container/package/host-runtime):
-  `ghcr.io/global-datacare/host-runtime@sha256:0742ce44f2c56b8a559ed872620c779adaac64c6e1b476d3fda1762f0d2fe510`.
+  `ghcr.io/global-datacare/host-runtime@sha256:f5d45cebaa5e7443ebf70aac85f33794d3d366dcb5370ab7921e9bc56336c0fa`.
 
 La primera ejecuta GW CORE. La segunda contiene los diez servidores de
 chaincode y selecciona cada contrato mediante `CHAINCODE_NAME`. No sustituye
-los paquetes CCAAS: sus package IDs dependen de los Services exactos del
-release y se generan después de fijar el nombre y namespace Helm.
+los paquetes CCAAS: estos usan los Services estables
+`gdc-cc-<contrato>:9999` y sus package IDs son reutilizables entre namespaces
+aislados de hosts.
 
 ## Qué demuestra
 
@@ -159,7 +160,7 @@ Para verificar o reutilizar los artefactos ya publicados sin reconstruirlos:
 
 ```bash
 export GW_PUBLIC_IMAGE="ghcr.io/global-datacare/gw-core@sha256:e08eb3482e8e6df812269ba72c14d7831c2cdc331fe7bc6836a606b4e2e96a71"
-export CCAAS_PUBLIC_IMAGE="ghcr.io/global-datacare/host-runtime@sha256:0742ce44f2c56b8a559ed872620c779adaac64c6e1b476d3fda1762f0d2fe510"
+export CCAAS_PUBLIC_IMAGE="ghcr.io/global-datacare/host-runtime@sha256:f5d45cebaa5e7443ebf70aac85f33794d3d366dcb5370ab7921e9bc56336c0fa"
 docker buildx imagetools inspect "${GW_PUBLIC_IMAGE}"
 docker buildx imagetools inspect "${CCAAS_PUBLIC_IMAGE}"
 docker pull "${GW_PUBLIC_IMAGE}"
@@ -199,8 +200,8 @@ los secretos de cada entorno. Antes de instalar un host autónomo deben existir:
 - MSP, TLS e identidad cliente GW generados localmente por el Nodo Operador;
 - secretos Kubernetes para GW, peer, CouchDB, PostgreSQL y autorización;
 - DNS, TLS, StorageClass, IngressClass y KMS del Nodo Operador;
-- imágenes CCAAS por digest y package IDs calculados para la dirección de
-  servicio concreta del release;
+- imágenes CCAAS por digest y package IDs deterministas para los Services
+  estables `gdc-cc-<contrato>:9999`;
 - reconciliación aprobada de MSP, canales y lifecycle de chaincodes.
 
 Helm no posee credenciales de registrar, no decide qué MSP entra en la red y no

@@ -1,6 +1,6 @@
+# Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 #!/usr/bin/env bash
-# Flow contract:
-# 1. One host fullname and namespace determine every CCAAS Service address.
+# 1. Every isolated host namespace exposes the same release-neutral CCAAS Service names.
 # 2. Ten deterministic packages produce exact Fabric package IDs and a values fragment.
 # 3. Repeating the command with the same inputs produces identical hashes.
 # 4. artifact-sc is approved on identity channels and the clinical data channel.
@@ -12,20 +12,20 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 WORK="$(mktemp -d)"
 trap 'rm -rf "${WORK}"' EXIT
 
-HOST_FULLNAME=host2 \
-KUBE_NAMESPACE=host2-system \
 CCAAS_IMAGE='registry.example.invalid/host-runtime@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' \
 CCAAS_OUTPUT_DIR="${WORK}/first" \
   bash "${ROOT}/scripts/onboarding/prepare-ccaas-packages.sh"
-HOST_FULLNAME=host2 \
-KUBE_NAMESPACE=host2-system \
 CCAAS_IMAGE='registry.example.invalid/host-runtime@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' \
 CCAAS_OUTPUT_DIR="${WORK}/second" \
   bash "${ROOT}/scripts/onboarding/prepare-ccaas-packages.sh"
 
 [[ "$(find "${WORK}/first" -name '*.tgz' | wc -l | tr -d ' ')" == "10" ]]
 [[ "$(yq '.chaincodes | length' "${WORK}/first/chaincodes.values.yaml")" == "10" ]]
-grep -R -Fq 'host2-cc-organization-sc.host2-system.svc.cluster.local:9999' "${WORK}/first/packages"
+grep -R -Fq 'gdc-cc-organization-sc:9999' "${WORK}/first/packages"
+if grep -R -Eq 'host2|\.svc\.cluster\.local' "${WORK}/first/packages"; then
+  echo 'CCAAS packages must not contain host- or namespace-specific addresses' >&2
+  exit 1
+fi
 grep -Fq $'artifact-sc\tidentity-global,identity-eu,health-care-eu\t' "${WORK}/first/manifest.tsv"
 grep -Fq $'subjectidentifier-sc\tidentity-global\t' "${WORK}/first/manifest.tsv"
 diff -r "${WORK}/first" "${WORK}/second"

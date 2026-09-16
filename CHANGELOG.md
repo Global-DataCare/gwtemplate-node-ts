@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+- Make all governed hosts use the release-neutral CCAAS Services
+  `gdc-cc-<contract>:9999`. The deterministic packages and package IDs are now
+  reusable across isolated host namespaces instead of being coupled to a Helm
+  release, host name or namespace; release the portable chart as `0.3.4`.
+  Evidence retries also remove the disposable Root CA and Fabric ICA database
+  volumes so stale affiliations cannot contaminate a fresh admission proof,
+  and lifecycle package checks consume the complete peer response without a
+  `grep -q` SIGPIPE false failure under `pipefail`. The evidence manifest now
+  records the dynamically admitted Kubernetes peer as `Host2MSP`, matching the
+  runtime proof instead of the bootstrap host.
 - Add explicit AWS IAM Roles Anywhere support to the portable `gdc-host` chart
   for Kubernetes clusters hosted outside AWS. The chart runs AWS's official
   credential helper by immutable digest, mounts the workload X.509 Secret only

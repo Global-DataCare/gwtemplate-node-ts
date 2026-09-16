@@ -13,7 +13,7 @@ Demuestra con datos sintéticos:
 2. Root CA e ICA de Fabric desechables;
 3. admisión de `Host2MSP` en una red inicialmente formada por `Host1MSP`;
 4. instalación mediante el chart `gdc-host` en kind;
-5. peer, CouchDB, GW CORE, PostgreSQL, IPFS y nueve CCAAS;
+5. peer, CouchDB, GW CORE, PostgreSQL, IPFS y diez CCAAS;
 6. escritura, lectura, denegación y persistencia después de reiniciar.
 
 ## Ejecución

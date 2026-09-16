@@ -11,6 +11,8 @@
 #    orderer port used by the kind bridge.
 # 7. artifact-sc is approved on both identity and clinical data channels so a
 #    clinical CID batch never targets a chaincode absent from its channel.
+# 8. lifecycle package discovery captures the complete peer response before
+#    matching one package ID, so grep cannot close the producer with SIGPIPE.
 # Authorization invariant: the committed policy permits either governed host MSP to endorse.
 # Persistence invariant: Host2 peer membership and CCAAS readiness survive restart.
 set -euo pipefail
@@ -63,6 +65,13 @@ grep -Fq 'host1_package_id=' "${CCAAS}"
 grep -Fq 'docker_peer_exec' "${CCAAS}"
 grep -Fq 'ensure_kind_package_installed' "${CCAAS}"
 grep -Fq 'ensure_docker_host2_package_installed' "${CCAAS}"
+grep -Fq 'installed="$(kind_peer_exec peer lifecycle chaincode queryinstalled)"' "${CCAAS}"
+grep -Fq 'grep -Fq "${package_id}" <<< "${installed}"' "${CCAAS}"
+grep -Fq 'installed="$(docker_peer_exec Host2MSP peer0-host2:7051 host2.example.com' "${CCAAS}"
+if grep -F 'queryinstalled | grep -Fq' "${CCAAS}"; then
+  echo 'queryinstalled must not feed grep -q directly under pipefail.' >&2
+  exit 1
+fi
 grep -Fq 'wait_for_kind_committed_definition' "${CCAAS}"
 grep -Fq 'committed="$(wait_for_kind_committed_definition "${channel}" "${name}")"' "${CCAAS}"
 grep -Fq -- '--sequence "${target_sequence}"' "${CCAAS}"
