@@ -152,6 +152,8 @@ grep -Fq 'kind load image-archive' ./scripts/smoke-helm-local-network.sh
 grep -Fq 'HOST_RUNTIME_IMAGE_ARCHIVE=' ./scripts/smoke-helm-local-network.sh
 grep -Fq 'DOCKER_CONFIG="${PUBLIC_DOCKER_CONFIG}" docker pull' ./scripts/smoke-helm-local-network.sh
 grep -Fq 'normalize_kind_peer_identity' ./scripts/smoke-helm-local-network.sh
+grep -Fq '"${COMPOSE_PROJECT_NAME}_root-ca-db"' ./scripts/collect-open-source-production-readiness-evidence.sh
+grep -Fq '"${COMPOSE_PROJECT_NAME}_ica-db"' ./scripts/collect-open-source-production-readiness-evidence.sh
 grep -Fq 'COPYFILE_DISABLE=1 tar -C "${KIND_PEER_DIR}/msp"' ./scripts/smoke-helm-local-network.sh
 grep -Fq 'peer channel join' ./scripts/smoke-helm-local-network.sh
 grep -Fq 'peer node status' ./scripts/smoke-helm-local-network.sh

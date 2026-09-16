@@ -6,6 +6,8 @@
   `gdc-cc-<contract>:9999`. The deterministic packages and package IDs are now
   reusable across isolated host namespaces instead of being coupled to a Helm
   release, host name or namespace; release the portable chart as `0.3.4`.
+  Evidence retries also remove the disposable Root CA and Fabric ICA database
+  volumes so stale affiliations cannot contaminate a fresh admission proof.
 - Add explicit AWS IAM Roles Anywhere support to the portable `gdc-host` chart
   for Kubernetes clusters hosted outside AWS. The chart runs AWS's official
   credential helper by immutable digest, mounts the workload X.509 Secret only
