@@ -9,7 +9,9 @@
   Evidence retries also remove the disposable Root CA and Fabric ICA database
   volumes so stale affiliations cannot contaminate a fresh admission proof,
   and lifecycle package checks consume the complete peer response without a
-  `grep -q` SIGPIPE false failure under `pipefail`.
+  `grep -q` SIGPIPE false failure under `pipefail`. The evidence manifest now
+  records the dynamically admitted Kubernetes peer as `Host2MSP`, matching the
+  runtime proof instead of the bootstrap host.
 - Add explicit AWS IAM Roles Anywhere support to the portable `gdc-host` chart
   for Kubernetes clusters hosted outside AWS. The chart runs AWS's official
   credential helper by immutable digest, mounts the workload X.509 Secret only
