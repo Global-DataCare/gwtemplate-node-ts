@@ -30,13 +30,13 @@ Deploy immutable manifest digests, not mutable tags:
 
 ```text
 ghcr.io/global-datacare/gw-core@sha256:e08eb3482e8e6df812269ba72c14d7831c2cdc331fe7bc6836a606b4e2e96a71
-ghcr.io/global-datacare/host-runtime@sha256:0742ce44f2c56b8a559ed872620c779adaac64c6e1b476d3fda1762f0d2fe510
+ghcr.io/global-datacare/host-runtime@sha256:f5d45cebaa5e7443ebf70aac85f33794d3d366dcb5370ab7921e9bc56336c0fa
 ```
 
 GW CORE and the CCAAS host runtime are separate artifacts. The latter contains
-the ten public chaincode servers selected through `CHAINCODE_NAME`; its
-deployment-specific package IDs must still be generated for the exact Helm
-release, namespace and Service addresses.
+the ten public chaincode servers selected through `CHAINCODE_NAME`. Every host
+namespace exposes the same `gdc-cc-<contract>:9999` Service names, so the
+deterministic packages and package IDs are reusable across host providers.
 
 ([test-api](https://globaldatacare-test-961105121121.europe-southwest1.run.app/api-docs/))
 

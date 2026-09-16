@@ -165,6 +165,11 @@ grep -Fq 'peer lifecycle chaincode approveformyorg' ./scripts/install-kind-ccaas
 grep -Fq 'touch -t 198001010000' ./scripts/install-kind-ccaas-chaincodes.sh
 grep -Fq 'tar --format ustar --uid 0 --gid 0' ./scripts/install-kind-ccaas-chaincodes.sh
 grep -Fq 'gzip -n' ./scripts/install-kind-ccaas-chaincodes.sh
+grep -Fq 'service_address="gdc-cc-${name}:9999"' ./scripts/install-kind-ccaas-chaincodes.sh
+if grep -Fq 'host-evidence-cc-${name}:9999' ./scripts/install-kind-ccaas-chaincodes.sh; then
+  echo 'local-network must exercise the release-neutral CCAAS Service contract' >&2
+  exit 1
+fi
 grep -Fq '.source.Type.LocalPackage.package_id == $package_id' ./scripts/install-kind-ccaas-chaincodes.sh
 grep -Fq '.version == $version and .sequence == $sequence and .approvals[$msp] == true' \
   ./scripts/install-kind-ccaas-chaincodes.sh

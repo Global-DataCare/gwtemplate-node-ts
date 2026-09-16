@@ -58,7 +58,7 @@ prepare_kind_ccaas_chaincodes() {
   for spec in "${KIND_CCAAS_SPECS[@]}"; do
     IFS='|' read -r name channel <<< "${spec}"
     label="${name}-kind-v1"
-    service_address="host-evidence-cc-${name}:9999"
+    service_address="gdc-cc-${name}:9999"
     package_root="${TEMP_DIR}/package-${name}"
     archive="${TEMP_DIR}/${name}-caas.tgz"
     rm -rf "${package_root}"

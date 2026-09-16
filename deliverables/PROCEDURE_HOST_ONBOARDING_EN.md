@@ -361,13 +361,13 @@ Upon boot, GW automatically creates the reserved technical record `host`, genera
 `peer.channels` contains Fabric channels, not GW sectors. It should list all channels already approved for the MSP that the new peer should join. Helm validates and injects the list, while Fabric DevOps team performs and verifies the effective join.
 
 ```bash
-helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.3.2
+helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.3.4
 
 bash scripts/validate-host-helm-values.sh \
   /secure/inventory/host.values.yaml '<namespace>' '<release>'
 
 helm upgrade --install '<release>' oci://ghcr.io/global-datacare/gdc-host \
-  --version 0.3.2 --namespace '<namespace>' --create-namespace \
+  --version 0.3.4 --namespace '<namespace>' --create-namespace \
   --values /secure/inventory/host.values.yaml \
   --atomic --wait --timeout 15m
 ```

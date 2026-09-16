@@ -1,5 +1,6 @@
+# Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 #!/usr/bin/env bash
-# Flow contract: render one portable governed host from immutable images; keep
+# Render one portable governed host from immutable images; keep
 # staging and production DNS/network/secret custody separate; materialize peer,
 # CouchDB, GW, PostgreSQL, IPFS and CCAAS runtimes without embedding credentials.
 set -euo pipefail
@@ -38,6 +39,9 @@ helm template host-st "${CHART}" \
 helm template host "${CHART}" \
   --namespace host-production \
   -f "${CHART}/ci/production-values.yaml" > "${TMP_DIR}/production.yaml"
+helm template another-host "${CHART}" \
+  --namespace another-host-production \
+  -f "${CHART}/ci/production-values.yaml" > "${TMP_DIR}/another-production.yaml"
 helm template host-st-external "${CHART}" \
   --namespace host-st-external \
   -f "${CHART}/ci/external-staging-values.yaml" > "${TMP_DIR}/external-staging.yaml"
@@ -78,6 +82,13 @@ grep -q 'STORAGE_PROVIDER: "ipfs"' "${TMP_DIR}/local-evidence.yaml"
 grep -q 'imagePullPolicy: Never' "${TMP_DIR}/local-evidence.yaml"
 grep -q 'image: "gw-core:evidence"' "${TMP_DIR}/local-evidence.yaml"
 grep -q 'image: "gdc-ccaas/organization-sc:local-test"' "${TMP_DIR}/local-evidence.yaml"
+grep -q '^  name: gdc-cc-organization-sc$' "${TMP_DIR}/production.yaml"
+grep -q '^  name: gdc-cc-organization-sc$' "${TMP_DIR}/another-production.yaml"
+if grep -Eq '^  name: (host|another-host)-gdc-host-cc-organization-sc$' \
+  "${TMP_DIR}/production.yaml" "${TMP_DIR}/another-production.yaml"; then
+  echo 'CCAAS Service names must be identical across isolated host namespaces' >&2
+  exit 1
+fi
 grep -A4 'name: chaincode' "${TMP_DIR}/local-evidence.yaml" | grep -q 'imagePullPolicy: Never'
 grep -A5 'name: CHAINCODE_ID' "${TMP_DIR}/local-evidence.yaml" | grep -q 'name: CHAINCODE_NAME'
 grep -q 'HOST_INTERNAL_IP: "0.0.0.0"' "${TMP_DIR}/local-evidence.yaml"

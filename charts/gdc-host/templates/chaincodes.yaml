@@ -3,7 +3,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "gdc-host.fullname" $ }}-cc-{{ .name }}
+  name: gdc-cc-{{ .name }}
   labels:
     {{- include "gdc-host.labels" $ | nindent 4 }}
     app.kubernetes.io/component: chaincode
@@ -39,7 +39,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "gdc-host.fullname" $ }}-cc-{{ .name }}
+  name: gdc-cc-{{ .name }}
   labels:
     {{- include "gdc-host.labels" $ | nindent 4 }}
     app.kubernetes.io/component: chaincode

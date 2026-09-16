@@ -98,7 +98,7 @@ El equipo que ejecuta la validación conserva el directorio anunciado bajo
 `artifacts/open-source-production-readiness/`, comprueba que todos los ficheros
 de `gates/` contienen `PASS` y verifica los hashes. El recolector prueba CA e
 ICA desechables, Fabric Docker con `Host1MSP`/`Host2MSP`, PostgreSQL/IPFS y un
-clúster kind donde Helm instala peer, CouchDB, GW y nueve CCAAS. Ejecuta
+clúster kind donde Helm instala peer, CouchDB, GW y diez CCAAS. Ejecuta
 Consent/SMART, controles negativos y reinicios.
 
 El mismo recolector ejecuta el gate público de migración de la ICA desde
@@ -361,7 +361,7 @@ GW CORE y CCAAS son artefactos OCI distintos. Use siempre sus digests:
 
 ```bash
 export GW_PUBLIC_IMAGE="ghcr.io/global-datacare/gw-core@sha256:e08eb3482e8e6df812269ba72c14d7831c2cdc331fe7bc6836a606b4e2e96a71"
-export CCAAS_PUBLIC_IMAGE="ghcr.io/global-datacare/host-runtime@sha256:0742ce44f2c56b8a559ed872620c779adaac64c6e1b476d3fda1762f0d2fe510"
+export CCAAS_PUBLIC_IMAGE="ghcr.io/global-datacare/host-runtime@sha256:f5d45cebaa5e7443ebf70aac85f33794d3d366dcb5370ab7921e9bc56336c0fa"
 docker buildx imagetools inspect "${GW_PUBLIC_IMAGE}"
 docker buildx imagetools inspect "${CCAAS_PUBLIC_IMAGE}"
 docker pull "${GW_PUBLIC_IMAGE}"
@@ -369,17 +369,15 @@ docker pull "${CCAAS_PUBLIC_IMAGE}"
 ```
 
 El values de GW usa `GW_PUBLIC_IMAGE`. Cada entrada CCAAS usa la misma
-`CCAAS_PUBLIC_IMAGE`, pero necesita su propio paquete `ccaas`; su
-`connection.json.address` debe ser el Service exacto del release. El package ID
-es `<label>:<sha256 del .tgz>`. Cambiar release, nombre completo, Service,
-puerto o TLS obliga a regenerarlo.
+`CCAAS_PUBLIC_IMAGE`, pero necesita su propio paquete `ccaas`. Todos los hosts
+usan `gdc-cc-<contrato>:9999` dentro de su namespace aislado; por ejemplo,
+`gdc-cc-organization-sc:9999`. El package ID es
+`<label>:<sha256 del .tgz>`. Solo cambiar ese contrato de Service, el puerto o
+TLS obliga a regenerarlo; cambiar el host, release o namespace no lo cambia.
 
-Genere los diez paquetes y el fragmento de values después de fijar el nombre
-completo que Helm usará para los Services:
+Genere una vez los diez paquetes reutilizables y el fragmento de values:
 
 ```bash
-HOST_FULLNAME="${HELM_RELEASE}" \
-KUBE_NAMESPACE="${KUBE_NAMESPACE}" \
 CCAAS_IMAGE="${CCAAS_PUBLIC_IMAGE}" \
 CCAAS_OUTPUT_DIR=/secure/onboarding/ccaas \
   bash scripts/onboarding/prepare-ccaas-packages.sh
@@ -453,8 +451,8 @@ helm template "${HELM_RELEASE}" charts/gdc-host \
   --namespace "${KUBE_NAMESPACE}" \
   --values /secure/inventory/host.values.yaml > /secure/onboarding/rendered.yaml
 
-helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.3.2
-tar -xzf gdc-host-0.3.2.tgz -C /secure/onboarding
+helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.3.4
+tar -xzf gdc-host-0.3.4.tgz -C /secure/onboarding
 
 helm upgrade --install "${HELM_RELEASE}" /secure/onboarding/gdc-host \
   --kube-context "${KUBE_CONTEXT}" --namespace "${KUBE_NAMESPACE}" \

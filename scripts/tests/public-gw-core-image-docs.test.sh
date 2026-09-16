@@ -12,7 +12,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 PACKAGE_PAGE="https://github.com/orgs/Global-DataCare/packages/container/package/gw-core"
 PUBLIC_IMAGE="ghcr.io/global-datacare/gw-core@sha256:e08eb3482e8e6df812269ba72c14d7831c2cdc331fe7bc6836a606b4e2e96a71"
 CCAAS_PACKAGE_PAGE="https://github.com/orgs/Global-DataCare/packages/container/package/host-runtime"
-CCAAS_IMAGE="ghcr.io/global-datacare/host-runtime@sha256:0742ce44f2c56b8a559ed872620c779adaac64c6e1b476d3fda1762f0d2fe510"
+CCAAS_IMAGE="ghcr.io/global-datacare/host-runtime@sha256:f5d45cebaa5e7443ebf70aac85f33794d3d366dcb5370ab7921e9bc56336c0fa"
 
 for relative_path in \
   README.md \
@@ -57,11 +57,25 @@ grep -Fq 'GW CORE y CCAAS son artefactos OCI distintos' "$ROOT_DIR/deliverables/
 unzip -p "$ROOT_DIR/deliverables/GUIA_HOST_REPRODUCIBLE_ES.docx" word/document.xml \
   | grep -Fq 'e08eb3482e8e6df812269ba72c14d7831c2cdc331fe7bc6836a606b4e2e96a71'
 unzip -p "$ROOT_DIR/deliverables/GUIA_HOST_REPRODUCIBLE_ES.docx" word/document.xml \
-  | grep -Fq '0742ce44f2c56b8a559ed872620c779adaac64c6e1b476d3fda1762f0d2fe510'
+  | grep -Fq 'f5d45cebaa5e7443ebf70aac85f33794d3d366dcb5370ab7921e9bc56336c0fa'
 unzip -p "$ROOT_DIR/deliverables/GUIA_HOST_REPRODUCIBLE_ES.docx" word/document.xml \
   | grep -Fq "$PACKAGE_PAGE"
 unzip -p "$ROOT_DIR/deliverables/GUIA_HOST_REPRODUCIBLE_ES.docx" word/document.xml \
   | grep -Fq "$CCAAS_PACKAGE_PAGE"
+
+for relative_path in \
+  charts/gdc-host/README.md \
+  deliverables/GUIA_OPERATIVA_HOST_ES.md \
+  deliverables/GUIDE_HOST_OPERATIONS_EN.md \
+  deliverables/GUIA_HOST_REPRODUCIBLE_ES.html \
+  deliverables/GUIDE_REPRODUCIBLE_HOST_EN.html; do
+  grep -Fq 'gdc-cc-organization-sc:9999' "$ROOT_DIR/$relative_path"
+  if grep -Eq 'HOST_FULLNAME=.*CCAAS|accuro-cc-|host-specific CCAAS|por release Helm' \
+    "$ROOT_DIR/$relative_path"; then
+    echo "CCAAS documentation must keep package IDs host-neutral: $relative_path" >&2
+    exit 1
+  fi
+done
 
 grep -Fq 'https://github.com/orgs/Global-DataCare/packages/container/package/dataspace-ica' \
   "$ROOT_DIR/deliverables/MIGRACION_Y_DESPLIEGUE_ICA_ES.md"

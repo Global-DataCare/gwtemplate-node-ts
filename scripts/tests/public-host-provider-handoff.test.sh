@@ -21,18 +21,18 @@ for file in "${GUIDE}" "${INDEX}" "${CHART_README}" "${CHART_METADATA}"; do
 done
 
 grep -Fq 'oci://ghcr.io/global-datacare/gdc-host' "${INDEX}"
-grep -Fq 'helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.3.2' "${GUIDE}"
+grep -Fq 'helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.3.4' "${GUIDE}"
 grep -Fq 'peer.channels' "${GUIDE}"
 grep -Fq 'fabric-ca-client getcainfo' "${GUIDE}"
 grep -Fq 'enroll-host-msp.sh' "${GUIDE}"
 grep -Fq 'enroll-host-client.sh' "${GUIDE}"
 grep -Fq 'provision-governed-msp-admin.sh' "${GUIDE}"
-grep -Fq 'MSP asignado y aprobado por la gobernanza de Fabric' "${GUIDE}"
-grep -Fq 'La definición pública del MSP la produce la autoridad de Fabric' "${GUIDE}"
+grep -Fq 'El MSP asignado conforme al procedimiento aprobado' "${GUIDE}"
+grep -Fq 'La definición pública del MSP la produce el equipo DevOps de Fabric' "${GUIDE}"
 grep -Fq 'materialize-kubernetes-secrets.sh' "${GUIDE}"
 grep -Fq 'helm upgrade --install' "${GUIDE}"
-grep -Fq 'La identidad registradora de la ICA de Fabric nunca se entrega al proveedor' "${GUIDE}"
-grep -Fq 'La ICA de Fabric no participa en el tráfico normal' "${GUIDE}"
+grep -Fq 'La identidad registradora de la ICA de Fabric nunca se entrega al equipo DevOps' "${GUIDE}"
+grep -Fq 'La ICA de Fabric no participa en el tráfico normal de gossip' "${GUIDE}"
 grep -Fq 'org.opencontainers.image.source: https://github.com/Global-DataCare/gwtemplate-node-ts' "${CHART_METADATA}"
 
 if rg -n '/Users/[^/[:space:]]+|34\.[0-9]+\.[0-9]+\.[0-9]+' "${ROOT}/deliverables"; then
