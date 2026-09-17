@@ -223,6 +223,39 @@ test('rotates every channel-group occurrence of an existing MSP without changing
   );
 });
 
+test('reconciles chaincode lifecycle without changing channel membership, grants or peer joins', () => {
+  const lifecycle = {
+    operation: 'reconcile-chaincodes',
+    channel: 'identity-eu',
+    mspId: 'HOSTMSP',
+    peerTargets: ['host-peer'],
+    grants: [],
+    chaincodes: decision().changes[0].chaincodes,
+  };
+  const value = decision({ changes: [lifecycle] });
+
+  assert.doesNotThrow(() => validateDecision(
+    value,
+    inventory,
+    Date.parse('2026-07-29T09:06:00.000Z'),
+  ));
+  assert.deepEqual(
+    buildPlan(value, inventory).steps.map((entry) => [entry.type, entry.target]),
+    [
+      ['ensure-chaincode-approved', 'host-peer'],
+      ['ensure-chaincode-committed', 'root-orderer'],
+    ],
+  );
+  assert.throws(
+    () => validateDecision(
+      decision({ changes: [{ ...lifecycle, grants: ['write'] }] }),
+      inventory,
+      Date.parse('2026-07-29T09:06:00.000Z'),
+    ),
+    /chaincode reconciliation must not request MSP material or grants/,
+  );
+});
+
 test('rejects request-selected channels, peers, mismatched operator identity and expiry', () => {
   const now = Date.parse('2026-07-29T09:06:00.000Z');
   assert.throws(

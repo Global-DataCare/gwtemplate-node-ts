@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Add a governed `reconcile-chaincodes` operation that can install/approve an
+  exact package on inventory-bound peers and commit its exact definition,
+  without changing MSPs, grants, channel membership or peer joins.
 - Make `rotate-organization-msp` converge every occurrence of the MSP in the
   channel configuration, including the Orderer group when the governance MSP
   is shared there; Fabric rejects different definitions for one MSP ID.

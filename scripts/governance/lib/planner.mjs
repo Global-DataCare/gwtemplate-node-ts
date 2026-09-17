@@ -80,6 +80,26 @@ export function buildPlan(decision, inventory) {
         mspDefinitionSha256: change.mspDefinitionSha256,
       }));
     }
+    if (change.operation === 'reconcile-chaincodes') {
+      for (const peerTarget of change.peerTargets) {
+        for (const chaincode of change.chaincodes) {
+          phases.approvals.push(step(decision.requestId, 'ensure-chaincode-approved', peerTarget, {
+            ...common,
+            ...chaincode,
+          }));
+        }
+      }
+      for (const chaincode of change.chaincodes) {
+        const definitionKey = `${change.channel}:${chaincode.name}`;
+        if (committedDefinitions.has(definitionKey)) continue;
+        committedDefinitions.add(definitionKey);
+        phases.commits.push(step(decision.requestId, 'ensure-chaincode-committed', network.ordererTarget, {
+          ...common,
+          governanceExecutorMspId: network.governanceExecutorMspId,
+          ...chaincode,
+        }));
+      }
+    }
     if (change.operation === 'revoke-organization') {
       phases.revocations.push(step(decision.requestId, 'remove-application-msp', network.ordererTarget, common));
     }
