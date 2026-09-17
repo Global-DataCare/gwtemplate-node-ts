@@ -192,7 +192,7 @@ test('validates inventory-bound decisions and builds an exact deterministic plan
   assert.equal(buildPlan(value, inventory).digest, plan.digest);
 });
 
-test('rotates an existing organization MSP without changing grants, peers or lifecycle', () => {
+test('rotates every channel-group occurrence of an existing MSP without changing grants, peers or lifecycle', () => {
   const rotation = {
     operation: 'rotate-organization-msp',
     channel: 'identity-eu',
@@ -211,7 +211,7 @@ test('rotates an existing organization MSP without changing grants, peers or lif
   ));
   assert.deepEqual(
     buildPlan(value, inventory).steps.map((entry) => [entry.type, entry.target]),
-    [['ensure-application-msp', 'root-orderer']],
+    [['ensure-channel-msp', 'root-orderer']],
   );
   assert.throws(
     () => validateDecision(

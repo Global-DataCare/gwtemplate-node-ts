@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Make `rotate-organization-msp` converge every occurrence of the MSP in the
+  channel configuration, including the Orderer group when the governance MSP
+  is shared there; Fabric rejects different definitions for one MSP ID.
 - Add a governed `rotate-organization-msp` decision operation that can update
   only an existing Application MSP definition and cannot alter grants, peer
   membership or chaincode lifecycle state.
