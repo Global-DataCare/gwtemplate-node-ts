@@ -5,6 +5,7 @@ const SPEC_VERSION = 'gdc.fabric.channel-governance/v1';
 const OPERATIONS = new Set([
   'ensure-channel',
   'admit-organization',
+  'reconcile-chaincodes',
   'rotate-organization-msp',
   'revoke-organization',
 ]);
@@ -177,6 +178,18 @@ export function validateDecision(decision, inventory, now = Date.now()) {
       && (peerTargets.length || grants.length || change.chaincodes?.length)
     ) {
       throw new Error(`${prefix} rotation must not request peer joins, grants or chaincodes.`);
+    }
+    if (
+      change.operation === 'reconcile-chaincodes'
+      && (
+        change.mspDefinitionSha256 !== undefined
+        || grants.length
+        || peerTargets.length === 0
+        || !Array.isArray(change.chaincodes)
+        || change.chaincodes.length === 0
+      )
+    ) {
+      throw new Error(`${prefix} chaincode reconciliation must not request MSP material or grants and requires peer targets and chaincodes.`);
     }
     if (
       change.operation === 'ensure-channel'
