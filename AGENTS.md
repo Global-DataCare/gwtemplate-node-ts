@@ -59,6 +59,13 @@ must not be represented as the audited production profile.
 - the mandatory manager test must inspect the exact argument passed to
   `protectConfidentialData`, prove protected attributes, and reject nested FHIR
   fields as persisted business state.
+8. GW CORE is a Fabric consumer, not a network-governance executor. A GW image,
+deployment or E2E request never authorizes direct production channel, MSP,
+policy, lifecycle, package or CCAAS mutation. Before any such work, read
+`../fabric-multicloud/.codex/skills/govern-production-fabric/SKILL.md`; require
+the exact current signed decision, complete captured plan, governed reconciler
+apply, audit record and postconditions. UNID-only lifecycle policy identifies
+the governor and never permits bypassing that workflow.
 
 ## Naming Discipline
 1. Keep the common concept first and the specialization last.
