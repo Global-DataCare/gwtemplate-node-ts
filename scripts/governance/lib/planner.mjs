@@ -75,7 +75,7 @@ export function buildPlan(decision, inventory) {
       }
     }
     if (change.operation === 'rotate-organization-msp') {
-      phases.memberships.push(step(decision.requestId, 'ensure-application-msp', network.ordererTarget, {
+      phases.memberships.push(step(decision.requestId, 'ensure-channel-msp', network.ordererTarget, {
         ...common,
         mspDefinitionSha256: change.mspDefinitionSha256,
       }));
