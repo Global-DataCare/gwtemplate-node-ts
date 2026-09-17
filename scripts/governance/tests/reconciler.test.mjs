@@ -192,6 +192,37 @@ test('validates inventory-bound decisions and builds an exact deterministic plan
   assert.equal(buildPlan(value, inventory).digest, plan.digest);
 });
 
+test('rotates an existing organization MSP without changing grants, peers or lifecycle', () => {
+  const rotation = {
+    operation: 'rotate-organization-msp',
+    channel: 'identity-eu',
+    mspId: 'HOSTMSP',
+    mspDefinitionSha256: 'e'.repeat(64),
+    peerTargets: [],
+    grants: [],
+    chaincodes: [],
+  };
+  const value = decision({ changes: [rotation] });
+
+  assert.doesNotThrow(() => validateDecision(
+    value,
+    inventory,
+    Date.parse('2026-07-29T09:06:00.000Z'),
+  ));
+  assert.deepEqual(
+    buildPlan(value, inventory).steps.map((entry) => [entry.type, entry.target]),
+    [['ensure-application-msp', 'root-orderer']],
+  );
+  assert.throws(
+    () => validateDecision(
+      decision({ changes: [{ ...rotation, grants: ['write'] }] }),
+      inventory,
+      Date.parse('2026-07-29T09:06:00.000Z'),
+    ),
+    /rotation must not request peer joins, grants or chaincodes/,
+  );
+});
+
 test('rejects request-selected channels, peers, mismatched operator identity and expiry', () => {
   const now = Date.parse('2026-07-29T09:06:00.000Z');
   assert.throws(

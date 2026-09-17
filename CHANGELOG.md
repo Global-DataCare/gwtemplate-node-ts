@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Add a governed `rotate-organization-msp` decision operation that can update
+  only an existing Application MSP definition and cannot alter grants, peer
+  membership or chaincode lifecycle state.
 - Make all governed hosts use the release-neutral CCAAS Services
   `gdc-cc-<contract>:9999`. The deterministic packages and package IDs are now
   reusable across isolated host namespaces instead of being coupled to a Helm
