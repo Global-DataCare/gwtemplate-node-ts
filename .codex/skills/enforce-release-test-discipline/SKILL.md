@@ -132,6 +132,13 @@ description: Enforce branch, TDD, canonical FHIR and schema.org vocabulary, fixt
 
 ## Keep test layers separate
 
+- A GW, SDK or portal release never authorizes a Fabric network mutation. If
+  the work reaches live channel membership, MSP, policy, lifecycle, package or
+  CCAAS state, first read the sibling canonical skill at
+  `../fabric-multicloud/.codex/skills/govern-production-fabric/SKILL.md` and
+  follow its signed-decision, capture-before-parse and reconciler-only
+  production workflow. UNID-only lifecycle governance is not permission to run
+  direct production `peer lifecycle` commands.
 - Enforce the same portal progression everywhere: `test -> local-network -> test-network -> network`.
   First run unit and integration tests with `networkKind=test`, then prove the
   normal local UI -> BFF -> high-level SDK -> GW/DataConv journey with real
