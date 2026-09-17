@@ -2,7 +2,12 @@ import { createHash } from 'node:crypto';
 import { canonicalJson } from './canonical-json.mjs';
 
 const SPEC_VERSION = 'gdc.fabric.channel-governance/v1';
-const OPERATIONS = new Set(['ensure-channel', 'admit-organization', 'revoke-organization']);
+const OPERATIONS = new Set([
+  'ensure-channel',
+  'admit-organization',
+  'rotate-organization-msp',
+  'revoke-organization',
+]);
 const GRANTS = new Set(['read', 'write']);
 const NETWORK_KINDS = new Set(['local-network', 'test-network', 'network']);
 const SHA256_HEX = /^[a-f0-9]{64}$/;
@@ -146,7 +151,7 @@ export function validateDecision(decision, inventory, now = Date.now()) {
     if (seenChanges.has(key)) throw new Error(`Duplicate governance change "${key}".`);
     seenChanges.add(key);
 
-    if (change.operation === 'admit-organization') {
+    if (change.operation === 'admit-organization' || change.operation === 'rotate-organization-msp') {
       assertSha256(change.mspDefinitionSha256, `${prefix}.mspDefinitionSha256`);
     }
     const peerTargets = Array.isArray(change.peerTargets) ? change.peerTargets : [];
@@ -166,6 +171,12 @@ export function validateDecision(decision, inventory, now = Date.now()) {
     }
     if (change.operation === 'revoke-organization' && (peerTargets.length || grants.length || change.chaincodes?.length)) {
       throw new Error(`${prefix} revocation must not request peer joins, grants or chaincodes.`);
+    }
+    if (
+      change.operation === 'rotate-organization-msp'
+      && (peerTargets.length || grants.length || change.chaincodes?.length)
+    ) {
+      throw new Error(`${prefix} rotation must not request peer joins, grants or chaincodes.`);
     }
     if (
       change.operation === 'ensure-channel'
