@@ -144,11 +144,12 @@ description: Enforce branch, TDD, canonical FHIR and schema.org vocabulary, fixt
 
 - A GW, SDK or portal release never authorizes a Fabric network mutation. If
   the work reaches live channel membership, MSP, policy, lifecycle, package or
-  CCAAS state, first read the sibling canonical skill at
-  `../fabric-multicloud/.codex/skills/govern-production-fabric/SKILL.md` and
-  follow its signed-decision, capture-before-parse and reconciler-only
-  production workflow. Product-only lifecycle governance is not permission to run
-  direct production `peer lifecycle` commands.
+  CCAAS state, stop unless a separately authorized operator workflow supplies
+  the exact current signed decision, immutable pre-change capture, a
+  deterministic reviewed plan, reconciler-only apply, an audit record and
+  verified postconditions. Missing artifacts or authorization are a hard
+  boundary: do not mutate the network. Product-only lifecycle governance is
+  not permission to run direct production `peer lifecycle` commands.
 - Enforce the same portal progression everywhere: `test -> local-network -> test-network -> network`.
   First run unit and integration tests with `networkKind=test`, then prove the
   normal local UI -> BFF -> high-level SDK -> service journey with real

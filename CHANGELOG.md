@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Make production Fabric safety governance self-contained in GW CORE. Public
+  repository instructions no longer depend on a sibling private repository;
+  they retain the separate authorization, immutable pre-change capture,
+  reviewed plan, reconciler-only apply, audit and postcondition gates.
+
 - Scope FHIR `CapabilityStatement` and SMART discovery to the exact tenant
   `section/format` server base, derive advertised resources from tenant DID
   service capabilities, report the correct R4/R5 release, and reject the

@@ -103,4 +103,17 @@ describe('current documentation source governance', () => {
     }
   });
 
+  it('keeps repository governance self-contained and independent of private sibling repositories', () => {
+    const publicGovernanceFiles = [
+      'AGENTS.md',
+      '.codex/skills/enforce-release-test-discipline/SKILL.md',
+    ];
+    // This exact local path is the forbidden wire value under test.
+    const privateSiblingDependency = /\.\.\/fabric-multicloud\/\.codex\/skills\/govern-production-fabric\/SKILL\.md/;
+
+    for (const path of publicGovernanceFiles) {
+      expect(read(path)).not.toMatch(privateSiblingDependency);
+    }
+  });
+
 });
