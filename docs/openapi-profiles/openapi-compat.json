@@ -7722,13 +7722,13 @@
         "x-profile": "core"
       }
     },
-    "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/fhir/metadata": {
+    "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/{section}/{format}/metadata": {
       "get": {
         "tags": [
           "Discovery"
         ],
         "summary": "FHIR CapabilityStatement (tenant)",
-        "description": "Returns the tenant's FHIR capability statement for supported sectors.",
+        "description": "Returns the capability statement for the exact tenant FHIR server base.",
         "parameters": [
           {
             "$ref": "#/components/parameters/TenantId"
@@ -7741,6 +7741,87 @@
           },
           {
             "$ref": "#/components/parameters/Sector"
+          },
+          {
+            "in": "path",
+            "name": "section",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "individual",
+                "digitaltwin",
+                "entity"
+              ]
+            }
+          },
+          {
+            "in": "path",
+            "name": "format",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "org.hl7.fhir.r4",
+                "org.hl7.fhir.r5"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/{section}/{format}/.well-known/smart-configuration": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "SMART configuration for one tenant FHIR server base",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Version"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          },
+          {
+            "in": "path",
+            "name": "section",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "individual",
+                "digitaltwin",
+                "entity"
+              ]
+            }
+          },
+          {
+            "in": "path",
+            "name": "format",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "org.hl7.fhir.r4",
+                "org.hl7.fhir.r5"
+              ]
+            }
           }
         ],
         "responses": {

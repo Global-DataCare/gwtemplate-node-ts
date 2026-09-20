@@ -53,6 +53,16 @@ description: Enforce branch, TDD, canonical FHIR and schema.org vocabulary, fixt
   value valid for that profile. For a shared claims-first contract, choose a
   deliberately supported cross-version representation and prove both
   projections. Never infer a value from a different FHIR release.
+- Model a native FHIR server base as
+  `/{tenantId}/cds-{jurisdiction}/{version}/{sector}/{section}/{format}`. Publish
+  its CapabilityStatement at `[base]/metadata` and SMART discovery at
+  `[base]/.well-known/smart-configuration`. Capabilities must be derived from
+  the exact tenant, sector, section and native FHIR format; never combine
+  `individual`, `digitaltwin`, R4 or R5 capabilities.
+- `org.hl7.fhir.api` is the claims-first API context, not a native FHIR release.
+  Canonical flat claim names come from each resource's FHIR SearchParameter
+  catalog; keep standard FHIR extensions and custom extensions separate, and
+  call non-standard extensions custom rather than GDC-owned.
 - Human cross-provider identity lookup has two hard boundaries: derive the
   canonical opaque subject identifier only for the provider-only Fabric
   lookup, then stop that hash at Fabric; resolve `indexProviderDid` and use IHE

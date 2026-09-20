@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Scope FHIR `CapabilityStatement` and SMART discovery to the exact tenant
+  `section/format` server base, derive advertised resources from tenant DID
+  service capabilities, report the correct R4/R5 release, and reject the
+  flat-claims `org.hl7.fhir.api` context as a native FHIR metadata endpoint.
+
 - Add a governed `reconcile-chaincodes` operation that can install/approve an
   exact package on inventory-bound peers and commit its exact definition,
   without changing MSPs, grants, channel membership or peer joins.

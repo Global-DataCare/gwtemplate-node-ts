@@ -85,7 +85,8 @@ describe('Swagger Spec Generation', () => {
     expect(spec.paths['/host/cds-{hostCoverageScope}/{version}/{hostNetwork}/dsp/catalog/dcat.json']).toBeDefined();
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/dspace-version']).toBeDefined();
     expect(spec.paths['/{tenantId}/cds-{jurisdiction}/{version}/{sector}/dsp/catalog/dcat.json']).toBeDefined();
-    expect(spec.paths['/{tenantId}/cds-{jurisdiction}/{version}/{sector}/fhir/metadata']).toBeDefined();
+    expect(spec.paths['/{tenantId}/cds-{jurisdiction}/{version}/{sector}/{section}/{format}/metadata']).toBeDefined();
+    expect(spec.paths['/{tenantId}/cds-{jurisdiction}/{version}/{sector}/{section}/{format}/.well-known/smart-configuration']).toBeDefined();
 
     // Swagger tags are intentionally numbered progressively (1..N) for readability in Swagger UI,
     // even though API_INTEGRATORS_GUIDE uses its own section numbering (6..9).
