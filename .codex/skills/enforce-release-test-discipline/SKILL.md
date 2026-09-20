@@ -147,11 +147,11 @@ description: Enforce branch, TDD, canonical FHIR and schema.org vocabulary, fixt
   CCAAS state, first read the sibling canonical skill at
   `../fabric-multicloud/.codex/skills/govern-production-fabric/SKILL.md` and
   follow its signed-decision, capture-before-parse and reconciler-only
-  production workflow. UNID-only lifecycle governance is not permission to run
+  production workflow. Product-only lifecycle governance is not permission to run
   direct production `peer lifecycle` commands.
 - Enforce the same portal progression everywhere: `test -> local-network -> test-network -> network`.
   First run unit and integration tests with `networkKind=test`, then prove the
-  normal local UI -> BFF -> high-level SDK -> GW/DataConv journey with real
+  normal local UI -> BFF -> high-level SDK -> service journey with real
   Playwright, in-memory services and no blockchain.
   Fixture pages, mocked routes and API-only Playwright are diagnostics and
   never satisfy this cross-system gate. Run Fabric/local-network only after it
@@ -295,7 +295,7 @@ local `test` stage with an immutable `npm pack` tarball. Never commit a
 `file:`, Git, workspace or vendored tarball dependency.
 
 Follow the canonical contract in
-[`docs/LOCAL_FIRST_RELEASE_CONTRACT.md`](../../../docs/LOCAL_FIRST_RELEASE_CONTRACT.md):
+[`06.C-LOCAL-FIRST-RELEASE-CONTRACT.md`](../../../docs-v1/06-AUDIT-AND-EVIDENCE/06.C-LOCAL-FIRST-RELEASE-CONTRACT.md):
 
 - Do not attempt `npm publish` until every affected local `test` gate is
   green, including unit, integration, local services, real UI and Playwright.

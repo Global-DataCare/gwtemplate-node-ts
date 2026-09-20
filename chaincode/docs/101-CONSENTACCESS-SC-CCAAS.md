@@ -813,4 +813,4 @@ Then check:
 > 101 note
 > - Teach here: the chaincode-side consent-access logic only after the caller already came through an SDK/app profile runtime and GW route.
 > - Do not present chaincode docs as the first user/login/profile entrypoint.
-> - Read [../../docs/01-OVERVIEW-AND-GUIDES/101-README.md](../../docs/01-OVERVIEW-AND-GUIDES/101-README.md) for the ordered path and upstream runtime entrypoints.
+> - Read [../../docs-v1/01-OVERVIEW-AND-GUIDES/01.N-TUTORIAL-READING-ORDER.md](../../docs-v1/01-OVERVIEW-AND-GUIDES/01.N-TUTORIAL-READING-ORDER.md) for the detailed v1 tutorial index.

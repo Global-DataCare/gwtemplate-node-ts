@@ -410,7 +410,7 @@ git clone <fabric-multicloud-repo-url>
 
 Operational anchor:
 
-- [25-trust-bundle-and-local-network-runbook.md](https://github.com/Global-DataCare/gwtemplate-node-ts/blob/main/docs-v2/25-trust-bundle-and-local-network-runbook.md)
+- [23-trust-bundle-local-network.md](https://github.com/Global-DataCare/gwtemplate-node-ts/blob/main/docs-v2/23-trust-bundle-local-network.md)
 
 Main commands:
 
@@ -449,7 +449,7 @@ Generated/public artifacts to audit:
 
 Operational references:
 
-- [24-local-audit-fabric-runtime.md](https://github.com/Global-DataCare/gwtemplate-node-ts/blob/main/docs-v2/24-local-audit-fabric-runtime.md)
+- [04.F-LOCAL-TOPOLOGY-AND-FABRIC-ENV-LOADER.md](https://github.com/Global-DataCare/gwtemplate-node-ts/blob/main/docs-v1/04-DEEP-DIVES/04.F-LOCAL-TOPOLOGY-AND-FABRIC-ENV-LOADER.md)
 - `../fabric-multicloud/devnet/fabric-v3`
 
 Canonical local command:

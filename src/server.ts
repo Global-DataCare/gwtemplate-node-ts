@@ -441,7 +441,7 @@ async function startServer(options?: StartServerOptions) {
 
   app.use(
     '/docs/openapi-profiles',
-    express.static(path.resolve(process.cwd(), 'docs', 'openapi-profiles'), {
+    express.static(path.resolve(process.cwd(), 'docs-v1', 'openapi-profiles'), {
       setHeaders: (res) => {
         res.setHeader('Cache-Control', 'no-store');
       },

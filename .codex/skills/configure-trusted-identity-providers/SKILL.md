@@ -47,7 +47,7 @@ production.
 ## Mandatory release authorization continuity
 
 Fail-fast order is unit and integration with `networkKind=test`, followed by a
-real local UI -> BFF -> SDK -> GW/DataConv Playwright journey without blockchain.
+real local UI -> BFF -> SDK -> service Playwright journey without blockchain.
 An unpublished SDK uses an immutable `npm pack` tarball as temporary
 `--no-save` local input without committing dependency or lockfile changes.
 Publish only after the entire affected local matrix is green; then install the
@@ -66,7 +66,7 @@ local `test` stage with an immutable `npm pack` tarball. Never commit a
 `file:`, Git, workspace or vendored tarball dependency.
 
 Follow the canonical contract in
-[`docs/LOCAL_FIRST_RELEASE_CONTRACT.md`](../../../docs/LOCAL_FIRST_RELEASE_CONTRACT.md):
+[`06.C-LOCAL-FIRST-RELEASE-CONTRACT.md`](../../../docs-v1/06-AUDIT-AND-EVIDENCE/06.C-LOCAL-FIRST-RELEASE-CONTRACT.md):
 
 - Do not attempt `npm publish` until every affected local `test` gate is
   green, including unit, integration, local services, real UI and Playwright.

@@ -1,7 +1,7 @@
 # API and Testing Strategy Overview
 #
 This test guide follows the shared narrative contract in
-[docs-v2/01-narrative-contract.md](../../docs-v2/01-narrative-contract.md).
+[docs-v2/01-narrative-rules.md](../../docs-v2/01-narrative-rules.md).
 
 ## Sectors: Network vs Business (Important!)
 
@@ -72,7 +72,7 @@ The system bootstraps itself from the environment configuration. A user does not
 
 1.  **System Startup**: On startup, the service checks for the presence of `DEMO_ORG1_*` variables in the environment (`.env` file).
 2.  **Automatic Bootstrapping**: If these variables exist, the service automatically calls the `TenantManager` to register the initial tenant (`ORG1`) and the `EmployeeManager` to create its designated administrator employee.
-3.  **Further Tenants**: Subsequent tenants are registered by an authorized administrator from an existing, trusted tenant. The process is detailed in the [Organization Registration Process Documentation](src/docs/organization_registration.md).
+3.  **Further Tenants**: Subsequent tenants are registered by an authorized administrator from an existing, trusted tenant. The process is detailed in the [organization registration guide](../../docs-v1/04-DEEP-DIVES/04.A-ORGANIZATION-REGISTRATION.md).
 
 ## 5. Employee & Group Management (`_batch` Endpoint)
 
@@ -157,7 +157,7 @@ The system bootstraps itself from the environment configuration. A user does not
 
 1.  **System Startup**: On startup, the service checks for the presence of `DEMO_ORG1_*` variables in the environment (`.env` file).
 2.  **Automatic Bootstrapping**: If these variables exist, the service automatically calls the `TenantManager` to register the initial tenant (`ORG1`) and the `EmployeeManager` to create its designated administrator employee.
-3.  **Further Tenants**: Subsequent tenants are registered by an authorized administrator from an existing, trusted tenant. The process is detailed in the [Organization Registration Process Documentation](src/docs/organization_registration.md).
+3.  **Further Tenants**: Subsequent tenants are registered by an authorized administrator from an existing, trusted tenant. The process is detailed in the [organization registration guide](../../docs-v1/04-DEEP-DIVES/04.A-ORGANIZATION-REGISTRATION.md).
 
 ## 5. Employee & Group Management (`_batch` Endpoint)
 

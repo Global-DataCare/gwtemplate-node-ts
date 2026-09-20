@@ -9,16 +9,20 @@ Reference GW backend for asynchronous secure ingestion, indexing, and search acr
 
 Primary references:
 - `README.md`
-- `docs/API_INTEGRATORS_GUIDE.md`
-- `docs/02-API-AND-ENDPOINTS/02.A-API-ENDPOINTS.md`
-- `docs/01-OVERVIEW-AND-GUIDES/01.G-TESTING-PATTERNS.md`
-- `docs/UC_CAPABILITY_MATRIX_SEDIA.md`
-- `docs/TESTING.md` / `docs/TESTING-E2E.md`
+- `docs-v1/02-API-AND-ENDPOINTS/02.D-API-CORE-INTEGRATION.md`
+- `docs-v1/02-API-AND-ENDPOINTS/02.A-API-ENDPOINTS.md`
+- `docs-v1/01-OVERVIEW-AND-GUIDES/01.F-TESTING-PATTERNS.md`
+- `docs-v1/06-AUDIT-AND-EVIDENCE/06.A-SEDIA-CAPABILITY-EVIDENCE-MATRIX.md`
+- `docs-v1/06-AUDIT-AND-EVIDENCE/06.D-TESTING-GUIDE.md` / `docs-v1/06-AUDIT-AND-EVIDENCE/06.E-END-TO-END-TESTING.md`
 
 ## Scope Governance
 1. Keep core GW scope explicit and testable.
 2. Features outside current core narrative must be documented as extension scope, not mixed into core acceptance criteria.
 3. OpenAPI/examples/tests must describe actual behavior, not aspirational behavior.
+4. The organization controller publishes products in Pontus-X through the
+   external portal/BFF. GW CORE owns the protected data plane and
+   must not be documented as reproducing, simulating or directly owning that
+   portal publication flow.
 
 ## Hard Rules
 0. In production each Kubernetes pod/process must unwrap the encrypted service
@@ -64,7 +68,7 @@ deployment or E2E request never authorizes direct production channel, MSP,
 policy, lifecycle, package or CCAAS mutation. Before any such work, read
 `../fabric-multicloud/.codex/skills/govern-production-fabric/SKILL.md`; require
 the exact current signed decision, complete captured plan, governed reconciler
-apply, audit record and postconditions. UNID-only lifecycle policy identifies
+apply, audit record and postconditions. Product-only lifecycle policy identifies
 the governor and never permits bypassing that workflow.
 
 ## Naming Discipline
@@ -89,7 +93,7 @@ For any endpoint/manager behavior change:
 ## Quality Gates
 - Portal evidence follows `test -> local-network -> test-network -> network`.
   First run unit and integration tests with `networkKind=test`, then prove the
-  normal local UI -> BFF -> high-level SDK -> GW/DataConv journey with real
+  normal local UI -> BFF -> high-level SDK -> service journey with real
   Playwright, in-memory services and no blockchain. Fixture pages, mocked routes
   and API-only Playwright never replace that cross-system proof. Fabric,
   staging and production follow in that order.

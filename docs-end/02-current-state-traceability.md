@@ -103,7 +103,7 @@ The wider lifecycle story is distributed:
   - dialogue/consent actor interaction proof
 - `../gdc-sdk-node-ts/tests/resource-operations.test.mjs`
   - SDK consent and digital twin operation coverage
-- `docs-v2/24-local-audit-fabric-runtime.md`
+- `docs-v1/04-DEEP-DIVES/04.F-LOCAL-TOPOLOGY-AND-FABRIC-ENV-LOADER.md`
   - canonical integrator-facing local Fabric baseline in this repo
 
 These references are useful, but they must not be described as if this repo

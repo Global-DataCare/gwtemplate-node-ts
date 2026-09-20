@@ -236,7 +236,7 @@ export function buildDemoCommunicationBatchSubmitRequest(config: DemoConfig) {
  * Deprecated compatibility alias.
  *
  * Kept temporarily so existing local tests can move in small patches, but new
- * docs/tests should use `buildDemoCommunicationBatchSubmitRequest`.
+ * documentation and tests should use `buildDemoCommunicationBatchSubmitRequest`.
  */
 export function buildDemoCommunicationDidcommRequest(config: DemoConfig) {
   return buildDemoCommunicationBatchSubmitRequest(config);

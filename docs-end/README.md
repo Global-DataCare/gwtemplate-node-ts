@@ -2,14 +2,14 @@
 
 > 101 note
 > - `docs-end` is the packaged closeout/audit narrative, not the main current integrator/runtime onboarding path.
-> - For the active GW reading order, start in [../docs-v2/101-README.md](../docs-v2/101-README.md).
+> - For the active GW reading order, start in [../docs-v2/26-tutorial-reading-order.md](../docs-v2/26-tutorial-reading-order.md).
 > - Use this folder after the current runtime/integrator path is already clear.
 
 Purpose:
 
 - keep the closeout package grouped in one place,
 - explain the order in which the closeout documents should be read,
-- point to the canonical portal/BFF/GW route table used by the closeout.
+- point to current evidence sources used by the closeout.
 
 ## Reading order
 
@@ -26,15 +26,8 @@ Purpose:
 6. [06-project-closure-executive-summary.md](./06-project-closure-executive-summary.md)
    - executive closeout summary
 
-## Canonical complementary table
+## Canonical references
 
-The closeout package refers to one canonical route/mapping table that remains
-outside this folder because it is also reused as a standalone reference:
-
-- [portal-api-gw.md](../portal-api-gw.md)
-
-Rule:
-
-- `docs-end` is the packaged closeout narrative,
-- `portal-api-gw.md` points to the canonical operation/mapping table in `docs`,
-- do not keep a second divergent copy of that table inside `docs-end`.
+- [Architecture overview](../docs-v1/01-OVERVIEW-AND-GUIDES/01.A-ARCHITECTURE-OVERVIEW.md)
+- [Dataspace DID services](../docs-v1/02-API-AND-ENDPOINTS/02.C-DATASPACE-DID-SERVICES.md)
+- [SEDIA capability evidence](../docs-v1/06-AUDIT-AND-EVIDENCE/06.A-SEDIA-CAPABILITY-EVIDENCE-MATRIX.md)

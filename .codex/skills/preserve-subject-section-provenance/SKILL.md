@@ -95,7 +95,7 @@ Use these canonical sources:
 - Concise SDK explanation:
   `docs/101-CLINICAL_AUTHOR_ATTESTER_BOUNDARIES.md`
 - CORE storage/index explanation:
-  `docs/01-OVERVIEW-AND-GUIDES/101-01.N-AUTHENTICATED-CLINICAL-AUTHOR.md`
+  `docs-v1/01-OVERVIEW-AND-GUIDES/01.M-AUTHENTICATED-CLINICAL-AUTHOR.md`
 
 Link to the canonical SDK snippet from CORE. Do not maintain a second,
 divergent copy.
@@ -123,11 +123,10 @@ or synonym for the current model. Prefer "current rules", "current model",
 Use "Contract" when referring to the FHIR `Contract` resource, "smart
 contract" for ledger code, or "API/schema contract" only when a formal
 interface guarantee is actually meant.
-
 ## Mandatory Release Authorization Continuity
 
 Fail-fast order is unit and integration with `networkKind=test`, followed by a
-real local UI -> BFF -> SDK -> GW/DataConv Playwright journey without blockchain.
+real local UI -> BFF -> SDK -> gateway/converter Playwright journey without blockchain.
 An unpublished SDK uses an immutable `npm pack` tarball as temporary
 `--no-save` local input without committing dependency or lockfile changes.
 Publish only after the entire affected local matrix is green; then install the

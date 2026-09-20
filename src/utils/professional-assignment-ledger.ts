@@ -30,8 +30,8 @@ export type ProfessionalAssignmentLedgerPayload = Readonly<{
  * // links.employeeLink identifies the person holding that assignment.
  * ```
  *
- * @see docs/01-OVERVIEW-AND-GUIDES/101-01.N-AUTHENTICATED-CLINICAL-AUTHOR.md
- * @see docs-v2/28-clinical-employee-ledger-schema.md
+ * @see docs-v1/01-OVERVIEW-AND-GUIDES/01.M-AUTHENTICATED-CLINICAL-AUTHOR.md
+ * @see docs-v2/25-clinical-employee-ledger-schema.md
  */
 export function buildProfessionalAssignmentLedgerPayload(params: Readonly<{
   assignmentIdentifier: string;

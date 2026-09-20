@@ -19,11 +19,11 @@ describe('digital twin private search-field documentation contract', () => {
     'utf8',
   );
   const lifecycle101 = readFileSync(
-    resolve(process.cwd(), 'docs/01-OVERVIEW-AND-GUIDES/101-01.I-LIFECYCLE.md'),
+    resolve(process.cwd(), 'docs-v1/01-OVERVIEW-AND-GUIDES/01.I-LIFECYCLE.md'),
     'utf8',
   );
   const capabilityMatrix = readFileSync(
-    resolve(process.cwd(), 'docs/90.F-UC_CAPABILITY_MATRIX_SEDIA.md'),
+    resolve(process.cwd(), 'docs-v1/06-AUDIT-AND-EVIDENCE/06.A-SEDIA-CAPABILITY-EVIDENCE-MATRIX.md'),
     'utf8',
   );
   const owningSkill = readFileSync(
