@@ -705,16 +705,45 @@ export function createDiscoveryRouter(
    *       '200': { description: OK }
    *       '404': { description: Not Found }
    *
-   * /{tenantId}/cds-{jurisdiction}/{version}/{sector}/fhir/metadata:
+   * /{tenantId}/cds-{jurisdiction}/{version}/{sector}/{section}/{format}/metadata:
    *   get:
    *     tags: [Discovery]
    *     summary: FHIR CapabilityStatement (tenant)
-   *     description: Returns the tenant's FHIR capability statement for supported sectors.
+   *     description: Returns the capability statement for the exact tenant FHIR server base.
    *     parameters:
    *       - $ref: '#/components/parameters/TenantId'
    *       - $ref: '#/components/parameters/Jurisdiction'
    *       - $ref: '#/components/parameters/Version'
    *       - $ref: '#/components/parameters/Sector'
+   *       - in: path
+   *         name: section
+   *         required: true
+   *         schema: { type: string, enum: [individual, digitaltwin, entity] }
+   *       - in: path
+   *         name: format
+   *         required: true
+   *         schema: { type: string, enum: [org.hl7.fhir.r4, org.hl7.fhir.r5] }
+   *     responses:
+   *       '200': { description: OK }
+   *       '404': { description: Not Found }
+   *
+   * /{tenantId}/cds-{jurisdiction}/{version}/{sector}/{section}/{format}/.well-known/smart-configuration:
+   *   get:
+   *     tags: [Discovery]
+   *     summary: SMART configuration for one tenant FHIR server base
+   *     parameters:
+   *       - $ref: '#/components/parameters/TenantId'
+   *       - $ref: '#/components/parameters/Jurisdiction'
+   *       - $ref: '#/components/parameters/Version'
+   *       - $ref: '#/components/parameters/Sector'
+   *       - in: path
+   *         name: section
+   *         required: true
+   *         schema: { type: string, enum: [individual, digitaltwin, entity] }
+   *       - in: path
+   *         name: format
+   *         required: true
+   *         schema: { type: string, enum: [org.hl7.fhir.r4, org.hl7.fhir.r5] }
    *     responses:
    *       '200': { description: OK }
    *       '404': { description: Not Found }
@@ -1432,8 +1461,8 @@ export function createDiscoveryRouter(
     res.status(404).type('text').send('Not Found');
   };
 
-  router.get([`${hostScopedWellKnownPrefix}/smart-configuration`, `${tenantWellKnownPrefix}/smart-configuration`], resolveTenant, checkFhirSector, (req, res) => {
-    const config = discoveryService.getSmartConfiguration(res.locals.vaultId);
+  router.get([`${hostScopedWellKnownPrefix}/smart-configuration`, `${tenantWellKnownPrefix}/smart-configuration`], resolveTenant, checkFhirSector, async (req, res) => {
+    const config = await discoveryService.getSmartConfiguration(res.locals.vaultId);
     if (config) {
       res.json(config);
     } else {
@@ -1441,11 +1470,33 @@ export function createDiscoveryRouter(
     }
   });
   
-  // Note: The FHIR metadata endpoint uses the full structured path.
-  router.get('/:tenantId/cds-:jurisdiction/:version/:sector/fhir/metadata', resolveTenant, checkFhirSector, async (req, res) => {
-    const statement = await discoveryService.getCapabilityStatement(res.locals.vaultId);
+  const tenantFhirBasePath = '/:tenantId/cds-:jurisdiction/:version/:sector/:section/:format';
+
+  /**
+   * FHIR discovery belongs to the exact server base that serves resources:
+   * `tenant-sector/section/format`. A tenant can therefore publish independent
+   * `individual` and `digitaltwin` CapabilityStatements without conflating the
+   * operational record with its pseudonymous research projection.
+   */
+  router.get(`${tenantFhirBasePath}/metadata`, resolveTenant, checkFhirSector, async (req, res) => {
+    const statement = await discoveryService.getCapabilityStatement(res.locals.vaultId, {
+      section: req.params.section,
+      format: req.params.format,
+    });
     if (statement) {
       res.json(statement);
+    } else {
+      res.status(404).type('text').send('Not Found');
+    }
+  });
+
+  router.get(`${tenantFhirBasePath}/.well-known/smart-configuration`, resolveTenant, checkFhirSector, async (req, res) => {
+    const config = await discoveryService.getSmartConfiguration(res.locals.vaultId, {
+      section: req.params.section,
+      format: req.params.format,
+    });
+    if (config) {
+      res.json(config);
     } else {
       res.status(404).type('text').send('Not Found');
     }

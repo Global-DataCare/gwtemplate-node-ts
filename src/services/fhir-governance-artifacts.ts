@@ -12,7 +12,15 @@ export type GovernedCapabilityStatementOptions = Readonly<{
   implementationVersion: string;
   implementationUrl: string;
   implementationDescription: string;
+  fhirVersion: string;
+  resources: readonly FhirEndpointCapability[];
   enableContractSearchParameters: boolean;
+}>;
+
+/** One resource and the implementation-specific actions exposed at a FHIR base. */
+export type FhirEndpointCapability = Readonly<{
+  resourceType: string;
+  actions: readonly string[];
 }>;
 
 type GovernedSearchParameter = Readonly<{
@@ -142,16 +150,21 @@ export function buildGovernedCapabilityStatement(
   if (!implementationDescription) {
     throw new Error('FHIR implementation description is required.');
   }
-  const resources: object[] = [{
-    type: ResourceTypesFhirR4.Communication,
-    searchParam: declareSearchParameters(canonicalBaseUrl, COMMUNICATION_SEARCH_PARAMETERS),
-  }];
-  if (options.enableContractSearchParameters) {
-    resources.push({
-      type: 'Contract',
-      searchParam: declareSearchParameters(canonicalBaseUrl, CONTRACT_SEARCH_PARAMETERS),
-    });
-  }
+  const resources: object[] = options.resources.map((capability) => {
+    const actions = [...new Set(capability.actions)].sort();
+    return {
+      type: capability.resourceType,
+      ...(actions.length > 0 ? {
+        documentation: `Implementation-specific endpoint actions: ${actions.join(', ')}.`,
+      } : {}),
+      ...(capability.resourceType === ResourceTypesFhirR4.Communication && actions.includes('_search') ? {
+        searchParam: declareSearchParameters(canonicalBaseUrl, COMMUNICATION_SEARCH_PARAMETERS),
+      } : {}),
+      ...(capability.resourceType === 'Contract' && options.enableContractSearchParameters && actions.includes('_search') ? {
+        searchParam: declareSearchParameters(canonicalBaseUrl, CONTRACT_SEARCH_PARAMETERS),
+      } : {}),
+    };
+  });
 
   return {
     resourceType: 'CapabilityStatement',
@@ -169,7 +182,7 @@ export function buildGovernedCapabilityStatement(
       description: implementationDescription,
       url: implementationUrl.toString().replace(/\/$/, ''),
     },
-    fhirVersion: '5.0.0',
+    fhirVersion: options.fhirVersion,
     format: ['application/fhir+json'],
     implementationGuide: [
       buildGovernedFhirArtifactUrl(canonicalBaseUrl, 'ImplementationGuide', 'network-governance'),

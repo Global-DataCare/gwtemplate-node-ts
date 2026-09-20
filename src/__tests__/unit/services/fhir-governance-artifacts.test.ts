@@ -1,8 +1,10 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 import {
   buildGovernedCapabilityStatement,
   buildGovernedFhirArtifactUrl,
 } from '../../../services/fhir-governance-artifacts';
+import { FhirVersionsByFormat, NativeFhirFormats } from '../../../constants/fhir-discovery';
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 
 describe('UNID-governed FHIR canonical artifacts', () => {
   it('builds stable canonical urls below the configured unid.online authority', () => {
@@ -27,6 +29,11 @@ describe('UNID-governed FHIR canonical artifacts', () => {
       implementationVersion: '1.0.0',
       implementationUrl: 'https://gw.example/tenant/cds-es/v1/antifraud/fhir',
       implementationDescription: 'Personal FHIR index for tenant vault-a',
+      fhirVersion: FhirVersionsByFormat[NativeFhirFormats.R4],
+      resources: [{
+        resourceType: ResourceTypesFhirR4.Communication,
+        actions: ['_search'],
+      }],
       enableContractSearchParameters: false,
     }) as any;
 
@@ -59,6 +66,8 @@ describe('UNID-governed FHIR canonical artifacts', () => {
       implementationVersion: '1.0.0',
       implementationUrl: 'https://gw.example/tenant/cds-es/v1/antifraud/fhir',
       implementationDescription: 'Tenant FHIR index',
+      fhirVersion: FhirVersionsByFormat[NativeFhirFormats.R4],
+      resources: [{ resourceType: 'Contract', actions: ['_search'] }],
       enableContractSearchParameters: true,
     }) as any;
 
@@ -78,6 +87,8 @@ describe('UNID-governed FHIR canonical artifacts', () => {
       implementationVersion: '1.0.0',
       implementationUrl: 'http://tenant.example/fhir',
       implementationDescription: 'Tenant FHIR index',
+      fhirVersion: FhirVersionsByFormat[NativeFhirFormats.R4],
+      resources: [],
       enableContractSearchParameters: false,
     })).toThrow(/implementation URL.*HTTPS/i);
   });

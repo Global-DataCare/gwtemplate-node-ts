@@ -83,6 +83,12 @@ E2E gates before `npm publish` or any container image build.
   authorization rule. Only `active` Consent may authorize.
 - `resource.meta.claims` is the canonical project-specific claims carrier in a Bundle document (or JSON:API Primary document embedded in a DIDComm message) and must always be persisted/propagated.
 - `resource.meta.claims` is not part of base FHIR. It is a claims-first extension used by GW/SDK contracts on top of FHIR-like resources.
+- Each native FHIR server base is tenant- and sector-scoped and then qualified
+  by `section/format`. Its standard discovery endpoints are `[base]/metadata`
+  and `[base]/.well-known/smart-configuration`; `individual` and `digitaltwin`
+  publish independent capabilities. `org.hl7.fhir.api` is the flat-claims
+  context, not a native FHIR release. See
+  [FHIR server-base discovery](docs-v1/02-API-AND-ENDPOINTS/02.I-FHIR-SERVER-BASE-DISCOVERY.md).
 - Those claims are often contextualized with `@context` such as `org.schema` or `org.hl7.fhir.api`, but may also use less-contextualized keys when the active `@context` already disambiguates them.
 - DIDComm `from` is the sender DID, JWT `iss` is the signing entity, `kid` is
   the concrete key DID URL, and SMART `sub` is the authorized actor. A direct

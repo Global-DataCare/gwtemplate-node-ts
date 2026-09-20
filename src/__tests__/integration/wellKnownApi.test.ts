@@ -37,6 +37,10 @@ import {
   buildGwCatalogArtifactPath,
   buildGwDspaceVersionWellKnownPath,
 } from 'gdc-common-utils-ts/utils/dataspace-protocol';
+import { NativeFhirFormats } from '../../constants/fhir-discovery';
+import { SUBJECT_SECTION_DIGITAL_TWIN } from '../../constants/domain';
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
+import { Format } from 'gdc-common-utils-ts/models/urlPath';
 
 const mockTenantsCacheManager = {
   getDidDocument: jest.fn(),
@@ -45,6 +49,7 @@ const mockTenantsCacheManager = {
   isTenantOperational: jest.fn(async () => true),
   getTenantDomainUrl: jest.fn(async () => 'https://host.example.com'),
   getTenantOperationalUrl: jest.fn(async () => 'https://gateway.example/tenant/cds-es/v1/health-care'),
+  getDidServiceConfig: jest.fn(),
   getTenantSector: jest.fn(async () => 'health-care'),
   listAutodiscoverableTenants: jest.fn(),
   listRegisteredTenants: jest.fn(),
@@ -220,21 +225,66 @@ describe('Well-Known DID Discovery API', () => {
     mockTenantsCacheManager.getTenantOperationalUrl.mockResolvedValue(
       `https://gateway.example/${testTenant1AlternateName}/cds-${urnParts.jurisdiction}/${urnParts.version}/${urnParts.sector}`,
     );
+    mockTenantsCacheManager.getDidServiceConfig.mockResolvedValue([{
+      selector: { section: SUBJECT_SECTION_DIGITAL_TWIN, format: NativeFhirFormats.R4 },
+      serviceEndpoint: ResourceTypesFhirR4.ResearchSubject,
+      actions: ['_search'],
+    }] as any);
 
     const response = await invokeExpress(app, {
       method: HttpRequestMethods.Get,
-      url: `/${testTenant1AlternateName}/cds-${urnParts.jurisdiction}/${urnParts.version}/${urnParts.sector}/fhir/metadata`,
+      url: `/${testTenant1AlternateName}/cds-${urnParts.jurisdiction}/${urnParts.version}/${urnParts.sector}/${SUBJECT_SECTION_DIGITAL_TWIN}/${NativeFhirFormats.R4}/metadata`,
     });
     const statement = JSON.parse(response.text);
 
     expect(response.status).toBe(200);
     expect(statement.kind).toBe('instance');
     expect(statement.implementation.url).toBe(
-      `https://gateway.example/${testTenant1AlternateName}/cds-${urnParts.jurisdiction}/${urnParts.version}/${urnParts.sector}/fhir`,
+      `https://gateway.example/${testTenant1AlternateName}/cds-${urnParts.jurisdiction}/${urnParts.version}/${urnParts.sector}/${SUBJECT_SECTION_DIGITAL_TWIN}/${NativeFhirFormats.R4}`,
     );
+    expect(statement.fhirVersion).toBe('4.0.1');
+    expect(statement.rest[0].resource.map((resource: any) => resource.type)).toEqual([
+      ResourceTypesFhirR4.ResearchSubject,
+    ]);
     expect(statement.instantiates).toContain(
       'https://unid.online/standards/fhir/CapabilityStatement/gw-core|1.0.0',
     );
+  });
+
+  it('publishes SMART configuration relative to the same tenant FHIR server base', async () => {
+    const urnParts = parseTenantUrn(testTenant1IdentifierUrn)!;
+    const operationalUrl = `https://gateway.example/${testTenant1AlternateName}/cds-${urnParts.jurisdiction}/${urnParts.version}/${urnParts.sector}`;
+    mockTenantsCacheManager.getDidDocument.mockResolvedValue({ id: testTenant1DidWebHosted } as any);
+    mockTenantsCacheManager.getTenantOperationalUrl.mockResolvedValue(operationalUrl);
+    mockTenantsCacheManager.getDidServiceConfig.mockResolvedValue([{
+      selector: { section: SUBJECT_SECTION_DIGITAL_TWIN, format: NativeFhirFormats.R4 },
+      serviceEndpoint: ResourceTypesFhirR4.ResearchSubject,
+      actions: ['_search'],
+    }] as any);
+
+    const fhirBase = `/${testTenant1AlternateName}/cds-${urnParts.jurisdiction}/${urnParts.version}/${urnParts.sector}/${SUBJECT_SECTION_DIGITAL_TWIN}/${NativeFhirFormats.R4}`;
+    const response = await invokeExpress(app, {
+      method: HttpRequestMethods.Get,
+      url: `${fhirBase}/.well-known/smart-configuration`,
+    });
+
+    expect(response.status).toBe(200);
+    expect(JSON.parse(response.text)).toEqual(expect.objectContaining({
+      issuer: 'https://host.example.com',
+      token_endpoint: `${operationalUrl}/identity/openid/smart/token`,
+    }));
+  });
+
+  it('does not expose native FHIR metadata for the flat-claims API format', async () => {
+    const urnParts = parseTenantUrn(testTenant1IdentifierUrn)!;
+    mockTenantsCacheManager.getDidDocument.mockResolvedValue({ id: testTenant1DidWebHosted } as any);
+
+    const response = await invokeExpress(app, {
+      method: HttpRequestMethods.Get,
+      url: `/${testTenant1AlternateName}/cds-${urnParts.jurisdiction}/${urnParts.version}/${urnParts.sector}/${SUBJECT_SECTION_DIGITAL_TWIN}/${Format.FhirApi}/metadata`,
+    });
+
+    expect(response.status).toBe(404);
   });
 });
 

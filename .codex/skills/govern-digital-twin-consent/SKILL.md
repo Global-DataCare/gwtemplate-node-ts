@@ -76,6 +76,23 @@ Verify current branches, versions and published npm state before release claims.
 
 ## Preserve MVP discovery and organization authorization
 
+- Treat `/{tenantId}/cds-{jurisdiction}/{version}/{sector}` as the tenant-sector
+  data-plane base and append `/{section}/{format}` for one exact FHIR server
+  base. `individual` and `digitaltwin` are independent capability and
+  authorization surfaces.
+- Publish the FHIR `CapabilityStatement` at `[base]/metadata` and SMART
+  discovery at `[base]/.well-known/smart-configuration`. Derive the advertised
+  release, resources and operations from the matching tenant DID service
+  selectors; never merge capabilities across sections or formats.
+- Treat `org.hl7.fhir.r4` and `org.hl7.fhir.r5` as native FHIR wire formats.
+  Treat `org.hl7.fhir.api` as the version-independent flat-claims context, not
+  as a native FHIR server and never give it a misleading CapabilityStatement.
+- Keep canonical FHIR SearchParameter claims, standard FHIR extensions and
+  custom extensions distinct. Call the last category custom extensions, not
+  GDC-owned extensions. Support the fields and value sets required by the
+  applicable IPS resource profiles at native create and card-display adapter
+  boundaries.
+
 - Use one public search contract for discovery and saved selections:
   `digitaltwin/.../ResearchSubject/_search` with a FHIR `Parameters` body.
 - A ResearchSubject is the public twin aggregate. Its `composition` declares

@@ -2,10 +2,18 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import { EntityConfig } from '../gdc-backend-utils-node/models/entity';
-import { DidDocument } from '../gdc-backend-utils-node/models/did';
+import { DidDocument, type DidService } from '../gdc-backend-utils-node/models/did';
 import { JwkSet } from '../gdc-backend-utils-node/models/jwk';
 import type { IDiscoveryTenantRegistry } from '../managers/IDiscoveryTenantRegistry';
-import { buildGovernedCapabilityStatement } from './fhir-governance-artifacts';
+import {
+  FhirVersionsByFormat,
+  isNativeFhirFormat,
+  type NativeFhirFormat,
+} from '../constants/fhir-discovery';
+import {
+  buildGovernedCapabilityStatement,
+  type FhirEndpointCapability,
+} from './fhir-governance-artifacts';
 
 function ensureTrailingSlash(url: string): string {
   return url.endsWith('/') ? url : `${url}/`;
@@ -13,6 +21,31 @@ function ensureTrailingSlash(url: string): string {
 
 function resolveDidServiceEndpoint(didDoc: DidDocument, suffix: string): string | undefined {
   return didDoc.service?.find((service) => service.id === `${didDoc.id}${suffix}`)?.serviceEndpoint as string | undefined;
+}
+
+export type FhirServerBaseSelector = Readonly<{
+  section: string;
+  format: string;
+}>;
+
+function resolveFhirEndpointCapabilities(
+  services: readonly DidService[],
+  selector: Readonly<{ section: string; format: NativeFhirFormat }>,
+): FhirEndpointCapability[] {
+  const actionsByResource = new Map<string, Set<string>>();
+  for (const service of services) {
+    if (service.selector?.section !== selector.section || service.selector?.format !== selector.format) continue;
+    const actions = Array.isArray(service.actions) ? service.actions.map(String) : [];
+    for (const resourceType of String(service.serviceEndpoint || '').split(',').map((value) => value.trim()).filter(Boolean)) {
+      const resourceActions = actionsByResource.get(resourceType) || new Set<string>();
+      actions.forEach((action) => resourceActions.add(action));
+      actionsByResource.set(resourceType, resourceActions);
+    }
+  }
+  return [...actionsByResource.entries()].map(([resourceType, actions]) => ({
+    resourceType,
+    actions: [...actions],
+  }));
 }
 
 /**
@@ -111,10 +144,22 @@ export class DiscoveryService {
    * @param vaultId The unique vault identifier of the tenant.
    * @returns A partial SMART configuration object, or undefined if not found.
    */
-  public async getSmartConfiguration(vaultId: string): Promise<object | undefined> {
+  public async getSmartConfiguration(
+    vaultId: string,
+    fhirBase?: FhirServerBaseSelector,
+  ): Promise<object | undefined> {
     const tenantUrl = await this.tenantsCacheManager.getTenantDomainUrl(vaultId);
     const operationalUrl = await this.tenantsCacheManager.getTenantOperationalUrl(vaultId);
     if (!tenantUrl || !operationalUrl) return undefined;
+
+    if (fhirBase) {
+      if (!isNativeFhirFormat(fhirBase.format)) return undefined;
+      const services = await this.tenantsCacheManager.getDidServiceConfig(vaultId) || [];
+      if (resolveFhirEndpointCapabilities(services, {
+        section: fhirBase.section,
+        format: fhirBase.format,
+      }).length === 0) return undefined;
+    }
 
     return {
       issuer: tenantUrl,
@@ -124,22 +169,43 @@ export class DiscoveryService {
   }
 
   /**
-   * Generates the FHIR CapabilityStatement and links every advertised custom
-   * SearchParameter to its governance-controlled canonical definition.
+   * Generates the CapabilityStatement for one exact tenant FHIR server base.
+   * The base is `tenant-sector/section/format`; resources are derived from the
+   * matching DID service selectors so another section or FHIR release is never
+   * advertised accidentally. `org.hl7.fhir.api` is a flat-claims contract and
+   * therefore is not exposed as a native FHIR metadata endpoint.
    * @param vaultId The unique vault identifier of the tenant.
-   * @returns A partial CapabilityStatement object.
+   * @param fhirBase Exact subject section and native FHIR wire format.
+   * @returns The instance CapabilityStatement, or undefined when that base is unsupported.
    */
-  async getCapabilityStatement(vaultId: string): Promise<object | undefined> {
-    const operationalUrl = await this.tenantsCacheManager.getTenantOperationalUrl(vaultId);
-    if (!operationalUrl) return undefined;
-    const implementationUrl = new URL('fhir', ensureTrailingSlash(operationalUrl)).toString();
+  async getCapabilityStatement(
+    vaultId: string,
+    fhirBase: FhirServerBaseSelector,
+  ): Promise<object | undefined> {
+    if (!isNativeFhirFormat(fhirBase.format)) return undefined;
+    const [operationalUrl, services] = await Promise.all([
+      this.tenantsCacheManager.getTenantOperationalUrl(vaultId),
+      this.tenantsCacheManager.getDidServiceConfig(vaultId),
+    ]);
+    if (!operationalUrl || !services) return undefined;
+    const resources = resolveFhirEndpointCapabilities(services, {
+      section: fhirBase.section,
+      format: fhirBase.format,
+    });
+    if (resources.length === 0) return undefined;
+    const implementationUrl = new URL(
+      `${encodeURIComponent(fhirBase.section)}/${encodeURIComponent(fhirBase.format)}`,
+      ensureTrailingSlash(operationalUrl),
+    ).toString();
     return buildGovernedCapabilityStatement({
       canonicalBaseUrl: process.env.FHIR_GOVERNANCE_CANONICAL_BASE_URL
         || 'https://unid.online/standards/fhir',
       implementationVersion: process.env.FHIR_GOVERNANCE_IMPLEMENTATION_VERSION
         || '1.0.0',
       implementationUrl,
-      implementationDescription: `Tenant FHIR index for ${vaultId}`,
+      implementationDescription: `Tenant FHIR ${fhirBase.section} endpoint for ${vaultId}`,
+      fhirVersion: FhirVersionsByFormat[fhirBase.format],
+      resources,
       enableContractSearchParameters:
         String(process.env.FHIR_ENABLE_CONTRACT_SEARCH_PARAMETERS || '').toLowerCase() === 'true',
     });
