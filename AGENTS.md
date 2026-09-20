@@ -65,11 +65,12 @@ must not be represented as the audited production profile.
   fields as persisted business state.
 8. GW CORE is a Fabric consumer, not a network-governance executor. A GW image,
 deployment or E2E request never authorizes direct production channel, MSP,
-policy, lifecycle, package or CCAAS mutation. Before any such work, read
-`../fabric-multicloud/.codex/skills/govern-production-fabric/SKILL.md`; require
-the exact current signed decision, complete captured plan, governed reconciler
-apply, audit record and postconditions. Product-only lifecycle policy identifies
-the governor and never permits bypassing that workflow.
+policy, lifecycle, package or CCAAS mutation. Such work requires a separately
+authorized operator workflow with the exact current signed decision, immutable
+pre-change capture, deterministic reviewed plan, reconciler-only apply, audit
+record and verified postconditions. If any artifact or authorization is absent,
+stop without mutating the network. Product-only lifecycle policy identifies the
+governor and never permits bypassing this contract.
 
 ## Naming Discipline
 1. Keep the common concept first and the specialization last.
