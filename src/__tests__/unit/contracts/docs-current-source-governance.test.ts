@@ -108,8 +108,8 @@ describe('current documentation source governance', () => {
       'AGENTS.md',
       '.codex/skills/enforce-release-test-discipline/SKILL.md',
     ];
-    // This exact local path is the forbidden wire value under test.
-    const privateSiblingDependency = /\.\.\/fabric-multicloud\/\.codex\/skills\/govern-production-fabric\/SKILL\.md/;
+    // Any sibling-repository skill path would make the public contract depend on local checkout topology.
+    const privateSiblingDependency = /\.\.\/[^`\s]+\/\.codex\/skills\/[^`\s]+\/SKILL\.md/;
 
     for (const path of publicGovernanceFiles) {
       expect(read(path)).not.toMatch(privateSiblingDependency);
