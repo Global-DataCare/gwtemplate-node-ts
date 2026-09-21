@@ -508,7 +508,7 @@ export function getConfig(): IServerConfig {
       ledger: {
         enabled: process.env.LEDGER_ENABLED ? process.env.LEDGER_ENABLED === 'true' : undefined,
         mspId: process.env.LEDGER_MSP_ID,
-        channelName: process.env.LEDGER_IDENTITY_CHANNEL_DEFAULT,
+        channelName: process.env.LEDGER_ORGANIZATION_IDENTITY_CHANNEL_DEFAULT,
         chaincodeName: process.env.LEDGER_ORG_CHAINCODE,
         schemaUrl: process.env.GOVERNANCE_SCHEMA_URL,
       },

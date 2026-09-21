@@ -53,12 +53,8 @@ for spec in "${specs[@]}"; do
     > "${package_root}/code/connection.json"
   jq -cn --arg label "${label}" '{path:"",type:"ccaas",label:$label}' \
     > "${package_root}/metadata.json"
-  touch -t 198001010000 "${package_root}/code/connection.json" "${package_root}/metadata.json"
-  COPYFILE_DISABLE=1 tar --format ustar --uid 0 --gid 0 \
-    -C "${package_root}/code" -cf - connection.json | gzip -n > "${package_root}/code.tar.gz"
-  touch -t 198001010000 "${package_root}/code.tar.gz"
-  COPYFILE_DISABLE=1 tar --format ustar --uid 0 --gid 0 \
-    -C "${package_root}" -cf - metadata.json code.tar.gz | gzip -n > "${archive}"
+  node "$(dirname "${BASH_SOURCE[0]}")/build-deterministic-ccaas-package.mjs" \
+    "${package_root}/code/connection.json" "${package_root}/metadata.json" "${archive}"
   digest="$(shasum -a 256 "${archive}" | awk '{print $1}')"
   package_id="${label}:${digest}"
   printf '  - name: %s\n    image: %s\n    packageId: %s\n' \

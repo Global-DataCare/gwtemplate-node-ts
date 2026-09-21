@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+- Release GW CORE `1.25.24` with organization ledger bootstrap routed through
+  `LEDGER_ORGANIZATION_IDENTITY_CHANNEL_DEFAULT`; the human identity channel no
+  longer overrides regional organization registration during host startup.
+
+- Release `gdc-host` chart `0.4.0` as the consolidated external-host baseline:
+  preserve the governed CCAAS package IDs with an OS-independent deterministic
+  USTAR/gzip writer, initialize PostgreSQL under a `pgdata` subdirectory for
+  ext4-backed CSI volumes, and pin the documented GW CORE image to `1.25.23`.
+  The release is gated by an isolated-MSP staging admission, four-channel
+  synchronization, all ten CCAAS runtimes, GW startup/restart and governed
+  removal before OCI publication. The documented GW CORE image is `1.25.24`,
+  including the regional organization-channel bootstrap fix proven by that gate.
+
 - Release `gdc-host` chart `0.3.8` with the external-orderer route implemented
   as a TLS-transparent TCP bridge, avoiding Kubernetes implementations that do
   not proxy a selectorless Service to a public-IP EndpointSlice.
