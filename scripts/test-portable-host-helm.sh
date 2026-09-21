@@ -111,6 +111,8 @@ if helm template invalid "${CHART}" -f "${TMP_DIR}/missing-default-channel.yaml"
   exit 1
 fi
 grep -q 'app.kubernetes.io/component: postgresql' "${TMP_DIR}/local-evidence.yaml"
+grep -A1 'name: PGDATA' "${TMP_DIR}/local-evidence.yaml" \
+  | grep -Fq 'value: "/var/lib/postgresql/data/pgdata"'
 grep -q 'app.kubernetes.io/component: ipfs' "${TMP_DIR}/local-evidence.yaml"
 if grep -q '^kind: Ingress$' "${TMP_DIR}/local-host1.yaml" \
   || grep -q '^kind: Ingress$' "${TMP_DIR}/local-host2.yaml"; then

@@ -3,7 +3,7 @@
 Distribución pública OCI:
 
 ```bash
-helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.3.8
+helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.4.0
 ```
 
 `gdc-host` empaqueta un límite de host reutilizable en cualquier Kubernetes:
@@ -21,7 +21,7 @@ values privado de cada release.
 ## Imágenes públicas de referencia
 
 - [GW CORE](https://github.com/orgs/Global-DataCare/packages/container/package/gw-core):
-  `ghcr.io/global-datacare/gw-core@sha256:e08eb3482e8e6df812269ba72c14d7831c2cdc331fe7bc6836a606b4e2e96a71`
+  `ghcr.io/global-datacare/gw-core@sha256:a9d18e92fc422f4fd79d18bfce6977814812187870f6ddda72aebc8428ae5b18`
 - [Runtime CCAAS](https://github.com/orgs/Global-DataCare/packages/container/package/host-runtime):
   `ghcr.io/global-datacare/host-runtime@sha256:f5d45cebaa5e7443ebf70aac85f33794d3d366dcb5370ab7921e9bc56336c0fa`
 
@@ -69,7 +69,7 @@ imágenes deben expresarse siempre por digest OCI:
 
 ```yaml
 gw:
-  image: ghcr.io/global-datacare/gw-core@sha256:e08eb3482e8e6df812269ba72c14d7831c2cdc331fe7bc6836a606b4e2e96a71
+  image: ghcr.io/global-datacare/gw-core@sha256:a9d18e92fc422f4fd79d18bfce6977814812187870f6ddda72aebc8428ae5b18
 ```
 
 La sección `host` identifica al operador y al controller técnico inicial del

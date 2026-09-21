@@ -21,7 +21,9 @@ for file in "${GUIDE}" "${INDEX}" "${CHART_README}" "${CHART_METADATA}"; do
 done
 
 grep -Fq 'oci://ghcr.io/global-datacare/gdc-host' "${INDEX}"
-grep -Fq 'helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.3.8' "${GUIDE}"
+grep -Fq 'helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.4.0' "${GUIDE}"
+grep -Fq 'tar -xzf gdc-host-0.4.0.tgz' "${GUIDE}"
+grep -Fq 'ghcr.io/global-datacare/gw-core@sha256:a9d18e92fc422f4fd79d18bfce6977814812187870f6ddda72aebc8428ae5b18' "${GUIDE}"
 grep -Fq 'peer.channels' "${GUIDE}"
 grep -Fq 'fabric-ca-client getcainfo' "${GUIDE}"
 grep -Fq 'enroll-host-msp.sh' "${GUIDE}"

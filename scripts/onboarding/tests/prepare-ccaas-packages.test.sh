@@ -12,6 +12,13 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 WORK="$(mktemp -d)"
 trap 'rm -rf "${WORK}"' EXIT
 
+if rg -n 'tar[[:space:]].*--(uid|gid)' "${ROOT}/scripts/onboarding/prepare-ccaas-packages.sh"; then
+  echo 'CCAAS package generation must not depend on GNU/BSD tar ownership flags' >&2
+  exit 1
+fi
+grep -Fq 'build-deterministic-ccaas-package.mjs' \
+  "${ROOT}/scripts/onboarding/prepare-ccaas-packages.sh"
+
 CCAAS_IMAGE='registry.example.invalid/host-runtime@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' \
 CCAAS_OUTPUT_DIR="${WORK}/first" \
   bash "${ROOT}/scripts/onboarding/prepare-ccaas-packages.sh"
@@ -29,6 +36,11 @@ fi
 grep -Fq $'artifact-sc\tidentity-global,identity-eu,health-care-eu\t' "${WORK}/first/manifest.tsv"
 grep -Fq $'subjectidentifier-sc\tidentity-global\t' "${WORK}/first/manifest.tsv"
 diff -r "${WORK}/first" "${WORK}/second"
+organization_digest="$(shasum -a 256 "${WORK}/first/packages/organization-sc.tgz" | awk '{print $1}')"
+if [[ "${organization_digest}" != '804c67d6179b6eec8c6341b320478f07ea075838f4e14171095a1d9b3768a2cb' ]]; then
+  echo "organization-sc package changed its governed ID: ${organization_digest}" >&2
+  exit 1
+fi
 while IFS=$'\t' read -r name channel archive package_id; do
   digest="$(shasum -a 256 "${WORK}/first/${archive}" | awk '{print $1}')"
   [[ "${package_id}" == "${name}-v1:${digest}" ]]

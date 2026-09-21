@@ -360,7 +360,7 @@ El runtime común de los diez chaincodes está disponible en la
 GW CORE y CCAAS son artefactos OCI distintos. Use siempre sus digests:
 
 ```bash
-export GW_PUBLIC_IMAGE="ghcr.io/global-datacare/gw-core@sha256:e08eb3482e8e6df812269ba72c14d7831c2cdc331fe7bc6836a606b4e2e96a71"
+export GW_PUBLIC_IMAGE="ghcr.io/global-datacare/gw-core@sha256:a9d18e92fc422f4fd79d18bfce6977814812187870f6ddda72aebc8428ae5b18"
 export CCAAS_PUBLIC_IMAGE="ghcr.io/global-datacare/host-runtime@sha256:f5d45cebaa5e7443ebf70aac85f33794d3d366dcb5370ab7921e9bc56336c0fa"
 docker buildx imagetools inspect "${GW_PUBLIC_IMAGE}"
 docker buildx imagetools inspect "${CCAAS_PUBLIC_IMAGE}"
@@ -451,8 +451,8 @@ helm template "${HELM_RELEASE}" charts/gdc-host \
   --namespace "${KUBE_NAMESPACE}" \
   --values /secure/inventory/host.values.yaml > /secure/onboarding/rendered.yaml
 
-helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.3.5
-tar -xzf gdc-host-0.3.5.tgz -C /secure/onboarding
+helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.4.0
+tar -xzf gdc-host-0.4.0.tgz -C /secure/onboarding
 
 helm upgrade --install "${HELM_RELEASE}" /secure/onboarding/gdc-host \
   --kube-context "${KUBE_CONTEXT}" --namespace "${KUBE_NAMESPACE}" \

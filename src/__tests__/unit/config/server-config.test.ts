@@ -215,6 +215,23 @@ describe('server-config sector resolution', () => {
     resetServerConfig();
   });
 
+  it('should route ledger organization registration through the regional organization channel', () => {
+    const previousEnv = process.env;
+    process.env = {
+      ...previousEnv,
+      LEDGER_IDENTITY_CHANNEL_DEFAULT: 'identity-global',
+      LEDGER_ORGANIZATION_IDENTITY_CHANNEL_DEFAULT: 'identity-eu',
+    };
+
+    resetServerConfig();
+    const config = getConfig();
+
+    expect(config.ledger?.channelName).toBe('identity-eu');
+
+    process.env = previousEnv;
+    resetServerConfig();
+  });
+
   it('should default security flags to disabled and map NETWORK_MODE by NODE_ENV', () => {
     const previousEnv = process.env;
     process.env = {
