@@ -116,8 +116,8 @@ peer:
     limits: { cpu: "1", memory: 1Gi }
 
 # Resolves the orderer hostname embedded in Fabric channel configuration from
-# an independently hosted Kubernetes cluster. The endpoint remains governed;
-# Helm only materializes the already approved network route.
+# an independently hosted Kubernetes cluster. The TLS-transparent TCP bridge
+# forwards only to the single governed address supplied by the inventory.
 ordererBridge:
   enabled: false
   serviceName: orderer
