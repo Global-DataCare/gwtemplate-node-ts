@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Release `gdc-host` chart `0.3.8` with the external-orderer route implemented
+  as a TLS-transparent TCP bridge, avoiding Kubernetes implementations that do
+  not proxy a selectorless Service to a public-IP EndpointSlice.
+
 - Release `gdc-host` chart `0.3.7` with a governed selectorless Service and
   EndpointSlice for the orderer hostname embedded in Fabric channel
   configuration, allowing a peer in an independent Kubernetes cluster to

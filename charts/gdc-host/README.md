@@ -3,7 +3,7 @@
 Distribución pública OCI:
 
 ```bash
-helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.3.7
+helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.3.8
 ```
 
 `gdc-host` empaqueta un límite de host reutilizable en cualquier Kubernetes:
@@ -112,9 +112,8 @@ por sí mismo: el administrador de Fabric verifica la configuración efectiva de
 cada canal y ejecuta la unión mediante el reconciliador gobernado.
 
 El hostname del orderer grabado en los canales actuales es `orderer`. En un
-clúster externo, `ordererBridge` crea el Service y EndpointSlice necesarios
-para resolverlo hacia la IP aprobada, sin desplegar otro orderer ni modificar
-el canal:
+clúster externo, `ordererBridge` crea un Service y un puente TCP transparente
+hacia la IP aprobada, sin desplegar otro orderer ni modificar el canal:
 
 ```yaml
 ordererBridge:

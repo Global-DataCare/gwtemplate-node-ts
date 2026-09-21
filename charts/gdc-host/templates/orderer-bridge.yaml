@@ -7,27 +7,50 @@ metadata:
     {{- include "gdc-host.labels" . | nindent 4 }}
     app.kubernetes.io/component: orderer-bridge
 spec:
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: orderer-bridge
   ports:
     - name: grpc
       protocol: TCP
       port: {{ .Values.ordererBridge.port }}
       targetPort: {{ .Values.ordererBridge.port }}
 ---
-apiVersion: discovery.k8s.io/v1
-kind: EndpointSlice
+apiVersion: apps/v1
+kind: Deployment
 metadata:
-  name: {{ include "gdc-host.fullname" . }}-orderer
+  name: {{ include "gdc-host.fullname" . }}-orderer-tcp-bridge
   labels:
     {{- include "gdc-host.labels" . | nindent 4 }}
     app.kubernetes.io/component: orderer-bridge
-    kubernetes.io/service-name: {{ .Values.ordererBridge.serviceName }}
-addressType: {{ .Values.ordererBridge.addressType }}
-endpoints:
-  {{- range .Values.ordererBridge.addresses }}
-  - addresses: [{{ . | quote }}]
-  {{- end }}
-ports:
-  - name: grpc
-    protocol: TCP
-    port: {{ .Values.ordererBridge.port }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: orderer-bridge
+  template:
+    metadata:
+      labels:
+        {{- include "gdc-host.labels" . | nindent 8 }}
+        app.kubernetes.io/component: orderer-bridge
+    spec:
+      containers:
+        - name: orderer-tcp-bridge
+          image: {{ .Values.images.init | quote }}
+          command: [sh, -ec]
+          args:
+            - {{ printf "exec nc -lk -p %v -e nc %s %v" .Values.ordererBridge.port (first .Values.ordererBridge.addresses) .Values.ordererBridge.port | quote }}
+          ports:
+            - { name: grpc, containerPort: {{ .Values.ordererBridge.port }} }
+          readinessProbe:
+            tcpSocket: { port: grpc }
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket: { port: grpc }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests: { cpu: 10m, memory: 16Mi }
+            limits: { cpu: 100m, memory: 64Mi }
 {{- end }}
