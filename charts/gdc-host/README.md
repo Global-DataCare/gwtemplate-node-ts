@@ -3,7 +3,7 @@
 Distribución pública OCI:
 
 ```bash
-helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.3.5
+helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.3.6
 ```
 
 `gdc-host` empaqueta un límite de host reutilizable en cualquier Kubernetes:

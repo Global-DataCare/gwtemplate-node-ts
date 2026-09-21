@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Release `gdc-host` chart `0.3.6` with the Fabric ICA certificate from the
+  enrollment MSP included in the peer TLS server chain and client trust
+  bundle, covering enrollments whose TLS archive contains only the Root CA.
+
 - Release `gdc-host` chart `0.3.5` with its single MSP peer configured as the
   static Fabric delivery leader, so a newly joined peer immediately retrieves
   channel blocks from the orderer and reaches the configuration that admits

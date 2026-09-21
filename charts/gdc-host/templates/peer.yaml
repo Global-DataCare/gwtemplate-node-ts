@@ -64,6 +64,13 @@ spec:
                 cat /tls/tlsintermediatecerts/*.pem >> /tls/server.crt
                 cat /tls/tlsintermediatecerts/*.pem >> /tls/ca.crt
               fi
+              # Some Fabric CA clients place the issuing ICA only in the
+              # enrollment MSP. Include it in both the served certificate
+              # chain and the peer-client trust bundle.
+              if ls /msp/intermediatecerts/*.pem >/dev/null 2>&1; then
+                cat /msp/intermediatecerts/*.pem >> /tls/server.crt
+                cat /msp/intermediatecerts/*.pem >> /tls/ca.crt
+              fi
           volumeMounts:
             - { name: msp-source, mountPath: /msp-source, readOnly: true }
             - { name: tls-source, mountPath: /tls-source, readOnly: true }
