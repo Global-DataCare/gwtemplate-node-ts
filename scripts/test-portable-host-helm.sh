@@ -70,6 +70,9 @@ grep -q 'name: CORE_PEER_GOSSIP_USELEADERELECTION' "${TMP_DIR}/production.yaml"
 grep -A1 'name: CORE_PEER_GOSSIP_USELEADERELECTION' "${TMP_DIR}/production.yaml" | grep -q 'value: "false"'
 grep -q 'name: CORE_PEER_GOSSIP_ORGLEADER' "${TMP_DIR}/production.yaml"
 grep -A1 'name: CORE_PEER_GOSSIP_ORGLEADER' "${TMP_DIR}/production.yaml" | grep -q 'value: "true"'
+grep -q '^kind: EndpointSlice$' "${TMP_DIR}/production.yaml"
+grep -q 'kubernetes.io/service-name: orderer' "${TMP_DIR}/production.yaml"
+grep -q 'addresses:.*192.0.2.10' "${TMP_DIR}/production.yaml"
 grep -q 'secretName: host-authorization' "${TMP_DIR}/production.yaml"
 grep -q 'mountPath: /var/run/gdc-host-authorization' "${TMP_DIR}/production.yaml"
 grep -q 'test -s /var/run/gdc-host-authorization/authorization.json' "${TMP_DIR}/production.yaml"

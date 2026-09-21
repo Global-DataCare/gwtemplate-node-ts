@@ -1,0 +1,33 @@
+{{- if .Values.ordererBridge.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.ordererBridge.serviceName }}
+  labels:
+    {{- include "gdc-host.labels" . | nindent 4 }}
+    app.kubernetes.io/component: orderer-bridge
+spec:
+  ports:
+    - name: grpc
+      protocol: TCP
+      port: {{ .Values.ordererBridge.port }}
+      targetPort: {{ .Values.ordererBridge.port }}
+---
+apiVersion: discovery.k8s.io/v1
+kind: EndpointSlice
+metadata:
+  name: {{ include "gdc-host.fullname" . }}-orderer
+  labels:
+    {{- include "gdc-host.labels" . | nindent 4 }}
+    app.kubernetes.io/component: orderer-bridge
+    kubernetes.io/service-name: {{ .Values.ordererBridge.serviceName }}
+addressType: {{ .Values.ordererBridge.addressType }}
+endpoints:
+  {{- range .Values.ordererBridge.addresses }}
+  - addresses: [{{ . | quote }}]
+  {{- end }}
+ports:
+  - name: grpc
+    protocol: TCP
+    port: {{ .Values.ordererBridge.port }}
+{{- end }}
