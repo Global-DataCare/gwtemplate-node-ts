@@ -21,7 +21,7 @@ The so-called "SEDIA runner" is not Helm, nor a tool supplied or approved by SED
 The two verified `linux/amd64` images are publicly available on GitHub Container Registry:
 
 - [GW CORE](https://github.com/orgs/Global-DataCare/packages/container/package/gw-core):
-`ghcr.io/global-datacare/gw-core@sha256:a9d18e92fc422f4fd79d18bfce6977814812187870f6ddda72aebc8428ae5b18`.
+`ghcr.io/global-datacare/gw-core@sha256:915069bc437e625e2444971191dec48e9c7b4cd65e04900612d8333af1daefa8`.
 - [Runtime CCAAS](https://github.com/orgs/Global-DataCare/packages/container/package/host-runtime):
 `ghcr.io/global-datacare/host-runtime@sha256:f5d45cebaa5e7443ebf70aac85f33794d3d366dcb5370ab7921e9bc56336c0fa`.
 
@@ -123,7 +123,7 @@ This gate requires that all four collections arrive in PostgreSQL, that each aud
 To verify or reuse already published artifacts without rebuilding them:
 
 ```bash
-export GW_PUBLIC_IMAGE="ghcr.io/global-datacare/gw-core@sha256:a9d18e92fc422f4fd79d18bfce6977814812187870f6ddda72aebc8428ae5b18"
+export GW_PUBLIC_IMAGE="ghcr.io/global-datacare/gw-core@sha256:915069bc437e625e2444971191dec48e9c7b4cd65e04900612d8333af1daefa8"
 export CCAAS_PUBLIC_IMAGE="ghcr.io/global-datacare/host-runtime@sha256:f5d45cebaa5e7443ebf70aac85f33794d3d366dcb5370ab7921e9bc56336c0fa"
 docker buildx imagetools inspect "${GW_PUBLIC_IMAGE}"
 docker buildx imagetools inspect "${CCAAS_PUBLIC_IMAGE}"

@@ -238,7 +238,7 @@ GW CORE is not published on npm. The verified version is available on the [GW CO
 GW CORE and CCAAS are different OCI artifacts. Always use the approved digests:
 
 ```bash
-export GW_PUBLIC_IMAGE="ghcr.io/global-datacare/gw-core@sha256:a9d18e92fc422f4fd79d18bfce6977814812187870f6ddda72aebc8428ae5b18"
+export GW_PUBLIC_IMAGE="ghcr.io/global-datacare/gw-core@sha256:915069bc437e625e2444971191dec48e9c7b4cd65e04900612d8333af1daefa8"
 export CCAAS_PUBLIC_IMAGE="ghcr.io/global-datacare/host-runtime@sha256:f5d45cebaa5e7443ebf70aac85f33794d3d366dcb5370ab7921e9bc56336c0fa"
 docker buildx imagetools inspect "${GW_PUBLIC_IMAGE}"
 docker buildx imagetools inspect "${CCAAS_PUBLIC_IMAGE}"
