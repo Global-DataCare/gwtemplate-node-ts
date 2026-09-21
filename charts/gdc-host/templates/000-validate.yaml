@@ -22,6 +22,12 @@
 {{- if and (eq .Values.environment "production") (empty .Values.peer.channels) -}}
 {{- fail "production requires peer.channels with the complete governed channel set" -}}
 {{- end -}}
+{{- if and (eq .Values.environment "production") (not .Values.ordererBridge.enabled) -}}
+{{- fail "production requires ordererBridge.enabled for the governed orderer endpoint embedded in channel configuration" -}}
+{{- end -}}
+{{- if and .Values.ordererBridge.enabled (empty .Values.ordererBridge.addresses) -}}
+{{- fail "ordererBridge.enabled requires at least one governed endpoint address" -}}
+{{- end -}}
 {{- if and (not (empty .Values.peer.channels)) (not (has .Values.host.identityChannel .Values.peer.channels)) -}}
 {{- fail "peer.channels must include host.identityChannel" -}}
 {{- end -}}

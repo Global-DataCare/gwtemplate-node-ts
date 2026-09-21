@@ -115,6 +115,16 @@ peer:
     requests: { cpu: 250m, memory: 512Mi }
     limits: { cpu: "1", memory: 1Gi }
 
+# Resolves the orderer hostname embedded in Fabric channel configuration from
+# an independently hosted Kubernetes cluster. The endpoint remains governed;
+# Helm only materializes the already approved network route.
+ordererBridge:
+  enabled: false
+  serviceName: orderer
+  addressType: IPv4
+  addresses: []
+  port: 7050
+
 externalPeer:
   host: ""
   port: 7051

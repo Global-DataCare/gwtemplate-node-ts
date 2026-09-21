@@ -3,7 +3,7 @@
 Distribución pública OCI:
 
 ```bash
-helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.3.6
+helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.3.7
 ```
 
 `gdc-host` empaqueta un límite de host reutilizable en cualquier Kubernetes:
@@ -110,6 +110,23 @@ peer:
 Helm inyecta esa lista como `HLF_BOOTSTRAP_CHANNELS`, pero no incorpora el peer
 por sí mismo: el administrador de Fabric verifica la configuración efectiva de
 cada canal y ejecuta la unión mediante el reconciliador gobernado.
+
+El hostname del orderer grabado en los canales actuales es `orderer`. En un
+clúster externo, `ordererBridge` crea el Service y EndpointSlice necesarios
+para resolverlo hacia la IP aprobada, sin desplegar otro orderer ni modificar
+el canal:
+
+```yaml
+ordererBridge:
+  enabled: true
+  serviceName: orderer
+  addressType: IPv4
+  addresses: [<ip-publica-orderer-aprobada>]
+  port: 7050
+```
+
+La dirección debe proceder del inventario gobernado. El certificado del
+orderer sigue validándose con el nombre y la CA ya fijados por Fabric.
 
 Antes de instalar, deben existir los Secrets referenciados:
 

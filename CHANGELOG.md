@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Release `gdc-host` chart `0.3.7` with a governed selectorless Service and
+  EndpointSlice for the orderer hostname embedded in Fabric channel
+  configuration, allowing a peer in an independent Kubernetes cluster to
+  retrieve blocks without an ad-hoc DNS or manifest patch.
+
 - Release `gdc-host` chart `0.3.6` with the Fabric ICA certificate from the
   enrollment MSP included in the peer TLS server chain and client trust
   bundle, covering enrollments whose TLS archive contains only the Root CA.

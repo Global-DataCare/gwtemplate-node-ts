@@ -99,6 +99,17 @@
         "externalEndpoint": { "type": "string", "minLength": 1 }
       }
     },
+    "ordererBridge": {
+      "type": "object",
+      "required": ["enabled", "serviceName", "addressType", "addresses", "port"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "serviceName": { "type": "string", "pattern": "^[a-z0-9](?:[-a-z0-9]*[a-z0-9])?$" },
+        "addressType": { "type": "string", "enum": ["IPv4", "IPv6"] },
+        "addresses": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 2 } },
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535 }
+      }
+    },
     "couchdb": { "type": "object", "properties": { "image": { "$ref": "#/definitions/digestImage" } } },
     "postgresql": { "type": "object", "properties": { "image": { "$ref": "#/definitions/digestImage" } } },
     "ipfs": { "type": "object", "properties": { "image": { "$ref": "#/definitions/digestImage" } } },
