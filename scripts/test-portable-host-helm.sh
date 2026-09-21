@@ -66,6 +66,10 @@ grep -q 'HOST_ADMIN_UID: "host-controller-001"' "${TMP_DIR}/production.yaml"
 grep -q 'HOST_ADMIN_ROLE: "ISCO-08|1120"' "${TMP_DIR}/production.yaml"
 grep -q 'HLF_BOOTSTRAP_CHANNELS: "identity-global,identity-eu,health-care-eu,animal-pet-eu"' \
   "${TMP_DIR}/production.yaml"
+grep -q 'name: CORE_PEER_GOSSIP_USELEADERELECTION' "${TMP_DIR}/production.yaml"
+grep -A1 'name: CORE_PEER_GOSSIP_USELEADERELECTION' "${TMP_DIR}/production.yaml" | grep -q 'value: "false"'
+grep -q 'name: CORE_PEER_GOSSIP_ORGLEADER' "${TMP_DIR}/production.yaml"
+grep -A1 'name: CORE_PEER_GOSSIP_ORGLEADER' "${TMP_DIR}/production.yaml" | grep -q 'value: "true"'
 grep -q 'secretName: host-authorization' "${TMP_DIR}/production.yaml"
 grep -q 'mountPath: /var/run/gdc-host-authorization' "${TMP_DIR}/production.yaml"
 grep -q 'test -s /var/run/gdc-host-authorization/authorization.json' "${TMP_DIR}/production.yaml"

@@ -54,8 +54,8 @@ migrada o desplegada.
 El mismo chart validado en `local-network` se distribuye como OCI:
 
 ```bash
-helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.3.4
-helm show chart oci://ghcr.io/global-datacare/gdc-host --version 0.3.4
+helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.3.5
+helm show chart oci://ghcr.io/global-datacare/gdc-host --version 0.3.5
 ```
 
 Paquete: [gdc-host en GHCR](https://github.com/orgs/Global-DataCare/packages/container/package/gdc-host).

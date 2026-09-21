@@ -85,6 +85,11 @@ spec:
             - { name: CORE_PEER_CHAINCODELISTENADDRESS, value: "0.0.0.0:7052" }
             - { name: CORE_PEER_GOSSIP_EXTERNALENDPOINT, value: {{ .Values.peer.externalEndpoint | quote }} }
             - { name: CORE_PEER_GOSSIP_BOOTSTRAP, value: {{ .Values.peer.bootstrap | quote }} }
+            # This chart owns exactly one peer for its MSP. Make it the static
+            # delivery leader so a newly admitted organization pulls blocks
+            # from the orderer immediately after joining a channel.
+            - { name: CORE_PEER_GOSSIP_USELEADERELECTION, value: "false" }
+            - { name: CORE_PEER_GOSSIP_ORGLEADER, value: "true" }
             {{- range $key, $value := .Values.peer.extraEnv }}
             - name: {{ $key }}
               value: {{ $value | quote }}
