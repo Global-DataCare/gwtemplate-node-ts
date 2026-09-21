@@ -510,13 +510,13 @@ valida e inyecta la lista, mientras que el equipo DevOps de Fabric realiza y
 verifica la unión efectiva.
 
 ```bash
-helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.3.4
+helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.3.5
 
 bash scripts/validate-host-helm-values.sh \
   /secure/inventory/host.values.yaml '<namespace>' '<release>'
 
 helm upgrade --install '<release>' oci://ghcr.io/global-datacare/gdc-host \
-  --version 0.3.4 --namespace '<namespace>' --create-namespace \
+  --version 0.3.5 --namespace '<namespace>' --create-namespace \
   --values /secure/inventory/host.values.yaml \
   --atomic --wait --timeout 15m
 ```

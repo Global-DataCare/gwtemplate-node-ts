@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Release `gdc-host` chart `0.3.5` with its single MSP peer configured as the
+  static Fabric delivery leader, so a newly joined peer immediately retrieves
+  channel blocks from the orderer and reaches the configuration that admits
+  its organization before lifecycle approval.
+
 - Make production Fabric safety governance self-contained in GW CORE. Public
   repository instructions no longer depend on a sibling private repository;
   they retain the separate authorization, immutable pre-change capture,

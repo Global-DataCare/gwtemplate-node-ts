@@ -44,8 +44,8 @@ infrastructure has already been migrated or deployed.
 The same chart validated in `local-network` is distributed through OCI:
 
 ```bash
-helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.3.4
-helm show chart oci://ghcr.io/global-datacare/gdc-host --version 0.3.4
+helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.3.5
+helm show chart oci://ghcr.io/global-datacare/gdc-host --version 0.3.5
 ```
 
 Package: [gdc-host on GHCR](https://github.com/orgs/Global-DataCare/packages/container/package/gdc-host).

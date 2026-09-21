@@ -310,8 +310,8 @@ helm template "${HELM_RELEASE}" charts/gdc-host \
   --namespace "${KUBE_NAMESPACE}" \
   --values /secure/inventory/host.values.yaml > /secure/onboarding/rendered.yaml
 
-helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.3.4
-tar -xzf gdc-host-0.3.4.tgz -C /secure/onboarding
+helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.3.5
+tar -xzf gdc-host-0.3.5.tgz -C /secure/onboarding
 
 helm upgrade --install "${HELM_RELEASE}" /secure/onboarding/gdc-host \
   --kube-context "${KUBE_CONTEXT}" --namespace "${KUBE_NAMESPACE}" \
