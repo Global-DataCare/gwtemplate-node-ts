@@ -34,6 +34,40 @@ describe('fhir-resource-rehydration utils', () => {
     });
   });
 
+  it('keeps clinical claims but rejects the persistence envelope and private query text', () => {
+    const resource = buildFhirResourceFromIndexedClaims(ResourceTypesFhirR4.Observation, {
+      id: 'observation-research-1',
+      audit: { creatorDid: 'did:web:private.example:professional:1' },
+      indexed: { attributes: [{ name: '__digitalTwinSearch.text', value: 'private copy' }] },
+      meta: { internalRevision: '1' },
+      tag: [{ system: 'urn:private', code: 'internal' }],
+      status: 'stored',
+      sequence: 7,
+      contentType: 'application/json',
+      content: { internal: true },
+      'Observation.subject': 'urn:uuid:00000000-0000-4000-8000-000000000001',
+      'Observation.status': 'final',
+      'Observation.code': 'http://loinc.org|8310-5',
+      'Observation.code-display': 'Body temperature',
+      'Observation.code-text': 'Temperatura corporal',
+      'Observation.language': 'es',
+      '__digitalTwinSearch.text': 'private search copy',
+    });
+
+    expect(resource.status).toBe('final');
+    expect(resource.code).toEqual({
+      text: 'Temperatura corporal',
+      coding: [{ system: 'http://loinc.org', code: '8310-5', display: 'Body temperature' }],
+    });
+    for (const storageEnvelopeKey of [
+      'id', 'audit', 'indexed', 'meta', 'tag', 'status', 'sequence', 'contentType', 'content',
+    ]) {
+      expect(resource.meta.claims).not.toHaveProperty(storageEnvelopeKey);
+    }
+    expect(resource.meta.claims['Observation.status']).toBe('final');
+    expect(JSON.stringify(resource)).not.toContain('private search copy');
+  });
+
   it('rehydrates DocumentReference content and keeps subject/date semantics', () => {
     const resource = buildFhirResourceFromIndexedClaims(ResourceTypesFhirR4.DocumentReference, {
       id: 'doc-1',

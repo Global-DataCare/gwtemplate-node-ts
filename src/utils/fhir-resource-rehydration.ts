@@ -18,6 +18,23 @@ const EFFECTIVE_FIELD_BY_RESOURCE_TYPE = Object.freeze<Record<string, string>>({
   [ResourceTypesFhirR4.DocumentReference]: 'date',
 });
 
+/**
+ * Bare persistence-envelope properties, never FHIR business claims. A
+ * namespaced claim such as `Observation.status` remains clinical content even
+ * though the bare envelope property `status` is excluded.
+ */
+const STORAGE_ENVELOPE_KEYS: ReadonlySet<string> = new Set([
+  'id',
+  'audit',
+  'indexed',
+  'meta',
+  'tag',
+  'status',
+  'sequence',
+  'contentType',
+  'content',
+]);
+
 function buildCodeableConcept(params: {
   text?: string;
   codeToken?: string;
@@ -41,6 +58,12 @@ function buildCodeableConcept(params: {
   };
 }
 
+/**
+ * Materializes public FHIR from canonical flat claims without copying storage
+ * envelopes or private query helpers. `code-display` and `code-text` remain
+ * source terminology evidence; consumers resolve authoritative displays and
+ * translations again from `system|code`.
+ */
 export function buildFhirResourceFromIndexedClaims(
   resourceType: string,
   record: Record<string, any>,
@@ -49,7 +72,9 @@ export function buildFhirResourceFromIndexedClaims(
   // them for migration compatibility, but expose and persist only the stable
   // FHIR API search-parameter namespace.
   const claims = canonicalizeFhirClaims(Object.fromEntries(
-    Object.entries(record || {}).filter(([key]) => !String(key).startsWith(DIGITAL_TWIN_SEARCH_CLAIM_PREFIX)),
+    Object.entries(record || {}).filter(([key]) =>
+      !STORAGE_ENVELOPE_KEYS.has(key)
+      && !String(key).startsWith(DIGITAL_TWIN_SEARCH_CLAIM_PREFIX)),
   ));
   const subject =
     normalizeReference(getClaimValue<string>(claims, `${resourceType}.subject`))

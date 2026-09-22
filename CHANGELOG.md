@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Release GW CORE `1.25.25` preserving canonical code, selected display,
+  confirmed local text and language as research-summary source evidence while
+  filtering persistence envelopes and private query data. Research consumers
+  re-resolve authoritative terminology from `system|code`.
+
 - Release GW CORE `1.25.24` with organization ledger bootstrap routed through
   `LEDGER_ORGANIZATION_IDENTITY_CHANNEL_DEFAULT`; the human identity channel no
   longer overrides regional organization registration during host startup.

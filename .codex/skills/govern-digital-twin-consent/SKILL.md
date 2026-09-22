@@ -118,6 +118,17 @@ Verify current branches, versions and published npm state before release claims.
   second index, and `__digitalTwinSearch.*` is never a public FHIR claim family.
   Consume those properties only for Composition-wide matching and strip them
   from search matches and materialized resources.
+- Preserve `<Resource>.code = system|code`, selected `code-display`, confirmed
+  local `code-text` and language in the permitted projection as source
+  terminology evidence. Consumers must not treat either label as authoritative:
+  DataConv re-resolves standardized terms and configured translations from the
+  code while retaining submitted labels as provenance. A UI or assistant uses
+  confirmed local text only when its language matches; otherwise it resolves the
+  requested language through the terminology service and falls back to the
+  re-resolved international display. An absent or unsupported code leaves the
+  submitted label as unstandardized review evidence, never an invented official
+  translation. Bare envelope `status` remains distinct from namespaced clinical
+  claims such as `Observation.status`.
 - Keep age range and host-wide aggregation out of the MVP.
 - For a tenant DID created before ResearchSubject became the public aggregate,
   accept its existing read-only digitaltwin Composition `_search` declaration
