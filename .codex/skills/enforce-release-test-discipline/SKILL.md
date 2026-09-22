@@ -258,6 +258,14 @@ dependency upward. The next package or deployable consumer may be changed only
 after the previous immutable version exists in the registry and its integrity
 and exported surface have been verified.
 
+For reusable FHIR claims, converters and typed entry editors,
+`gdc-common-utils-ts` owns the canonical contract. Implement and test it there,
+publish and verify the immutable package, then run the affected SDK contract
+and E2E suites without compatibility regressions before pinning that exact
+version in GW or another deployable consumer. Never repair the same FHIR field
+independently inside GW, and never advance GW merely because the shared package
+test passed while an affected SDK still fails.
+
 1. Update the owning changelog with tested behavior. Shared changelogs remain
    product-neutral.
 2. Run focused tests, affected integration/E2E tests, full tests, typecheck,

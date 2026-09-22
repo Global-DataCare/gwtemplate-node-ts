@@ -1,4 +1,4 @@
-// Flow contract: preserve canonical code plus confirmed source labels while pseudonymizing identifiers; research consumers re-resolve authoritative terminology from the code.
+// Flow contract: pseudonymize research facts, retain coded/date/category data, and never expose submitted labels or author identity.
 import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 import {
   DIGITAL_TWIN_SEARCH_DATE_CLAIM,
@@ -39,20 +39,24 @@ describe('digital twin research projection', () => {
     expect(getDigitalTwinSubjectAliasSectionId()).toContain('digitaltwin_subject_aliases');
   });
 
-  it('keeps confirmed terminology source evidence while removing identifying narrative', () => {
+  it('keeps canonical code while removing source labels and identifying narrative', () => {
     const twinSubjectId = 'urn:uuid:00000000-0000-4000-8000-000000000001';
     const projected = projectClaimsForDigitalTwin({
       resourceType: ResourceTypesFhirR4.MedicationStatement,
       twinSubjectId,
       claims: {
         '@context': 'org.hl7.fhir.r4',
+        '@type': 'MedicationStatement:SelfReported',
         'MedicationStatement.identifier': 'clinical-medication-123',
+        'MedicationStatement.author': 'did:web:api.acme.org:member:private-author',
+        'MedicationStatement.attester': 'urn:uuid:private-attester',
+        'MedicationStatement.information-source': 'PractitionerRole/private-source',
         'MedicationStatement.subject': 'did:web:api.acme.org:individual:123',
         'MedicationStatement.patient': 'did:web:api.acme.org:individual:123',
         'MedicationStatement.code': 'http://snomed.info/sct|387207008',
-        'MedicationStatement.code-text': 'Ibuprofeno',
+        'MedicationStatement.code-text': 'Private dictated wording',
         'MedicationStatement.dosage-instruction': 'Take after dinner',
-        'MedicationStatement.code-display': 'Ibuprofen',
+        'MedicationStatement.code-display': 'Private source display',
         'MedicationStatement.effective-dateTime': '2026-08-20T10:30:00.000Z',
         'MedicationStatement.language': 'es',
         'MedicationStatement.medication-text': 'Alice takes ibuprofen',
@@ -64,21 +68,27 @@ describe('digital twin research projection', () => {
     expect(projected['MedicationStatement.identifier']).toMatch(/^urn:uuid:/);
     expect(projected['MedicationStatement.identifier']).not.toBe('clinical-medication-123');
     expect(projected['MedicationStatement.code']).toBe('http://snomed.info/sct|387207008');
-    expect(projected['MedicationStatement.code-text']).toBe('Ibuprofeno');
-    expect(projected['MedicationStatement.code-display']).toBe('Ibuprofen');
-    expect(projected).not.toHaveProperty('MedicationStatement.patient');
-    expect(projected).not.toHaveProperty('MedicationStatement.dosage-instruction');
-    expect(projected).not.toHaveProperty('MedicationStatement.medication-text');
-    expect(projected).not.toHaveProperty('MedicationStatement.note');
-    expect(projected[DIGITAL_TWIN_SEARCH_TEXT_CLAIM]).toBe('Ibuprofeno\u001fIbuprofen');
+    expect(projected['@type']).toBe('MedicationStatement:SelfReported');
+    expect(Object.hasOwn(projected, 'MedicationStatement.author')).toBe(false);
+    expect(Object.hasOwn(projected, 'MedicationStatement.attester')).toBe(false);
+    expect(Object.hasOwn(projected, 'MedicationStatement.information-source')).toBe(false);
+    expect(JSON.stringify(projected)).not.toContain('private-author');
+    expect(JSON.stringify(projected)).not.toContain('private-attester');
+    expect(JSON.stringify(projected)).not.toContain('private-source');
+    expect(Object.hasOwn(projected, 'MedicationStatement.code-text')).toBe(false);
+    expect(Object.hasOwn(projected, 'MedicationStatement.code-display')).toBe(false);
+    expect(Object.hasOwn(projected, 'MedicationStatement.patient')).toBe(false);
+    expect(Object.hasOwn(projected, 'MedicationStatement.dosage-instruction')).toBe(false);
+    expect(Object.hasOwn(projected, 'MedicationStatement.medication-text')).toBe(false);
+    expect(Object.hasOwn(projected, 'MedicationStatement.note')).toBe(false);
+    expect(Object.hasOwn(projected, DIGITAL_TWIN_SEARCH_TEXT_CLAIM)).toBe(false);
     expect(projected[DIGITAL_TWIN_SEARCH_DATE_CLAIM]).toBe('2026-08-20T10:30:00.000Z');
     expect(projected[DIGITAL_TWIN_SEARCH_LANGUAGE_CLAIM]).toBe('es');
-    // These three private properties coexist with the preserved coded claims
+    // The governed date/language helpers coexist with the preserved code
     // on the same projected resource record. The projection does not write a
     // second search document or a separate collection.
     expect(Object.keys(projected)).toEqual(expect.arrayContaining([
       'MedicationStatement.code',
-      DIGITAL_TWIN_SEARCH_TEXT_CLAIM,
       DIGITAL_TWIN_SEARCH_DATE_CLAIM,
       DIGITAL_TWIN_SEARCH_LANGUAGE_CLAIM,
     ]));

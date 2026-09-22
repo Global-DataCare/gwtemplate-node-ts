@@ -1,4 +1,4 @@
-// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
+// Flow contract: authorized clinical documents remain searchable and materializable while digital-twin projections stay pseudonymous and code-preserving.
 // TDD flow contract: ingest clinical sections, read the current summary, delete one
 // exact authored resource through a batch, then prove operational and permitted
 // Digital Twin readback no longer contains it.
@@ -28,6 +28,7 @@ import {
   ResourceTypesFhirR4,
 } from 'gdc-common-utils-ts/constants/index';
 import { ResearchSubjectClaim } from 'gdc-common-utils-ts/models/interoperable-claims/research-subject-claims';
+import { AllergyIntoleranceReactionSeverities } from 'gdc-common-utils-ts/models/interoperable-claims/allergy-intolerance-claims';
 import { Format, JobAction } from 'gdc-common-utils-ts/constants/Schemas';
 import {
   HttpHeaderNames,
@@ -51,6 +52,7 @@ import {
   EXAMPLE_KYC_CONTROLLER_USER_UUID,
   EXAMPLE_KYC_CONTROLLER_UUID,
   EXAMPLE_TENANT_SERVICE_DID,
+  EXAMPLE_VITAL_SIGN_CODE_BLOOD_PRESSURE_PANEL,
 } from 'gdc-common-utils-ts/examples/shared';
 import { FhirIpsCreatorKinds } from 'gdc-common-utils-ts/utils/fhir-ips-creator-identity';
 import { getClinicalCreatorBindingsSectionId } from '../../utils/ips-bundle';
@@ -1149,18 +1151,6 @@ describe('Composition Bundle _search API (integration)', () => {
         alias.id === createHash('sha256').update(source).digest('hex'))?.twinSubjectId;
       const searchCases = [
         {
-          // Basic portal search: sections are repeated, text is
-          // resource-agnostic and an omitted date-to is resolved by GW.
-          thid: 'ips-all-sections-basic-text-date-search-001',
-          expectedSubject: twinFor(subjectDid),
-          parameters: [
-            { name: 'section', valueString: HealthcareBasicSections.HistoryOfMedicationUse.attributeValue },
-            { name: 'section', valueString: HealthcareBasicSections.Results.attributeValue },
-            { name: 'date-from', valueDate: '2024-01-01' },
-            { name: 'text', valueString: 'lisinopril' },
-          ],
-        },
-        {
           thid: 'ips-all-sections-med-search-001',
           expectedSubject: twinFor(subjectDid),
           parameters: [
@@ -1587,11 +1577,12 @@ describe('Composition Bundle _search API (integration)', () => {
     }
   });
 
-  // Journey: 1. ingest an IPS document; 2. permit its pseudonymous projection;
-  // 3. discover the registered ResearchSubject; 4. materialize R4 and API
-  // summaries. Authorization invariant: only the consented UUID subject is
-  // returned. Persistence invariant: code plus confirmed source display/text
-  // survive while storage envelopes and private query data never surface.
+  // Journey: 1. ingest an IPS document containing medication, blood pressure,
+  // and immunization facts; 2. permit its pseudonymous projection; 3. discover
+  // the registered ResearchSubject; 4. materialize R4 and API summaries.
+  // Authorization invariant: only the consented UUID subject is returned.
+  // Persistence invariant: canonical codes survive while submitted labels,
+  // author identity, storage envelopes, and private query data never surface.
   it('materializes selected digital twins through Communication -> ResearchSubject/$summary in r4 and api formats', async () => {
     process.env.NODE_ENV = 'test';
     process.env.DB_PROVIDER = 'mem';
@@ -1653,11 +1644,37 @@ describe('Composition Bundle _search API (integration)', () => {
       const sourceMedication = ipsBundle.entry
         .find((bundleEntry: any) => bundleEntry?.resource?.resourceType === ResourceTypesFhirR4.MedicationStatement)
         ?.resource;
-      const sourceObservation = ipsBundle.entry
-        .find((bundleEntry: any) => bundleEntry?.resource?.resourceType === ResourceTypesFhirR4.Observation)
+      const sourceAllergy = ipsBundle.entry
+        .find((bundleEntry: any) => bundleEntry?.resource?.resourceType === ResourceTypesFhirR4.AllergyIntolerance)
         ?.resource;
+      const sourceCondition = ipsBundle.entry
+        .find((bundleEntry: any) => bundleEntry?.resource?.resourceType === ResourceTypesFhirR4.Condition)
+        ?.resource;
+      const sourceObservation = ipsBundle.entry
+        .find((bundleEntry: any) => bundleEntry?.resource?.resourceType === ResourceTypesFhirR4.Observation
+          && bundleEntry?.resource?.code?.coding
+            ?.some((coding: any) => coding?.code === EXAMPLE_VITAL_SIGN_CODE_BLOOD_PRESSURE_PANEL))
+        ?.resource;
+      const sourceImmunization = ipsBundle.entry
+        .find((bundleEntry: any) => bundleEntry?.resource?.resourceType === ResourceTypesFhirR4.Immunization)
+        ?.resource;
+      const sourceProcedure = ipsBundle.entry
+        .find((bundleEntry: any) => bundleEntry?.resource?.resourceType === ResourceTypesFhirR4.Procedure)
+        ?.resource;
+      const medicationPeriodStart = sourceMedication.effectiveDateTime;
+      const medicationPeriodEnd = new Date(Date.parse(medicationPeriodStart) + (30 * 24 * 60 * 60 * 1000)).toISOString();
+      delete sourceMedication.effectiveDateTime;
+      sourceMedication.effectivePeriod = { start: medicationPeriodStart, end: medicationPeriodEnd };
+      sourceAllergy.reaction = [{
+        manifestation: [sourceAllergy.code],
+        severity: AllergyIntoleranceReactionSeverities.Severe,
+      }];
       const sourceMedicationCoding = sourceMedication?.medicationCodeableConcept?.coding?.[0];
+      const sourceAllergyCoding = sourceAllergy?.code?.coding?.[0];
+      const sourceConditionCoding = sourceCondition?.code?.coding?.[0];
       const sourceObservationCoding = sourceObservation?.code?.coding?.[0];
+      const sourceImmunizationCoding = sourceImmunization?.vaccineCode?.coding?.[0];
+      const sourceProcedureCoding = sourceProcedure?.code?.coding?.[0];
       const medicationCodeToken = `${sourceMedicationCoding.system}|${sourceMedicationCoding.code}`;
       const documentReference = {
         resourceType: ResourceTypesFhirR4.DocumentReference,
@@ -1825,6 +1842,17 @@ describe('Composition Bundle _search API (integration)', () => {
       expect(
         r4Payload?.data?.[0]?.resource?.entry?.some((entry: any) => entry?.resource?.resourceType === 'Observation'),
       ).toBe(true);
+      expect(
+        r4Payload?.data?.[0]?.resource?.entry?.some((entry: any) => entry?.resource?.resourceType === 'Immunization'),
+      ).toBe(true);
+      for (const expectedResourceType of [
+        ResourceTypesFhirR4.AllergyIntolerance,
+        ResourceTypesFhirR4.Condition,
+        ResourceTypesFhirR4.Procedure,
+      ]) {
+        expect(r4Payload?.data?.[0]?.resource?.entry
+          ?.some((entry: any) => entry?.resource?.resourceType === expectedResourceType)).toBe(true);
+      }
       const r4Medication = r4Payload?.data?.[0]?.resource?.entry
         ?.map((entry: any) => entry?.resource)
         .find((resource: any) => resource?.medicationCodeableConcept?.coding?.some((coding: any) =>
@@ -1833,22 +1861,43 @@ describe('Composition Bundle _search API (integration)', () => {
         ?.map((entry: any) => entry?.resource)
         .find((resource: any) => resource?.code?.coding?.some((coding: any) =>
           coding?.system === sourceObservationCoding.system && coding?.code === sourceObservationCoding.code));
+      const r4Immunization = r4Payload?.data?.[0]?.resource?.entry
+        ?.map((entry: any) => entry?.resource)
+        .find((resource: any) => resource?.vaccineCode?.coding?.some((coding: any) =>
+          coding?.system === sourceImmunizationCoding.system && coding?.code === sourceImmunizationCoding.code));
+      const findCodedResource = (resourceType: string, code: string) => r4Payload?.data?.[0]?.resource?.entry
+        ?.map((entry: any) => entry?.resource)
+        .find((resource: any) => resource?.resourceType === resourceType
+          && resource?.code?.coding?.some((coding: any) => coding?.code === code));
+      const r4Allergy = findCodedResource(ResourceTypesFhirR4.AllergyIntolerance, sourceAllergyCoding.code);
+      const r4Condition = findCodedResource(ResourceTypesFhirR4.Condition, sourceConditionCoding.code);
+      const r4Procedure = findCodedResource(ResourceTypesFhirR4.Procedure, sourceProcedureCoding.code);
       expect(r4Medication?.medicationCodeableConcept).toMatchObject({
-        text: sourceMedication.medicationCodeableConcept.text,
-        coding: [expect.objectContaining({
-          system: sourceMedicationCoding.system,
-          code: sourceMedicationCoding.code,
-          display: sourceMedicationCoding.display,
-        })],
+        coding: [expect.objectContaining({ system: sourceMedicationCoding.system, code: sourceMedicationCoding.code })],
       });
+      expect(r4Medication?.medicationCodeableConcept).not.toHaveProperty('text');
+      expect(r4Medication?.medicationCodeableConcept?.coding?.[0]).not.toHaveProperty('display');
+      expect(r4Medication?.effectivePeriod).toEqual({ start: medicationPeriodStart, end: medicationPeriodEnd });
       expect(r4Observation?.code).toMatchObject({
-        text: sourceObservation.code.text,
-        coding: [expect.objectContaining({
-          system: sourceObservationCoding.system,
-          code: sourceObservationCoding.code,
-          display: sourceObservationCoding.display,
-        })],
+        coding: [expect.objectContaining({ system: sourceObservationCoding.system, code: sourceObservationCoding.code })],
       });
+      expect(r4Observation?.component).toHaveLength(2);
+      expect(r4Immunization?.vaccineCode).toMatchObject({
+        coding: [expect.objectContaining({ system: sourceImmunizationCoding.system, code: sourceImmunizationCoding.code })],
+      });
+      expect(r4Allergy?.reaction?.[0]?.severity).toBe(AllergyIntoleranceReactionSeverities.Severe);
+      expect(r4Condition?.code?.coding?.[0]).toMatchObject({
+        system: sourceConditionCoding.system,
+        code: sourceConditionCoding.code,
+      });
+      expect(r4Procedure?.code?.coding?.[0]).toMatchObject({
+        system: sourceProcedureCoding.system,
+        code: sourceProcedureCoding.code,
+      });
+      expect(JSON.stringify(r4Payload?.data?.[0]?.resource)).not.toContain(sourceObservationCoding.display);
+      expect(JSON.stringify(r4Payload?.data?.[0]?.resource)).not.toContain(sourceImmunizationCoding.display);
+      expect(JSON.stringify(r4Payload?.data?.[0]?.resource)).not.toContain('PractitionerRole/');
+      expect(JSON.stringify(r4Payload?.data?.[0]?.resource)).not.toContain('Practitioner/');
 
       const apiMaterializeResp = await invokeExpress(app, {
         method: HttpRequestMethods.Post,
@@ -1921,10 +1970,8 @@ describe('Composition Bundle _search API (integration)', () => {
       expect(apiMedicationEntry.resource.meta.claims).toBeDefined();
       expect(apiMedicationEntry.resource.meta.claims['MedicationStatement.subject']).toBe(twinSubjectId);
       expect(apiMedicationEntry.resource.meta.claims['MedicationStatement.code']).toBe(medicationCodeToken);
-      expect(apiMedicationEntry.resource.meta.claims['MedicationStatement.code-display'])
-        .toBe(sourceMedicationCoding.display);
-      expect(apiMedicationEntry.resource.meta.claims['MedicationStatement.code-text'])
-        .toBe(sourceMedication.medicationCodeableConcept.text);
+      expect(Object.hasOwn(apiMedicationEntry.resource.meta.claims, 'MedicationStatement.code-display')).toBe(false);
+      expect(Object.hasOwn(apiMedicationEntry.resource.meta.claims, 'MedicationStatement.code-text')).toBe(false);
       expect(apiMedicationEntry.resource.meta.claims).not.toHaveProperty('indexed');
       expect(JSON.stringify(apiMedicationEntry.resource)).not.toContain('__digitalTwinSearch');
     } finally {

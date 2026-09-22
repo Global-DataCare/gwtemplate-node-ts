@@ -2164,7 +2164,7 @@ export function createApiRouter(
    *   post:
    *     tags:
    *       - 9. Research Digital Twin
-   *     summary: Search digital twins by IPS sections, clinical date range and text
+   *     summary: Search digital twins by IPS sections and governed coded filters
    *     description: |
    *       Submits an async section-first digital twin search request.
    *
@@ -2174,11 +2174,11 @@ export function createApiRouter(
    *         uses internally to index that ResearchSubject and connect its resources
    *       - repeated `section` parameters use OR semantics and each section may
    *         span several resource families
-   *       - inclusive `date-from` and non-empty `text` are required
-   *       - inclusive `date-to` is optional; GW resolves an omitted value to
-   *         its current time for that request
-   *       - text is matched case/accent-insensitively against a private derived
-   *         search document, not exposed clinical free text
+   *       - canonical resource filters such as `Observation.code` and
+   *         `MedicationStatement.code` match preserved `system|code` tokens
+   *       - optional `text` plus `date-from`/`date-to` is available only when a
+   *         governed terminology boundary produced the private normalized text;
+   *         submitted clinical labels are never promoted into that index
    *       - internal matching may fan out to indexed resource families for the
    *         requested section, but the response returns matched `ResearchSubject`
    *         aggregates rather than leaf resources
@@ -2186,10 +2186,10 @@ export function createApiRouter(
    *       Current runtime rules:
    *       - request body should carry a FHIR `Parameters` resource
    *       - `section` is required
-   *       - section OR, text and date constraints are combined with AND and
-   *         text/date must match the same clinical resource
+   *       - section OR and supplied resource/date/text constraints are combined
+   *         with AND and must match the same clinical resource
    *       - matched subjects are deduplicated before returning ResearchSubjects
-   *       - advanced resource-scoped filters remain compatibility input
+   *       - resource-scoped coded filters are the fail-closed baseline
    *       - poll completion on the existing `_batch-response` path with the
    *         same `thid`
    *     parameters:

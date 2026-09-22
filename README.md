@@ -88,13 +88,15 @@ E2E gates before `npm publish` or any container image build.
   context, not a native FHIR release. See
   [FHIR server-base discovery](docs-v1/02-API-AND-ENDPOINTS/02.H-FHIR-SERVER-BASE-DISCOVERY.md).
 - Those claims are often contextualized with `@context` such as `org.schema` or `org.hl7.fhir.api`, but may also use less-contextualized keys when the active `@context` already disambiguates them.
-- A materialized research summary preserves `system|code`, the selected
-  `display`, confirmed local text and language as source evidence. The received
-  labels are not authoritative terminology: DataConv re-resolves standardized
-  terms from the code. A UI uses local text when its language matches; otherwise
-  it asks the terminology service for the requested language and falls back to
-  the re-resolved international display. Storage, audit and query metadata never
-  become clinical content.
+- A research projection preserves `system|code` and removes received `display`
+  and local `text`, because either may contain dictated or locally authored
+  content. A terminology service may later re-resolve standardized display and
+  localized text from `system|code`; GW never promotes the submitted labels to
+  research terminology. `Coding.userSelected` means that a person explicitly
+  chose the coding, not that the author was a patient rather than a professional.
+  A non-identifying provenance category distinguishes self-reported from
+  professional clinical data; the research output never reveals the author.
+  Storage, audit and query metadata never become clinical content.
 - DIDComm `from` is the sender DID, JWT `iss` is the signing entity, `kid` is
   the concrete key DID URL, and SMART `sub` is the authorized actor. A direct
   actor flow may deliberately share the actor DID across `from`, `iss` and

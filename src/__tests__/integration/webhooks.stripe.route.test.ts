@@ -1,16 +1,13 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: an optional webhook adapter is absent by default, fail-closed when explicitly enabled, and never blocks unrelated production startup.
 import request from 'supertest';
-import { startServer, resetServerConfig } from '../../server';
-import { QueueAdapterMem } from '../../adapters/queue-mem';
+import express from 'express';
+import { resetServerConfig } from '../../server';
+import { createWebhooksRouter } from '../../routes/webhooks';
 
 describe('stripe webhook route', () => {
   const previousEnv = process.env;
-  const queueAdapters: QueueAdapterMem[] = [];
 
   afterEach(async () => {
-    for (const queueAdapter of queueAdapters.splice(0)) {
-      queueAdapter.stop();
-    }
     process.env = previousEnv;
     resetServerConfig();
   });
@@ -18,15 +15,12 @@ describe('stripe webhook route', () => {
   it('mounts Stripe webhook at /webhooks/stripe', async () => {
     process.env = {
       ...previousEnv,
+      STRIPE_ENABLED: 'true',
       STRIPE_SECRET_KEY: 'sk_test_dummy',
       STRIPE_WEBHOOK_SIGNING_SECRET: 'whsec_dummy',
     };
-    resetServerConfig();
-
-    const { app, queueAdapter } = await startServer({ listen: false });
-    if (queueAdapter instanceof QueueAdapterMem) {
-      queueAdapters.push(queueAdapter);
-    }
+    const app = express();
+    app.use('/webhooks', createWebhooksRouter({} as any));
 
     const response = await request(app)
       .post('/webhooks/stripe')
@@ -35,5 +29,37 @@ describe('stripe webhook route', () => {
 
     // Route should exist and fail on signature verification (400), not on missing endpoint (404).
     expect(response.status).toBe(400);
+  });
+
+  it.each([undefined, 'false'])('starts production without payment credentials when the adapter flag is %s', async (enabled) => {
+    process.env = {
+      ...previousEnv,
+      NODE_ENV: 'production',
+      STRIPE_ENABLED: enabled,
+      STRIPE_SECRET_KEY: undefined,
+      STRIPE_WEBHOOK_SIGNING_SECRET: undefined,
+    };
+    const app = express();
+    app.use('/webhooks', createWebhooksRouter({} as any));
+
+    const response = await request(app)
+      .post('/webhooks/stripe')
+      .set('Content-Type', 'application/json')
+      .send({});
+
+    expect(response.status).toBe(404);
+  });
+
+  it('fails startup when the payment adapter is explicitly enabled without its credentials', async () => {
+    process.env = {
+      ...previousEnv,
+      NODE_ENV: 'production',
+      STRIPE_ENABLED: 'true',
+      STRIPE_SECRET_KEY: undefined,
+      STRIPE_WEBHOOK_SIGNING_SECRET: undefined,
+    };
+    expect(() => createWebhooksRouter({} as any)).toThrow(
+      'Stripe environment variables (STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SIGNING_SECRET) are not configured.',
+    );
   });
 });

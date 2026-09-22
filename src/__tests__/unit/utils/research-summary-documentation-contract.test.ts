@@ -1,4 +1,4 @@
-// Flow contract: public guides preserve source terminology evidence and explain code-based normalization without exposing storage plumbing.
+// Flow contract: public guidance keeps coded research projection, terminology, authorship, and user-selection boundaries distinct.
 import { readFileSync } from 'fs';
 import path from 'path';
 
@@ -14,9 +14,10 @@ describe('research summary documentation contract', () => {
   ])('keeps %s at the observable application contract', (relativePath) => {
     const publicGuide = repositoryFile(relativePath);
     expect(publicGuide).toContain('system|code');
-    expect(publicGuide).toMatch(/display.*local text.*source\s+evidence/is);
-    expect(publicGuide).toMatch(/not.*authoritative\s+terminology/is);
-    expect(publicGuide).toMatch(/language matches.*terminology service.*international\s+display/is);
+    expect(publicGuide).toMatch(/removes.*received.*display.*text/is);
+    expect(publicGuide).toMatch(/terminology service.*system\|code/is);
+    expect(publicGuide).toMatch(/userSelected.*(?:chose|chosen).*not.*patient.*professional/is);
+    expect(publicGuide).toMatch(/self-reported.*professional clinical.*never reveals the author/is);
     expect(publicGuide).not.toContain('__digitalTwinSearch');
     expect(publicGuide).not.toContain('indexed.attributes');
   });
@@ -24,8 +25,9 @@ describe('research summary documentation contract', () => {
   it('keeps implementation boundaries in the repository skill', () => {
     const operationalSkill = repositoryFile('.codex/skills/govern-digital-twin-consent/SKILL.md');
     expect(operationalSkill).toContain('<Resource>.code = system|code');
-    expect(operationalSkill).toMatch(/source\s+terminology evidence/is);
-    expect(operationalSkill).toMatch(/must\s+not\s+treat either label as authoritative/is);
-    expect(operationalSkill).toContain('Bare envelope `status`');
+    expect(operationalSkill).toMatch(/remove.*received.*code-display.*code-text/is);
+    expect(operationalSkill).toMatch(/terminology.*re-resolve.*standardized/is);
+    expect(operationalSkill).toMatch(/Remove.*author.*attester.*performer.*source.*research projection/is);
+    expect(operationalSkill).toMatch(/Bare envelope\s+`status`/);
   });
 });
