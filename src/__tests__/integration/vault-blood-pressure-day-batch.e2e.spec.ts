@@ -1,6 +1,7 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: persist and rehydrate atomic daily blood-pressure batches in a real Firestore boundary before and after audit anchoring.
 import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
-import admin from 'firebase-admin';
+import { deleteApp, getApps, initializeApp } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
 import * as fs from 'fs';
 import * as path from 'path';
 import { buildExampleConfidentialJwe, buildExampleConfidentialStorageDoc } from 'gdc-common-utils-ts/utils/confidential-storage-test-data';
@@ -92,14 +93,14 @@ describeIfConfigured('FirestoreVaultRepository blood-pressure day batches (E2E)'
   const hostCollectionName = 'host';
 
   beforeAll(() => {
-    if (!admin.apps.length) {
-      admin.initializeApp();
+    if (getApps().length === 0) {
+      initializeApp({ projectId: process.env.GCLOUD_PROJECT || 'gw-core-local-e2e' });
     }
-    repository = new FirestoreVaultRepository(admin.firestore(), hostCollectionName, new InMemoryConfidentialBlobStore());
+    repository = new FirestoreVaultRepository(getFirestore(), hostCollectionName, new InMemoryConfidentialBlobStore());
   });
 
   beforeEach(async () => {
-    const db = admin.firestore();
+    const db = getFirestore();
     await db.collection(hostCollectionName).doc(getEnvSectionId('tenants')).collection('documents').doc(vaultId).set({
       id: vaultId,
       registered: new Date().toISOString(),
@@ -107,13 +108,13 @@ describeIfConfigured('FirestoreVaultRepository blood-pressure day batches (E2E)'
   }, 10000);
 
   afterAll(async () => {
-    const db = admin.firestore();
+    const db = getFirestore();
     await db.collection(vaultId).doc(sectionId).collection('documents').doc(day1Id).delete().catch(() => undefined);
     await db.collection(vaultId).doc(sectionId).collection('documents').doc(day2Id).delete().catch(() => undefined);
     await db.collection(hostCollectionName).doc(getEnvSectionId('tenants')).collection('documents').doc(vaultId).delete().catch(() => undefined);
-    const app = admin.apps[0];
+    const app = getApps()[0];
     if (app) {
-      await app.delete();
+      await deleteApp(app);
     }
   });
 
@@ -127,8 +128,8 @@ describeIfConfigured('FirestoreVaultRepository blood-pressure day batches (E2E)'
 
       await repository.put(vaultId, [day1Batch, day2Batch], sectionId);
 
-      const day1Raw = await admin.firestore().collection(vaultId).doc(sectionId).collection('documents').doc(day1Id).get();
-      const day2Raw = await admin.firestore().collection(vaultId).doc(sectionId).collection('documents').doc(day2Id).get();
+      const day1Raw = await getFirestore().collection(vaultId).doc(sectionId).collection('documents').doc(day1Id).get();
+      const day2Raw = await getFirestore().collection(vaultId).doc(sectionId).collection('documents').doc(day2Id).get();
 
       expect(day1Raw.exists).toBe(true);
       expect(day2Raw.exists).toBe(true);
@@ -159,7 +160,7 @@ describeIfConfigured('FirestoreVaultRepository blood-pressure day batches (E2E)'
 
       await repository.put(vaultId, [anchoredDay1], sectionId);
 
-      const anchoredDay1Raw = await admin.firestore().collection(vaultId).doc(sectionId).collection('documents').doc(day1Id).get();
+      const anchoredDay1Raw = await getFirestore().collection(vaultId).doc(sectionId).collection('documents').doc(day1Id).get();
       expect((anchoredDay1Raw.data() as ConfidentialStorageDoc | undefined)?.audit?.txId).toBe('tx-e2e-blood-pressure-day-1');
       expect(isPendingBlockchainRegistration(anchoredDay1Raw.data() as ConfidentialStorageDoc)).toBe(false);
 

@@ -16,15 +16,15 @@ import { STRIPE_API_VERSION } from '../utils/stripe-api-version';
 export function createWebhooksRouter(queueAdapter: QueueAdapter): express.Router {
   const router = express.Router();
 
-  // Stripe is an optional integration surface. In production, we fail fast if it's enabled but misconfigured.
-  if (!process.env.STRIPE_SECRET_KEY || !process.env.STRIPE_WEBHOOK_SIGNING_SECRET) {
-    if (process.env.NODE_ENV === 'production') {
-      throw new Error(
-        'Stripe environment variables (STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SIGNING_SECRET) are not configured.',
-      );
-    }
-    console.warn('[Webhooks] Stripe not configured. /webhooks/stripe will be disabled.');
+  const stripeEnabled = String(process.env.STRIPE_ENABLED || '').trim().toLowerCase() === 'true';
+  if (!stripeEnabled) {
+    console.log('[Webhooks] Optional payment webhook adapter is disabled.');
     return router;
+  }
+  if (!process.env.STRIPE_SECRET_KEY || !process.env.STRIPE_WEBHOOK_SIGNING_SECRET) {
+    throw new Error(
+      'Stripe environment variables (STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SIGNING_SECRET) are not configured.',
+    );
   }
 
   const stripeClient = new stripe.Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: STRIPE_API_VERSION });

@@ -239,6 +239,10 @@ Legacy note:
 `STRIPE_TAX_ENABLED`
 - Enables/disables Stripe tax behavior where the Stripe path is used.
 
+`STRIPE_ENABLED`
+- Enables the optional Stripe webhook adapter only when set explicitly to `true`.
+- When absent or `false`, its credentials are not required in any environment.
+
 `STRIPE_SECRET_KEY`
 - Stripe secret API key.
 

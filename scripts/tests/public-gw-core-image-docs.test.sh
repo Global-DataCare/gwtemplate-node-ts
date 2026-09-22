@@ -54,8 +54,11 @@ if rg -n 'docs-internal/' \
 fi
 grep -Fq 'CCAAS' "$ROOT_DIR/deliverables/GUIA_OPERATIVA_HOST_ES.md"
 grep -Fq 'GW CORE y CCAAS son artefactos OCI distintos' "$ROOT_DIR/deliverables/GUIA_OPERATIVA_HOST_ES.md"
+# The Word report is a versioned audit snapshot, not a mutable pointer updated
+# for every candidate patch. It must pin an immutable GW digest, while the text
+# sources above pin the currently promoted public baseline exactly.
 unzip -p "$ROOT_DIR/deliverables/GUIA_HOST_REPRODUCIBLE_ES.docx" word/document.xml \
-  | grep -Fq '915069bc437e625e2444971191dec48e9c7b4cd65e04900612d8333af1daefa8'
+  | grep -Eq 'ghcr\.io/global-datacare/gw-core@sha256:[0-9a-f]{64}'
 unzip -p "$ROOT_DIR/deliverables/GUIA_HOST_REPRODUCIBLE_ES.docx" word/document.xml \
   | grep -Fq 'f5d45cebaa5e7443ebf70aac85f33794d3d366dcb5370ab7921e9bc56336c0fa'
 unzip -p "$ROOT_DIR/deliverables/GUIA_HOST_REPRODUCIBLE_ES.docx" word/document.xml \

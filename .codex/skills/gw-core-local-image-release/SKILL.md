@@ -58,6 +58,10 @@ be copied into this reusable skill.
 - Resolve the pushed tag to a registry digest and deploy that digest.
 - Wait for rollout and verify the effective image, `/host/ping`, `/api-docs/`,
   host DID and host JWKS before declaring success.
+- Do not rewrite public guides or binary audit reports for every candidate
+  patch. Text guides pin the deliberately promoted audited baseline; a Word
+  report remains an immutable versioned snapshot with its own valid digest.
+  Update either only in an explicit documentation/baseline promotion.
 
 ## Network-mode boundary
 

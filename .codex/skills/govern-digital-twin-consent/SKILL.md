@@ -113,22 +113,27 @@ Verify current branches, versions and published npm state before release claims.
   resource. Resolve an omitted end date to GW current time.
 - A section may map to several resource families. Never require the BFF to
   choose or know a resource type for basic search.
-- Append private derived text/date/language properties to the same projected resource record
-  during projection. They are not a separate collection or a
+- Append only governed derived date/language properties to the same projected resource record
+  during projection. A text helper may be added only from terminology output
+  re-resolved from the preserved code, never from submitted labels. They are not a separate collection or a
   second index, and `__digitalTwinSearch.*` is never a public FHIR claim family.
   Consume those properties only for Composition-wide matching and strip them
   from search matches and materialized resources.
-- Preserve `<Resource>.code = system|code`, selected `code-display`, confirmed
-  local `code-text` and language in the permitted projection as source
-  terminology evidence. Consumers must not treat either label as authoritative:
-  DataConv re-resolves standardized terms and configured translations from the
-  code while retaining submitted labels as provenance. A UI or assistant uses
-  confirmed local text only when its language matches; otherwise it resolves the
-  requested language through the terminology service and falls back to the
-  re-resolved international display. An absent or unsupported code leaves the
-  submitted label as unstandardized review evidence, never an invented official
-  translation. Bare envelope `status` remains distinct from namespaced clinical
-  claims such as `Observation.status`.
+- Preserve `<Resource>.code = system|code` and language, but remove received
+  `code-display` and `code-text` from the research projection. The terminology
+  boundary must re-resolve standardized display and configured translations
+  from the preserved code before either label can enter research data. Keep
+  submitted labels only in the operational clinical record as provenance. An
+  absent or unsupported code cannot be integrated into research and never
+  produces an invented official translation. `Coding.userSelected` means a
+  person explicitly selected the coding; it does not distinguish a patient
+  from a professional. Preserve only a non-identifying resource/provenance
+  category such as self-reported versus professional clinical data. Remove
+  concrete author, attester, performer, asserter, recorder, source, custodian
+  and sender references from the research projection while retaining them in
+  the protected operational record. Bare envelope
+  `status` remains distinct from namespaced clinical claims such as
+  `Observation.status`.
 - Keep age range and host-wide aggregation out of the MVP.
 - For a tenant DID created before ResearchSubject became the public aggregate,
   accept its existing read-only digitaltwin Composition `_search` declaration

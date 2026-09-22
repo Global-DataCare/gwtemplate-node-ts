@@ -4,7 +4,6 @@ import type { IVaultRepository } from '../database/repositories/vault/vault.repo
 import { getEnvSectionId } from './section-env';
 
 const DIGITAL_TWIN_SUBJECT_ALIAS_SECTION = 'digitaltwin_subject_aliases';
-const RESEARCH_PROJECTION_AUTHOR = 'urn:gdc:research-projection';
 const DIGITAL_TWIN_SUBJECT_URN_UUID = /^urn:uuid:[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 /**
@@ -27,6 +26,7 @@ const BLOCKED_RESEARCH_CLAIM_SEGMENT = /(?:^|[.\-_])(display|text|title|descript
 const RESEARCH_IDENTIFIER_CLAIM = /(?:^|\.)(?:id|identifier)(?:\.value)?$/i;
 const RESEARCH_PATIENT_CLAIM = /(?:^|\.)patient(?:\.reference)?$/i;
 const RESEARCH_SUBJECT_CLAIM = /(?:^|\.)subject(?:\.reference)?$/i;
+const RESEARCH_PROVENANCE_REFERENCE_CLAIM = /(?:^|[.\-_])(?:author|attester|performer|asserter|recorder|source|information-source|custodian|sender)(?:$|[.\-_])/i;
 
 const RESEARCH_RESOURCE_TYPES = new Set([
   'MedicationStatement',
@@ -123,17 +123,19 @@ export function isDigitalTwinResearchResourceType(resourceType: string): boolean
 
 /**
  * Builds the fail-closed minimal research projection used before DataConv is
- * integrated. Canonical `system|code`, selected display, confirmed local text
- * and language remain source terminology evidence; received labels are not
- * authoritative and research consumers resolve standardized terminology from
- * the code. Arbitrary narrative and identifying claims are removed; resource
- * and business identifiers are replaced deterministically within the twin,
- * and every patient/subject reference is rebound to the research subject.
+ * integrated. Canonical `system|code` remains the integration key. Received
+ * display/text labels are removed because they may contain dictated or locally
+ * authored content; a terminology boundary may later re-resolve standardized
+ * labels from the code. Arbitrary narrative and identifying claims are removed;
+ * resource and business identifiers are replaced deterministically within the
+ * twin, and every patient/subject reference is rebound to the research subject.
  *
- * The returned object also carries optional `__digitalTwinSearch.text`,
- * `.date` and `.language` properties on that same projected resource record.
- * Composition-wide discovery consumes them privately; they are not a separate
- * collection and never become clinical claims in a response.
+ * The returned object also carries optional `__digitalTwinSearch.date` and
+ * `.language` properties on that same projected resource record. A later
+ * terminology boundary may add `__digitalTwinSearch.text` from the canonical
+ * code, never from submitted labels. Composition-wide discovery consumes these
+ * properties privately; they are not a separate collection and never become
+ * clinical claims in a response.
  */
 export function projectClaimsForDigitalTwin(input: {
   claims: Record<string, unknown>;
@@ -147,10 +149,6 @@ export function projectClaimsForDigitalTwin(input: {
   }
   if (!twinSubjectId) throw new Error('twinSubjectId is required');
 
-  const searchableText = Array.from(new Set(Object.entries(input.claims || {})
-    .filter(([key]) => /\.code-(?:display|text)$/i.test(String(key || '').trim()))
-    .map(([, value]) => String(value || '').trim())
-    .filter(Boolean)));
   const searchableDate = Object.entries(input.claims || {})
     .filter(([key]) => /\.(?:effective(?:-?datetime)?|issued|recorded(?:date|on)?|occurrence-?datetime|onset-?datetime|performed-?datetime|date|datetime|period-start)$/i.test(String(key || '').trim()))
     .map(([, value]) => String(value || '').trim())
@@ -166,21 +164,11 @@ export function projectClaimsForDigitalTwin(input: {
       projected[normalizedKey] = rawValue;
       continue;
     }
-    // Confirmed concept labels belong to the coded source fact. They survive as
-    // evidence, but downstream research re-resolves authoritative labels from
-    // system|code instead of trusting either received string.
-    if (/\.code-(?:display|text)$/i.test(normalizedKey)) {
-      projected[normalizedKey] = rawValue;
-      continue;
-    }
+    if (RESEARCH_PROVENANCE_REFERENCE_CLAIM.test(normalizedKey)) continue;
     if (BLOCKED_RESEARCH_CLAIM_SEGMENT.test(normalizedKey)) continue;
     if (RESEARCH_PATIENT_CLAIM.test(normalizedKey)) continue;
     if (RESEARCH_SUBJECT_CLAIM.test(normalizedKey)) {
       projected[normalizedKey] = twinSubjectId;
-      continue;
-    }
-    if (/\.author$/i.test(normalizedKey)) {
-      projected[normalizedKey] = RESEARCH_PROJECTION_AUTHOR;
       continue;
     }
     if (RESEARCH_IDENTIFIER_CLAIM.test(normalizedKey)) {
@@ -189,7 +177,6 @@ export function projectClaimsForDigitalTwin(input: {
     }
     projected[normalizedKey] = rawValue;
   }
-  if (searchableText.length > 0) projected[DIGITAL_TWIN_SEARCH_TEXT_CLAIM] = searchableText.join('\u001f');
   if (searchableDate) projected[DIGITAL_TWIN_SEARCH_DATE_CLAIM] = searchableDate;
   if (searchableLanguage) projected[DIGITAL_TWIN_SEARCH_LANGUAGE_CLAIM] = String(searchableLanguage).trim();
   return projected;

@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+- Release GW CORE `1.25.26` without making credentials for a disabled optional
+  webhook adapter a production-startup prerequisite. Restore the fail-closed
+  research projection: retain canonical coded facts but exclude submitted
+  display/text labels and concrete provenance identities until governed
+  terminology/provenance boundaries re-resolve non-identifying output. Consume
+  `gdc-common-utils-ts@2.9.23` for canonical allergy reaction severity,
+  medication effective periods and typed immunization/observation details.
+
 - Release GW CORE `1.25.25` preserving canonical code, selected display,
   confirmed local text and language as research-summary source evidence while
   filtering persistence envelopes and private query data. Research consumers

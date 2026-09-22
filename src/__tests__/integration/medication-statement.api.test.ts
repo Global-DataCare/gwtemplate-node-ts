@@ -1,4 +1,4 @@
-// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
+// Flow contract: medication writes preserve operational provenance while consented research projection exposes only pseudonymous governed facts.
 // Contract marker: imported clinical resources preserve their external author provenance.
 import { GatewayResponseEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
 import { GatewayRequestEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
@@ -955,11 +955,9 @@ describe('MedicationStatement API (integration)', () => {
       expect(digitalTwinRecords[0]['org.hl7.fhir.api.MedicationStatement.subject']).toBe(twinSubjectId);
       expect(digitalTwinRecords[0]['org.hl7.fhir.api.MedicationStatement.code']).toBe(medicationCode);
       expect(digitalTwinRecords[0]['org.hl7.fhir.api.MedicationStatement.identifier']).not.toBe('urn:uuid:medication-digitaltwin-001');
-      // The same projected resource record may retain private derived search
-      // fields beside its coded MedicationStatement claims. This is not a
-      // separate collection: search/materialization strips the private fields,
-      // and the check below continues to reject source text/display/note claims.
-      expect(digitalTwinRecords[0][DIGITAL_TWIN_SEARCH_TEXT_CLAIM]).toContain('Paracetamol');
+      // Source labels are not research search data. Standard text/display may
+      // be added only after resolving the preserved code through terminology.
+      expect(Object.hasOwn(digitalTwinRecords[0], DIGITAL_TWIN_SEARCH_TEXT_CLAIM)).toBe(false);
       expect(Object.keys(digitalTwinRecords[0]).some((key) =>
         key !== '@context'
         && !key.startsWith(DIGITAL_TWIN_SEARCH_CLAIM_PREFIX)
