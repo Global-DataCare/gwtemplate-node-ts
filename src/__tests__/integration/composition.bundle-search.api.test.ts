@@ -1587,6 +1587,11 @@ describe('Composition Bundle _search API (integration)', () => {
     }
   });
 
+  // Journey: 1. ingest an IPS document; 2. permit its pseudonymous projection;
+  // 3. discover the registered ResearchSubject; 4. materialize R4 and API
+  // summaries. Authorization invariant: only the consented UUID subject is
+  // returned. Persistence invariant: code plus confirmed source display/text
+  // survive while storage envelopes and private query data never surface.
   it('materializes selected digital twins through Communication -> ResearchSubject/$summary in r4 and api formats', async () => {
     process.env.NODE_ENV = 'test';
     process.env.DB_PROVIDER = 'mem';
@@ -1645,6 +1650,15 @@ describe('Composition Bundle _search API (integration)', () => {
         },
       });
       const ipsBundle = loadIpsAllSectionsFixture(subjectDid);
+      const sourceMedication = ipsBundle.entry
+        .find((bundleEntry: any) => bundleEntry?.resource?.resourceType === ResourceTypesFhirR4.MedicationStatement)
+        ?.resource;
+      const sourceObservation = ipsBundle.entry
+        .find((bundleEntry: any) => bundleEntry?.resource?.resourceType === ResourceTypesFhirR4.Observation)
+        ?.resource;
+      const sourceMedicationCoding = sourceMedication?.medicationCodeableConcept?.coding?.[0];
+      const sourceObservationCoding = sourceObservation?.code?.coding?.[0];
+      const medicationCodeToken = `${sourceMedicationCoding.system}|${sourceMedicationCoding.code}`;
       const documentReference = {
         resourceType: ResourceTypesFhirR4.DocumentReference,
         id: 'ips-twin-materialization-document-reference-001',
@@ -1811,6 +1825,30 @@ describe('Composition Bundle _search API (integration)', () => {
       expect(
         r4Payload?.data?.[0]?.resource?.entry?.some((entry: any) => entry?.resource?.resourceType === 'Observation'),
       ).toBe(true);
+      const r4Medication = r4Payload?.data?.[0]?.resource?.entry
+        ?.map((entry: any) => entry?.resource)
+        .find((resource: any) => resource?.medicationCodeableConcept?.coding?.some((coding: any) =>
+          coding?.system === sourceMedicationCoding.system && coding?.code === sourceMedicationCoding.code));
+      const r4Observation = r4Payload?.data?.[0]?.resource?.entry
+        ?.map((entry: any) => entry?.resource)
+        .find((resource: any) => resource?.code?.coding?.some((coding: any) =>
+          coding?.system === sourceObservationCoding.system && coding?.code === sourceObservationCoding.code));
+      expect(r4Medication?.medicationCodeableConcept).toMatchObject({
+        text: sourceMedication.medicationCodeableConcept.text,
+        coding: [expect.objectContaining({
+          system: sourceMedicationCoding.system,
+          code: sourceMedicationCoding.code,
+          display: sourceMedicationCoding.display,
+        })],
+      });
+      expect(r4Observation?.code).toMatchObject({
+        text: sourceObservation.code.text,
+        coding: [expect.objectContaining({
+          system: sourceObservationCoding.system,
+          code: sourceObservationCoding.code,
+          display: sourceObservationCoding.display,
+        })],
+      });
 
       const apiMaterializeResp = await invokeExpress(app, {
         method: HttpRequestMethods.Post,
@@ -1882,6 +1920,13 @@ describe('Composition Bundle _search API (integration)', () => {
       expect(Object.keys(apiMedicationEntry.resource).sort()).toEqual(['id', 'meta', 'resourceType']);
       expect(apiMedicationEntry.resource.meta.claims).toBeDefined();
       expect(apiMedicationEntry.resource.meta.claims['MedicationStatement.subject']).toBe(twinSubjectId);
+      expect(apiMedicationEntry.resource.meta.claims['MedicationStatement.code']).toBe(medicationCodeToken);
+      expect(apiMedicationEntry.resource.meta.claims['MedicationStatement.code-display'])
+        .toBe(sourceMedicationCoding.display);
+      expect(apiMedicationEntry.resource.meta.claims['MedicationStatement.code-text'])
+        .toBe(sourceMedication.medicationCodeableConcept.text);
+      expect(apiMedicationEntry.resource.meta.claims).not.toHaveProperty('indexed');
+      expect(JSON.stringify(apiMedicationEntry.resource)).not.toContain('__digitalTwinSearch');
     } finally {
       queueAdapter.stop();
     }

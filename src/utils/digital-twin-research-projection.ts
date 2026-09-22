@@ -123,9 +123,12 @@ export function isDigitalTwinResearchResourceType(resourceType: string): boolean
 
 /**
  * Builds the fail-closed minimal research projection used before DataConv is
- * integrated. Free text and identifying claims are removed; resource and
- * business identifiers are replaced deterministically within the twin, and
- * every patient/subject reference is rebound to the research subject.
+ * integrated. Canonical `system|code`, selected display, confirmed local text
+ * and language remain source terminology evidence; received labels are not
+ * authoritative and research consumers resolve standardized terminology from
+ * the code. Arbitrary narrative and identifying claims are removed; resource
+ * and business identifiers are replaced deterministically within the twin,
+ * and every patient/subject reference is rebound to the research subject.
  *
  * The returned object also carries optional `__digitalTwinSearch.text`,
  * `.date` and `.language` properties on that same projected resource record.
@@ -160,6 +163,13 @@ export function projectClaimsForDigitalTwin(input: {
     const normalizedKey = String(key || '').trim();
     if (!normalizedKey) continue;
     if (normalizedKey === '@context') {
+      projected[normalizedKey] = rawValue;
+      continue;
+    }
+    // Confirmed concept labels belong to the coded source fact. They survive as
+    // evidence, but downstream research re-resolves authoritative labels from
+    // system|code instead of trusting either received string.
+    if (/\.code-(?:display|text)$/i.test(normalizedKey)) {
       projected[normalizedKey] = rawValue;
       continue;
     }
