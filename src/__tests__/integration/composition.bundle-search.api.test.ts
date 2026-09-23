@@ -1,3 +1,5 @@
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
+import { resolveHostPhysicalCollectionName } from '../../config/storage-layout';
 // Flow contract: authorized clinical documents remain searchable and materializable while digital-twin projections stay pseudonymous and code-preserving.
 // TDD flow contract: ingest clinical sections, read the current summary, delete one
 // exact authored resource through a batch, then prove operational and permitted
@@ -147,7 +149,7 @@ describe('Composition Bundle _search API (integration)', () => {
         [ClaimsOrganizationSchemaorg.identifierValue]: process.env.ORG_HOST_ID_VALUE,
         [ClaimsServiceSchemaorg.category]: Sector.SYSTEM,
       };
-      const hostCollectionName = generateTenantCollectionNameFromClaims(hostBootstrapClaims as any);
+      const hostCollectionName = resolveHostPhysicalCollectionName();
       const tenantClaims = testPayloadCreateTenant1.body.data[0].resource.meta.claims as any;
       const tenantVaultId = getTenantVaultId(tenantClaims[ClaimsServiceSchemaorg.category], testTenant1TenantId);
 
@@ -292,7 +294,7 @@ describe('Composition Bundle _search API (integration)', () => {
         [ClaimsOrganizationSchemaorg.identifierValue]: process.env.ORG_HOST_ID_VALUE,
         [ClaimsServiceSchemaorg.category]: Sector.SYSTEM,
       };
-      const hostCollectionName = generateTenantCollectionNameFromClaims(hostBootstrapClaims as any);
+      const hostCollectionName = resolveHostPhysicalCollectionName();
       const tenantClaims = testPayloadCreateTenant1.body.data[0].resource.meta.claims as any;
       const tenantVaultId = getTenantVaultId(tenantClaims[ClaimsServiceSchemaorg.category], testTenant1TenantId);
 
@@ -447,7 +449,7 @@ describe('Composition Bundle _search API (integration)', () => {
         [ClaimsOrganizationSchemaorg.identifierValue]: process.env.ORG_HOST_ID_VALUE,
         [ClaimsServiceSchemaorg.category]: Sector.SYSTEM,
       };
-      const hostCollectionName = generateTenantCollectionNameFromClaims(hostBootstrapClaims as any);
+      const hostCollectionName = resolveHostPhysicalCollectionName();
       const tenantClaims = testPayloadCreateTenant1.body.data[0].resource.meta.claims as any;
       const tenantVaultId = getTenantVaultId(tenantClaims[ClaimsServiceSchemaorg.category], testTenant1TenantId);
 
@@ -557,7 +559,7 @@ describe('Composition Bundle _search API (integration)', () => {
         [ClaimsOrganizationSchemaorg.identifierValue]: process.env.ORG_HOST_ID_VALUE,
         [ClaimsServiceSchemaorg.category]: Sector.SYSTEM,
       };
-      const hostCollectionName = generateTenantCollectionNameFromClaims(hostBootstrapClaims as any);
+      const hostCollectionName = resolveHostPhysicalCollectionName();
       const tenantClaims = testPayloadCreateTenant1.body.data[0].resource.meta.claims as any;
       const tenantVaultId = getTenantVaultId(tenantClaims[ClaimsServiceSchemaorg.category], testTenant1TenantId);
 
@@ -696,7 +698,7 @@ describe('Composition Bundle _search API (integration)', () => {
         [ClaimsOrganizationSchemaorg.identifierValue]: process.env.ORG_HOST_ID_VALUE,
         [ClaimsServiceSchemaorg.category]: Sector.SYSTEM,
       };
-      const hostCollectionName = generateTenantCollectionNameFromClaims(hostBootstrapClaims as any);
+      const hostCollectionName = resolveHostPhysicalCollectionName();
       const tenantClaims = testPayloadCreateTenant1.body.data[0].resource.meta.claims as any;
       const tenantVaultId = getTenantVaultId(tenantClaims[ClaimsServiceSchemaorg.category], testTenant1TenantId);
 
@@ -1435,7 +1437,7 @@ describe('Composition Bundle _search API (integration)', () => {
         [ClaimsOrganizationSchemaorg.identifierValue]: process.env.ORG_HOST_ID_VALUE,
         [ClaimsServiceSchemaorg.category]: Sector.SYSTEM,
       };
-      const hostCollectionName = generateTenantCollectionNameFromClaims(hostBootstrapClaims as any);
+      const hostCollectionName = resolveHostPhysicalCollectionName();
       const tenantClaims = testPayloadCreateTenant1.body.data[0].resource.meta.claims as any;
       const tenantVaultId = getTenantVaultId(tenantClaims[ClaimsServiceSchemaorg.category], testTenant1TenantId);
 
@@ -1610,7 +1612,7 @@ describe('Composition Bundle _search API (integration)', () => {
         [ClaimsOrganizationSchemaorg.identifierValue]: process.env.ORG_HOST_ID_VALUE,
         [ClaimsServiceSchemaorg.category]: Sector.SYSTEM,
       };
-      const hostCollectionName = generateTenantCollectionNameFromClaims(hostBootstrapClaims as any);
+      const hostCollectionName = resolveHostPhysicalCollectionName();
       const tenantClaims = testPayloadCreateTenant1.body.data[0].resource.meta.claims as any;
       const tenantVaultId = getTenantVaultId(tenantClaims[ClaimsServiceSchemaorg.category], testTenant1TenantId);
 

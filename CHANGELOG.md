@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+- Prepare GW CORE `1.25.27` and the unpublished `gdc-host` chart `0.4.1`, keeping the physical host registry independent from the legal organization that
+  operates it. New Helm deployments use `<deployment>_<network>_<scope>__host`;
+  existing installations require an explicit migration pin for any old path.
+- Preserve external Composition author and attester provenance across direct
+  IPS and DocumentReference-wrapped imports, and distinguish those documents
+  from authenticated section-edit commands.
+- Normalize canonical ISO 3166 Consent actor URNs before shared target matching,
+  preserving country and subdivision semantics with the published common-utils
+  compatibility layer.
+
 - Release GW CORE `1.25.26` without making credentials for a disabled optional
   webhook adapter a production-startup prerequisite. Restore the fail-closed
   research projection: retain canonical coded facts but exclude submitted

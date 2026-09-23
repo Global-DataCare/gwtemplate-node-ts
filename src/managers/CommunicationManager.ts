@@ -804,7 +804,11 @@ export class CommunicationManager implements IJobProcessor {
       [CompositionClaim.Type]: typeCode,
       'Composition.source': 'Communication',
     }, Format.FHIR_API);
-    if (claimsSection) {
+    // A native document import preserves the source Composition author graph.
+    // The authenticated importer is transport/audit provenance and must not
+    // be required to own the external document author or attester identities.
+    // Direct section commands still require the enrolled creator binding.
+    if (claimsSection && !payloadComposition) {
       try {
         await this.requireAuthenticatedSectionProvenance(job, tenantVaultId, claims);
       } catch (error) {
@@ -1899,6 +1903,16 @@ export class CommunicationManager implements IJobProcessor {
     entry: any,
     fhirResource: FhirCommunication,
   ): string | undefined {
+    const commandClaims = normalizeContextualizedClaims({
+      ...(entry?.meta?.claims && typeof entry.meta.claims === 'object' ? entry.meta.claims : {}),
+      ...(entry?.resource?.meta?.claims && typeof entry.resource.meta.claims === 'object'
+        ? entry.resource.meta.claims
+        : {}),
+    });
+    const commandAuthor = this.getFirstClaimValue(commandClaims, [
+      CompositionClaim.Author,
+      'org.hl7.fhir.r4.Composition.author',
+    ]);
     const attachmentAuthor = this.resolveCommunicationAttachments(entry, fhirResource)
       .map((resolved) => this.parseAttachmentJson(resolved.documentAttachment))
       .map((resource) => resource?.meta?.claims && typeof resource.meta.claims === 'object'
@@ -1926,6 +1940,7 @@ export class CommunicationManager implements IJobProcessor {
     return claimedAuthor?.split(',')[0]?.trim()
       || nativeAuthor?.split(',')[0]?.trim()
       || attachmentAuthor?.split(',')[0]?.trim()
+      || commandAuthor?.split(',')[0]?.trim()
       || getAuthenticatedJobActorIdentifiers(job)[0];
   }
 
@@ -2231,7 +2246,7 @@ export class CommunicationManager implements IJobProcessor {
       CompositionClaim.Type,
       CompositionClaim.Title,
     ]) {
-      const value = documentClaims?.[claimName];
+      const value = getClaimValue(documentClaims || {}, claimName);
       if (value !== undefined && value !== null && String(value).trim()) {
         baseClaims[claimName] = value;
       }
@@ -2297,7 +2312,7 @@ export class CommunicationManager implements IJobProcessor {
       CompositionClaim.Type,
       CompositionClaim.Title,
     ]) {
-      const value = documentClaims?.[claimName];
+      const value = getClaimValue(documentClaims || {}, claimName);
       if (value !== undefined && value !== null && String(value).trim()) {
         normalizedClaims[claimName] = value;
       }

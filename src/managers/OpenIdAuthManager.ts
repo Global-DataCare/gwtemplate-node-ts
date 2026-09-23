@@ -25,7 +25,7 @@ import { getEnvSectionId } from '../utils/section-env';
 import { ServiceCapability } from 'gdc-common-utils-ts/constants/service-capabilities';
 import { HealthcareConsentPurposes } from 'gdc-common-utils-ts/constants/healthcare';
 import { deriveGrantedSmartScopes } from 'gdc-common-utils-ts/utils/smart-scope';
-import type { ConsentRule } from 'gdc-common-utils-ts/models/consent-rule';
+import { ClaimConsent, type ConsentRule } from 'gdc-common-utils-ts/models/consent-rule';
 import { getMatchingIndividualMemberCredentialFromVpToken } from 'gdc-common-utils-ts/utils/individual-smart';
 import type { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
 import { getOrCreateDigitalTwinSubjectId } from '../utils/digital-twin-research-projection';
@@ -276,8 +276,21 @@ export class OpenIdAuthManager implements IJobProcessor {
     const compositionReadOnlyRequest = requestedScopeTokens.length > 0
       && requestedScopeTokens.every((value) =>
         /^organization\/Composition\.(?:r|rs)\?/i.test(value));
+    // gdc-common-utils-ts <=2.9.23 parses canonical ISO URNs but retains the
+    // URN as the comparison value. Project only the evaluator input to the
+    // same country/subdivision token used by the trusted runtime jurisdiction.
+    const sharedEvaluatorRules = activeRules.map((rule) => {
+      const actorIdentifiers = String(getClaimValue<string>(rule, ClaimConsent.actorIdentifier) || '')
+        .split(',')
+        .map((value) => value.trim())
+        .filter(Boolean);
+      const normalizedActors = actorIdentifiers.map((value) => this.normalizeJurisdictionRuleActor(value) || value);
+      return normalizedActors.some((value, index) => value !== actorIdentifiers[index])
+        ? { ...rule, [ClaimConsent.actorIdentifier]: normalizedActors.join(',') }
+        : rule;
+    });
     const sharedProjection = compositionReadOnlyRequest
-      ? deriveGrantedSmartScopes(activeRules as ConsentRule[], {
+      ? deriveGrantedSmartScopes(sharedEvaluatorRules as ConsentRule[], {
           requestedScopes: requestedScopeTokens,
           actor: {
             actorKind: actor.memberKind === 'individual' ? 'related-person' : 'professional',
@@ -1278,10 +1291,12 @@ export class OpenIdAuthManager implements IJobProcessor {
 
   private normalizeJurisdictionRuleActor(ruleActor: string): string | undefined {
     const direct = String(ruleActor || '').trim().toUpperCase();
-    if (/^[A-Z]{2}$/.test(direct)) return direct;
+    if (/^[A-Z]{2}(?:-[A-Z0-9]{1,3})?$/.test(direct)) return direct;
     const isoStd = direct.match(/^URN:ISO:STD:ISO:3166\|([A-Z]{2})$/);
     if (isoStd) return isoStd[1];
-    const iso = direct.match(/^URN:ISO:3166(?:-2)?:([A-Z]{2})(?:[-:].*)?$/);
+    const subdivision = direct.match(/^URN:ISO:3166-2:([A-Z]{2}-[A-Z0-9]{1,3})$/);
+    if (subdivision) return subdivision[1];
+    const iso = direct.match(/^URN:ISO:3166:([A-Z]{2})$/);
     if (iso) return iso[1];
     return undefined;
   }

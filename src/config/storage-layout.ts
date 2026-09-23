@@ -56,3 +56,17 @@ export function scopePhysicalCollectionName(collectionName: string): string {
   const scope = resolveStorageScope();
   return scope.prefix ? `${scope.prefix}__${collectionName}` : collectionName;
 }
+
+/**
+ * Resolves the physical host registry independently from the organization that
+ * operates the deployment. `HOST_LEGACY_PHYSICAL_COLLECTION` is an explicit
+ * migration-only pin for installations that already persisted the registry
+ * under a legal-identity-derived collection name.
+ */
+export function resolveHostPhysicalCollectionName(): string {
+  const legacyCollection = String(process.env.HOST_LEGACY_PHYSICAL_COLLECTION || '').trim();
+  if (legacyCollection && !/^[A-Za-z0-9._-]+$/.test(legacyCollection)) {
+    throw new Error('HOST_LEGACY_PHYSICAL_COLLECTION must be one exact collection identifier.');
+  }
+  return legacyCollection || scopePhysicalCollectionName('host');
+}

@@ -138,7 +138,9 @@ export class TenantsCacheManager implements ITenantsManager, IPrivilegedTenantRe
         return undefined;
       }
 
-      tenantConfig.collectionName = generateTenantCollectionNameFromClaims(tenantConfig.claims);
+      tenantConfig.collectionName = vaultId === 'host'
+        ? this.hostCollectionName
+        : generateTenantCollectionNameFromClaims(tenantConfig.claims);
       if (tenantConfig.didDocument) {
         tenantConfig.didDocument = normalizeDidDocumentKeyRelationships(tenantConfig.didDocument);
       }

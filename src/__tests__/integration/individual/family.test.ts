@@ -1,4 +1,5 @@
 // Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
+import { resolveHostPhysicalCollectionName } from '../../../config/storage-layout';
 // src/__tests__/integration/individual/family.test.ts
 // Always create JSDoc, do not use strings inline in keys nor values, use types instead, and reuse the data test examples.
 import { GatewayRequestEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
@@ -141,7 +142,7 @@ describe('[/individual/org.schema/Organization/_batch] Integration Tests (sandbo
   beforeEach(async () => {
     jest.clearAllMocks();
     vaultRepository = new VaultMemRepository();
-    const hostCollectionName = generateTenantCollectionNameFromClaims(testClaimsHostInitialization);
+    const hostCollectionName = resolveHostPhysicalCollectionName();
     tenantsCacheManager = new TenantsCacheManager(vaultRepository, () => mockKmsService, hostCollectionName);
 
     const config = {

@@ -1,4 +1,5 @@
 // Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
+import { resolveHostPhysicalCollectionName } from '../../config/storage-layout';
 // src/__tests__/integration/end-to-end-legacy.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 import { HttpStatusCodes } from 'gdc-common-utils-ts/constants/http';
@@ -111,7 +112,7 @@ describe('End-to-End API Flow (Legacy / Unencrypted)', () => {
     process.env.FHIR_LEGACY = 'true';
     process.env.DEMO_ALLOW_INSECURE_BEARER = 'true';
     
-    const hostCollectionName = generateTenantCollectionNameFromClaims(testClaimsHostInitialization);
+    const hostCollectionName = resolveHostPhysicalCollectionName();
     tenantManager = new TenantsCacheManager(vaultRepository, () => kmsService, hostCollectionName);
     kmsService = new KmsService(cryptographyService, tenantManager);
     await kmsService.init();
@@ -250,7 +251,7 @@ describe('End-to-End API Flow (Legacy / Unencrypted)', () => {
       claims[ClaimsServiceSchemaorg.category],
       claims[ClaimsOrganizationSchemaorg.identifierValue],
     );
-    const hostCollectionName = generateTenantCollectionNameFromClaims(testClaimsHostInitialization);
+    const hostCollectionName = resolveHostPhysicalCollectionName();
     const secureTenantRecord = await vaultRepository.get<any>(hostCollectionName, vaultId, getEnvSectionId('tenants'));
     expect(secureTenantRecord).toBeDefined();
 

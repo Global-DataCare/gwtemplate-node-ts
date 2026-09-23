@@ -4,7 +4,7 @@
 
 import { HealthcareActorRoles, HealthcareConsentActions, HealthcareConsentPurposes } from 'gdc-common-utils-ts/constants/healthcare';
 import { EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_SUBJECT_DID } from 'gdc-common-utils-ts/examples/inter-tenant-access-contract';
-import { ClaimConsent } from 'gdc-common-utils-ts/models/consent-rule';
+import { ClaimConsent, ConsentStatuses } from 'gdc-common-utils-ts/models/consent-rule';
 
 const testConsentSubject = EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_SUBJECT_DID;
 
@@ -14,6 +14,7 @@ export const testConsentRulePermitOrgDid = {
   [ClaimConsent.subject]: testConsentSubject,
   [ClaimConsent.identifier]: 'urn:uuid:rule-org',
   [ClaimConsent.decision]: 'permit',
+  [ClaimConsent.status]: ConsentStatuses.Active,
   [ClaimConsent.actorIdentifier]: 'did:web:api.acme.org',
   [ClaimConsent.actorRole]: HealthcareActorRoles.Physician,
   [ClaimConsent.action]: HealthcareConsentActions.AllergiesAndIntolerances,
@@ -27,6 +28,7 @@ export const testConsentRulePermitJurisdiction = {
   [ClaimConsent.subject]: testConsentSubject,
   [ClaimConsent.identifier]: 'urn:uuid:rule-jurisdiction',
   [ClaimConsent.decision]: 'permit',
+  [ClaimConsent.status]: ConsentStatuses.Active,
   [ClaimConsent.actorIdentifier]: 'urn:iso:3166:ES',
   [ClaimConsent.actorRole]: HealthcareActorRoles.Physician,
   [ClaimConsent.action]: HealthcareConsentActions.AllergiesAndIntolerances,
@@ -40,6 +42,7 @@ export const testConsentRulePermitEmailWildcardRole = {
   [ClaimConsent.subject]: testConsentSubject,
   [ClaimConsent.identifier]: 'urn:uuid:rule-email',
   [ClaimConsent.decision]: 'permit',
+  [ClaimConsent.status]: ConsentStatuses.Active,
   [ClaimConsent.actorIdentifier]: 'doctor1@acme.org',
   [ClaimConsent.actorRole]: '*',
   [ClaimConsent.action]: HealthcareConsentActions.AllergiesAndIntolerances,

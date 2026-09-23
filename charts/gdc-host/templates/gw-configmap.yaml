@@ -12,6 +12,7 @@ data:
   NODE_ENV: {{ ternary "production" "demo" (eq .Values.environment "production") | quote }}
   DEPLOYMENT_ENV: {{ .Values.environment | quote }}
   NETWORK_MODE: {{ .Values.networkMode | quote }}
+  STORAGE_LAYOUT: "scoped-v2"
   SECURITY_MODE: {{ .Values.gw.securityMode | quote }}
   DIDCOMM_PLAIN: {{ .Values.gw.didcommPlain | quote }}
   AUTH_TOKEN_VERIFIER: {{ .Values.gw.authTokenVerifier | quote }}
@@ -25,6 +26,7 @@ data:
   HOST_ADMIN_UID: {{ .Values.host.adminUid | quote }}
   HOST_ADMIN_ROLE: {{ .Values.host.adminRole | quote }}
   HOST_STORAGE_SCOPE: {{ .Values.host.storageScope | quote }}
+  HOST_LEGACY_PHYSICAL_COLLECTION: {{ .Values.host.legacyPhysicalCollection | quote }}
   HOST_TERMS_URL: {{ printf "%s/terms" (trimSuffix "/" .Values.host.publicUrl) | quote }}
   ALLOWED_SECTORS: {{ join "," .Values.host.allowedSectors | quote }}
   SECTORS_ALLOWED: {{ join "," .Values.host.allowedSectors | quote }}

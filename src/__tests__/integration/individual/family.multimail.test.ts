@@ -1,4 +1,5 @@
 // Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
+import { resolveHostPhysicalCollectionName } from '../../../config/storage-layout';
 // Always create JSDoc, do not use strings inline in keys nor values, use types instead, and reuse the data test examples.
 import { GatewayRequestEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
 import { HttpStatusCodes } from 'gdc-common-utils-ts/constants/http';
@@ -56,7 +57,7 @@ describe('FamilyManager multi-email integration (web/app)', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
     vaultRepository = new VaultMemRepository();
-    const hostCollectionName = generateTenantCollectionNameFromClaims(testClaimsHostInitialization);
+    const hostCollectionName = resolveHostPhysicalCollectionName();
     tenantsCacheManager = new TenantsCacheManager(vaultRepository, () => mockKmsService, hostCollectionName);
 
     const config = {

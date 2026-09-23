@@ -22,6 +22,9 @@ host:
   adminUid: host-controller-001
   adminRole: ISCO-08|1120
   storageScope: host
+  # Migration-only exact collection name. New hosts leave this empty and use
+  # <deployment>_<networkMode>_<storageScope>__host.
+  legacyPhysicalCollection: ""
   allowedSectors:
     - onehealth-research
   identityChannel: identity-global

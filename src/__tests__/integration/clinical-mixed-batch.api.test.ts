@@ -18,8 +18,9 @@ import { HttpStatusCodes } from 'gdc-common-utils-ts/constants/http';
 import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
 import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 import { invokeExpress } from './helpers/invokeExpress';
-import { getTenantVaultId, generateTenantCollectionNameFromClaims } from '../../utils/tenant';
-import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { resolveHostPhysicalCollectionName } from '../../config/storage-layout';
+import { getTenantVaultId } from '../../utils/tenant';
+import { ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { HealthcareBasicSections } from 'gdc-common-utils-ts/constants/index';
 import {
   CompositionAttesterModes,
@@ -69,12 +70,7 @@ describe('clinical mixed batch API (integration)', () => {
 
     const { app, queueAdapter, tenantManager, vaultRepository, kmsService } = await startServer({ listen: false });
     try {
-      const hostCollectionName = generateTenantCollectionNameFromClaims({
-        [ClaimsOrganizationSchemaorg.addressCountry]: process.env.ORG_HOST_JURISDICTION,
-        [ClaimsOrganizationSchemaorg.identifierType]: process.env.ORG_HOST_ID_TYPE,
-        [ClaimsOrganizationSchemaorg.identifierValue]: process.env.ORG_HOST_ID_VALUE,
-        [ClaimsServiceSchemaorg.category]: Sector.SYSTEM,
-      } as any);
+      const hostCollectionName = resolveHostPhysicalCollectionName();
       const tenantClaims = testPayloadCreateTenant1.body.data[0].resource.meta.claims as any;
       const tenantVaultId = getTenantVaultId(tenantClaims[ClaimsServiceSchemaorg.category], testTenant1TenantId);
       await kmsService.provisionKeys(tenantVaultId);
