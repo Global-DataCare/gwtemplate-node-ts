@@ -1,13 +1,24 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 /**
  * Flow contract: legacy deployments retain their exact physical paths, while
  * scoped deployments require explicit environment, ledger mode and anonymous
  * host scope before any persistence path can be resolved.
  */
-import { resolveStorageScope, scopePhysicalCollectionName } from '../../../config/storage-layout';
+import {
+  resolveHostPhysicalCollectionName,
+  resolveStorageScope,
+  scopePhysicalCollectionName,
+} from '../../../config/storage-layout';
 import { getEnvSectionId } from '../../../utils/section-env';
 
-const KEYS = ['STORAGE_LAYOUT', 'DEPLOYMENT_ENV', 'NETWORK_MODE', 'HOST_STORAGE_SCOPE', 'NODE_ENV'] as const;
+const KEYS = [
+  'STORAGE_LAYOUT',
+  'DEPLOYMENT_ENV',
+  'NETWORK_MODE',
+  'HOST_STORAGE_SCOPE',
+  'HOST_LEGACY_PHYSICAL_COLLECTION',
+  'NODE_ENV',
+] as const;
 const original = Object.fromEntries(KEYS.map((key) => [key, process.env[key]]));
 
 afterEach(() => {
@@ -75,5 +86,38 @@ describe('storage layout contract', () => {
     process.env.HOST_STORAGE_SCOPE = 'staging/host-a/v1';
 
     expect(() => resolveStorageScope()).toThrow(/lowercase slug/);
+  });
+
+  test('keeps the scoped physical host registry independent from operator claims', () => {
+    process.env.STORAGE_LAYOUT = 'scoped-v2';
+    process.env.DEPLOYMENT_ENV = 'staging';
+    process.env.NETWORK_MODE = 'test-network';
+    process.env.HOST_STORAGE_SCOPE = 'host-b';
+    delete process.env.HOST_LEGACY_PHYSICAL_COLLECTION;
+
+    expect(resolveHostPhysicalCollectionName()).toBe('staging_test-network_host-b__host');
+  });
+
+  test('uses the stable logical host collection in legacy layout', () => {
+    process.env.STORAGE_LAYOUT = 'legacy-v1';
+    delete process.env.HOST_LEGACY_PHYSICAL_COLLECTION;
+
+    expect(resolveHostPhysicalCollectionName()).toBe('host');
+  });
+
+  test('accepts one exact migration pin for an existing host registry', () => {
+    process.env.STORAGE_LAYOUT = 'scoped-v2';
+    process.env.DEPLOYMENT_ENV = 'staging';
+    process.env.NETWORK_MODE = 'test-network';
+    process.env.HOST_STORAGE_SCOPE = 'host-b';
+    process.env.HOST_LEGACY_PHYSICAL_COLLECTION = 'existing-host-registry';
+
+    expect(resolveHostPhysicalCollectionName()).toBe('existing-host-registry');
+  });
+
+  test('rejects a migration pin that is not one exact collection identifier', () => {
+    process.env.HOST_LEGACY_PHYSICAL_COLLECTION = 'project/collections/host';
+
+    expect(() => resolveHostPhysicalCollectionName()).toThrow(/collection identifier/);
   });
 });

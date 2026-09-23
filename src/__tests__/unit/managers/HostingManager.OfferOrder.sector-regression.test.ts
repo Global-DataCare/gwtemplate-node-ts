@@ -1,4 +1,5 @@
 // Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
+import { resolveHostPhysicalCollectionName } from '../../../config/storage-layout';
 import { beforeEach } from '@jest/globals';
 import { VaultMemRepository } from '../../../database/repositories/vault/vault.mem.repository';
 import { TenantsCacheManager } from '../../../managers/TenantsCacheManager';
@@ -33,7 +34,7 @@ let hostingManager: InstanceType<typeof HostingManager>;
 beforeEach(async () => {
   jest.clearAllMocks();
   const vaultRepository = new VaultMemRepository();
-  const hostCollectionName = tenantUtils.generateTenantCollectionNameFromClaims(testClaimsHostInitialization);
+  const hostCollectionName = resolveHostPhysicalCollectionName();
   const mockTenantsCacheManager = new TenantsCacheManager(
     vaultRepository,
     () => mockKmsService,

@@ -1,4 +1,4 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 // TDD contract: research fixtures distinguish authenticated local authors from preserved external IPS provenance.
 import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
 import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
@@ -24,7 +24,8 @@ import { initializeTenantServicesConfig } from '../../../utils/services';
 import { getIndividualSectionId } from '../../../utils/individual-sections';
 import { getEnvSectionId } from '../../../utils/section-env';
 import { persistConsentRuleAndAttachment } from '../../../utils/consent-storage';
-import { generateTenantCollectionNameFromClaims, getTenantVaultId } from '../../../utils/tenant';
+import { getTenantVaultId } from '../../../utils/tenant';
+import { resolveHostPhysicalCollectionName } from '../../../config/storage-layout';
 import { invokeExpress } from './invokeExpress';
 import { testPayloadCreateTenant1 } from '../../data/end-to-end.data';
 import {
@@ -175,12 +176,7 @@ function buildLabTenantClaims(): Record<string, unknown> {
 }
 
 function buildHostCollectionName(): string {
-  return generateTenantCollectionNameFromClaims({
-    [ClaimsOrganizationSchemaorg.addressCountry]: process.env.ORG_HOST_JURISDICTION,
-    [ClaimsOrganizationSchemaorg.identifierType]: process.env.ORG_HOST_ID_TYPE,
-    [ClaimsOrganizationSchemaorg.identifierValue]: process.env.ORG_HOST_ID_VALUE,
-    [ClaimsServiceSchemaorg.category]: Sector.SYSTEM,
-  });
+  return resolveHostPhysicalCollectionName();
 }
 
 /**

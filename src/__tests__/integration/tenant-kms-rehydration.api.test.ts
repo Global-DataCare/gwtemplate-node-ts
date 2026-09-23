@@ -1,4 +1,5 @@
 // Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
+import { resolveHostPhysicalCollectionName } from '../../config/storage-layout';
 /**
  * Flow contract: activate a tenant, purchase a professional seat through the
  * explicit Offer and host Order boundary, restart KMS, then prove that the
@@ -42,7 +43,7 @@ import { buildLicensePurchaseEntry } from 'gdc-common-utils-ts';
 const hostBootstrapClaims = testClaimsHostInitialization;
 
 describe('Tenant KMS rehydration after activate route story', () => {
-  const hostCollectionName = generateTenantCollectionNameFromClaims(hostBootstrapClaims);
+  const hostCollectionName = resolveHostPhysicalCollectionName();
   const vaultRepository = new VaultMemRepository();
   const logger = new ConsoleLogger();
   const cryptographyService = new CryptographyService(new AdapterCryptoSdkNode());

@@ -1,4 +1,5 @@
 // Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
+import { resolveHostPhysicalCollectionName } from '../../../config/storage-layout';
 /**
  * TEST SECTOR USAGE: This test uses both network (infra) and business (functional) sectors.
  *
@@ -128,7 +129,7 @@ describe('FamilyManager - Offer/Order Flow', () => {
 
     vaultRepository = new VaultMemRepository();
 
-    hostCollectionName = tenantUtils.generateTenantCollectionNameFromClaims(testClaimsHostInitialization);
+    hostCollectionName = resolveHostPhysicalCollectionName();
 
     tenantsCacheManager = new TenantsCacheManager(vaultRepository, () => mockKmsService, hostCollectionName);
 

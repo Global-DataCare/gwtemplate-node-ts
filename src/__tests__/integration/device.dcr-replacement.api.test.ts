@@ -1,3 +1,5 @@
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
+import { resolveHostPhysicalCollectionName } from '../../config/storage-layout';
 // TDD contract: write this test red first; make it green only with the complete real behavior.
 import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
 process.env.DEV_SEED = 'true';
@@ -120,7 +122,7 @@ describe('Device DCR replacement route story', () => {
     vaultRepository = new VaultMemRepository();
     const asyncResponseStore = new AsyncResponseStoreMem();
 
-    const hostCollectionName = generateTenantCollectionNameFromClaims(testClaimsHostInitialization);
+    const hostCollectionName = resolveHostPhysicalCollectionName();
     tenantManager = new TenantsCacheManager(vaultRepository, () => kmsService, hostCollectionName);
     kmsService = new KmsService(cryptographyService, tenantManager);
     await kmsService.init();

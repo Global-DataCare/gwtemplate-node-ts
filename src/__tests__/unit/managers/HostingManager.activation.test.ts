@@ -1,4 +1,5 @@
 // Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
+import { resolveHostPhysicalCollectionName } from '../../../config/storage-layout';
 import { GatewayResponseEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
 import { GatewayRequestEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
 import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
@@ -141,7 +142,7 @@ describe('HostingManager activation flow', () => {
     (uuidv4 as jest.Mock).mockReturnValue('activation-test-uuid');
 
     vaultRepository = new VaultMemRepository();
-    hostCollectionName = tenantUtils.generateTenantCollectionNameFromClaims(testClaimsHostInitialization);
+    hostCollectionName = resolveHostPhysicalCollectionName();
     mockTenantsCacheManager = new TenantsCacheManager(
       vaultRepository,
       () => mockKmsService,

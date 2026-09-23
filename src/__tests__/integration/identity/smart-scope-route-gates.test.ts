@@ -1,4 +1,5 @@
 // Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
+import { resolveHostPhysicalCollectionName } from '../../../config/storage-layout';
 // TDD contract: write this test red first; make it green only with the complete real behavior.
 import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
 import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
@@ -50,7 +51,7 @@ describe('SMART scope route gates (integration)', () => {
       [ClaimsOrganizationSchemaorg.identifierValue]: process.env.ORG_HOST_ID_VALUE,
       [ClaimsServiceSchemaorg.category]: Sector.SYSTEM,
     };
-    const hostCollectionName = generateTenantCollectionNameFromClaims(hostBootstrapClaims);
+    const hostCollectionName = resolveHostPhysicalCollectionName();
 
     const tenantClaims = testPayloadCreateTenant1.body.data[0].resource.meta.claims as any;
     const tenantVaultId = getTenantVaultId(

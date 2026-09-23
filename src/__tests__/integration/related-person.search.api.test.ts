@@ -1,4 +1,5 @@
 // Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
+import { resolveHostPhysicalCollectionName } from '../../config/storage-layout';
 import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
 import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 import { invokeExpress } from './helpers/invokeExpress';
@@ -67,7 +68,7 @@ describe('RelatedPerson subject-scoped search API', () => {
         },
       } as any, 'host');
       await vaultRepository.put(
-        generateTenantCollectionNameFromClaims(hostClaims as any),
+        resolveHostPhysicalCollectionName(),
         [protectedTenant as any],
         getEnvSectionId('tenants'),
       );

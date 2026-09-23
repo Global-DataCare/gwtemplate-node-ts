@@ -13,7 +13,6 @@ if (!isTestEnv && (process.env.DB_PROVIDER === 'firestore' || process.env.STORAG
 }
 
 import { Worker } from './worker';
-import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { createApiRouter } from './routes/api';
 import { createDiscoveryRouter } from './routes/discovery';
 import { DiscoveryService } from './services/DiscoveryService';
@@ -27,7 +26,6 @@ import { TenantsCacheManager } from './managers/TenantsCacheManager';
 import { EmployeeManager } from './managers/EmployeeManager';
 import { IcaManager } from './managers/IcaManager';
 import { MessagingManager } from './managers/MessagingManager';
-import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { IndividualManager } from './managers/IndividualManager';
 import { CredentialManager } from './managers/CredentialManager';
 import { CompositionManager } from './managers/CompositionManager';
@@ -43,8 +41,7 @@ import { IAuthorizationManager } from './managers/auth/IAuthorizationManager';
 import { createFhirRouter } from './routes/fhir';
 import { createGlobalErrorHandler } from './middlewares/global-error-handler';
 import * as path from 'path';
-import { generateTenantCollectionNameFromClaims } from './utils/tenant';
-import { resolveStorageScope } from './config/storage-layout';
+import { resolveHostPhysicalCollectionName, resolveStorageScope } from './config/storage-layout';
 import { assertLedgerGenesisVerificationMode } from './blockchain/fabric/v3/fabric-target-policy';
 import {
   parseExpectedChannelBindings,
@@ -176,14 +173,7 @@ async function startServer(options?: StartServerOptions) {
     options.testMiddlewares.forEach((mw) => app.use(mw));
   }
 
-  // Calculate the correct physical collection name for the host from configuration.
-  const hostBootstrapClaims = {
-    [ClaimsOrganizationSchemaorg.addressCountry]: config.host.jurisdiction,
-    [ClaimsOrganizationSchemaorg.identifierType]: config.host.idType,
-    [ClaimsOrganizationSchemaorg.identifierValue]: config.host.idValue,
-    [ClaimsServiceSchemaorg.category]: Sector.SYSTEM,
-  };
-  const hostCollectionName = generateTenantCollectionNameFromClaims(hostBootstrapClaims);
+  const hostCollectionName = resolveHostPhysicalCollectionName();
   
   // --- DEPENDENCY INJECTION ---
   const storageScope = resolveStorageScope();

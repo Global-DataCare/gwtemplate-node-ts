@@ -61,7 +61,7 @@ type PersistTenantConfigDeps = Readonly<{
  * - optional admin/service resources in their dedicated sections
  */
 export async function persistHostConfig(deps: PersistHostConfigDeps): Promise<void> {
-  const hostCollectionName = generateTenantCollectionNameFromClaims(deps.allClaims);
+  const hostCollectionName = deps.hostRuntime.hostCollectionName;
   const logicalVaultId = 'host';
 
   await deps.vaultRepository.createNewVault({ id: hostCollectionName });

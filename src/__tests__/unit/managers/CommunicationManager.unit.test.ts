@@ -2283,6 +2283,11 @@ describe('CommunicationManager Unit Tests', () => {
               id: 'ips-composition-embedded-001',
               status: 'final',
               subject: { reference: subjectDid },
+              author: [{ reference: EXAMPLE_PROVIDER_ORGANIZATION_AUTHORIZATION_URN_CDS }],
+              attester: [{
+                mode: CompositionAttesterModes.Professional,
+                party: { reference: `urn:uuid:${EXAMPLE_KYC_CONTROLLER_UUID}` },
+              }],
               type: { coding: [{ system: 'http://loinc.org', code: '60591-5' }] },
             },
           },
@@ -2384,6 +2389,10 @@ describe('CommunicationManager Unit Tests', () => {
         medicationRecord['MedicationStatement.identifier']
         || medicationRecord['org.hl7.fhir.api.MedicationStatement.identifier'],
       ).toBe('urn:uuid:medication-embedded-001');
+      expect(medicationRecord[CompositionClaim.Author])
+        .toBe(EXAMPLE_PROVIDER_ORGANIZATION_AUTHORIZATION_URN_CDS);
+      expect(medicationRecord[CompositionClaim.Attester])
+        .toBe(`urn:uuid:${EXAMPLE_KYC_CONTROLLER_UUID}`);
     });
 
     it('projects one Composition index per IPS section into individual and digitaltwin scopes', async () => {
@@ -2712,7 +2721,7 @@ describe('CommunicationManager Unit Tests', () => {
       expect(secondObservationPuts).toHaveLength(0);
     });
 
-    it('does not persist the same Composition projection twice when the document is resent in another Communication thread', async () => {
+    it('preserves one imported Composition without requiring the importer to own its external author graph', async () => {
       mockTenantsCacheManager.getTenantDid.mockResolvedValue(testServerDid as any);
       mockVaultRepository.vaultExists.mockResolvedValue(true as any);
 
@@ -2727,6 +2736,7 @@ describe('CommunicationManager Unit Tests', () => {
               identifier: [{ value: 'urn:uuid:ips-composition-stable-001' }],
               status: 'final',
               subject: { reference: subjectDid },
+              author: [{ reference: EXAMPLE_PROVIDER_ORGANIZATION_AUTHORIZATION_URN_CDS }],
               type: { coding: [{ system: 'http://loinc.org', code: '60591-5' }] },
               section: [{ code: { coding: [{ system: 'http://loinc.org', code: '10160-0' }] } }],
             },
@@ -2752,6 +2762,7 @@ describe('CommunicationManager Unit Tests', () => {
                   '@context': 'org.hl7.fhir.r4',
                   'Communication.subject': subjectDid,
                   'Communication.sent': '2026-05-22T10:00:00Z',
+                  [CompositionClaim.Section]: HealthcareBasicSections.HistoryOfMedicationUse.attributeValue,
                 },
               },
               resource: {

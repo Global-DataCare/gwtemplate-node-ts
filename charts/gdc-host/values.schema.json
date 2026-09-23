@@ -15,7 +15,7 @@
     },
     "host": {
       "type": "object",
-      "required": ["domain", "publicUrl", "legalName", "jurisdiction", "idType", "idValue", "adminEmail", "adminUid", "adminRole", "allowedSectors", "identityChannel", "organizationIdentityChannel", "dataChannel"],
+      "required": ["domain", "publicUrl", "legalName", "jurisdiction", "idType", "idValue", "adminEmail", "adminUid", "adminRole", "storageScope", "allowedSectors", "identityChannel", "organizationIdentityChannel", "dataChannel"],
       "properties": {
         "domain": { "type": "string", "minLength": 3 },
         "publicUrl": { "type": "string", "pattern": "^https?://" },
@@ -26,6 +26,8 @@
         "adminEmail": { "type": "string", "format": "email" },
         "adminUid": { "type": "string", "minLength": 3 },
         "adminRole": { "type": "string", "minLength": 3 },
+        "storageScope": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+        "legacyPhysicalCollection": { "type": "string", "pattern": "^[A-Za-z0-9._-]*$" },
         "allowedSectors": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
         "identityChannel": { "type": "string", "minLength": 1 },
         "organizationIdentityChannel": { "type": "string", "minLength": 1 },

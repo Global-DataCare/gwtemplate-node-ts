@@ -98,6 +98,13 @@ Frontera de persistencia y Fabric:
   renombran colecciones ni secciones de forma implicita.
 - Los despliegues nuevos usan `STORAGE_LAYOUT=scoped-v2` junto con
   `DEPLOYMENT_ENV`, `NETWORK_MODE` y `HOST_STORAGE_SCOPE`.
+- El registro fisico del host termina siempre en `__host`; no se deriva de
+  `HOST_ID_VALUE`, del nombre legal ni del correo de sus controladores.
+- `HOST_LEGACY_PHYSICAL_COLLECTION` solo fija el nombre exacto de una colección
+  ya existente durante una migración. Los hosts nuevos deben dejarlo vacío.
+- Preparar o publicar este cambio no autoriza desplegarlo sobre un host operado
+  por terceros; en particular, `dev-host@globaldatacare.es` queda fuera del
+  rollout de esta rama.
 - El prefijo fisico resultante sigue
   `<deployment>_<network-mode>_<host>_...`.
 - En `staging/test-network`, el MVP puede usar

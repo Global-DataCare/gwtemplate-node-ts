@@ -1,4 +1,5 @@
 // Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
+import { resolveHostPhysicalCollectionName } from '../../config/storage-layout';
 /**
  * TEST SECTOR USAGE: This integration test covers both network (infra) and business (functional) sectors.
  *
@@ -218,7 +219,7 @@ describe('Organization Registration API', () => {
     process.env.JSON_LEGACY = 'true';
     process.env.DEMO_ALLOW_INSECURE_BEARER = 'true';
 
-    const hostCollectionName = generateTenantCollectionNameFromClaims(testClaimsHostInitialization);
+    const hostCollectionName = resolveHostPhysicalCollectionName();
     vaultRepository = new VaultMemRepository();
     tenantsCacheManager = new TenantsCacheManager(vaultRepository, () => mockKmsService, hostCollectionName);
     asyncResponseStore = new AsyncResponseStoreMem();

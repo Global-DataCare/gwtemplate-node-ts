@@ -18,6 +18,7 @@ import {
   testClaimsTenant1AlternateNameInvalidPrefix,
 } from '../../data/end-to-end.data';
 import * as tenantUtils from '../../../utils/tenant';
+import { resolveHostPhysicalCollectionName } from '../../../config/storage-layout';
 import { ClaimsOrganizationSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { toJwkThumbprintSha256Urn } from 'gdc-common-utils-ts/utils/jwk-thumbprint';
 import { getEnvSectionId } from '../../../utils/section-env';
@@ -147,7 +148,7 @@ describe('HostingManager', () => {
     (uuidValidate as jest.Mock).mockReturnValue(true);
 
     vaultRepository = new VaultMemRepository();
-    const hostCollectionName = tenantUtils.generateTenantCollectionNameFromClaims(testClaimsHostInitialization);
+    const hostCollectionName = resolveHostPhysicalCollectionName();
     mockTenantsCacheManager = new TenantsCacheManager(vaultRepository, () => mockKmsService, hostCollectionName) as jest.Mocked<TenantsCacheManager>;
 
     mockConfig = {
@@ -179,7 +180,7 @@ describe('HostingManager', () => {
       firebase: {},
     };
 
-    const hostCollectionNameForRuntime = tenantUtils.generateTenantCollectionNameFromClaims(testClaimsHostInitialization);
+    const hostCollectionNameForRuntime = resolveHostPhysicalCollectionName();
     const hostRuntime = {
       hostCollectionName: hostCollectionNameForRuntime,
       hostDid: composeHostDidWebId(mockConfig.apiBaseUrl, mockConfig.hostExternalDomain),

@@ -83,11 +83,17 @@ host:
   adminEmail: <email-controller-aprobado>
   adminUid: <identificador-estable-controller>
   adminRole: <rol-ISCO-08>
+  storageScope: <slug-estable-del-host>
+  # Solo al migrar una instalación que ya tenga otro nombre físico:
+  legacyPhysicalCollection: ""
   allowedSectors:
     - <sector-autorizado>
 ```
 
 El chart valida que los tres campos `admin*` existan y los inyecta en GW CORE.
+La colección física reservada termina en `__host` y no cambia cuando cambia la
+organización operadora ni su controller. `legacyPhysicalCollection` se usa solo
+para fijar temporalmente el nombre exacto de una colección histórica.
 Durante el arranque, GW crea el registro técnico `host`, genera sus claves
 operativas mediante el adaptador KMS y publica su DID canónico en
 `https://<host>/.well-known/did.json`. El registro del operador no constituye

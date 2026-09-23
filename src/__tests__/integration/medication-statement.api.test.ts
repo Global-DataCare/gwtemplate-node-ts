@@ -1,3 +1,5 @@
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
+import { resolveHostPhysicalCollectionName } from '../../config/storage-layout';
 // Flow contract: medication writes preserve operational provenance while consented research projection exposes only pseudonymous governed facts.
 // Contract marker: imported clinical resources preserve their external author provenance.
 import { GatewayResponseEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
@@ -75,7 +77,7 @@ describe('MedicationStatement API (integration)', () => {
         [ClaimsOrganizationSchemaorg.identifierValue]: process.env.ORG_HOST_ID_VALUE,
         [ClaimsServiceSchemaorg.category]: Sector.SYSTEM,
       };
-      const hostCollectionName = generateTenantCollectionNameFromClaims(hostBootstrapClaims as any);
+      const hostCollectionName = resolveHostPhysicalCollectionName();
       const tenantClaims = testPayloadCreateTenant1.body.data[0].resource.meta.claims as any;
       const tenantVaultId = getTenantVaultId(tenantClaims[ClaimsServiceSchemaorg.category], testTenant1TenantId);
 
@@ -438,7 +440,7 @@ describe('MedicationStatement API (integration)', () => {
         [ClaimsOrganizationSchemaorg.identifierValue]: process.env.ORG_HOST_ID_VALUE,
         [ClaimsServiceSchemaorg.category]: Sector.SYSTEM,
       };
-      const hostCollectionName = generateTenantCollectionNameFromClaims(hostBootstrapClaims as any);
+      const hostCollectionName = resolveHostPhysicalCollectionName();
       const tenantClaims = testPayloadCreateTenant1.body.data[0].resource.meta.claims as any;
       const tenantVaultId = getTenantVaultId(tenantClaims[ClaimsServiceSchemaorg.category], testTenant1TenantId);
 
@@ -787,7 +789,7 @@ describe('MedicationStatement API (integration)', () => {
         [ClaimsOrganizationSchemaorg.identifierValue]: process.env.ORG_HOST_ID_VALUE,
         [ClaimsServiceSchemaorg.category]: Sector.SYSTEM,
       };
-      const hostCollectionName = generateTenantCollectionNameFromClaims(hostBootstrapClaims as any);
+      const hostCollectionName = resolveHostPhysicalCollectionName();
       const tenantClaims = {
         ...(testPayloadCreateTenant1.body.data[0].resource.meta.claims as any),
         [ClaimsServiceSchemaorg.category]: 'health-care',
@@ -1037,7 +1039,7 @@ describe('MedicationStatement API (integration)', () => {
         [ClaimsOrganizationSchemaorg.identifierValue]: process.env.ORG_HOST_ID_VALUE,
         [ClaimsServiceSchemaorg.category]: Sector.SYSTEM,
       };
-      const hostCollectionName = generateTenantCollectionNameFromClaims(hostBootstrapClaims as any);
+      const hostCollectionName = resolveHostPhysicalCollectionName();
       const tenantClaims = testPayloadCreateTenant1.body.data[0].resource.meta.claims as any;
       const tenantVaultId = getTenantVaultId(tenantClaims[ClaimsServiceSchemaorg.category], testTenant1TenantId);
 
