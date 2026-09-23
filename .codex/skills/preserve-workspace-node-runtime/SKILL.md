@@ -49,6 +49,31 @@ runtime.
 3. Record effective internal versions with `npm ls` after `npm ci`; never infer
    them only from `package.json` or the lockfile.
 
+## Isolate and clean local test runtimes
+
+1. Before starting services, inventory the required TCP listeners, local
+   processes and Docker containers. Never attach to, stop or reuse an unknown
+   process merely because its health endpoint responds.
+2. Lease one product-specific and run-specific port block atomically. UHC,
+   VetChain and every assistant or portal run must use disjoint blocks, with a
+   per-run offset for concurrent executions. Pass every derived URL and port to
+   all children; fixed shared ports are not valid concurrent-test isolation.
+3. Record ownership for every PID, process group, temporary file and container.
+   Use unique container names and terminate the complete owned process group in
+   `finally` and on `SIGINT` or `SIGTERM`. A failed startup must run the
+   same cleanup path as a completed test.
+4. After every gate, prove that no listener, child process or container owned by
+   that execution remains. Keep services alive only for an explicitly stated
+   immediate continuation; record the owner and leased ports, and clean them
+   before ending the turn.
+5. Do not run redundant full matrices concurrently. Bound builds, browsers,
+   emulators and containers to the machine capacity; on resource pressure,
+   stop launching work, clean owned runtimes and resume the smallest gate.
+6. A cross-repository E2E has exactly one orchestrator that owns the complete
+   GW, ICA, DataConv, portal and assistant runtime. A healthcheck without the
+   expected run ownership, configuration and source revision is not evidence
+   that the correct service is under test.
+
 ## Fail fast across browser and E2E matrices
 
 Run the smallest failing journey and the first browser/project first. Configure
