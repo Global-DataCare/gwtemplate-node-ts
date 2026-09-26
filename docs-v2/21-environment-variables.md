@@ -639,6 +639,19 @@ These configure the main operational PostgreSQL connection.
 `FIREBASE_API_KEY`
 - Firebase web/API key used for relevant auth/testing flows.
 
+### Research terminology
+
+`RESEARCH_TERMINOLOGY_BASE_URL`
+- Optional base URL of the governed terminology API used for new digital-twin
+  research projections.
+- When absent, the projection retains the exact canonical code and omits labels.
+
+`RESEARCH_TERMINOLOGY_SERVICE_TOKEN`
+- Optional bearer token for the terminology API. It belongs in the deployment
+  Secret, never in a ConfigMap or Helm values file.
+- Lookup failures leave a code-only projection and never make an already
+  persisted operational clinical write appear to fail.
+
 ## 23. Auth And Federation
 
 `AUTH_TOKEN_VERIFIER`

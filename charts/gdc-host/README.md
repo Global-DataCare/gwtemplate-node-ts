@@ -143,7 +143,7 @@ Antes de instalar, deben existir los Secrets referenciados:
 | `peer.couchdbSecretName` | `username`, `password` |
 | `postgresql.existingSecret` | `POSTGRES_USER`, `POSTGRES_PASSWORD` |
 | `redis.existingSecret` | `REDIS_PASSWORD` |
-| `gw.existingSecret` | identidad cliente Fabric, credenciales de proveedores y configuración secreta de KMS |
+| `gw.existingSecret` | identidad cliente Fabric, credenciales de proveedores, configuración secreta de KMS y `RESEARCH_TERMINOLOGY_SERVICE_TOKEN` cuando se habilita terminología de investigación |
 
 Ejemplo de forma de los comandos; los valores reales deben proceder del gestor
 de secretos del proveedor:

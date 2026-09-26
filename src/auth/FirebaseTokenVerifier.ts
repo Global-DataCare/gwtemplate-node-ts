@@ -1,7 +1,6 @@
 // src/auth/FirebaseTokenVerifier.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import { getAuth } from 'firebase-admin/auth';
 import { ITokenVerifier, VerificationResult } from './ITokenVerifier';
 
 /**
@@ -12,6 +11,7 @@ import { ITokenVerifier, VerificationResult } from './ITokenVerifier';
 export class FirebaseTokenVerifier implements ITokenVerifier {
   public async verify(token: string): Promise<VerificationResult> {
     try {
+      const { getAuth } = await import('firebase-admin/auth');
       const decoded = await getAuth().verifyIdToken(token);
       return { valid: true, payload: decoded };
     } catch (error: any) {

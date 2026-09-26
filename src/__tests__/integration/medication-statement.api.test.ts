@@ -372,7 +372,7 @@ describe('MedicationStatement API (integration)', () => {
         allergies: 1,
         observations: 1,
       });
-      const [firstMedication] = await vaultRepository.getContainersInSection(
+      const [firstMedication] = await vaultRepository.getContainersInSection<any>(
         tenantVaultId,
         canonicalSectionIds.medications,
       );
@@ -957,9 +957,9 @@ describe('MedicationStatement API (integration)', () => {
       expect(digitalTwinRecords[0]['org.hl7.fhir.api.MedicationStatement.subject']).toBe(twinSubjectId);
       expect(digitalTwinRecords[0]['org.hl7.fhir.api.MedicationStatement.code']).toBe(medicationCode);
       expect(digitalTwinRecords[0]['org.hl7.fhir.api.MedicationStatement.identifier']).not.toBe('urn:uuid:medication-digitaltwin-001');
-      // Source labels are not research search data. Standard text/display may
-      // be added only after resolving the preserved code through terminology.
-      expect(Object.hasOwn(digitalTwinRecords[0], DIGITAL_TWIN_SEARCH_TEXT_CLAIM)).toBe(false);
+      // Source labels are not research search data. The canonical token remains
+      // searchable, and trusted text/display may be added only by terminology.
+      expect(digitalTwinRecords[0][DIGITAL_TWIN_SEARCH_TEXT_CLAIM]).toBe(medicationCode);
       expect(Object.keys(digitalTwinRecords[0]).some((key) =>
         key !== '@context'
         && !key.startsWith(DIGITAL_TWIN_SEARCH_CLAIM_PREFIX)

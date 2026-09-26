@@ -1,4 +1,4 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: ICA verification uses the selected network path and additional controller keys exclude the primary key.
 import { buildIcaVerifyUrl, withoutDuplicatePrimaryJwk } from '../../../managers/hosting/ica-did-registration';
 import { toJwkThumbprintSha256Urn } from 'gdc-common-utils-ts/utils/jwk-thumbprint';
 
@@ -37,8 +37,8 @@ describe('ICA verification network-kind routing', () => {
 
 describe('ICA DID registration key projection', () => {
   it('removes the primary key from additional controller JWKS', () => {
-    const primary = { kty: 'EC', crv: 'P-384', x: 'primary-x', y: 'primary-y', kid: 'primary-key' };
-    const additional = { kty: 'EC', crv: 'P-384', x: 'additional-x', y: 'additional-y', kid: 'additional-key' };
+    const primary = { kty: 'EC', crv: 'P-384', x: 'primary-x', y: 'primary-y', kid: 'primary-key' } as const;
+    const additional = { kty: 'EC', crv: 'P-384', x: 'additional-x', y: 'additional-y', kid: 'additional-key' } as const;
 
     expect(withoutDuplicatePrimaryJwk({ keys: [{ ...primary }, additional] }, primary)).toEqual({
       keys: [{ ...additional, kid: toJwkThumbprintSha256Urn(additional) }],

@@ -1,4 +1,4 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: shared local-network data drives the complete SMART access journeys without ad-hoc identifiers.
 // Always create JSDoc, do not use strings inline in keys nor values, use types instead, and reuse the data test examples.
 import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
 import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
@@ -34,6 +34,9 @@ import {
   addVC,
 } from 'gdc-common-utils-ts';
 import { demoCommunicationMedicationIpsDefaults } from './demo-communication-medications-ips.data';
+
+type ConsentRuleWithSourceReference = ConsentRule
+  & Partial<Record<ClaimConsent.sourceReference, string>>;
 
 /**
  * Canonical ids reused by the local-network SMART access smoke.
@@ -302,7 +305,7 @@ export function buildDemoSecretaryIpsSearchRequest(input: Readonly<{
  */
 export function buildDemoResearchPermitByRoleConsent(input: Readonly<{
   subjectDid: string;
-}>): ConsentRule {
+}>): ConsentRuleWithSourceReference {
   return {
     '@context': 'org.hl7.fhir.api',
     [ClaimConsent.identifier]: DEMO_SMART_ACCESS_LOCAL_IDS.researchRoleConsentIdentifier,
@@ -325,7 +328,7 @@ export function buildDemoResearchPermitByRoleConsent(input: Readonly<{
  */
 export function buildDemoResearchPermitByEmailConsent(input: Readonly<{
   subjectDid: string;
-}>): ConsentRule {
+}>): ConsentRuleWithSourceReference {
   return {
     '@context': 'org.hl7.fhir.api',
     [ClaimConsent.identifier]: DEMO_SMART_ACCESS_LOCAL_IDS.researchDirectEmailConsentIdentifier,

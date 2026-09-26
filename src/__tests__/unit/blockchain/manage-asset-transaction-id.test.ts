@@ -19,10 +19,12 @@ describe('ManageAsset Fabric transaction receipt', () => {
     const submit = jest.fn(async () => undefined);
     const getTransactionId = jest.fn(() => EXAMPLE_OBSERVATION_PANEL_IDENTIFIER);
     const endorse = jest.fn(async () => ({ getResult, getTransactionId, submit }));
-    const newProposal = jest.fn(() => ({ endorse }));
+    const newProposal = jest.fn((_name: string, _options: { arguments: string[] }) => ({ endorse }));
     const manager = new ManageAsset('artifact');
-    jest.spyOn(manager as any, 'withContract').mockImplementation(async (_mspId: string, handler: any) =>
-      handler({ contract: { newProposal } }));
+    jest.spyOn(manager as any, 'withContract').mockImplementation((async (...args: unknown[]) => {
+      const handler = args[1] as (context: { contract: { newProposal: typeof newProposal } }) => unknown;
+      return handler({ contract: { newProposal } });
+    }) as any);
 
     const receipt = await manager.submitWithTransactionId(
       EXAMPLE_OBSERVATION_IDENTIFIER,

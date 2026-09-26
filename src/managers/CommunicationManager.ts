@@ -55,7 +55,7 @@ import { GatewayResponseEntryTypes } from '../shared/gateway-response-types';
 import {
   getOrCreateDigitalTwinSubjectId,
   isDigitalTwinResearchResourceType,
-  projectClaimsForDigitalTwin,
+  resolveAndProjectClaimsForDigitalTwin,
 } from '../utils/digital-twin-research-projection';
 import { isDigitalTwinSecondaryUseEnabled } from '../utils/digital-twin-secondary-use';
 import { getAuthenticatedJobActorIdentifiers } from '../utils/authenticated-job-actor';
@@ -868,10 +868,12 @@ export class CommunicationManager implements IJobProcessor {
       tenantVaultId,
       sourceSubject: subject,
     });
-    const researchClaims = projectClaimsForDigitalTwin({
+    const researchClaims = await resolveAndProjectClaimsForDigitalTwin({
       claims,
       resourceType: ResourceTypesFhirR4.Composition,
       twinSubjectId,
+      sector: String(job.sector || ''),
+      jurisdiction: String(job.jurisdiction || ''),
     });
     const researchVersionId = claimsToContentCid(researchClaims).cid;
     researchClaims['Composition.meta.versionId'] = researchVersionId;
@@ -1817,10 +1819,12 @@ export class CommunicationManager implements IJobProcessor {
         tenantVaultId: input.tenantVaultId,
         sourceSubject: subjectRef,
       });
-      const researchClaims = projectClaimsForDigitalTwin({
+      const researchClaims = await resolveAndProjectClaimsForDigitalTwin({
         claims: persistedClaims,
         resourceType: input.resourceType,
         twinSubjectId,
+        sector: String(input.job.sector || ''),
+        jurisdiction: String(input.job.jurisdiction || ''),
       });
       const researchVersionId = claimsToContentCid(this.clinicalContentVersionClaims(researchClaims)).cid;
       researchClaims[`${input.resourceType}.meta.versionId`] = researchVersionId;

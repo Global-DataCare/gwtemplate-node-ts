@@ -8,6 +8,7 @@ import {
   getOrCreateDigitalTwinSubjectId,
   isDigitalTwinResearchResourceType,
   projectClaimsForDigitalTwin,
+  resolveAndProjectClaimsForDigitalTwin,
 } from '../../../utils/digital-twin-research-projection';
 
 /**
@@ -39,7 +40,7 @@ describe('digital twin research projection', () => {
     expect(getDigitalTwinSubjectAliasSectionId()).toContain('digitaltwin_subject_aliases');
   });
 
-  it('keeps canonical code while removing source labels and identifying narrative', () => {
+  it('keeps canonical code and trusted resolved labels while removing source labels and identifying narrative', () => {
     const twinSubjectId = 'urn:uuid:00000000-0000-4000-8000-000000000001';
     const projected = projectClaimsForDigitalTwin({
       resourceType: ResourceTypesFhirR4.MedicationStatement,
@@ -62,6 +63,17 @@ describe('digital twin research projection', () => {
         'MedicationStatement.medication-text': 'Alice takes ibuprofen',
         'MedicationStatement.note': 'Call Alice on 555-0100',
       },
+      terminology: {
+        codeClaim: 'MedicationStatement.code',
+        textClaim: 'MedicationStatement.code-text',
+        displayClaim: 'MedicationStatement.code-display',
+        system: 'http://snomed.info/sct',
+        code: '387207008',
+        text: 'Ibuprofeno normalizado',
+        display: 'Ibuprofen normalized',
+        textLanguage: 'es',
+        displayLanguage: 'en',
+      },
     });
 
     expect(projected['MedicationStatement.subject']).toBe(twinSubjectId);
@@ -75,13 +87,15 @@ describe('digital twin research projection', () => {
     expect(JSON.stringify(projected)).not.toContain('private-author');
     expect(JSON.stringify(projected)).not.toContain('private-attester');
     expect(JSON.stringify(projected)).not.toContain('private-source');
-    expect(Object.hasOwn(projected, 'MedicationStatement.code-text')).toBe(false);
-    expect(Object.hasOwn(projected, 'MedicationStatement.code-display')).toBe(false);
+    expect(projected['MedicationStatement.code-text']).toBe('Ibuprofeno normalizado');
+    expect(projected['MedicationStatement.code-display']).toBe('Ibuprofen normalized');
     expect(Object.hasOwn(projected, 'MedicationStatement.patient')).toBe(false);
     expect(Object.hasOwn(projected, 'MedicationStatement.dosage-instruction')).toBe(false);
     expect(Object.hasOwn(projected, 'MedicationStatement.medication-text')).toBe(false);
     expect(Object.hasOwn(projected, 'MedicationStatement.note')).toBe(false);
-    expect(Object.hasOwn(projected, DIGITAL_TWIN_SEARCH_TEXT_CLAIM)).toBe(false);
+    expect(projected[DIGITAL_TWIN_SEARCH_TEXT_CLAIM]).toBe(
+      'http://snomed.info/sct|387207008\u001fIbuprofeno normalizado\u001fIbuprofen normalized',
+    );
     expect(projected[DIGITAL_TWIN_SEARCH_DATE_CLAIM]).toBe('2026-08-20T10:30:00.000Z');
     expect(projected[DIGITAL_TWIN_SEARCH_LANGUAGE_CLAIM]).toBe('es');
     // The governed date/language helpers coexist with the preserved code
@@ -92,6 +106,31 @@ describe('digital twin research projection', () => {
       DIGITAL_TWIN_SEARCH_DATE_CLAIM,
       DIGITAL_TWIN_SEARCH_LANGUAGE_CLAIM,
     ]));
+  });
+
+  it('keeps a code-only projection when the configured terminology boundary is unavailable', async () => {
+    process.env.RESEARCH_TERMINOLOGY_BASE_URL = 'https://terminology.example';
+    const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({ ok: false, status: 503 } as Response);
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      const projected = await resolveAndProjectClaimsForDigitalTwin({
+        resourceType: 'Observation', sector: 'health-care', jurisdiction: 'ES',
+        twinSubjectId: 'urn:uuid:00000000-0000-4000-8000-000000000001',
+        claims: {
+          'Observation.code': 'http://loinc.org|8310-5',
+          'Observation.code-text': 'texto no confiable',
+          'Observation.code-display': 'untrusted display',
+        },
+      });
+      expect(projected['Observation.code']).toBe('http://loinc.org|8310-5');
+      expect(projected).not.toHaveProperty('Observation.code-text');
+      expect(projected).not.toHaveProperty('Observation.code-display');
+      expect(errorSpy).toHaveBeenCalled();
+    } finally {
+      delete process.env.RESEARCH_TERMINOLOGY_BASE_URL;
+      fetchSpy.mockRestore();
+      errorSpy.mockRestore();
+    }
   });
 
   it('rejects identity-bearing resource families from the research plane', () => {

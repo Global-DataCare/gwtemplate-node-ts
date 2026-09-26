@@ -1,4 +1,4 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: an existing tenant re-registers its bound controller without creating a second offer.
 import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 import { describe, expect, it, jest } from '@jest/globals';
 import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
@@ -18,7 +18,7 @@ describe('processOrganizationVerificationTransaction legacy re-registration', ()
     const createPendingTenantRegistrationFromClaims = jest.fn(async () => {
       throw new Error('must not create a second pending registration');
     });
-    const reregisterExistingLegacyRepresentativeController = jest.fn(async () => ({
+    const reregisterExistingLegacyRepresentativeController = jest.fn(async (_input: unknown) => ({
       ...claims,
       [ClaimsOrganizationSchemaorg.identifier]: 'urn:example:organization:existing',
     }));

@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+- Prepare GW CORE `1.25.28` and the unpublished `gdc-host` chart `0.4.2`.
+- Resolve trusted local and English terminology for new digital-twin research
+  projections from canonical `system|code`, while discarding caller-provided
+  labels and falling back to code-only projection when the optional governed
+  terminology service is unavailable.
+- Load Firebase Admin authentication only inside Firebase verification and
+  federation calls, so deployments using another configured verifier do not
+  fail during unrelated gateway bootstrap.
+
 - Prepare GW CORE `1.25.27` and the unpublished `gdc-host` chart `0.4.1`, keeping the physical host registry independent from the legal organization that
   operates it. New Helm deployments use `<deployment>_<network>_<scope>__host`;
   existing installations require an explicit migration pin for any old path.

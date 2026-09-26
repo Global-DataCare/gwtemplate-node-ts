@@ -18,8 +18,12 @@ describe('TrustedOidcTokenVerifier', () => {
       verify: jest.fn().mockResolvedValue({ valid: true, payload: { iss: 'https://securetoken.google.com/unid-production' } }),
     };
     const verifier = new TrustedOidcTokenVerifier([
-      { issuer: 'globaldatacare.es', verifier: gdcVerifier },
-      { issuer: 'https://securetoken.google.com/unid-production', verifier: firebaseVerifier },
+      { issuer: 'globaldatacare.es', audience: 'globaldatacare.es', verifier: gdcVerifier },
+      {
+        issuer: 'https://securetoken.google.com/unid-production',
+        audience: 'unid-production',
+        verifier: firebaseVerifier,
+      },
     ]);
 
     const result = await verifier.verify(unsignedToken({ iss: 'globaldatacare.es' }));
@@ -32,7 +36,7 @@ describe('TrustedOidcTokenVerifier', () => {
   it('rejects an issuer that is not configured without trying another provider', async () => {
     const configuredVerifier: ITokenVerifier = { verify: jest.fn() };
     const verifier = new TrustedOidcTokenVerifier([
-      { issuer: 'globaldatacare.es', verifier: configuredVerifier },
+      { issuer: 'globaldatacare.es', audience: 'globaldatacare.es', verifier: configuredVerifier },
     ]);
 
     const result = await verifier.verify(unsignedToken({ iss: 'https://attacker.example' }));

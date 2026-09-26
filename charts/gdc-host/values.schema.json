@@ -48,6 +48,7 @@
         "imagePullPolicy": { "type": "string", "enum": ["Always", "IfNotPresent", "Never"] },
         "fabricPeerEndpoint": { "type": "string" },
         "existingSecret": { "type": "string", "minLength": 1 },
+        "researchTerminologyBaseUrl": { "type": "string" },
         "awsCredentials": {
           "type": "object",
           "required": ["mode", "rolesAnywhere"],
