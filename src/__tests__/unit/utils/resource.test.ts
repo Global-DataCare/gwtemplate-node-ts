@@ -1,18 +1,15 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: resource identifiers preserve valid UUIDs and generate replacements only under the documented rules.
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/__tests__/unit/utils/resource.test.ts
 
 import { jest } from '@jest/globals';
+import { v4 as uuidv4, validate as uuidValidate } from 'uuid';
+import { determineResourceId } from '../../../utils/resource';
 
-const uuidMock = {
+jest.mock('uuid', () => ({
     v4: jest.fn(),
     validate: jest.fn(),
-};
-
-jest.unstable_mockModule('uuid', () => uuidMock);
-
-const { determineResourceId } = await import('../../../utils/resource'); // Corrected import path
-const { v4: uuidv4, validate: uuidValidate } = await import('uuid');
+}));
 
 describe('determineResourceId', () => {
     const validUuid = 'a1b2c3d4-e5f6-7890-1234-567890abcdef';

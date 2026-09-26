@@ -54,8 +54,8 @@ runtime.
 1. Before starting services, inventory the required TCP listeners, local
    processes and Docker containers. Never attach to, stop or reuse an unknown
    process merely because its health endpoint responds.
-2. Lease one product-specific and run-specific port block atomically. UHC,
-   VetChain and every assistant or portal run must use disjoint blocks, with a
+2. Lease one product-specific and run-specific port block atomically. Every
+   product, assistant and portal run must use disjoint blocks, with a
    per-run offset for concurrent executions. Pass every derived URL and port to
    all children; fixed shared ports are not valid concurrent-test isolation.
 3. Record ownership for every PID, process group, temporary file and container.
@@ -70,7 +70,7 @@ runtime.
    emulators and containers to the machine capacity; on resource pressure,
    stop launching work, clean owned runtimes and resume the smallest gate.
 6. A cross-repository E2E has exactly one orchestrator that owns the complete
-   GW, ICA, DataConv, portal and assistant runtime. A healthcheck without the
+   gateway, authority, conversion, portal and assistant runtime. A healthcheck without the
    expected run ownership, configuration and source revision is not evidence
    that the correct service is under test.
 

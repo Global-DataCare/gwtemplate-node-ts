@@ -500,6 +500,9 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
       status: 'active',
       deviceId: clientId,
     });
+    if (!activatedLicense) {
+      throw new Error('Expected the activated controller device license to be persisted.');
+    }
     expect(activatedLicense.deviceBindings).toEqual(expect.arrayContaining([
       expect.objectContaining({
         clientId,

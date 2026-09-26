@@ -16,7 +16,7 @@ import type { ITenantsManager } from './ITenantsManager';
 import { getEnvSectionId } from '../utils/section-env';
 import {
   getOrCreateDigitalTwinSubjectId,
-  projectClaimsForDigitalTwin,
+  resolveAndProjectClaimsForDigitalTwin,
 } from '../utils/digital-twin-research-projection';
 import { isDigitalTwinSecondaryUseEnabled } from '../utils/digital-twin-secondary-use';
 import { buildSearchResponseEntries } from '../utils/didcomm-response';
@@ -195,10 +195,12 @@ export class MedicationStatementManager implements IJobProcessor {
               tenantVaultId,
               sourceSubject: subject,
             });
-            const researchClaims = projectClaimsForDigitalTwin({
+            const researchClaims = await resolveAndProjectClaimsForDigitalTwin({
               claims,
               resourceType: ResourceTypesFhirR4.MedicationStatement,
               twinSubjectId,
+              sector: job.sector,
+              jurisdiction,
             });
             const researchId = String(
               researchClaims['MedicationStatement.identifier']

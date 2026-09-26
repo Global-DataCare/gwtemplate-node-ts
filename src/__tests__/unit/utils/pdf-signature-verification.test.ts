@@ -1,21 +1,11 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: PDF verification delegates to a registered adapter and fails closed when none exists.
 // pdf-signature-verification.test.ts
 // TDD: PDF signature verification for patient/representative consent
 import { PdfSignatureVerificationManager, BasicPdfSignatureVerifierAdapter, PdfVerifySubmission } from '../../../utils/pdf-signature-verification';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 describe('PdfSignatureVerificationManager', () => {
   it('verifies a sample PDF (simulated) and returns signer and signingTime', async () => {
-    // Simulate: load a small PDF file (or use Buffer.from for demo)
-    const pdfPath = path.join(__dirname, '../../data/consent-form.pdf');
-    const pdfBytes = fs.existsSync(pdfPath)
-      ? fs.readFileSync(pdfPath)
-      : Buffer.from('%PDF-1.4\n%EOF', 'utf8');
+    const pdfBytes = Buffer.from('%PDF-1.4\n%EOF', 'utf8');
     const submission: PdfVerifySubmission = {
       pdfBytes,
       contentType: 'application/pdf',

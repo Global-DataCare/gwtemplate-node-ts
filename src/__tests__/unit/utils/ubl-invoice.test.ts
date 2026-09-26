@@ -1,16 +1,12 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: a canonical UBL invoice hashes deterministically and validates when an external schema is configured.
 import { readFileSync, mkdtempSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import { spawnSync } from 'child_process';
 import { hashUblInvoiceXml } from '../../../utils/ubl-invoice';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 describe('UBL Invoice (EN 16931) validation + hash', () => {
-  const xmlPath = path.resolve(__dirname, '../../data/ubl-invoice-minimal.xml');
+  const xmlPath = path.resolve(process.cwd(), 'src/__tests__/data/ubl-invoice-minimal.xml');
   const schemaPath = process.env.PEPPOL_INVOICE_XSD;
 
   it('computes a stable hash for anchoring', () => {

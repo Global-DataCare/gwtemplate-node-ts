@@ -1,6 +1,10 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: verifier selection is deterministic while each external identity-provider SDK remains isolated.
 // src/__tests__/unit/auth/token-verifier-registry.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
+
+jest.mock('firebase-admin/auth', () => ({
+  getAuth: jest.fn(),
+}));
 
 import {
   clearTokenVerifierAdapters,

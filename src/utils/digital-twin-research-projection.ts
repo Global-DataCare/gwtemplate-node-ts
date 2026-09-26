@@ -2,6 +2,10 @@ import { createHash, randomUUID } from 'crypto';
 import type { RecordBase } from 'gdc-common-utils-ts/models/resource-document';
 import type { IVaultRepository } from '../database/repositories/vault/vault.repository';
 import { getEnvSectionId } from './section-env';
+import {
+  resolveResearchTerminologyLabels,
+  type ResolvedResearchTerminology,
+} from '../services/research-terminology-resolver';
 
 const DIGITAL_TWIN_SUBJECT_ALIAS_SECTION = 'digitaltwin_subject_aliases';
 const DIGITAL_TWIN_SUBJECT_URN_UUID = /^urn:uuid:[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -141,6 +145,7 @@ export function projectClaimsForDigitalTwin(input: {
   claims: Record<string, unknown>;
   resourceType: string;
   twinSubjectId: string;
+  terminology?: ResolvedResearchTerminology;
 }): Record<string, unknown> {
   const resourceType = String(input.resourceType || '').trim();
   const twinSubjectId = String(input.twinSubjectId || '').trim();
@@ -149,6 +154,13 @@ export function projectClaimsForDigitalTwin(input: {
   }
   if (!twinSubjectId) throw new Error('twinSubjectId is required');
 
+  const searchableText = Array.from(new Set([
+    ...Object.entries(input.claims || {})
+      .filter(([key]) => /\.code$/i.test(String(key || '').trim()))
+      .map(([, value]) => String(value || '').trim()),
+    String(input.terminology?.text || '').trim(),
+    String(input.terminology?.display || '').trim(),
+  ].filter(Boolean)));
   const searchableDate = Object.entries(input.claims || {})
     .filter(([key]) => /\.(?:effective(?:-?datetime)?|issued|recorded(?:date|on)?|occurrence-?datetime|onset-?datetime|performed-?datetime|date|datetime|period-start)$/i.test(String(key || '').trim()))
     .map(([, value]) => String(value || '').trim())
@@ -164,6 +176,7 @@ export function projectClaimsForDigitalTwin(input: {
       projected[normalizedKey] = rawValue;
       continue;
     }
+    if (/\.code-(?:display|text)$/i.test(normalizedKey)) continue;
     if (RESEARCH_PROVENANCE_REFERENCE_CLAIM.test(normalizedKey)) continue;
     if (BLOCKED_RESEARCH_CLAIM_SEGMENT.test(normalizedKey)) continue;
     if (RESEARCH_PATIENT_CLAIM.test(normalizedKey)) continue;
@@ -177,7 +190,33 @@ export function projectClaimsForDigitalTwin(input: {
     }
     projected[normalizedKey] = rawValue;
   }
+  if (input.terminology?.text) projected[input.terminology.textClaim] = input.terminology.text;
+  if (input.terminology?.display) projected[input.terminology.displayClaim] = input.terminology.display;
+  if (searchableText.length > 0) projected[DIGITAL_TWIN_SEARCH_TEXT_CLAIM] = searchableText.join('\u001f');
   if (searchableDate) projected[DIGITAL_TWIN_SEARCH_DATE_CLAIM] = searchableDate;
-  if (searchableLanguage) projected[DIGITAL_TWIN_SEARCH_LANGUAGE_CLAIM] = String(searchableLanguage).trim();
+  const normalizedLanguage = input.terminology?.textLanguage || searchableLanguage;
+  if (normalizedLanguage) projected[DIGITAL_TWIN_SEARCH_LANGUAGE_CLAIM] = String(normalizedLanguage).trim();
   return projected;
+}
+
+/** Resolves governed terminology before building a research projection. */
+export async function resolveAndProjectClaimsForDigitalTwin(input: {
+  claims: Record<string, unknown>;
+  resourceType: string;
+  twinSubjectId: string;
+  sector: string;
+  jurisdiction: string;
+}): Promise<Record<string, unknown>> {
+  let terminology: ResolvedResearchTerminology | undefined;
+  try {
+    terminology = await resolveResearchTerminologyLabels(input);
+  } catch (error) {
+    console.error('[ResearchTerminology] Exact-label resolution failed; projecting canonical code only.', error);
+  }
+  return projectClaimsForDigitalTwin({
+    claims: input.claims,
+    resourceType: input.resourceType,
+    twinSubjectId: input.twinSubjectId,
+    ...(terminology ? { terminology } : {}),
+  });
 }

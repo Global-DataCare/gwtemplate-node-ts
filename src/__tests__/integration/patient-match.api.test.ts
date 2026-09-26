@@ -4,25 +4,34 @@ import request from 'supertest';
 import { createApiRouter } from '../../routes/api';
 import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
+import type { PatientMatchSearchset } from '../../managers/IndividualManager';
 
 describe('IHE PDQm ITI-119 Patient/$match transport boundary', () => {
   const previousEnv = process.env;
   const path = '/clinic/cds-es/v1/health-care/individual/org.hl7.fhir.api/Patient/$match';
+  const patientIdentifier = { system: 'urn:oid:1.2.3.4.5', value: 'patient-123' };
   const parameters = {
     resourceType: ResourceTypesFhirR4.Parameters,
     parameter: [{
       name: 'resource',
       resource: {
         resourceType: ResourceTypesFhirR4.Patient,
-        identifier: [{ system: 'urn:oid:1.2.3.4.5', value: 'patient-123' }],
+        identifier: [patientIdentifier],
       },
     }],
   };
-  const searchset = {
+  const searchset: PatientMatchSearchset = {
     resourceType: ResourceTypesFhirR4.Bundle,
     type: 'searchset',
     total: 1,
-    entry: [{ resource: { resourceType: ResourceTypesFhirR4.Patient, id: 'patient-uuid' }, search: { mode: 'match' } }],
+    entry: [{
+      resource: {
+        resourceType: ResourceTypesFhirR4.Patient,
+        id: 'patient-uuid',
+        identifier: [patientIdentifier],
+      },
+      search: { mode: 'match' },
+    }],
   };
 
   afterEach(() => {

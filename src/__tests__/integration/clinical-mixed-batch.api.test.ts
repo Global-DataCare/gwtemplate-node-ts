@@ -242,7 +242,6 @@ describe('clinical mixed batch API (integration)', () => {
       );
 
       const correctedByAnotherMember = await submit('mixed-batch-subject-authored-update', {
-        type: GatewayRequestEntryTypes.ObservationEdit,
         request: {
           method: HttpRequestMethods.Put,
           url: `${ResourceTypesFhirR4.Observation}/${subjectAuthoredId}`,
@@ -277,7 +276,6 @@ describe('clinical mixed batch API (integration)', () => {
       }));
 
       const forbiddenMemberDelete = await submit('mixed-batch-subject-authored-delete', {
-        type: GatewayRequestEntryTypes.ObservationDelete,
         request: {
           method: HttpRequestMethods.Delete,
           url: `${ResourceTypesFhirR4.Observation}/${subjectAuthoredId}`,

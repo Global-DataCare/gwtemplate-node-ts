@@ -91,6 +91,7 @@ gw:
   authTokenVerifier: firebase
   securityMode: strict
   didcommPlain: disabled
+  researchTerminologyBaseUrl: ""
   extraEnv: {}
 
 peer:

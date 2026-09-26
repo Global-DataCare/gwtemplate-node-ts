@@ -1,7 +1,6 @@
 // src/auth/OidcFederationService.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
-import { getAuth } from 'firebase-admin/auth';
 import { createRemoteJWKSet, jwtVerify, JWTPayload } from 'jose';
 
 export type FederationProvider = 'eidas';
@@ -81,6 +80,7 @@ export async function federateOidcIdTokenToFirebaseCustomToken(params: {
     ...(email ? { email } : {}),
   };
 
+  const { getAuth } = await import('firebase-admin/auth');
   const firebaseCustomToken = await getAuth().createCustomToken(uid, customClaims);
 
   return { provider: params.provider, subject, email, firebaseCustomToken };
