@@ -3,13 +3,16 @@
 // File: src/__tests__/unit/utils/resource.test.ts
 
 import { jest } from '@jest/globals';
-import { v4 as uuidv4, validate as uuidValidate } from 'uuid';
-import { determineResourceId } from '../../../utils/resource';
 
-jest.mock('uuid', () => ({
-    v4: jest.fn(),
-    validate: jest.fn(),
+const uuidv4 = jest.fn();
+const uuidValidate = jest.fn();
+
+jest.unstable_mockModule('uuid', () => ({
+    v4: uuidv4,
+    validate: uuidValidate,
 }));
+
+const { determineResourceId } = await import('../../../utils/resource');
 
 describe('determineResourceId', () => {
     const validUuid = 'a1b2c3d4-e5f6-7890-1234-567890abcdef';
@@ -18,27 +21,27 @@ describe('determineResourceId', () => {
     
     beforeEach(() => {
         // Reset mocks before each test
-        (uuidv4 as jest.Mock).mockClear();
-        (uuidValidate as jest.Mock).mockClear();
+        uuidv4.mockReset();
+        uuidValidate.mockReset();
     });
 
     it('should return the UUID from a valid identifier', () => {
-        (uuidValidate as jest.Mock).mockReturnValue(true);
+        uuidValidate.mockReturnValue(true);
         const resourceId = determineResourceId(validIdentifier);
         expect(resourceId).toBe(validUuid);
         expect(uuidv4).not.toHaveBeenCalled();
     });
 
     it("should generate a new UUID if the identifier is invalid", () => {
-        (uuidValidate as jest.Mock).mockReturnValue(false);
-        (uuidv4 as jest.Mock).mockReturnValue('new-generated-uuid');
+        uuidValidate.mockReturnValue(false);
+        uuidv4.mockReturnValue('new-generated-uuid');
         const resourceId = determineResourceId('invalid-identifier');
         expect(resourceId).toBe('new-generated-uuid');
         expect(uuidv4).toHaveBeenCalledTimes(1);
     });
 
     it("should generate a new UUID if no identifier is provided", () => {
-        (uuidv4 as jest.Mock).mockReturnValue('new-generated-uuid');
+        uuidv4.mockReturnValue('new-generated-uuid');
         const resourceId = determineResourceId(undefined);
         expect(resourceId).toBe('new-generated-uuid');
         expect(uuidv4).toHaveBeenCalledTimes(1);
@@ -52,13 +55,13 @@ describe('determineResourceId', () => {
     });
 
     it("should still extract a valid UUID even in 'demo' mode if provided", () => {
-        (uuidValidate as jest.Mock).mockReturnValue(true);
+        uuidValidate.mockReturnValue(true);
         const resourceId = determineResourceId(validIdentifier, 'demo');
         expect(resourceId).toBe(validUuid);
     });
 
     it("should extract the UUID from a complex identifier string containing a comma", () => {
-        (uuidValidate as jest.Mock).mockReturnValue(true);
+        uuidValidate.mockReturnValue(true);
         const complexIdentifier = `urn:uuid:${validUuid},did:web:some-controller`;
         const resourceId = determineResourceId(complexIdentifier);
         expect(resourceId).toBe(validUuid);

@@ -65,6 +65,7 @@ grep -q 'STORAGE_LAYOUT: "scoped-v2"' "${TMP_DIR}/production.yaml"
 grep -q 'RESEARCH_TERMINOLOGY_BASE_URL: ""' "${TMP_DIR}/production.yaml"
 grep -q 'HOST_STORAGE_SCOPE: "host"' "${TMP_DIR}/production.yaml"
 grep -q 'HOST_LEGACY_PHYSICAL_COLLECTION: ""' "${TMP_DIR}/production.yaml"
+grep -q 'HOST_JURISDICTION: "ES"' "${TMP_DIR}/production.yaml"
 grep -q 'HOST_ADMIN_EMAIL: "controller@host.example.invalid"' "${TMP_DIR}/production.yaml"
 grep -q 'HOST_ADMIN_UID: "host-controller-001"' "${TMP_DIR}/production.yaml"
 grep -q 'HOST_ADMIN_ROLE: "ISCO-08|1120"' "${TMP_DIR}/production.yaml"
@@ -159,6 +160,13 @@ cp "${CHART}/ci/production-values.yaml" "${TMP_DIR}/missing-host-controller.yaml
 sed -i.bak 's/adminEmail: controller@host.example.invalid/adminEmail: ""/' "${TMP_DIR}/missing-host-controller.yaml"
 if helm lint "${CHART}" -f "${TMP_DIR}/missing-host-controller.yaml" >/dev/null 2>&1; then
   echo "chart accepted production without the host controller email" >&2
+  exit 1
+fi
+
+cp "${CHART}/ci/production-values.yaml" "${TMP_DIR}/missing-host-jurisdiction.yaml"
+yq -i '.host.jurisdiction = ""' "${TMP_DIR}/missing-host-jurisdiction.yaml"
+if helm lint "${CHART}" -f "${TMP_DIR}/missing-host-jurisdiction.yaml" >/dev/null 2>&1; then
+  echo "chart accepted production without an explicit host jurisdiction" >&2
   exit 1
 fi
 

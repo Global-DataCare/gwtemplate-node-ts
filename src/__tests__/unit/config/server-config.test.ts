@@ -5,7 +5,6 @@
  * every unrecognized value.
  */
 import {
-  DEFAULT_HOST_JURISDICTION,
   buildSectorsFromMainAndSubsectors,
   determineApiBaseUrl,
   getConfig,
@@ -23,8 +22,22 @@ import {
 } from '../../../config/server-config';
 
 describe('server-config sector resolution', () => {
-  it('centralizes the host jurisdiction default', () => {
-    expect(DEFAULT_HOST_JURISDICTION).toBe('es');
+  it('does not invent a host jurisdiction when deployment configuration omits it', () => {
+    const previousHostJurisdiction = process.env.HOST_JURISDICTION;
+    const previousLegacyHostJurisdiction = process.env.ORG_HOST_JURISDICTION;
+    delete process.env.HOST_JURISDICTION;
+    delete process.env.ORG_HOST_JURISDICTION;
+    resetServerConfig();
+
+    try {
+      expect(getConfig().host.jurisdiction).toBeUndefined();
+    } finally {
+      if (previousHostJurisdiction === undefined) delete process.env.HOST_JURISDICTION;
+      else process.env.HOST_JURISDICTION = previousHostJurisdiction;
+      if (previousLegacyHostJurisdiction === undefined) delete process.env.ORG_HOST_JURISDICTION;
+      else process.env.ORG_HOST_JURISDICTION = previousLegacyHostJurisdiction;
+      resetServerConfig();
+    }
   });
 
   it('should resolve synthetic sectors from MAINSECTOR + SUBSECTORSALLOWED', () => {

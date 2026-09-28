@@ -53,6 +53,11 @@ if [[ -z "$DATASPACE_ICA_ROOT" || ! -f "${DATASPACE_ICA_ROOT}/package.json" ]]; 
   echo 'ERROR: dataspace-ica-ts was not found; set DATASPACE_ICA_ROOT to its checkout.' >&2
   exit 2
 fi
+ICA_ENV_FILE="${ICA_ENV_FILE:-${DATASPACE_ICA_ROOT}/.env.local}"
+if [[ -n "${ICA_ENV_FILE_OVERRIDE_REQUIRED:-}" && ! -f "$ICA_ENV_FILE" ]]; then
+  echo "ERROR: configured ICA_ENV_FILE does not exist: ${ICA_ENV_FILE}" >&2
+  exit 2
+fi
 
 for command_name in curl npm node; do
   command -v "$command_name" >/dev/null 2>&1 || {
@@ -115,7 +120,7 @@ start_local_ica() {
     SECURITY_MODE=demo \
     DEMO_ALLOW_INSECURE_BEARER=true \
     DB_PROVIDER=mem \
-    npm run api:local
+    node --env-file-if-exists="$ICA_ENV_FILE" ./src/api/server.ts
   ) >"$ICA_LOG_FILE" 2>&1 &
   ICA_PID=$!
 

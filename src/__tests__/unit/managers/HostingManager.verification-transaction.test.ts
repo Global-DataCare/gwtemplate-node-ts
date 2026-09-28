@@ -207,6 +207,31 @@ describe('HostingManager legal organization verification transaction', () => {
     global.fetch = originalFetch;
   });
 
+  it('fails before contacting ICA when neither route nor host configuration declares jurisdiction', async () => {
+    global.fetch = jest.fn() as any;
+    const config = buildConfig();
+    config.host.jurisdiction = undefined;
+    const manager = new HostingManager(
+      mockVaultRepository,
+      mockKmsService,
+      mockTenantsCacheManager,
+      mockStorageAdapter,
+      mockLogger,
+      config,
+      mockHostRuntime,
+    );
+    const job = buildTransactionJob();
+    job.jurisdiction = undefined;
+
+    const response = await manager.process(job, 'test', false);
+
+    expect(response.body.data[0]?.response?.status).toBe('400');
+    expect(response.body.data[0]?.response?.outcome?.issue?.[0]?.diagnostics).toMatch(
+      /ICA verification jurisdiction is required/i,
+    );
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
   it('forwards host Organization/_transaction to ICA _verify and wraps the ICA response', async () => {
     const fetchCalls: Array<{ url: string; init?: RequestInit }> = [];
     const icaVerifyResponse = buildIcaVerifyResponse();
