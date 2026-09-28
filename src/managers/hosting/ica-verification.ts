@@ -67,44 +67,54 @@ export async function forwardOrganizationVerificationTransactionToIca(
     : Array.isArray((deps.job.content?.body as any)?.attachments)
       ? (deps.job.content?.body as any).attachments
       : [];
+  const jurisdiction = String(deps.job.jurisdiction || deps.hostJurisdiction || '').trim().toUpperCase();
+  if (!jurisdiction) {
+    throw new ManagerError(
+      'ICA verification jurisdiction is required from the request or configured host jurisdiction.',
+      IssueType.Required,
+    );
+  }
+  const existingHostAuthorizationProof = (deps.job.content?.body as any)?.hostAuthorizationProof;
+  const signedHostResource = existingHostAuthorizationProof
+    ? (deps.job.content?.body as any)?.data?.[0]?.resource
+    : undefined;
+  const translatedResource = signedHostResource || {
+    meta: {
+      claims: deps.claims,
+    },
+    ...(deps.resource.controller ? { controller: deps.resource.controller } : {}),
+    ...(deps.resource.organization ? { organization: deps.resource.organization } : {}),
+    ...(deps.resource.legalRepresentativePayload
+      ? { legalRepresentative: deps.resource.legalRepresentativePayload }
+      : deps.resource.legalRepresentative
+        ? { legalRepresentative: deps.resource.legalRepresentative }
+        : {}),
+    verification: {
+      resourceType: deps.resourceType,
+    },
+  };
   const translatedBody = {
     resourceType: ResourceTypesFhirR4.Bundle,
     type: 'collection',
     total: 1,
     data: [{
       type: deps.entry.type || deps.organizationVerificationTransactionRequestType,
-      resource: {
-        meta: {
-          claims: deps.claims,
-        },
-        ...(deps.resource.controller ? { controller: deps.resource.controller } : {}),
-        ...(deps.resource.organization ? { organization: deps.resource.organization } : {}),
-        ...(deps.resource.legalRepresentativePayload
-          ? { legalRepresentative: deps.resource.legalRepresentativePayload }
-          : deps.resource.legalRepresentative
-            ? { legalRepresentative: deps.resource.legalRepresentative }
-            : {}),
-        verification: {
-          resourceType: deps.resourceType,
-        },
-      },
+      resource: translatedResource,
     }],
   };
-  const translatedResource = translatedBody.data[0].resource;
   const hostAuthorizationPayload = {
-    jurisdiction: String(deps.job.jurisdiction || deps.hostJurisdiction || 'ES').toUpperCase(),
+    jurisdiction,
     sector: deps.requestedSector,
     networkKind: String(deps.job.sector || '').toLowerCase(),
     resourceType: deps.resourceType,
     resource: translatedResource,
   };
-  const hostAuthorizationProof = attachments.length
-    ? undefined
-    : { jws: await deps.signHostAuthorizationPayload(hostAuthorizationPayload) };
+  const hostAuthorizationProof = existingHostAuthorizationProof
+    || (attachments.length ? undefined : { jws: await deps.signHostAuthorizationPayload(hostAuthorizationPayload) });
   const requestPayload = {
     jti: String(deps.job.content?.jti || uuidv4()),
     thid: String(deps.job.content?.thid || uuidv4()),
-    iss: attachments.length ? deps.job.content?.iss : deps.hostDid,
+    iss: attachments.length || existingHostAuthorizationProof ? deps.job.content?.iss : deps.hostDid,
     aud: 'ica',
     type: deps.job.content?.type || 'application/api+json',
     body: {
@@ -116,11 +126,7 @@ export async function forwardOrganizationVerificationTransactionToIca(
   };
 
   const fetchImpl = deps.fetchImpl || fetch;
-  const verifyUrl = deps.buildIcaVerifyUrl(
-    deps.job.jurisdiction || deps.hostJurisdiction || 'ES',
-    deps.requestedSector,
-    deps.resourceType,
-  );
+  const verifyUrl = deps.buildIcaVerifyUrl(jurisdiction, deps.requestedSector, deps.resourceType);
   const response = await fetchImpl(verifyUrl, {
     method: HttpRequestMethods.Post,
     headers: {
@@ -136,7 +142,7 @@ export async function forwardOrganizationVerificationTransactionToIca(
       throw new ManagerError('ICA verify returned 202 Accepted without Location header.', IssueType.NotSupported);
     }
     const polled = await deps.pollIcaJsonResult(location, verifyUrl);
-    return polled || {};
+    return assertIcaVerificationSucceeded(polled || {});
   }
   if (!response.ok) {
     const text = await response.text().catch(() => '');
@@ -147,7 +153,44 @@ export async function forwardOrganizationVerificationTransactionToIca(
   if (!contentType.includes('application/json')) {
     return {};
   }
-  return await response.json().catch(() => ({}));
+  return assertIcaVerificationSucceeded(await response.json().catch(() => ({})));
+}
+
+function assertIcaVerificationSucceeded(payload: unknown): unknown {
+  let failureDiagnostic = '';
+  const visited = new WeakSet<object>();
+  const walk = (node: unknown): void => {
+    if (failureDiagnostic || !node || typeof node !== 'object') return;
+    if (visited.has(node as object)) return;
+    visited.add(node as object);
+    if (Array.isArray(node)) {
+      node.forEach(walk);
+      return;
+    }
+    const value = node as Record<string, unknown>;
+    const severity = String(value.severity || '').toLowerCase();
+    if (severity === 'error' || severity === 'fatal') {
+      failureDiagnostic = String(value.diagnostics || value.details || 'terminal ICA OperationOutcome');
+      return;
+    }
+    if (value.status === 'failed') {
+      failureDiagnostic = String(value.error || 'terminal ICA verification status is failed');
+      return;
+    }
+    if (value.response && typeof value.response === 'object') {
+      const status = Number((value.response as Record<string, unknown>).status);
+      if (Number.isFinite(status) && status >= 400) {
+        failureDiagnostic = `terminal ICA response status ${status}`;
+        return;
+      }
+    }
+    Object.values(value).forEach(walk);
+  };
+  walk(payload);
+  if (failureDiagnostic) {
+    throw new ManagerError(`ICA verification failed: ${failureDiagnostic}`, IssueType.Exception);
+  }
+  return payload;
 }
 
 /**

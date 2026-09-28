@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+- Prepare GW CORE `1.25.29` and the unpublished `gdc-host` chart `0.4.3`.
+  Organization verification now requires an explicit route or host
+  jurisdiction instead of silently substituting Spain, preserves an incoming
+  preauthorized ICA proof with the exact resource that was signed, and treats
+  terminal ICA failures inside successful HTTP or polling envelopes as
+  failures rather than completed onboarding.
+
 - Prepare GW CORE `1.25.28` and the unpublished `gdc-host` chart `0.4.2`.
 - Resolve trusted local and English terminology for new digital-twin research
   projections from canonical `system|code`, while discarding caller-provided
