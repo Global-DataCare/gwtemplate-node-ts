@@ -358,3 +358,19 @@ Follow the canonical contract in
   `<version>-data-utils`) or `common-utils`; no duplicated literals are
   allowed. If the reusable datum does not exist, add it first to its owning
   shared package with tests and consume that export downstream.
+
+## Preserve legal organization and hosted-tenant boundaries
+
+- A legal identifier addresses the neutral organization. It cannot select one
+  hosted sector/provider tenant when that organization has several.
+- Registration and lifecycle operations select the exact tenant with legal
+  identifier type/value plus its public DID in `Organization.sameAs`.
+  Identifier-only compatibility is allowed only for exactly one match;
+  ambiguity is `409 Conflict`.
+- Store the current sector/provider binding through the existing `artifact-sc`
+  on the identity-zone channel. This is a GW payload change and never
+  authorizes chaincode, CCAAS, policy or Fabric lifecycle mutation.
+- An asynchronous SDK validates the initial submit before polling. A submit
+  non-2xx is terminal: preserve status, body, `OperationOutcome` diagnostic and
+  `Location`, and perform zero polls. Never replace an initial `401` with a
+  later poll `404`.

@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Clarify in the repository skill and lifecycle 101 that a legal organization
+  is neutral, each hosted sector/provider tenant is selected by its exact
+  `Organization.sameAs` DID, and the existing `artifact-sc` stores the current
+  provider binding without a CCAAS change.
+
 - Prepare GW CORE `1.25.30`: Order confirmation and idempotent replay now
   expose the exact registered tenant DID, allowing SDK lifecycle calls to
   target one hosted tenant without reconstructing identifiers.
