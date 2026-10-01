@@ -20,6 +20,7 @@ import { getEnvSectionId } from '../utils/section-env';
 import { getTenantAuthorizationStatus, isTenantAuthorizationOperational, TenantAuthorizationLifecycleStatus } from '../utils/tenant-lifecycle';
 import { hasProviderServiceCapabilityClaim } from '../utils/services';
 import { getTenantServiceCapabilityClaim } from '../utils/service-capability-claims';
+import { normalizePublicAliasList } from 'gdc-common-utils-ts/utils/same-as';
 
 const SERVICE_OPERATIONAL_URL_CLAIM = 'org.schema.Service.url';
 
@@ -233,13 +234,30 @@ export class TenantsCacheManager implements ITenantsManager, IPrivilegedTenantRe
    * (e.g. VAT/TAX id stored in `Organization.identifier.value`).
    */
   public async findTenantVaultIdByIdentifierValue(identifierValue: string): Promise<string | undefined> {
+    const matches = await this.findTenantVaultIdsByIdentifierValue(identifierValue);
+    return matches[0];
+  }
+
+  /**
+   * Resolves all exact tenant registrations for one legal identifier while
+   * preserving the hosted-tenant boundary used by lifecycle operations. The
+   * registry indexes the neutral legal identifier; protected registrations
+   * are then read to match the exact public tenant DID.
+   */
+  public async findTenantVaultIdsByIdentifierValue(
+    identifierValue: string,
+    constraints: Readonly<{
+      identifierType?: string;
+      tenantDid?: string;
+    }> = {},
+  ): Promise<string[]> {
     const target = String(identifierValue || '').trim();
-    if (!target) return undefined;
+    if (!target) return [];
 
     const hostConfig = await this.getTenant('host');
     const hostIdentifierValue = String(hostConfig?.claims?.[ClaimsOrganizationSchemaorg.identifierValue] || '').trim();
     if (hostIdentifierValue && hostIdentifierValue === target) {
-      return 'host';
+      return ['host'];
     }
 
     const results = await this.vaultRepository.query(
@@ -247,7 +265,33 @@ export class TenantsCacheManager implements ITenantsManager, IPrivilegedTenantRe
       { sectionId: getEnvSectionId('tenants'), where: [{ name: ClaimsOrganizationSchemaorg.identifierValue, value: target }] },
       { hydrate: false },
     );
-    return results.length > 0 ? String(results[0]?.id || '').trim() || undefined : undefined;
+    const expectedIdentifierType = String(constraints.identifierType || '').trim().toLowerCase();
+    const expectedTenantDid = String(constraints.tenantDid || '').trim();
+    const matches: string[] = [];
+
+    for (const result of results) {
+      const vaultId = String(result?.id || '').trim();
+      if (!vaultId) continue;
+      const tenantConfig = await this.getTenant(vaultId);
+      const claims = tenantConfig?.claims || {};
+      if (expectedIdentifierType
+        && String(claims[ClaimsOrganizationSchemaorg.identifierType] || '').trim().toLowerCase() !== expectedIdentifierType) {
+        continue;
+      }
+      if (expectedTenantDid) {
+        const tenantDids = normalizePublicAliasList([
+          String(tenantConfig?.didDocument?.id || ''),
+          ...(Array.isArray(tenantConfig?.didDocument?.alsoKnownAs)
+            ? tenantConfig.didDocument.alsoKnownAs.map(String)
+            : []),
+          ...normalizePublicAliasList(claims[ClaimsOrganizationSchemaorg.sameAs] as string | string[] | undefined),
+        ]);
+        if (!tenantDids.includes(expectedTenantDid)) continue;
+      }
+      matches.push(vaultId);
+    }
+
+    return [...new Set(matches)];
   }
 
   /**

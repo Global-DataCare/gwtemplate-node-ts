@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+- Prepare GW CORE `1.25.30`: Order confirmation and idempotent replay now
+  expose the exact registered tenant DID, allowing SDK lifecycle calls to
+  target one hosted tenant without reconstructing identifiers.
+- Keep the neutral legal organization in `organization-sc` and register one
+  independently updatable provider binding per organization and data-space
+  sector in `artifact-sc`, including historical provider/DID rotation and
+  `validated`/`revoked` lifecycle state.
+- Make host lifecycle operations select an exact tenant by its registered
+  `Organization.sameAs` DID when one legal identifier owns several sector
+  tenants; ambiguous legacy requests now fail with `409` without mutations.
+
 - Prepare GW CORE `1.25.29` and the unpublished `gdc-host` chart `0.4.3`.
   Organization verification now requires an explicit route or host
   jurisdiction instead of silently substituting Spain, preserves an incoming

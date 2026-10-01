@@ -38,10 +38,16 @@ import { GatewayClaim } from '../../../shared/gateway-claim-contract';
 import { GatewayVerificationStatus } from '../../../shared/gateway-response-types';
 import {
   EXAMPLE_API_ORGANIZATION_DID,
+  EXAMPLE_HOST_PUBLIC_DID,
   EXAMPLE_LICENSE_INVOICE_ID,
   EXAMPLE_LICENSE_PAYMENT_METHOD_STRIPE,
 } from 'gdc-common-utils-ts/examples/shared';
 import { URN_NETWORK } from '../../data/urn.data';
+import { DataspaceSectors } from 'gdc-common-utils-ts/constants/sectors';
+import {
+  buildLegalSectorOrganizationAssetId,
+  buildLegalSectorOrganizationUrn,
+} from 'gdc-common-utils-ts/utils/legal-sector-organization-urn';
 
 const uuidMock = {
   v4: jest.fn(),
@@ -52,6 +58,7 @@ jest.unstable_mockModule('uuid', () => uuidMock);
 
 const { v4: uuidv4 } = await import('uuid');
 const { HostingManager } = await import('../../../managers/HostingManager');
+const { ManageAssetArtifact } = await import('../../../blockchain/fabric/v3/manageAssetArtifact');
 
 const mockStorageAdapter: jest.Mocked<IStorageAdapter> = {
   upload: jest.fn(),
@@ -140,6 +147,7 @@ describe('HostingManager activation flow', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
     (uuidv4 as jest.Mock).mockReturnValue('activation-test-uuid');
+    jest.spyOn(ManageAssetArtifact.prototype, 'read').mockRejectedValue(new Error('Artifact not found'));
 
     vaultRepository = new VaultMemRepository();
     hostCollectionName = resolveHostPhysicalCollectionName();
@@ -1369,6 +1377,121 @@ describe('HostingManager activation flow', () => {
 
     const response = await hostingManager.process(buildLifecycleJob('_purge'));
     expect(response.body.data[0].response.status).toBe('200');
+  });
+
+  it('should revoke the exact sector hosting binding when its tenant is disabled', async () => {
+    const activationJob = buildActivationJob();
+    await hostingManager.process(activationJob);
+    const claims = activationJob.content!.body!.data[0]!.meta!.claims;
+    const tenantVaultId = tenantUtils.getTenantVaultId(
+      claims[ClaimsServiceSchemaorg.category] as Sector,
+      claims[ClaimsOrganizationSchemaorg.alternateName],
+    );
+    const tenantConfig = await mockTenantsCacheManager.getTenant(tenantVaultId);
+    const tenantDid = String(tenantConfig?.didDocument?.id || '');
+    const artifactSpy = jest.spyOn(ManageAssetArtifact.prototype, 'upsertArtifact').mockResolvedValue({} as any);
+    mockConfig.networkMode = 'local-network';
+    mockConfig.ledger = { enabled: true, mspId: 'Host1MSP' };
+
+    const response = await hostingManager.process(buildLifecycleJob('_disable'));
+
+    const sectorUrn = buildLegalSectorOrganizationUrn({
+      sector: String(claims[ClaimsServiceSchemaorg.category]),
+      country: String(claims[ClaimsOrganizationSchemaorg.addressCountry]),
+      identifierType: String(claims[ClaimsOrganizationSchemaorg.identifierType]),
+      identifierValue: String(claims[ClaimsOrganizationSchemaorg.identifierValue]),
+    });
+    expect(response.body.data[0].response.status).toBe('200');
+    expect(artifactSpy).toHaveBeenCalledWith(
+      'Host1MSP',
+      buildLegalSectorOrganizationAssetId(sectorUrn),
+      expect.objectContaining({
+        status: 'revoked',
+        meta: { attributes: expect.objectContaining({ tenantDid }) },
+      }),
+    );
+  });
+
+  it('should disable descendants only in the tenant selected by its public DID', async () => {
+    // One legal organization may operate one tenant per business sector. This
+    // journey proves that bulk descendant disable never mutates the sibling
+    // tenant merely because both registrations share the same legal NIF.
+    const activationJob = buildActivationJob();
+    await hostingManager.process(activationJob);
+    const healthClaims = activationJob.content!.body!.data[0]!.meta!.claims;
+    const healthVaultId = tenantUtils.getTenantVaultId(
+      healthClaims[ClaimsServiceSchemaorg.category] as Sector,
+      healthClaims[ClaimsOrganizationSchemaorg.alternateName],
+    );
+    const healthRegistryDoc = await vaultRepository.get<ConfidentialStorageDoc>(
+      hostCollectionName,
+      healthVaultId,
+      getEnvSectionId('tenants'),
+    );
+    expect(healthRegistryDoc).toBeDefined();
+
+    const animalTenantDid = buildOrganizationDidWeb({
+      hostDidWeb: EXAMPLE_HOST_PUBLIC_DID,
+      tenantId: String(healthClaims[ClaimsOrganizationSchemaorg.identifierValue]),
+      jurisdiction: String(healthClaims[ClaimsOrganizationSchemaorg.addressCountry]),
+      sector: DataspaceSectors.AnimalCare,
+    });
+    const animalClaims = {
+      ...healthClaims,
+      [ClaimsServiceSchemaorg.category]: DataspaceSectors.AnimalCare,
+    };
+    const animalVaultId = tenantUtils.getTenantVaultId(
+      DataspaceSectors.AnimalCare,
+      animalClaims[ClaimsOrganizationSchemaorg.alternateName],
+    );
+    await vaultRepository.put(hostCollectionName, [{
+      ...healthRegistryDoc!,
+      id: animalVaultId,
+      content: {
+        ...(healthRegistryDoc!.content as any),
+        claims: animalClaims,
+        didDocument: {
+          ...(healthRegistryDoc!.content as any).didDocument,
+          id: animalTenantDid,
+        },
+      },
+    }], getEnvSectionId('tenants'));
+
+    const healthIndividualId = `${healthVaultId}-individual`;
+    const animalIndividualId = `${animalVaultId}-individual`;
+    await putIndividualLifecycleDoc(healthVaultId, healthIndividualId, EntityLifecycleStatus.Active);
+    await putIndividualLifecycleDoc(animalVaultId, animalIndividualId, EntityLifecycleStatus.Active);
+
+    const ambiguousResponse = await hostingManager.process(buildLifecycleJob('_disable-descendants'));
+    expect(ambiguousResponse.body.data[0].response.status).toBe('409');
+    expect((await vaultRepository.get<any>(
+      healthVaultId,
+      healthIndividualId,
+      getEnvSectionId(SUBJECT_SECTION_INDIVIDUAL),
+    ))?.status).toBe(EntityLifecycleStatus.Active);
+    expect((await vaultRepository.get<any>(
+      animalVaultId,
+      animalIndividualId,
+      getEnvSectionId(SUBJECT_SECTION_INDIVIDUAL),
+    ))?.status).toBe(EntityLifecycleStatus.Active);
+
+    const disableAnimalDescendants = buildLifecycleJob('_disable-descendants');
+    const lifecycleClaims = disableAnimalDescendants.content!.body!.data[0]!.meta!.claims;
+    lifecycleClaims[ClaimsOrganizationSchemaorg.sameAs] = animalTenantDid;
+    lifecycleClaims[ClaimsOrganizationSchemaorg.identifierType] = animalClaims[ClaimsOrganizationSchemaorg.identifierType];
+
+    const response = await hostingManager.process(disableAnimalDescendants);
+    expect(response.body.data[0].response.status).toBe('200');
+    expect((await vaultRepository.get<any>(
+      healthVaultId,
+      healthIndividualId,
+      getEnvSectionId(SUBJECT_SECTION_INDIVIDUAL),
+    ))?.status).toBe(EntityLifecycleStatus.Active);
+    expect((await vaultRepository.get<any>(
+      animalVaultId,
+      animalIndividualId,
+      getEnvSectionId(SUBJECT_SECTION_INDIVIDUAL),
+    ))?.status).toBe(EntityLifecycleStatus.Inactive);
   });
 
   it('should keep retained communications outside descendant counts and cleanup', async () => {

@@ -47,6 +47,7 @@ import { AdapterCryptoSdkNode } from '../../gdc-backend-utils-node/adapters/node
 import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { getEnvSectionId } from '../../utils/section-env';
 import { AppAuthorizationManager } from '../../managers/AppAuthorizationManager';
+import { GatewayClaim } from '../../shared/gateway-claim-contract';
 
 type InMemoryResponse = {
   status: number;
@@ -312,7 +313,7 @@ describe('Organization Registration API', () => {
   async function activateTenantDirectly(
     representativeCredentialId = 'did:web:controller.example.com',
     activationClaims: Record<string, unknown> = { ...testClaimsTenant1Registration },
-  ): Promise<{ tenantId: string; sector: string }> {
+  ): Promise<{ tenantId: string; sector: string; tenantDid: string }> {
     const vpTokenCompact = [
       Buffer.from(JSON.stringify({ alg: 'ML-DSA-44', typ: 'JWT' })).toString('base64url'),
       Buffer.from(JSON.stringify({
@@ -413,6 +414,7 @@ describe('Organization Registration API', () => {
     return {
       tenantId: String(responseClaims[ClaimsOrganizationSchemaorg.alternateName]),
       sector: String(responseClaims[ClaimsServiceSchemaorg.category]),
+      tenantDid: String(responseClaims[GatewayClaim.OrganizationDid]),
     };
   }
 
@@ -634,6 +636,7 @@ describe('Organization Registration API', () => {
               meta: {
                 claims: {
                   [ClaimsOrganizationSchemaorg.identifierValue]: testClaimsTenant1Registration[ClaimsOrganizationSchemaorg.identifierValue],
+                  [ClaimsOrganizationSchemaorg.sameAs]: tenant.tenantDid,
                 },
               },
             },
@@ -653,6 +656,9 @@ describe('Organization Registration API', () => {
       });
       expect(disableResponse.status).toBe(202);
       const disableJob = (mockQueueAdapter.addJob as jest.Mock).mock.calls[0][1] as JobRequest;
+      expect(disableJob.content!.body.data[0].meta.claims).toMatchObject({
+        [ClaimsOrganizationSchemaorg.sameAs]: tenant.tenantDid,
+      });
       await hostingManager.process(disableJob);
 
       const employeeUrl = `/${tenant.tenantId}/cds-es/v1/${tenant.sector}/entity/org.schema/Employee/_batch`;
@@ -706,6 +712,7 @@ describe('Organization Registration API', () => {
                 meta: {
                   claims: {
                     [ClaimsOrganizationSchemaorg.identifierValue]: testClaimsTenant1Registration[ClaimsOrganizationSchemaorg.identifierValue],
+                    [ClaimsOrganizationSchemaorg.sameAs]: tenant.tenantDid,
                   },
                 },
               },
@@ -715,6 +722,9 @@ describe('Organization Registration API', () => {
       });
       expect(enableResponse.status).toBe(202);
       const enableJob = (mockQueueAdapter.addJob as jest.Mock).mock.calls[1][1] as JobRequest;
+      expect(enableJob.content!.body.data[0].meta.claims).toMatchObject({
+        [ClaimsOrganizationSchemaorg.sameAs]: tenant.tenantDid,
+      });
       await hostingManager.process(enableJob);
 
       const allowedResponse = await invokeExpress(app, {

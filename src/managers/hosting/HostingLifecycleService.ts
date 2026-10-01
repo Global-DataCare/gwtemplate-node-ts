@@ -4,7 +4,10 @@ import { HttpStatusCodes } from 'gdc-common-utils-ts/constants/http';
 import { v4 as uuidv4 } from 'uuid';
 import { BundleEntry, ErrorEntry } from 'gdc-common-utils-ts/models/bundle';
 import { JobRequest } from 'gdc-common-utils-ts/models/confidential-job';
-import { ClaimsOrganizationSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import {
+  ClaimsOrganizationSchemaorg,
+  ClaimsServiceSchemaorg,
+} from 'gdc-common-utils-ts/constants/schemaorg';
 import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
 import { IssueType } from 'gdc-common-utils-ts/models/issue';
 import {
@@ -38,6 +41,10 @@ import {
   SUBJECT_SECTION_INDIVIDUAL,
 } from '../../constants/domain';
 import { GatewayClaim } from '../../shared/gateway-claim-contract';
+import { shouldUseFabricLedger } from '../../adapters/credential-ledger-resolver';
+import { resolveOrganizationIdentityChannel } from '../../utils/ledger';
+import { upsertOrganizationSectorHostingBindingOnLedger } from '../../utils/ledger-organization-registration';
+import { resolveLedgerOrganizationId } from '../../utils/ledger-organization-registration-helpers';
 
 type TenantLifecycleAction =
   | typeof ACTION_DISABLE
@@ -147,7 +154,7 @@ export class HostingLifecycleService {
      */
     const vaultId = identifierValue === this.config.host.idValue
       ? 'host'
-      : await this.tenantsCacheManager.findTenantVaultIdByIdentifierValue(identifierValue);
+      : await this.resolveHostedTenantVaultId(identifierValue, claims);
     if (!vaultId) {
       throw new ManagerError(`Tenant not found for identifier.value '${identifierValue}'`, IssueType.NotFound);
     }
@@ -209,6 +216,7 @@ export class HostingLifecycleService {
       }
       await this.assertTenantPurgeAllowed(currentStatus);
       this.assertNoUnpurgedTenantDescendants(descendants!);
+      await this.updateTenantSectorHostingBinding(tenantConfig, 'revoked');
       const tenantRegistryDeleted = await this.vaultRepository.delete(hostCollectionName, vaultId, getEnvSectionId('tenants'));
       if (!tenantRegistryDeleted) {
         throw new ManagerError(`Tenant registry purge failed for '${vaultId}'.`, IssueType.Exception);
@@ -257,6 +265,12 @@ export class HostingLifecycleService {
     };
     const secureDoc = await this.kmsService.protectConfidentialData(updatedDoc, 'host');
     await this.vaultRepository.put(hostCollectionName, [secureDoc], getEnvSectionId('tenants'));
+    if (!isHostLifecycle) {
+      await this.updateTenantSectorHostingBinding(
+        updatedConfig,
+        action === ACTION_DISABLE ? 'revoked' : 'validated',
+      );
+    }
     await this.tenantsCacheManager.refreshTenant(vaultId);
 
     return {
@@ -273,6 +287,73 @@ export class HostingLifecycleService {
       },
       response: { status: String(HttpStatusCodes.Ok) },
     };
+  }
+
+  private async updateTenantSectorHostingBinding(
+    tenantConfig: OrganizationConfig,
+    status: 'validated' | 'revoked',
+  ): Promise<void> {
+    const ledgerEnabled = shouldUseFabricLedger({
+      ...process.env,
+      NETWORK_MODE: this.config.networkMode,
+      LEDGER_ENABLED: typeof this.config.ledger?.enabled === 'boolean'
+        ? String(this.config.ledger.enabled)
+        : process.env.LEDGER_ENABLED,
+    });
+    if (!ledgerEnabled) return;
+
+    const mspId = this.config.ledger?.mspId || process.env.LEDGER_MSP_ID || process.env.HLF_MSP_ID_HOST1;
+    if (!mspId) {
+      throw new ManagerError('Ledger MSP ID is missing. Set LEDGER_MSP_ID.', IssueType.Exception);
+    }
+    const claims = (tenantConfig.claims || {}) as Record<string, unknown>;
+    const jurisdiction = String(
+      claims[ClaimsOrganizationSchemaorg.addressCountry]
+        || this.config.host.jurisdiction
+        || '',
+    );
+    await upsertOrganizationSectorHostingBindingOnLedger({
+      mspId,
+      channelName: this.config.ledger?.channelName
+        || resolveOrganizationIdentityChannel(jurisdiction),
+      organizationId: resolveLedgerOrganizationId(claims, tenantConfig.id),
+      organizationClaims: claims,
+      tenantDid: tenantConfig.didDocument?.id,
+      providerDomain: this.config.hostExternalDomain,
+      sector: String(claims[ClaimsServiceSchemaorg.category] || ''),
+      jurisdiction,
+      status,
+    });
+  }
+
+  /**
+   * Resolves one hosted tenant without crossing the sector boundary when the
+   * same legal organization operates more than one tenant. The legal
+   * identifier type/value identifies the organization; `Organization.sameAs`
+   * selects the exact hosted tenant DID.
+   *
+   * Historical callers that only send `identifier.value` remain supported
+   * while that value identifies exactly one hosted tenant. Ambiguous requests
+   * fail closed and never select the first repository result.
+   */
+  private async resolveHostedTenantVaultId(
+    identifierValue: string,
+    claims: Record<string, unknown>,
+  ): Promise<string | undefined> {
+    const identifierType = String(claims[ClaimsOrganizationSchemaorg.identifierType] || '').trim();
+    const tenantDid = String(claims[ClaimsOrganizationSchemaorg.sameAs] || '').trim();
+    const matches = await this.tenantsCacheManager.findTenantVaultIdsByIdentifierValue(
+      identifierValue,
+      { identifierType, tenantDid },
+    );
+
+    if (matches.length > 1) {
+      throw new ManagerError(
+        `Tenant identifier.value '${identifierValue}' is ambiguous; provide the exact hosted tenant DID in Organization.sameAs.`,
+        IssueType.Conflict,
+      );
+    }
+    return matches[0];
   }
 
   private resolveLifecycleAuthorization(job: JobRequest): LifecycleAuthorizationContext {

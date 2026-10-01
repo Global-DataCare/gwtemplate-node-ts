@@ -37,6 +37,7 @@ import {
   HOST_ORDER_REQUIRED_INPUT_CLAIMS,
   HOST_ORDER_REQUIRED_INPUT_DISPLAY_CLAIMS,
 } from './hosting-claim-contracts';
+import { GatewayClaim } from '../../shared/gateway-claim-contract';
 
 type ProcessHostOrderEntryDeps = Readonly<{
   entry: BundleEntry;
@@ -123,6 +124,10 @@ export async function processHostOrderEntry(deps: ProcessHostOrderEntryDeps): Pr
       ...decryptedClaims,
       [ClaimsOrderSchemaorg.acceptedOfferIdentifier]: offerId,
     };
+    const replayTenantDid = String((decryptedContent as any)?.didDocument?.id || '').trim();
+    if (replayTenantDid) {
+      replayClaims[GatewayClaim.OrganizationDid] = replayTenantDid;
+    }
     const indexedOfferMatches = Boolean(secureDoc.indexed?.attributes?.some((attribute) =>
       attribute.name === ClaimsOfferSchemaorg.identifier && String(attribute.value).trim() === offerId));
     const protectedOfferMatches = String(replayClaims[ClaimsOfferSchemaorg.identifier] || '').trim() === offerId;
@@ -372,6 +377,7 @@ export async function processHostOrderEntry(deps: ProcessHostOrderEntryDeps): Pr
     paymentConfirmed: true,
     ...readOfferPaymentContext(processedClaims),
   });
+  paymentCommunication.claims[GatewayClaim.OrganizationDid] = tenantDid;
   const invoiceBundle = buildGatewayInvoiceBundle({
     invoiceId: String(
       paymentCommunication.claims[ClaimsOrderSchemaorg.partOfInvoice]
