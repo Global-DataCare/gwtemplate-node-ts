@@ -21,6 +21,7 @@ TS_NODE_TRANSPILE_ONLY=1 TS_NODE_SKIP_IGNORE=1 \
   --test ./scripts/tests/render-demo-consentaccess-payload.test.mts
 bash ./scripts/tests/consentaccess-multi-host-lifecycle.test.sh
 bash ./scripts/tests/public-gw-core-image-docs.test.sh
+bash ./scripts/tests/public-image-promotion.test.sh
 
 forbidden_product_pattern="pet${EMPTY_VALUE:-}chain|vet${EMPTY_VALUE:-}chain|pet${EMPTY_VALUE:-}d|sos${EMPTY_VALUE:-}chain|u${EMPTY_VALUE:-}hc|u${EMPTY_VALUE:-}nid|acc${EMPTY_VALUE:-}uro"
 if rg -n -i "$forbidden_product_pattern" \

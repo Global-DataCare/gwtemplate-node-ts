@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Add a fail-closed public-image promotion command that accepts only an
+  already-tested source digest and an immutable semantic-version/commit tag;
+  it rejects mutable tags such as `latest` and reports the published digest
+  required by external host deployments.
+
 - Clarify in the repository skill and lifecycle 101 that a legal organization
   is neutral, each hosted sector/provider tenant is selected by its exact
   `Organization.sameAs` DID, and the existing `artifact-sc` stores the current
