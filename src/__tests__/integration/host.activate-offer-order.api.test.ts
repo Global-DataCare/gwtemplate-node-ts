@@ -44,6 +44,7 @@ import { ORGANIZATION_ORDER_REQUEST } from '../data/example-payloads';
 import { ManageAssetOrganization } from '../../blockchain/fabric/v3/manageAssetOrganization';
 import { ManageAssetCryptographicKey } from '../../blockchain/fabric/v3/manageAssetCryptographicKey';
 import { ManageAssetSubjectKeyBinding } from '../../blockchain/fabric/v3/manageAssetSubjectKeyBinding';
+import { ManageAssetArtifact } from '../../blockchain/fabric/v3/manageAssetArtifact';
 
 function buildActivationPayload(): Record<string, unknown> {
   const vpTokenCompact = [
@@ -154,6 +155,7 @@ describe('Host activation Offer/Order route story', () => {
   let queueAdapter: QueueAdapterMem;
   const originalFetch = global.fetch;
   let ensureKeySpy: ReturnType<typeof jest.spyOn>;
+  let upsertArtifactSpy: ReturnType<typeof jest.spyOn>;
 
   beforeAll(async () => {
     resetServerConfig();
@@ -175,6 +177,8 @@ describe('Host activation Offer/Order route story', () => {
       asset: {},
     } as any);
     jest.spyOn(ManageAssetSubjectKeyBinding.prototype, 'upsertSubjectKeyBinding').mockResolvedValue({} as any);
+    jest.spyOn(ManageAssetArtifact.prototype, 'read').mockRejectedValue(new Error('artifact not found'));
+    upsertArtifactSpy = jest.spyOn(ManageAssetArtifact.prototype, 'upsertArtifact').mockResolvedValue({} as any);
     const serverInstance = await startServer({ listen: false });
     app = serverInstance.app;
     server = serverInstance.server;
@@ -256,6 +260,20 @@ describe('Host activation Offer/Order route story', () => {
     const activationKeyIds = activationKeyCalls.map((call: any[]) => call[1]);
     expect(activationKeyIds.length).toBeGreaterThan(0);
     expect(new Set(activationKeyIds).size).toBe(activationKeyIds.length);
+    expect(upsertArtifactSpy).toHaveBeenCalledWith(
+      'TestMSP',
+      expect.any(String),
+      expect.objectContaining({
+        artifactType: 'organization-sector-hosting-binding',
+        status: 'validated',
+        meta: expect.objectContaining({
+          attributes: expect.objectContaining({
+            sector: testClaimsTenant1Registration[ClaimsServiceSchemaorg.category],
+            tenantDid: expect.stringContaining('did:web:'),
+          }),
+        }),
+      }),
+    );
 
     const orderPayload = structuredClone(ORGANIZATION_ORDER_REQUEST) as any;
     orderPayload.thid = 'activation-route-order-thid';

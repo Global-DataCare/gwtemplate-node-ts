@@ -13,6 +13,7 @@ import {
   ORGANIZATION_ORDER_REQUEST,
   ORGANIZATION_VERIFICATION_TRANSACTION_REQUEST,
 } from '../data/example-payloads';
+import { GatewayClaim } from '../../shared/gateway-claim-contract';
 
 describe('Host transaction Offer/Order route story', () => {
   let harness: StoryHarness;
@@ -116,6 +117,9 @@ describe('Host transaction Offer/Order route story', () => {
     const orderEntry = orderPoll.body.data[0];
     expect(orderEntry.response.status).toBe('201');
     expect(orderEntry.resource?.meta?.claims?.[ClaimsOrderSchemaorg.acceptedOfferIdentifier]).toBe(offerId);
+    expect(orderEntry.resource?.meta?.claims?.[GatewayClaim.OrganizationDid]).toBe(
+      transactionPayload.body.data[0].resource.organization.did,
+    );
     expect(orderEntry.meta?.claims).toBeUndefined();
     expect(JSON.stringify(orderEntry.resource)).toContain(
       transactionPayload.body.data[0].resource.organization.did,
@@ -140,6 +144,9 @@ describe('Host transaction Offer/Order route story', () => {
     const replayEntry = replayPoll.body.data[0];
     expect(replayEntry.response.status).toBe('200');
     expect(replayEntry.resource?.meta?.claims?.[ClaimsOrderSchemaorg.acceptedOfferIdentifier]).toBe(offerId);
+    expect(replayEntry.resource?.meta?.claims?.[GatewayClaim.OrganizationDid]).toBe(
+      transactionPayload.body.data[0].resource.organization.did,
+    );
     expect(replayEntry.resource?.meta?.claims?.['org.schema.IndividualProduct.serialNumber']).toBeTruthy();
   });
 

@@ -24,6 +24,7 @@ import { IKmsService } from '../../../gdc-backend-utils-node/models/IKmsService'
 import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 import { EXAMPLE_LICENSE_INVALID_OFFER_ID } from 'gdc-common-utils-ts';
 import { extractBundleSearchResources } from 'gdc-common-utils-ts/utils/organization-employee-lifecycle';
+import { GatewayClaim } from '../../../shared/gateway-claim-contract';
 
 // Create a mock KMS service for testing.
 export const mockKmsService: jest.Mocked<IKmsService> = {
@@ -248,6 +249,7 @@ describe('HostingManager - Offer/Order Flow', () => {
     expect(finalDoc.content!.status).toBe('active');
     expect(finalDoc.content!.networkStatus[0].status).toBe('active');
     expect(finalDoc.content!.didDocument).toBeDefined();
+    expect(finalClaims?.[GatewayClaim.OrganizationDid]).toBe(finalDoc.content!.didDocument.id);
 
     // Assert that the tenant's own vault and resources were created
     const tenantCollectionName =

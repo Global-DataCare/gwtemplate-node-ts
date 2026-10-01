@@ -1,4 +1,4 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 // src/__tests__/unit/managers/TenantsCacheManager.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
@@ -13,10 +13,13 @@ import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { DidService } from '../../../gdc-backend-utils-node/models/did';
 import { ClaimsRecord } from 'gdc-common-utils-ts/models/resource-document';
 import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { buildOrganizationDidWeb } from 'gdc-common-utils-ts/utils/did';
+import { EXAMPLE_HOST_PUBLIC_DID } from 'gdc-common-utils-ts/examples/shared';
 import { testConfigDataHost, testConfigTenant1 } from '../../data/organization.data';
 import { testClaimsHostInitialization, testClaimsTenant1Registration } from '../../data/end-to-end.data';
 import { EntityLifecycleStatus, EntityType } from '../../../gdc-backend-utils-node/models/enums';
 import { applyTenantAuthorizationStatus } from '../../../utils/tenant-lifecycle';
+import { DataspaceSectors } from 'gdc-common-utils-ts/constants/sectors';
 
 describe('TenantsCacheManager', () => {
   let tenantsCacheManager: InstanceType<typeof TenantsCacheManager>;
@@ -39,13 +42,19 @@ describe('TenantsCacheManager', () => {
   };
 
   const tenantUrn = (testClaimsTenant1Registration as ClaimsRecord)[ClaimsOrganizationSchemaorg.identifier];
+  const healthTenantDid = buildOrganizationDidWeb({
+    hostDidWeb: EXAMPLE_HOST_PUBLIC_DID,
+    tenantId: String(testClaimsTenant1Registration[ClaimsOrganizationSchemaorg.identifierValue]),
+    jurisdiction: String(testClaimsTenant1Registration[ClaimsOrganizationSchemaorg.addressCountry]),
+    sector: String(testClaimsTenant1Registration[ClaimsServiceSchemaorg.category]),
+  });
   const acmeConfig: EntityConfig = {
     id: testConfigTenant1.id,
     type: EntityType.Organization,
     status: EntityLifecycleStatus.Active,
     claims: testClaimsTenant1Registration,
     didConfig: { service: mockServices },
-    didDocument: { '@context': 'https://www.w3.org/ns/did/v1', id: tenantUrn },
+    didDocument: { '@context': 'https://www.w3.org/ns/did/v1', id: healthTenantDid },
     meta: { lastUpdated: '' },
   };
   const suspendedAcmeConfig = applyTenantAuthorizationStatus(acmeConfig, 'suspended');
@@ -65,6 +74,7 @@ describe('TenantsCacheManager', () => {
     mockVaultRepository = {
       getContainersInSection: jest.fn(),
       get: jest.fn(),
+      query: jest.fn(),
     } as jest.Mocked<any>;
 
     mockKmsService = {
@@ -117,13 +127,62 @@ describe('TenantsCacheManager', () => {
     });
   });
 
+  describe('hosted tenant DID lookup', () => {
+    it('returns only the tenant whose public DID matches', async () => {
+      // The same legal organization can host separate tenant indexes in more
+      // than one business sector. A lifecycle operation must never select the
+      // first NIF match and mutate a sibling sector.
+      const animalTenantDid = buildOrganizationDidWeb({
+        hostDidWeb: EXAMPLE_HOST_PUBLIC_DID,
+        tenantId: String(testClaimsTenant1Registration[ClaimsOrganizationSchemaorg.identifierValue]),
+        jurisdiction: String(testClaimsTenant1Registration[ClaimsOrganizationSchemaorg.addressCountry]),
+        sector: DataspaceSectors.AnimalCare,
+      });
+      const animalConfig = {
+        ...acmeConfig,
+        didDocument: { ...acmeConfig.didDocument, id: animalTenantDid },
+        claims: {
+          ...acmeConfig.claims,
+          [ClaimsServiceSchemaorg.category]: DataspaceSectors.AnimalCare,
+        },
+      } as EntityConfig;
+      const animalVaultId = getTenantVaultId(
+        DataspaceSectors.AnimalCare,
+        acmeAlternateName,
+      );
+
+      mockVaultRepository.query.mockResolvedValue([
+        { id: acmeVaultId } as any,
+        { id: animalVaultId } as any,
+      ]);
+      mockVaultRepository.get.mockImplementation(async (_collection, id) => {
+        if (id === acmeVaultId) return { id: acmeVaultId } as any;
+        if (id === animalVaultId) return { id: animalVaultId } as any;
+        return undefined;
+      });
+      mockKmsService.unprotectConfidentialData.mockImplementation((async (record: any) => {
+        if (record.id === acmeVaultId) return acmeConfig;
+        if (record.id === animalVaultId) return animalConfig;
+        return undefined;
+      }) as IKmsService['unprotectConfidentialData']);
+
+      await expect(tenantsCacheManager.findTenantVaultIdsByIdentifierValue(
+        String(testClaimsTenant1Registration[ClaimsOrganizationSchemaorg.identifierValue]),
+        {
+          identifierType: String(testClaimsTenant1Registration[ClaimsOrganizationSchemaorg.identifierType]),
+          tenantDid: animalTenantDid,
+        },
+      )).resolves.toEqual([animalVaultId]);
+    });
+  });
+
   describe('getTenantDid', () => {
     // These tests now check the on-demand caching logic.
     it('should return the DID for an existing tenant', async () => {
       mockVaultRepository.get.mockResolvedValue({ id: acmeVaultId } as any);
       mockKmsService.unprotectConfidentialData.mockResolvedValue(acmeConfig);
       const result = await tenantsCacheManager.getTenantDid(acmeVaultId);
-      expect(result).toBe(tenantUrn);
+      expect(result).toBe(healthTenantDid);
     });
 
     it('should return the DID for the host', async () => {
@@ -240,7 +299,7 @@ describe('TenantsCacheManager', () => {
       const tenants = await tenantsCacheManager.listAutodiscoverableTenants();
 
       expect(tenants).toHaveLength(1);
-      expect(tenants[0].didDocument.id).toBe(tenantUrn);
+      expect(tenants[0].didDocument.id).toBe(healthTenantDid);
       expect(mockVaultRepository.getContainersInSection).toHaveBeenCalledWith(
         hostCollectionName,
         getEnvSectionId('tenants'),

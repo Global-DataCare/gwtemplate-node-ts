@@ -43,6 +43,20 @@ export interface IHostingTenantRegistry {
   findTenantVaultIdByIdentifierValue(identifierValue: string): Promise<string | undefined>;
 
   /**
+   * Returns every tenant registration matching one legal identifier value,
+   * optionally narrowed by identifier type and the exact hosted tenant DID.
+   * Lifecycle callers use this instead of selecting an arbitrary first match
+   * when one legal organization operates several sector tenants.
+   */
+  findTenantVaultIdsByIdentifierValue(
+    identifierValue: string,
+    constraints?: Readonly<{
+      identifierType?: string;
+      tenantDid?: string;
+    }>,
+  ): Promise<string[]>;
+
+  /**
    * Returns the physical collection name for a tenant or host vault.
    *
    * Legacy warning:

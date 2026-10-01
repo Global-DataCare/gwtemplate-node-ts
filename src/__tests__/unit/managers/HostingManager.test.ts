@@ -21,6 +21,11 @@ import * as tenantUtils from '../../../utils/tenant';
 import { resolveHostPhysicalCollectionName } from '../../../config/storage-layout';
 import { ClaimsOrganizationSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { toJwkThumbprintSha256Urn } from 'gdc-common-utils-ts/utils/jwk-thumbprint';
+import {
+  buildLegalSectorOrganizationAssetId,
+  buildLegalSectorOrganizationUrn,
+} from 'gdc-common-utils-ts/utils/legal-sector-organization-urn';
+import { buildPublicAliasLedgerAssetId } from 'gdc-common-utils-ts/utils/same-as';
 import { getEnvSectionId } from '../../../utils/section-env';
 import type { IVaultRepository } from '../../../database/repositories/vault/vault.repository';
 import { VaultMemRepository } from '../../../database/repositories/vault/vault.mem.repository';
@@ -55,7 +60,10 @@ const { ManageAssetCryptographicKey } = await import('../../../blockchain/fabric
 const { ManageAssetSubjectKeyBinding } = await import('../../../blockchain/fabric/v3/manageAssetSubjectKeyBinding');
 const { ManageAssetArtifact } = await import('../../../blockchain/fabric/v3/manageAssetArtifact');
 const { ManageAssetArtifactEvent } = await import('../../../blockchain/fabric/v3/manageAssetArtifactEvent');
-const { registerOrganizationOnLedger } = await import('../../../utils/ledger-organization-registration');
+const {
+  registerOrganizationOnLedger,
+  upsertOrganizationSectorHostingBindingOnLedger,
+} = await import('../../../utils/ledger-organization-registration');
 
 const mockStorageAdapter: jest.Mocked<IStorageAdapter> = {
   upload: jest.fn(),
@@ -146,6 +154,7 @@ describe('HostingManager', () => {
     jest.clearAllMocks();
     (uuidv4 as jest.Mock).mockReturnValue('new-mocked-uuid-v4');
     (uuidValidate as jest.Mock).mockReturnValue(true);
+    jest.spyOn(ManageAssetArtifact.prototype, 'read').mockRejectedValue(new Error('Artifact not found'));
 
     vaultRepository = new VaultMemRepository();
     const hostCollectionName = resolveHostPhysicalCollectionName();
@@ -609,7 +618,32 @@ describe('HostingManager', () => {
       status: 'active',
     }));
 
-    expect(upsertArtifactSpy).toHaveBeenCalledTimes(1);
+    const sectorOrganizationUrn = buildLegalSectorOrganizationUrn({
+      sector: Sector.HEALTH_CARE,
+      country: 'ES',
+      identifierType: 'TAX',
+      identifierValue: 'acme-id',
+    });
+    const sectorBindingId = buildLegalSectorOrganizationAssetId(sectorOrganizationUrn);
+    expect(upsertArtifactSpy).toHaveBeenCalledTimes(2);
+    expect(upsertArtifactSpy).toHaveBeenCalledWith('Host1MSP', sectorBindingId, expect.objectContaining({
+      artifactId: sectorBindingId,
+      hash: buildPublicAliasLedgerAssetId('did:web:api.acme.org'),
+      hashAlg: 'sha3-384-multihash',
+      artifactType: 'organization-sector-hosting-binding',
+      declaredBy: ledgerOrgId,
+      declaredByType: 'tenant',
+      status: 'validated',
+      meta: {
+        attributes: expect.objectContaining({
+          organizationId: ledgerOrgId,
+          legalSectorOrganizationUrn: sectorOrganizationUrn,
+          sector: Sector.HEALTH_CARE,
+          tenantDid: 'did:web:api.acme.org',
+          providerDomain: mockConfig.hostExternalDomain,
+        }),
+      },
+    }));
     expect(upsertArtifactSpy).toHaveBeenCalledWith('Host1MSP', `artifact_sha256_${signedHash}`, expect.objectContaining({
       artifactId: `artifact_sha256_${signedHash}`,
       hash: signedHash,
@@ -727,6 +761,93 @@ describe('HostingManager', () => {
         }),
       }),
     }));
+  });
+
+  it('[ledger] updates one tenant provider binding under the same sector asset id', async () => {
+    const upsertArtifactSpy = jest.spyOn(ManageAssetArtifact.prototype, 'upsertArtifact').mockResolvedValue({} as any);
+    const claims = {
+      [ClaimsOrganizationSchemaorg.identifierType]: 'TAX',
+      [ClaimsOrganizationSchemaorg.identifierValue]: 'acme-id',
+      [ClaimsOrganizationSchemaorg.addressCountry]: 'ES',
+    };
+    const shared = {
+      mspId: 'Host1MSP',
+      channelName: 'identity-eu',
+      organizationId: 'urn:org:tax:acme-id',
+      organizationClaims: claims,
+      sector: Sector.HEALTH_CARE,
+      jurisdiction: 'ES',
+      status: 'validated' as const,
+    };
+
+    await upsertOrganizationSectorHostingBindingOnLedger({
+      ...shared,
+      tenantDid: 'did:web:provider-a.example.org:acme-id:cds-ES:v1:health-care',
+      providerDomain: 'provider-a.example.org',
+    });
+    await upsertOrganizationSectorHostingBindingOnLedger({
+      ...shared,
+      tenantDid: 'did:web:provider-b.example.org:acme-id:cds-ES:v1:health-care',
+      providerDomain: 'provider-b.example.org',
+    });
+
+    expect(upsertArtifactSpy).toHaveBeenCalledTimes(2);
+    expect(upsertArtifactSpy.mock.calls[0]?.[1]).toBe(upsertArtifactSpy.mock.calls[1]?.[1]);
+    expect(upsertArtifactSpy.mock.calls[0]?.[2]).toEqual(expect.objectContaining({
+      meta: { attributes: expect.objectContaining({ providerDomain: 'provider-a.example.org' }) },
+    }));
+    expect(upsertArtifactSpy.mock.calls[1]?.[2]).toEqual(expect.objectContaining({
+      meta: { attributes: expect.objectContaining({ providerDomain: 'provider-b.example.org' }) },
+    }));
+  });
+
+  it('[ledger] does not append history when a tenant provider binding is unchanged', async () => {
+    const claims = {
+      [ClaimsOrganizationSchemaorg.identifierType]: 'TAX',
+      [ClaimsOrganizationSchemaorg.identifierValue]: 'acme-id',
+      [ClaimsOrganizationSchemaorg.addressCountry]: 'ES',
+    };
+    const sectorUrn = buildLegalSectorOrganizationUrn({
+      sector: Sector.HEALTH_CARE,
+      country: 'ES',
+      identifierType: 'TAX',
+      identifierValue: 'acme-id',
+    });
+    const artifactId = buildLegalSectorOrganizationAssetId(sectorUrn);
+    const tenantDid = 'did:web:provider.example.org:acme-id:cds-ES:v1:health-care';
+    jest.spyOn(ManageAssetArtifact.prototype, 'read').mockResolvedValue({
+      artifactId,
+      hash: buildPublicAliasLedgerAssetId(tenantDid),
+      hashAlg: 'sha3-384-multihash',
+      artifactType: 'organization-sector-hosting-binding',
+      declaredBy: 'urn:org:tax:acme-id',
+      declaredByType: 'tenant',
+      status: 'validated',
+      meta: {
+        attributes: {
+          organizationId: 'urn:org:tax:acme-id',
+          legalSectorOrganizationUrn: sectorUrn,
+          sector: Sector.HEALTH_CARE,
+          tenantDid,
+          providerDomain: 'provider.example.org',
+        },
+      },
+    });
+    const upsertArtifactSpy = jest.spyOn(ManageAssetArtifact.prototype, 'upsertArtifact').mockResolvedValue({} as any);
+
+    await upsertOrganizationSectorHostingBindingOnLedger({
+      mspId: 'Host1MSP',
+      channelName: 'identity-eu',
+      organizationId: 'urn:org:tax:acme-id',
+      organizationClaims: claims,
+      tenantDid,
+      providerDomain: 'provider.example.org',
+      sector: Sector.HEALTH_CARE,
+      jurisdiction: 'ES',
+      status: 'validated',
+    });
+
+    expect(upsertArtifactSpy).not.toHaveBeenCalled();
   });
 
   it('[ledger] registers one key and binding for aliased verification methods that share a JWK thumbprint', async () => {

@@ -16,6 +16,11 @@ import { ManageAssetSubjectKeyBinding } from '../blockchain/fabric/v3/manageAsse
 import type { CryptographicKeyLedgerPayload } from '../blockchain/fabric/v3/manageAssetCryptographicKey';
 import { canonicalize } from './json-canon';
 import {
+  buildLegalSectorOrganizationAssetId,
+  buildLegalSectorOrganizationUrn,
+} from 'gdc-common-utils-ts/utils/legal-sector-organization-urn';
+import { buildPublicAliasLedgerAssetId } from 'gdc-common-utils-ts/utils/same-as';
+import {
   resolveLedgerOrganizationId,
   hashLedgerString,
   inferLedgerJwkUse,
@@ -159,6 +164,19 @@ export async function registerOrganizationOnLedger(params: {
       didDocumentId: params.config.didDocument?.id,
       verificationMethods: params.config.didDocument?.verificationMethod,
     });
+    if (params.role === 'tenant') {
+      await upsertOrganizationSectorHostingBindingOnLedger({
+        mspId,
+        channelName,
+        organizationId: ledgerOrgId,
+        organizationClaims,
+        tenantDid: params.config.didDocument?.id,
+        providerDomain: params.hostExternalDomain,
+        sector: params.sector,
+        jurisdiction: params.jurisdiction || params.hostJurisdiction,
+        status: 'validated',
+      });
+    }
     await registerOrganizationArtifactsOnLedger({
       mspId,
       channelName,
@@ -182,6 +200,94 @@ export async function registerOrganizationOnLedger(params: {
     }
     throw new ManagerError(`Ledger registration failed: ${message}`, IssueType.Exception);
   }
+}
+
+/**
+ * Creates or updates the current provider binding for one legal organization
+ * in one data-space sector. The key is stable across provider/DID rotation;
+ * `artifact-sc` history retains every previous binding value.
+ */
+export async function upsertOrganizationSectorHostingBindingOnLedger(params: {
+  mspId: string;
+  channelName: string;
+  organizationId: string;
+  organizationClaims: Record<string, unknown>;
+  tenantDid?: string;
+  providerDomain?: string;
+  sector: Sector | string;
+  jurisdiction?: string;
+  status: 'validated' | 'revoked';
+}): Promise<void> {
+  const identifierType = String(
+    params.organizationClaims[ClaimsOrganizationSchemaorg.identifierType] || '',
+  ).trim();
+  const identifierValue = String(
+    params.organizationClaims[ClaimsOrganizationSchemaorg.identifierValue] || '',
+  ).trim();
+  const country = String(
+    params.organizationClaims[ClaimsOrganizationSchemaorg.addressCountry]
+      || params.jurisdiction
+      || '',
+  ).trim();
+  const administrativeSublevel1 = String(
+    params.organizationClaims[ClaimsOrganizationSchemaorg.addressRegion] || '',
+  ).trim() || undefined;
+  const tenantDid = String(params.tenantDid || '').trim();
+  if (!identifierType || !identifierValue || !country || !tenantDid) {
+    throw new ManagerError(
+      'Organization sector hosting binding requires identifier type/value, country and tenant DID.',
+      IssueType.Required,
+    );
+  }
+
+  const legalSectorOrganizationUrn = buildLegalSectorOrganizationUrn({
+    sector: String(params.sector),
+    country,
+    administrativeSublevel1,
+    identifierType,
+    identifierValue,
+  });
+  const artifactId = buildLegalSectorOrganizationAssetId(legalSectorOrganizationUrn);
+  const manager = new ManageAssetArtifact({
+    chaincodeName: process.env.LEDGER_ARTIFACT_CHAINCODE || 'artifact-sc',
+    channelName: params.channelName,
+  });
+  const payload = {
+    artifactId,
+    hash: buildPublicAliasLedgerAssetId(tenantDid),
+    hashAlg: 'sha3-384-multihash',
+    artifactType: 'organization-sector-hosting-binding',
+    declaredBy: params.organizationId,
+    declaredByType: 'tenant',
+    status: params.status,
+    meta: {
+      attributes: {
+        organizationId: params.organizationId,
+        legalSectorOrganizationUrn,
+        sector: String(params.sector),
+        tenantDid,
+        providerDomain: String(params.providerDomain || '').trim() || undefined,
+      },
+    },
+  };
+  try {
+    const existing = await manager.read(params.mspId, artifactId) as any;
+    const existingMeaning = {
+      artifactId: existing?.artifactId,
+      hash: existing?.hash,
+      hashAlg: existing?.hashAlg,
+      artifactType: existing?.artifactType,
+      declaredBy: existing?.declaredBy,
+      declaredByType: existing?.declaredByType,
+      status: existing?.status,
+      meta: { attributes: existing?.meta?.attributes || {} },
+    };
+    if (canonicalize(existingMeaning) === canonicalize(payload)) return;
+  } catch {
+    // Read is an idempotency optimization. Upsert remains the authoritative
+    // create/update operation and surfaces any real Fabric connectivity error.
+  }
+  await manager.upsertArtifact(params.mspId, artifactId, payload);
 }
 
 async function registerOrganizationKeysOnLedger(params: {
