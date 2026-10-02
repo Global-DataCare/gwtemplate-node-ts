@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Enforce one secret-free `env.example` repository template, reject the legacy
+  `.env.example` filename and require `.env*` to be ignored before every test
+  layer. Replace populated development credentials in the template with
+  explicit non-secret placeholders.
+
 - Add a fail-closed public-image promotion command that accepts only an
   already-tested source digest and an immutable semantic-version/commit tag;
   it rejects mutable tags such as `latest` and reports the published digest
