@@ -105,6 +105,8 @@ describe('HostingManager activation flow', () => {
           credentialSubject: {
             id: EXAMPLE_API_ORGANIZATION_DID,
             taxID: 'VATES-B00112233',
+            legalName: 'ACME HEALTH SL',
+            address: { addressCountry: 'ES' },
             category: testClaimsTenant1Registration[ClaimsServiceSchemaorg.category],
             serviceType: testClaimsTenant1Registration[ClaimsServiceSchemaorg.serviceType],
           },
@@ -904,6 +906,22 @@ describe('HostingManager activation flow', () => {
       'Unexpected error during registration processing:',
       expect.anything(),
     );
+  });
+
+  it('uses the verified ICA organization credential as the legal identity source for Gaia-X projection', async () => {
+    const job = buildActivationJob();
+    const activationClaims = { ...job.content!.body!.data[0]!.meta!.claims } as Record<string, unknown>;
+    delete activationClaims[ClaimsOrganizationSchemaorg.legalName];
+    delete activationClaims[ClaimsOrganizationSchemaorg.addressCountry];
+    job.content!.body!.data[0]!.meta!.claims = activationClaims;
+    delete (job.content!.body as any).organizationCredential;
+
+    const responsePayload = await hostingManager.process(job);
+    const entry = responsePayload.body.data[0];
+
+    expect(entry.response.status).toBe('201');
+    expect(entry.resource.meta.claims[ClaimsOrganizationSchemaorg.legalName]).toBe('ACME HEALTH SL');
+    expect(entry.resource.meta.claims[ClaimsOrganizationSchemaorg.addressCountry]).toBe('ES');
   });
 
   it('should derive organization identifier claims from taxID when activation claims omit them', async () => {

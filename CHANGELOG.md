@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Prepare GW CORE `1.25.31`. Fix strict legacy organization activation so the Gaia-X Legal Participant
+  projection reuses `legalName`, `taxID` and `address.addressCountry` from the
+  already-validated ICA OrganizationCredential instead of requiring callers to
+  duplicate that legal identity in activation claims.
+
 - Enforce one secret-free `env.example` repository template, reject the legacy
   `.env.example` filename and require `.env*` to be ignored before every test
   layer. Replace populated development credentials in the template with
