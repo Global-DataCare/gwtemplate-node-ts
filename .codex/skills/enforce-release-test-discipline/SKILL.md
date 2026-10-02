@@ -140,6 +140,32 @@ description: Enforce branch, TDD, canonical FHIR and schema.org vocabulary, fixt
   FHIR fields as persisted business state. Add the corresponding route test and
   keep an affected real local E2E with no skip.
 
+## Keep environment templates secret-free
+
+- Apply the same file contract to every portal, assistant, gateway and shared
+  package: version only `env.example`; never version `.env.example` or any
+  other `.env*` file.
+- Put the exact `.env*` rule in `.gitignore`. Because `env.example` has no
+  leading dot, it remains versionable without an exception rule.
+- Keep only documented example values and explicit placeholders in
+  `env.example`. Secret-shaped variables such as passwords, tokens, API keys,
+  private keys, seeds and client secrets must be empty or use an unmistakable
+  placeholder such as `replace-in-ignored-env-file`; a syntactically plausible
+  credential is not an example.
+- Copy `env.example` to an ignored `.env.local`, `.env.test`, `.env.staging` or
+  other runtime file. Production and staging secrets belong in the deployment
+  platform's secret manager, not in Git, portal bundles, screenshots, docs or
+  test fixtures.
+- Add an executable repository contract to the normal test lifecycle. It must
+  fail when `env.example` is missing, `.env.example` exists, `.env*` is not
+  ignored, documentation tells users to copy `.env.example`, or a
+  secret-shaped variable has a populated non-placeholder value. A skill or
+  prose-only rule is insufficient.
+- Before committing, search the branch and reachable history for the affected
+  variable name without printing its value. If a real credential entered a
+  versioned file or external transcript, remove it and require rotation; do
+  not claim that deletion alone restores secrecy.
+
 ## Keep test layers separate
 
 - A GW, SDK or portal release never authorizes a Fabric network mutation. If
