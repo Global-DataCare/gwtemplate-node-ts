@@ -51,6 +51,16 @@ export function applyLegalOrganizationIdentityCompatibility(
     ? (organizationCredential as any).credentialSubject[0]
     : (organizationCredential as any)?.credentialSubject;
   const taxId = String(subject?.taxID || '').trim();
+  const credentialLegalName = String(subject?.legalName || '').trim();
+  const credentialAddress = Array.isArray(subject?.address) ? subject.address[0] : subject?.address;
+  const credentialAddressCountry = String(credentialAddress?.addressCountry || '').trim();
+
+  // The ICA OrganizationCredential is already validated by the activation
+  // trust adapter. Reuse its legal identity when legacy `_activate` callers do
+  // not duplicate those claims in the activation entry.
+  if (!String(processedClaims[ClaimsOrganizationSchemaorg.legalName] || '').trim() && credentialLegalName) {
+    processedClaims[ClaimsOrganizationSchemaorg.legalName] = credentialLegalName;
+  }
 
   if (!identifierValue && taxId) {
     processedClaims[ClaimsOrganizationSchemaorg.identifierValue] = taxId;
@@ -63,9 +73,10 @@ export function applyLegalOrganizationIdentityCompatibility(
     processedClaims[ClaimsOrganizationSchemaorg.identifierType] = uuidValidate(normalizedUuidValue) ? 'UUID' : 'TAX';
   }
   if (!String(processedClaims[ClaimsOrganizationSchemaorg.addressCountry] || '').trim()) {
-    const inferredCountry = inferJurisdictionFromLegalIdentifier(taxId || finalIdentifierValue);
-    if (inferredCountry) {
-      processedClaims[ClaimsOrganizationSchemaorg.addressCountry] = inferredCountry;
+    const addressCountry = credentialAddressCountry
+      || inferJurisdictionFromLegalIdentifier(taxId || finalIdentifierValue);
+    if (addressCountry) {
+      processedClaims[ClaimsOrganizationSchemaorg.addressCountry] = addressCountry;
     }
   }
   if (!alternateName && !isIndividualOrg && finalIdentifierValue) {

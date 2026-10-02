@@ -1029,6 +1029,8 @@ export function createApiRouter(
    *
    *       Expected semantics:
    *       - canonical proof input is `body.vp_token`; it contains the ICA-issued OrganizationCredential, LegalRepresentativeCredential and ServiceControllerCredential
+   *       - the validated OrganizationCredential is the legal-identity source for `legalName`, `taxID` and `address.addressCountry`; callers do not duplicate those fields in activation `meta.claims`
+   *       - GW derives the Gaia-X Legal Participant projection from that verified legal identity; callers do not submit Gaia-X `headquarterAddress`, `legalAddress` or `legalRegistrationNumber` as activation claims
    *       - LegalRepresentativeCredential carries legal capacity and professional ISCO occupation; it does not grant tenant control by itself
    *       - ServiceControllerCredential carries `RESPRSN` in `owner.additionalType`, ISCO in `owner.hasOccupation.occupationalCategory`, and `owner.hasCredential.material` bound to the presenter actor JWK
    *       - legacy two-VC compatibility normally requires the old LegalRepresentativeCredential itself to contain both `RESPRSN` and matching `hasCredential` material

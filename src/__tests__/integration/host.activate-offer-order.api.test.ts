@@ -323,6 +323,54 @@ describe('Host activation Offer/Order route story', () => {
   });
 
   /**
+   * Route contract for ICA-owned legal identity.
+   *
+   * `_activate` must not require callers to duplicate the legal name or legal
+   * address already present in the verified ICA OrganizationCredential.
+   */
+  it('projects legal identity from the ICA OrganizationCredential when activation claims omit it', async () => {
+    const activationPayload = buildActivationPayload() as any;
+    const uniqueTaxId = 'VATES-B00997766';
+    const credentialSubject = activationPayload.body.organizationCredential.credentialSubject;
+    credentialSubject.taxID = uniqueTaxId;
+    credentialSubject.legalName = 'ICA VERIFIED ORGANIZATION SL';
+    credentialSubject.address = { addressCountry: 'ES' };
+    activationPayload.body.representativeCredential.credentialSubject.memberOf.taxID = uniqueTaxId;
+
+    const claims = activationPayload.body.data[0].resource.meta.claims;
+    claims[ClaimsOrganizationSchemaorg.identifierValue] = uniqueTaxId;
+    claims[ClaimsOrganizationSchemaorg.taxId] = uniqueTaxId;
+    claims[ClaimsOrganizationSchemaorg.alternateName] = uniqueTaxId;
+    delete claims[ClaimsOrganizationSchemaorg.legalName];
+    delete claims[ClaimsOrganizationSchemaorg.addressCountry];
+
+    const activationSubmit = await invokeExpress(app, {
+      method: HttpRequestMethods.Post,
+      url: '/host/cds-es/v1/local-network/registry/org.schema/Organization/_activate',
+      headers: { 'content-type': 'application/json' },
+      body: activationPayload,
+    });
+
+    expect(activationSubmit.status).toBe(202);
+    await queueAdapter.waitForEmptyQueue();
+
+    const activationPollPath = new URL(activationSubmit.headers.location, 'http://localhost').pathname;
+    const activationPoll = await invokeExpress(app, {
+      method: HttpRequestMethods.Post,
+      url: activationPollPath,
+      headers: { 'content-type': 'application/json' },
+      body: { thid: activationPayload.thid },
+    });
+    const activationResult = JSON.parse(activationPoll.text) as { data: Array<Record<string, any>> };
+    const resultClaims = activationResult.data[0]?.resource?.meta?.claims;
+
+    expect(activationPoll.status).toBe(200);
+    expect(activationResult.data[0]?.response?.status).toBe('201');
+    expect(resultClaims?.[ClaimsOrganizationSchemaorg.legalName]).toBe('ICA VERIFIED ORGANIZATION SL');
+    expect(resultClaims?.[ClaimsOrganizationSchemaorg.addressCountry]).toBe('ES');
+  });
+
+  /**
    * Consumer contract guard for host registry path construction.
    *
    * Host onboarding routes use the host registry network selector in the path
