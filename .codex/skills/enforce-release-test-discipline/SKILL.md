@@ -264,6 +264,23 @@ description: Enforce branch, TDD, canonical FHIR and schema.org vocabulary, fixt
 
 ## Preserve shared-package neutrality
 
+- Treat `gdc-*` as frozen for new product functionality. Change it only for a
+  confirmed shared bug or security correction, unless a separate explicit
+  promotion review approves an already-proven product capability as genuinely
+  product-neutral.
+- Incubate every new SOS capability in `sos-*` first. Keep VetChain and UHC
+  specialization in `vet-*` and `uhc-*`; do not use a `gdc-*` release to make a
+  product experiment available to its first consumer.
+- Before proposing promotion from `sos-*` to `gdc-*`, prove the product-local
+  implementation through the real local UI -> BFF -> high-level SDK -> service
+  journey with Playwright, plus its affected unit and integration suites. The
+  promotion is a later compatibility task with its own red test and neutral
+  consumers; it is not part of the product feature branch by default.
+- A shared npm registry is a release target, never an integration loop. Use
+  `npm pack` overlays while iterating. Never run `npm publish` to discover the
+  next cross-repository failure. Plan one immutable publication only after the
+  complete local matrix is green; if that publication exposes an artifact-only
+  fault, stop and diagnose it instead of automatically publishing another patch.
 - Never place a product name, branded hostname, product route or product policy
   in GW CORE or a shared `gdc-*` package, including tests, examples, docs,
   comments and changelogs.
@@ -284,13 +301,14 @@ dependency upward. The next package or deployable consumer may be changed only
 after the previous immutable version exists in the registry and its integrity
 and exported surface have been verified.
 
-For reusable FHIR claims, converters and typed entry editors,
-`gdc-common-utils-ts` owns the canonical contract. Implement and test it there,
-publish and verify the immutable package, then run the affected SDK contract
-and E2E suites without compatibility regressions before pinning that exact
-version in GW or another deployable consumer. Never repair the same FHIR field
-independently inside GW, and never advance GW merely because the shared package
-test passed while an affected SDK still fails.
+For a previously promoted, standards-neutral FHIR contract already owned by
+`gdc-common-utils-ts`, fix it once in that owner. New SOS claims, converters or
+typed editors start in `sos-*` and can move to `gdc-*` only through the explicit
+promotion review above. After promotion, publish and verify the one immutable
+package artifact, then run affected SDK and E2E contracts before pinning it in
+a deployable consumer. Never repair the same promoted FHIR field independently
+inside GW, and never advance GW merely because a shared-package unit test passed
+while an affected SDK or real local consumer journey still fails.
 
 1. Update the owning changelog with tested behavior. Shared changelogs remain
    product-neutral.

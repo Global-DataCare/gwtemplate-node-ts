@@ -57,4 +57,19 @@ describe('shared local-first portal release policy', () => {
       expect(contract).toMatch(/resume.*failed gate.*predecessor.*state/is);
     }
   });
+
+  it('incubates product capabilities in the product family before any explicit neutral gdc promotion', () => {
+    const root = process.cwd();
+    const skill = readFileSync(resolve(root, '.codex/skills/enforce-release-test-discipline/SKILL.md'), 'utf8');
+    const localFirstContract = readFileSync(resolve(root, 'docs-v1/06-AUDIT-AND-EVIDENCE/06.C-LOCAL-FIRST-RELEASE-CONTRACT.md'), 'utf8');
+
+    for (const contract of [skill, localFirstContract]) {
+      expect(contract).toMatch(/gdc-\*.*frozen.*bug.*security/is);
+      expect(contract).toMatch(/new SOS.*sos-\*.*first/is);
+      expect(contract).toMatch(/product-local.*real local.*UI.*BFF.*SDK.*service.*Playwright/is);
+      expect(contract).toMatch(/explicit.*promotion review.*product-neutral/is);
+      expect(contract).toMatch(/one.*immutable.*publication.*after.*local.*green/is);
+      expect(contract).toMatch(/never.*npm publish.*integration loop/is);
+    }
+  });
 });
