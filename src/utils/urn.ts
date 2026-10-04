@@ -1,10 +1,6 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // File: src/utils/urn.ts
-import { sha256 } from '@noble/hashes/sha2.js';
-import baseX from 'base-x';
-
-const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-const base58btc = baseX(BASE58_ALPHABET);
+import { buildStableActorIdentifier } from 'gdc-common-utils-ts/utils/actor-identifier';
 export const EMPLOYEE_URN_SEGMENT = ':employee:';
 export const EMPLOYEE_ROLE_URN_SEGMENT = ':role:';
 
@@ -34,13 +30,8 @@ export interface StableEmployeeUrnParams {
 }
 
 function hashEmployeeEmail(email: string): string {
-  const bytes = new TextEncoder().encode(email.trim().toLowerCase());
-  const digest = sha256(bytes);
-  const multihash = new Uint8Array(2 + digest.length);
-  multihash[0] = 0x12; // sha2-256
-  multihash[1] = 0x20; // 32 bytes
-  multihash.set(digest, 2);
-  return 'z' + base58btc.encode(multihash);
+  return buildStableActorIdentifier({ contactKind: 'email', contact: email })
+    .replace(/^urn:multibase:/, '');
 }
 
 export function normalizeEmployeeRole(role: string): string {

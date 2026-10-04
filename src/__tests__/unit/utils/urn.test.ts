@@ -1,4 +1,4 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: employee URNs preserve the canonical tenant prefix, shared SHA3-256 stable actor identifier and exact normalized role; changing the email hash implementation must never split licence, profile and DCR identity for the same employee.
 
 import {
     createEmployeeUrn,
@@ -10,6 +10,7 @@ import {
 } from "../../../utils/urn";
 import { URN_NAMESPACE, URN_ORGANIZATION_ID_TYPE, URN_VERSION } from "../../data/urn.data";
 import { normalizeSameAsHash } from 'gdc-common-utils-ts/utils/same-as';
+import { buildStableActorIdentifier } from 'gdc-common-utils-ts/utils/actor-identifier';
 import { HealthcareActorRoles } from 'gdc-common-utils-ts/constants/healthcare';
 import {
     EXAMPLE_CONTROLLER_DID,
@@ -34,6 +35,16 @@ describe('createEmployeeUrn', () => {
         const params = { ...baseParams, role: '1120' };
         const urn = createEmployeeUrn(params);
         expect(urn).toMatch(/:employee:z[1-9A-HJ-NP-Za-km-z]+:role:1120$/);
+    });
+
+    it('uses the canonical stable actor identifier bytes for the employee path', () => {
+        const urn = createEmployeeUrn({ ...baseParams, role: 'ISCO-08|2211' });
+        const stableActorIdentifier = buildStableActorIdentifier({
+            contactKind: 'email',
+            contact: baseParams.email,
+        });
+        const stableActorPath = stableActorIdentifier.replace('urn:multibase:', '');
+        expect(urn).toContain(`:employee:${stableActorPath}:role:isco-08|2211`);
     });
 
     it('should create a URN with explicit role scheme normalized as system|code', () => {
