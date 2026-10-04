@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Derive the employee URN path from the shared canonical stable actor
+  identifier instead of a duplicated SHA2-256 implementation. Licence, profile
+  and DCR validation now resolve the same normalized email identity.
+
 - Prepare GW CORE `1.25.31`. Fix strict legacy organization activation so the Gaia-X Legal Participant
   projection reuses `legalName`, `taxID` and `address.addressCountry` from the
   already-validated ICA OrganizationCredential instead of requiring callers to
