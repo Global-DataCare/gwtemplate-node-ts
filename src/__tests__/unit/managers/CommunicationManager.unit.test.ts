@@ -2020,6 +2020,16 @@ describe('CommunicationManager Unit Tests', () => {
               date: '2026-05-22T09:00:00Z',
               author: [{ reference: EXAMPLE_PROVIDER_ORGANIZATION_DID }],
               custodian: { reference: EXAMPLE_PROVIDER_ORGANIZATION_DID },
+              section: [{
+                code: { coding: [{ system: 'http://loinc.org', code: '10160-0' }] },
+                entry: [
+                  { reference: 'MedicationStatement/medication-001' },
+                  { reference: 'Consent/medication-consent-001' },
+                ],
+              }, {
+                code: { coding: [{ system: 'http://loinc.org', code: '8716-3' }] },
+                entry: [{ reference: 'Observation/observation-001' }],
+              }],
               attester: [
                 {
                   mode: CompositionAttesterModes.Professional,
@@ -2085,6 +2095,31 @@ describe('CommunicationManager Unit Tests', () => {
               identifier: [{ value: 'urn:uuid:observation-001' }],
             },
           },
+          {
+            resource: {
+              resourceType: ResourceTypesFhirR4.Consent,
+              id: 'medication-consent-001',
+              status: 'active',
+              patient: { reference: subjectDid },
+              identifier: [{ value: 'urn:uuid:medication-consent-001' }],
+              sourceReference: { reference: 'DocumentReference/medication-document-001' },
+            },
+          },
+          {
+            resource: {
+              resourceType: ResourceTypesFhirR4.DocumentReference,
+              id: 'medication-document-001',
+              status: 'current',
+              subject: { reference: subjectDid },
+              date: '2026-05-22T11:30:00Z',
+              identifier: [{ value: 'urn:uuid:medication-document-001' }],
+              content: [{ attachment: {
+                contentType: 'application/pdf',
+                url: 'https://records.example.org/medication-document-001.pdf',
+                title: 'Medication document',
+              } }],
+            },
+          },
         ],
       };
 
@@ -2111,7 +2146,6 @@ describe('CommunicationManager Unit Tests', () => {
                   'Communication.identifier': 'comm-bundle-001',
                   'Communication.subject': subjectDid,
                   'Communication.sent': '2026-05-22T10:00:00Z',
-                  'Composition.section': 'LOINC|10160-0',
                 },
               },
               resource: {
@@ -2151,7 +2185,7 @@ describe('CommunicationManager Unit Tests', () => {
       await communicationManager.process(job);
 
       const ledgerMappings = ((mockBlockchainAdapter.registerCidVersionMappings as jest.Mock).mock.calls.at(-1)?.[0] || []) as any[];
-      expect(ledgerMappings).toHaveLength(3);
+      expect(ledgerMappings).toHaveLength(5);
       for (const mapping of ledgerMappings) {
         expect(mapping.relationships?.author).toHaveLength(1);
         expect(mapping.relationships?.custodian).toEqual(mapping.relationships?.author);
@@ -2169,11 +2203,23 @@ describe('CommunicationManager Unit Tests', () => {
       const tenantVaultId = 'health-care_acme';
       const medicationsSectionId = getSubjectScopedSectionId(subjectDid, 'individual', 'medications');
       const observationsSectionId = getSubjectScopedSectionId(subjectDid, 'individual', 'observations');
+      const documentReferencesSectionId = getSubjectScopedSectionId(subjectDid, 'individual', 'document-references');
 
       const medicationPut = mockVaultRepository.put.mock.calls.find(
         (args) => args[0] === tenantVaultId && args[2] === medicationsSectionId,
       );
       expect(medicationPut).toBeDefined();
+      const sectionDocumentReferencePut = mockVaultRepository.put.mock.calls.find(
+        (args) => args[0] === tenantVaultId
+          && args[2] === documentReferencesSectionId
+          && (args[1] as any[])[0]?.id === 'medication-document-001',
+      );
+      expect(sectionDocumentReferencePut).toBeDefined();
+      const sectionDocumentReferenceRecord = (sectionDocumentReferencePut?.[1] as any[])[0];
+      expect(
+        sectionDocumentReferenceRecord[CompositionClaim.Section]
+        || sectionDocumentReferenceRecord[`${Format.FHIR_API}.${CompositionClaim.Section}`],
+      ).toBe('LOINC|10160-0');
       const medicationRecord = (medicationPut?.[1] as any[])[0];
       expect(medicationRecord.id).toBe('medication-001');
       expect(medicationRecord.audit?.creatorDid).toBe(decoded.iss);

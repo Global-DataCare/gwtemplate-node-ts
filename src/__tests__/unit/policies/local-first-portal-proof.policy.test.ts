@@ -65,7 +65,7 @@ describe('shared local-first portal release policy', () => {
 
     for (const contract of [skill, localFirstContract]) {
       expect(contract).toMatch(/gdc-\*.*frozen.*bug.*security/is);
-      expect(contract).toMatch(/new SOS.*sos-\*.*first/is);
+      expect(contract).toMatch(/new cross-product.*incubat.*first/is);
       expect(contract).toMatch(/product-local.*real local.*UI.*BFF.*SDK.*service.*Playwright/is);
       expect(contract).toMatch(/explicit.*promotion review.*product-neutral/is);
       expect(contract).toMatch(/one.*immutable.*publication.*after.*local.*green/is);

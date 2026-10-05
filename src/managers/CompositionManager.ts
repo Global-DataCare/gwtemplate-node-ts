@@ -66,6 +66,7 @@ import {
   isRegisteredDigitalTwinSubjectId,
 } from '../utils/digital-twin-research-projection';
 import { purgeDigitalTwinSubjectLink } from '../utils/digital-twin-secondary-use';
+import { constrainSmartCompositionReadSections } from '../utils/smart-scope-route-authorization';
 
 /**
  * Canonical HL7 IPS "all sections" example used to validate the current
@@ -381,13 +382,22 @@ export class CompositionManager implements IJobProcessor {
       throw new Error('Missing required subject search parameter for Composition search.');
     }
 
+    const requestedSections = extractCompositionSearchSections(context.body);
+    const searchSections = context.isSummaryOperation && context.scope === SUBJECT_SECTION_INDIVIDUAL
+      ? constrainSmartCompositionReadSections({
+          bearerPayload: (job.content as any)?.meta?.bearer?.jwt?.payload,
+          subject: searchSubject!,
+          requestedSections,
+        })
+      : requestedSections;
+
     return {
       tenantVaultId,
       searchResourceType,
       useDocumentReferenceSection: searchResourceType === 'documentreference',
       useCommunicationSection: searchResourceType === 'communication',
       searchSubject,
-      searchSections: extractCompositionSearchSections(context.body),
+      searchSections,
       excludedSearchSections: extractCompositionExcludedSearchSections(context.body),
       searchTypes: context.isSummaryOperation
         ? this.extractSummaryTypes(context.body)

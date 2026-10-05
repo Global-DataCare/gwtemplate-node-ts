@@ -104,6 +104,18 @@ E2E gates before `npm publish` or any container image build.
   `Communication` or `Bundle`; they never receive DIDComm identity fields.
   HTTP Authorization proves the caller and `Communication.sender` remains a
   FHIR business participant reference.
+- `Subject/$summary` is always bounded by the authenticated SMART token. An
+  optional application section selector can only narrow that authorization:
+  the returned document contains the intersection of requested and authorized
+  `system|code` section tokens. Omitting the selector means "all authorized
+  sections", not "all stored sections". The server reconstructs each retained
+  Composition section as a document graph, so directly and transitively linked
+  resources remain available while unrelated `Communication` wrapper/index
+  `DocumentReference` resources are excluded. SDK clients inspect the returned
+  `Composition` with `getDocumentSections()` and resolve a requested token with
+  `getDocumentSectionByCode(...)`; they must not compare a plain `.code` value
+  directly with a `system|code` token or treat a client-side selector as an
+  authorization setter.
 - In a clinical document Bundle, `Composition.author` identifies who created
   the content and `Composition.attester` identifies each registered assignment
   that explicitly attested it. Neither role implies who transported the

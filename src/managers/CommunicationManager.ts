@@ -92,7 +92,8 @@ type SupportedProjectedResourceType =
   | 'CarePlan'
   | 'Encounter'
   | 'AdverseEvent'
-  | 'Consent';
+  | 'Consent'
+  | 'DocumentReference';
 
 type ProjectionConfig = {
   collectionId: string;
@@ -181,6 +182,11 @@ const PROJECTED_RESOURCE_CONFIG: Record<SupportedProjectedResourceType, Projecti
     collectionId: FhirResourceTypeDataCollections[ResourceTypesFhirR4.Consent],
     subjectClaimKeys: ['Consent.subject', 'Consent.patient'],
     identifierClaimKeys: ['Consent.identifier', 'Consent.identifier.value'],
+  },
+  DocumentReference: {
+    collectionId: DataCollectionIds.documentReferences,
+    subjectClaimKeys: ['DocumentReference.subject', 'DocumentReference.patient'],
+    identifierClaimKeys: ['DocumentReference.identifier', 'DocumentReference.identifier.value'],
   },
 };
 
@@ -1180,14 +1186,20 @@ export class CommunicationManager implements IJobProcessor {
     const communicationSender = this.resolveCommunicationSender(entry, fhirResource);
     const clinicalAuthorDid = this.resolveClinicalResourceAuthor(job, entry, fhirResource);
     await this.persistClinicalAuthorIdentityBinding(job, tenantVaultId, clinicalAuthorDid);
-    const explicitSection = String(
+    const declaredSection = String(
       (entry?.resource?.meta?.claims?.[CommunicationClaim.Topic] as string | undefined)
       || (entry?.meta?.claims?.[CommunicationClaim.Topic] as string | undefined)
       || (entry?.resource?.meta?.claims?.[CompositionClaim.Section] as string | undefined)
       || (entry?.meta?.claims?.[CompositionClaim.Section] as string | undefined)
-      || this.extractCompositionSectionsFromCommunication(entry, fhirResource)[0]
       || '',
     ).trim();
+    const documentSections = this.extractCompositionSectionsFromCommunication(entry, fhirResource);
+    // An explicit Communication section scopes a section update. For a native
+    // document without that declaration, implicit membership is safe only
+    // when the Composition has exactly one section. In a multi-section IPS,
+    // every resource must be linked by Composition.section[].entry[].
+    const explicitSection = declaredSection
+      || (documentSections.length === 1 ? documentSections[0] : '');
     for (const resolved of this.resolveCommunicationAttachments(entry, fhirResource)) {
       const attachment = resolved.documentAttachment;
       const parsedAttachment = this.parseAttachmentJson(attachment);
@@ -2979,6 +2991,20 @@ export class CommunicationManager implements IJobProcessor {
       .find((resource: any) => resource?.resourceType === ResourceTypesFhirR4.Composition);
     const sections = Array.isArray(composition?.section) ? composition.section : [];
     const sectionTokensByReference = new Map<string, Set<string>>();
+    const entryByReference = new Map<string, any>();
+
+    const entryAliases = (bundleEntry: any): string[] => {
+      const resource = bundleEntry?.resource;
+      const resourceId = String(resource?.id || '').trim();
+      return [
+        String(bundleEntry?.fullUrl || '').trim(),
+        resourceId,
+        resourceId && resource?.resourceType ? `${resource.resourceType}/${resourceId}` : '',
+      ].filter(Boolean);
+    };
+    for (const bundleEntry of entries) {
+      for (const alias of entryAliases(bundleEntry)) entryByReference.set(alias, bundleEntry);
+    }
 
     for (const section of sections) {
       const coding = section?.code?.coding?.[0];
@@ -2995,17 +3021,54 @@ export class CommunicationManager implements IJobProcessor {
       }
     }
 
+    // Supporting resources inherit the section membership of the resource
+    // that references them. This preserves graphs such as
+    // Composition -> Consent -> DocumentReference without pretending that an
+    // unrelated transport attachment belongs to the first document section.
+    const collectResourceReferences = (value: unknown, target: Set<string>): void => {
+      if (Array.isArray(value)) {
+        value.forEach((item) => collectResourceReferences(item, target));
+        return;
+      }
+      if (!value || typeof value !== 'object') return;
+      const record = value as Record<string, unknown>;
+      if (typeof record.reference === 'string' && record.reference.trim()) {
+        target.add(record.reference.trim());
+      }
+      for (const [key, nested] of Object.entries(record)) {
+        if (key !== 'reference') collectResourceReferences(nested, target);
+      }
+    };
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const bundleEntry of entries) {
+        const inheritedTokens = new Set<string>();
+        for (const alias of entryAliases(bundleEntry)) {
+          for (const token of sectionTokensByReference.get(alias) || []) inheritedTokens.add(token);
+        }
+        if (inheritedTokens.size === 0) continue;
+        const references = new Set<string>();
+        collectResourceReferences(bundleEntry?.resource, references);
+        for (const reference of references) {
+          const referencedEntry = entryByReference.get(reference);
+          if (!referencedEntry) continue;
+          for (const alias of entryAliases(referencedEntry)) {
+            const tokens = sectionTokensByReference.get(alias) || new Set<string>();
+            const sizeBefore = tokens.size;
+            inheritedTokens.forEach((token) => tokens.add(token));
+            sectionTokensByReference.set(alias, tokens);
+            if (tokens.size !== sizeBefore) changed = true;
+          }
+        }
+      }
+    }
+
     for (const bundleEntry of entries) {
       const resource = bundleEntry?.resource;
       if (!resource || resource.resourceType === ResourceTypesFhirR4.Composition) continue;
-      const resourceId = String(resource.id || '').trim();
-      const aliases = [
-        String(bundleEntry?.fullUrl || '').trim(),
-        resourceId,
-        resourceId ? `${resource.resourceType}/${resourceId}` : '',
-      ].filter(Boolean);
       const tokens = new Set<string>();
-      for (const alias of aliases) {
+      for (const alias of entryAliases(bundleEntry)) {
         for (const token of sectionTokensByReference.get(alias) || []) tokens.add(token);
       }
       if (tokens.size === 0) continue;

@@ -2567,6 +2567,13 @@ export function createApiRouter(
   *       - request body should be a FHIR `Parameters` resource
   *       - minimum required parameter is `subject`
   *       - optional parameters include `document-type`, `section`, and `exclude-section`
+  *       - GW validates the requested subject against the authenticated SMART scope
+  *       - when the SMART scope limits `section`, omitting the request filter inherits
+  *         that set and supplying one narrows the result to the intersection
+  *       - section-limited summaries omit unrelated clinical resources and
+  *         `DocumentReference` records without an authorized section membership
+  *       - a `DocumentReference` linked directly or through a referenced section
+  *         resource remains part of that section, including external-content records
   *
   *       See also:
   *       - `gdc-common-utils-ts/docs/101-COMMUNICATION_LAYERING.md`

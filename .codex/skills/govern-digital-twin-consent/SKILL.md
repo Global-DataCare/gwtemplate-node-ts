@@ -74,6 +74,30 @@ Verify current branches, versions and published npm state before release claims.
 - Never teach a patient portal to submit an IPS Bundle or canonical Composition to `digitaltwin/.../Composition/_batch`.
 - Treat the direct Composition batch only as explicitly scoped adapter/compatibility plumbing for a pre-authorized registered twin; keep it outside the portal 101.
 
+## Preserve consent-scoped operational summaries
+
+- Enforce the authenticated `organization/Composition` SMART subject and
+  section constraints while GW materializes `Subject/$summary`; a frontend or
+  BFF filter is presentation logic, never the authorization boundary.
+- An omitted application section filter inherits the token-authorized set. An
+  explicit filter is reduced to `requested sections ∩ authorized sections`.
+  A subject mismatch or empty intersection fails with `403`.
+- Let the returned `Composition.section` describe what was actually disclosed.
+  SDK 101 examples enumerate it with `getDocumentSections()` and match each
+  requested FHIR token through `getDocumentSectionByCode(...)`; they never
+  compare a plain `section.code` directly with `system|code`. Offer a separate
+  permission request only for the missing sections.
+- Preserve the complete authorized document graph. A resource is not orphaned
+  merely because it is not an immediate `Composition.section[].entry[]` child;
+  follow FHIR references transitively, including
+  `Composition -> Consent -> DocumentReference`.
+- Keep a section-linked `DocumentReference`, whether linked directly or
+  transitively. Exclude unrelated Communication attachment/index wrappers from
+  a section-limited summary, and never infer their membership from the first
+  section of a multi-section document.
+- Prove this with the canonical all-sections fixture at unit, HTTP integration,
+  real SDK E2E and Fabric local-network layers before any image promotion.
+
 ## Preserve MVP discovery and organization authorization
 
 - Treat `/{tenantId}/cds-{jurisdiction}/{version}/{sector}` as the tenant-sector

@@ -7,11 +7,12 @@ set -euo pipefail
 # - actual endpoint access using the emitted access token
 #
 # Covered live paths:
-# 1. individual consent -> SMART token -> individual Bundle/_search
-# 2. medical-secretary consent -> SMART token -> individual Bundle/_search
-# 3. unconsented medical secretary -> denied SMART token
-# 4. research contract + provider consent -> SMART token -> public digitaltwin ResearchSubject/_search
-# 5. allowed and denied research employees by role and by direct email
+# 1. all-sections IPS -> individual consent -> SMART token -> scoped Subject/$summary
+# 2. individual consent -> SMART token -> individual Bundle/_search
+# 3. medical-secretary consent -> SMART token -> individual Bundle/_search
+# 4. unconsented medical secretary -> denied SMART token
+# 5. research contract + provider consent -> SMART token -> public digitaltwin ResearchSubject/_search
+# 6. allowed and denied research employees by role and by direct email
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 # shellcheck source=/dev/null
@@ -44,6 +45,8 @@ SMART_TOKEN_ENDPOINT="${BASE_URL}/${TENANT_ID}/cds-${JURISDICTION}/v1/${SECTOR}/
 SMART_TOKEN_POLL_ENDPOINT="${BASE_URL}/${TENANT_ID}/cds-${JURISDICTION}/v1/${SECTOR}/identity/openid/smart/_batch-response"
 INDIVIDUAL_BUNDLE_SEARCH_ENDPOINT="${BASE_URL}/${TENANT_ID}/cds-${JURISDICTION}/v1/${SECTOR}/individual/org.hl7.fhir.r4/Bundle/_search"
 INDIVIDUAL_BUNDLE_SEARCH_POLL_ENDPOINT="${BASE_URL}/${TENANT_ID}/cds-${JURISDICTION}/v1/${SECTOR}/individual/org.hl7.fhir.r4/Bundle/_search-response"
+INDIVIDUAL_COMMUNICATION_ENDPOINT="${BASE_URL}/${TENANT_ID}/cds-${JURISDICTION}/v1/${SECTOR}/individual/org.hl7.fhir.r4/Communication/_batch"
+INDIVIDUAL_COMMUNICATION_POLL_ENDPOINT="${BASE_URL}/${TENANT_ID}/cds-${JURISDICTION}/v1/${SECTOR}/individual/org.hl7.fhir.r4/Communication/_batch-response"
 DIGITAL_TWIN_SEARCH_ENDPOINT="${BASE_URL}/${TENANT_ID}/cds-${JURISDICTION}/v1/${SECTOR}/digitaltwin/org.hl7.fhir.r4/ResearchSubject/_search"
 DIGITAL_TWIN_SEARCH_POLL_ENDPOINT="${BASE_URL}/${TENANT_ID}/cds-${JURISDICTION}/v1/${SECTOR}/digitaltwin/org.hl7.fhir.r4/ResearchSubject/_batch-response"
 
@@ -233,6 +236,67 @@ run_individual_bundle_search_with_token() {
   echo "[smart-access-smoke] verified individual Bundle/_search through SMART token"
 }
 
+ingest_individual_all_sections() {
+  local request_payload
+  request_payload="$(render_smart_payload INDIVIDUAL_ALL_SECTIONS_INGESTION_REQUEST)"
+  local thid
+  thid="$(jq -r '.thid' <<<"${request_payload}")"
+
+  echo "[smart-access-smoke] POST canonical all-sections IPS"
+  post_json "${INDIVIDUAL_COMMUNICATION_ENDPOINT}" "${AUTH_BEARER}" "${request_payload}" >/dev/null
+
+  local ingestion_payload
+  ingestion_payload="$(poll_async_json "${INDIVIDUAL_COMMUNICATION_POLL_ENDPOINT}" "${thid}" 60 1)"
+  if ! jq -e '.data[0].response.status == "200"' <<<"${ingestion_payload}" >/dev/null; then
+    echo "ERROR: canonical all-sections IPS ingestion did not complete" >&2
+    echo "${ingestion_payload}" >&2
+    return 1
+  fi
+  echo "[smart-access-smoke] canonical all-sections IPS stored"
+}
+
+run_individual_scoped_summary_with_token() {
+  local access_token="$1"
+  local request_payload
+  request_payload="$(render_smart_payload INDIVIDUAL_SCOPED_SUMMARY_REQUEST)"
+  local thid
+  thid="$(jq -r '.thid' <<<"${request_payload}")"
+
+  echo "[smart-access-smoke] POST unfiltered Subject/\$summary through section-scoped SMART token"
+  post_json "${INDIVIDUAL_COMMUNICATION_ENDPOINT}" "${access_token}" "${request_payload}" >/dev/null
+
+  local summary_payload
+  summary_payload="$(poll_async_json "${INDIVIDUAL_COMMUNICATION_POLL_ENDPOINT}" "${thid}" 60 1)"
+  if ! jq -e '.data[0].response.status == "200" and .data[0].resource.type == "document"' <<<"${summary_payload}" >/dev/null; then
+    echo "ERROR: section-scoped Subject/\$summary did not complete" >&2
+    echo "${summary_payload}" >&2
+    return 1
+  fi
+
+  local returned_sections
+  returned_sections="$(jq -c '[.data[0].resource.entry[]? | select(.resource.resourceType == "Composition") | .resource.section[]?.code.coding[0].code] | sort' <<<"${summary_payload}")"
+  if [[ "${returned_sections}" != '["10160-0","11450-4"]' ]]; then
+    echo "ERROR: section-scoped Subject/\$summary leaked or omitted sections: ${returned_sections}" >&2
+    echo "${summary_payload}" >&2
+    return 1
+  fi
+
+  if jq -e '[.data[0].resource.entry[]?.resource.resourceType] | any(. == "AllergyIntolerance" or . == "Immunization" or . == "Observation" or . == "CarePlan")' <<<"${summary_payload}" >/dev/null; then
+    echo "ERROR: section-scoped Subject/\$summary leaked an unauthorized clinical resource" >&2
+    echo "${summary_payload}" >&2
+    return 1
+  fi
+  local returned_document_references
+  returned_document_references="$(jq -c '[.data[0].resource.entry[]? | select(.resource.resourceType == "DocumentReference") | .resource.id] | sort' <<<"${summary_payload}")"
+  if [[ "${returned_document_references}" != '["smart-summary-authorized-medication-document"]' ]]; then
+    echo "ERROR: section-scoped Subject/\$summary omitted its authorized document or leaked a document from another/unrelated section graph: ${returned_document_references}" >&2
+    echo "${summary_payload}" >&2
+    return 1
+  fi
+  jq -e '[.data[0].resource.entry[]?.resource.resourceType] | any(. == "Condition") and any(. == "MedicationStatement")' <<<"${summary_payload}" >/dev/null
+  echo "[smart-access-smoke] verified SMART subject and section enforcement at Subject/\$summary"
+}
+
 run_digital_twin_search_with_token() {
   local access_token="$1"
   local request_payload
@@ -273,9 +337,11 @@ PROVIDER_ORGANIZATION_DID="${PROVIDER_ORGANIZATION_DID:-$(resolve_provider_organ
 echo "[smart-access-smoke] provider organization DID: ${PROVIDER_ORGANIZATION_DID}"
 
 echo "[smart-access-smoke] verifying individual SMART access"
+ingest_individual_all_sections
 submit_consent_batch_and_verify_asset INDIVIDUAL_CONSENT_BATCH_REQUEST INDIVIDUAL_RULE_ID_LIST
 individual_token_payload="$(request_smart_token INDIVIDUAL_SMART_TOKEN_REQUEST true)"
 individual_access_token="$(jq -r '.access_token' <<<"${individual_token_payload}")"
+run_individual_scoped_summary_with_token "${individual_access_token}"
 run_individual_bundle_search_with_token "${individual_access_token}"
 
 echo "[smart-access-smoke] verifying authorized medical-secretary access and negative control"
@@ -317,6 +383,7 @@ jq -n \
     channel: $channel,
     chaincode: $chaincode,
     verifiedFlows: [
+      "individual-consent-smart-scoped-summary",
       "individual-consent-smart-bundle-search",
       "medical-secretary-consent-smart-bundle-search-allow",
       "medical-secretary-without-consent-smart-token-deny",

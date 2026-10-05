@@ -76,6 +76,14 @@ import {
 import { SUBJECT_SECTION_DIGITAL_TWIN } from '../../constants/domain';
 
 describe('Composition Bundle _search API (integration)', () => {
+  function createDemoBearer(payload: Record<string, unknown>): string {
+    return [
+      Buffer.from(JSON.stringify({ alg: 'none', typ: 'JWT' })).toString('base64url'),
+      Buffer.from(JSON.stringify(payload)).toString('base64url'),
+      'demo',
+    ].join('.');
+  }
+
   function loadIpsAllSectionsFixture(subjectDid: string): any {
     // Official HL7 IPS fixture used to feed individual, mirror into digitaltwin,
     // and verify section-first `ResearchSubject/_search` behavior end to end.
@@ -941,8 +949,8 @@ describe('Composition Bundle _search API (integration)', () => {
         '8716-3': Array(3).fill('Observation'),
         '29762-2': Array(2).fill('Observation'),
         '104605-1': ['Flag'],
-        '81338-6': ['Consent'],
-        '42348-3': ['Consent'],
+        '81338-6': ['Consent', 'DocumentReference'],
+        '42348-3': ['Consent', 'DocumentReference'],
         '47420-5': ['Condition'],
         '11348-0': ['Condition'],
         '10162-6': ['Observation'],
@@ -970,6 +978,89 @@ describe('Composition Bundle _search API (integration)', () => {
           .sort();
         expect(types).toEqual([...(expectedSectionTypes[code] || [])].sort());
       }
+
+      // Authorization regression: a SMART token constrained to two IPS
+      // sections must constrain the materialized summary. When the request
+      // asks for those sections plus an unauthorized section, the returned
+      // Composition exposes only the authorized intersection so the caller
+      // can compare requested and returned section codes.
+      const scopedSectionCodes = [
+        HealthcareBasicSections.ProblemList.attributeValue,
+        HealthcareBasicSections.HistoryOfMedicationUse.attributeValue,
+      ];
+      const requestedScopedSectionCodes = [
+        ...scopedSectionCodes,
+        HealthcareBasicSections.AllergiesAndIntolerances.attributeValue,
+      ];
+      const sectionScopedBearer = createDemoBearer({
+        sub: EXAMPLE_SUBJECT_DID,
+        scope: `organization/Composition.rs?subject=${encodeURIComponent(subjectDid)}&section=${scopedSectionCodes.join(',')}`,
+      });
+      const scopedSummaryResp = await invokeExpress(app, {
+        method: HttpRequestMethods.Post,
+        url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch`,
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${sectionScopedBearer}` },
+        body: {
+          thid: 'ips-all-sections-scoped-summary-001',
+          body: {
+            resourceType: ResourceTypesFhirR4.Bundle,
+            type: 'batch',
+            entry: [{
+              request: { method: HttpRequestMethods.Post, url: 'individual/org.hl7.fhir.r4/Communication' },
+              resource: {
+                resourceType: ResourceTypesFhirR4.Communication,
+                status: 'completed',
+                subject: { reference: subjectDid },
+                payload: [{
+                  contentReference: {
+                    reference: `individual/org.hl7.fhir.r4/Subject/$summary?subject=${encodeURIComponent(subjectDid)}&section=${encodeURIComponent(requestedScopedSectionCodes.join(','))}`,
+                  },
+                }],
+              },
+            }],
+          },
+        },
+      });
+      expect(scopedSummaryResp.status).toBe(202);
+
+      let scopedSummaryPayload: any;
+      for (let i = 0; i < 50; i++) {
+        const pollResp = await invokeExpress(app, {
+          method: HttpRequestMethods.Post,
+          url: `/${testTenant1TenantId}/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Communication/_batch-response`,
+          headers: { 'content-type': 'application/json' },
+          body: { thid: 'ips-all-sections-scoped-summary-001' },
+        });
+        if (pollResp.status === 200) {
+          scopedSummaryPayload = JSON.parse(pollResp.text);
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 50));
+      }
+
+      const scopedSummary = scopedSummaryPayload?.data?.[0]?.resource;
+      const scopedComposition = scopedSummary?.entry
+        ?.find((bundleEntry: any) => bundleEntry?.resource?.resourceType === 'Composition')
+        ?.resource;
+      const returnedScopedSectionCodes = (scopedComposition?.section || [])
+        .map((section: any) => section?.code?.coding?.[0]?.code)
+        .sort();
+      expect(returnedScopedSectionCodes).toEqual(['10160-0', '11450-4']);
+
+      const returnedScopedResourceTypes = (scopedSummary?.entry || [])
+        .map((bundleEntry: any) => bundleEntry?.resource?.resourceType);
+      expect(returnedScopedResourceTypes).toEqual(expect.arrayContaining([
+        ResourceTypesFhirR4.Composition,
+        ResourceTypesFhirR4.Condition,
+        ResourceTypesFhirR4.MedicationStatement,
+      ]));
+      expect(returnedScopedResourceTypes).not.toEqual(expect.arrayContaining([
+        ResourceTypesFhirR4.AllergyIntolerance,
+        ResourceTypesFhirR4.Immunization,
+        ResourceTypesFhirR4.Observation,
+        ResourceTypesFhirR4.CarePlan,
+        ResourceTypesFhirR4.DocumentReference,
+      ]));
 
       const allergiesSection = 'LOINC|48765-2';
       const sectionSubjectDid = 'did:web:api.acme.org:individual:section-only-allergy-001';

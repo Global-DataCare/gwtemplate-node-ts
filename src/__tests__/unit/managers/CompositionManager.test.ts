@@ -387,6 +387,115 @@ describe('CompositionManager', () => {
     expect(data[0].resource.type).toBe('document');
   });
 
+  it('limits Subject/$summary to the sections carried by the authenticated SMART scope', async () => {
+    const subjectDid = EXAMPLE_SUBJECT_DID;
+    const problemSection = HealthcareBasicSections.ProblemList.attributeValue;
+    const medicationSection = HealthcareBasicSections.HistoryOfMedicationUse.attributeValue;
+    const allergySection = HealthcareBasicSections.AllergiesAndIntolerances.attributeValue;
+
+    mockVaultRepository.listContainersInSection.mockImplementation(async (_vaultId: string, sectionId: string) => {
+      if (sectionId === getSubjectScopedSectionId(subjectDid, 'individual', DataCollectionIds.composition)) {
+        return [{
+          id: 'composition-smart-section-contract',
+          [CompositionClaim.Identifier]: 'urn:uuid:composition-smart-section-contract',
+          [CompositionClaim.Subject]: subjectDid,
+          [CompositionClaim.Section]: [problemSection, medicationSection, allergySection].join(','),
+          [CompositionClaim.Date]: '2026-10-05T00:00:00Z',
+          [CompositionClaim.Author]: EXAMPLE_TENANT_SERVICE_DID,
+          [CompositionClaim.Type]: HealthcareBasicSections.PatientSummaryDocument.attributeValue,
+        }] as any;
+      }
+      if (sectionId === getSubjectScopedSectionId(subjectDid, 'individual', DataCollectionIds.conditions)) {
+        return [{
+          id: 'condition-smart-section-contract',
+          'Condition.identifier': 'urn:uuid:condition-smart-section-contract',
+          'Condition.subject': subjectDid,
+          [CompositionClaim.Section]: problemSection,
+        }] as any;
+      }
+      if (sectionId === getSubjectScopedSectionId(subjectDid, 'individual', DataCollectionIds.medications)) {
+        return [{
+          id: 'medication-smart-section-contract',
+          'MedicationStatement.identifier': 'urn:uuid:medication-smart-section-contract',
+          'MedicationStatement.subject': subjectDid,
+          'MedicationStatement.status': 'active',
+          [CompositionClaim.Section]: medicationSection,
+        }] as any;
+      }
+      if (sectionId === getSubjectScopedSectionId(subjectDid, 'individual', DataCollectionIds.allergies)) {
+        return [{
+          id: 'allergy-smart-section-contract',
+          'AllergyIntolerance.identifier': 'urn:uuid:allergy-smart-section-contract',
+          'AllergyIntolerance.subject': subjectDid,
+          [CompositionClaim.Section]: allergySection,
+        }] as any;
+      }
+      if (sectionId === getSubjectScopedSectionId(subjectDid, 'individual', DataCollectionIds.documentReferences)) {
+        return [
+          {
+            id: 'document-smart-section-contract',
+            'DocumentReference.identifier': 'urn:uuid:document-smart-section-contract',
+            'DocumentReference.subject': subjectDid,
+            [CompositionClaim.Section]: medicationSection,
+          },
+          {
+            id: 'document-unscoped-external-contract',
+            'DocumentReference.identifier': 'urn:uuid:document-unscoped-external-contract',
+            'DocumentReference.subject': subjectDid,
+          },
+        ] as any;
+      }
+      return [] as any;
+    });
+
+    const response = await manager.process(createJob({
+      sector: 'health-care',
+      section: 'individual',
+      format: 'org.hl7.fhir.r4',
+      resourceType: 'Subject',
+      action: '$summary',
+      content: {
+        ...(createJob().content as any),
+        meta: {
+          bearer: {
+            jwt: {
+              payload: {
+                scope: `organization/Composition.rs?subject=${encodeURIComponent(subjectDid)}&section=${problemSection},${medicationSection}`,
+              },
+            },
+          },
+        },
+        body: {
+          resourceType: ResourceTypesFhirR4.Parameters,
+          parameter: [{ name: 'subject', valueString: subjectDid }],
+        },
+      } as any,
+    }));
+
+    const summary = (response.body as any).data[0].resource;
+    const composition = summary.entry.find((entry: any) => entry.resource?.resourceType === ResourceTypesFhirR4.Composition)?.resource;
+    const returnedSections = composition.section.map((section: any) => section.code.coding[0].code);
+    const returnedResourceTypes = summary.entry.map((entry: any) => entry.resource?.resourceType);
+
+    expect(returnedSections).toEqual([
+      problemSection.split('|')[1],
+      medicationSection.split('|')[1],
+    ]);
+    expect(returnedResourceTypes).toContain(ResourceTypesFhirR4.Condition);
+    expect(returnedResourceTypes).toContain(ResourceTypesFhirR4.MedicationStatement);
+    expect(returnedResourceTypes).toContain(ResourceTypesFhirR4.DocumentReference);
+    expect(returnedResourceTypes).not.toContain(ResourceTypesFhirR4.AllergyIntolerance);
+    expect(summary.entry
+      .filter((entry: any) => entry.resource?.resourceType === ResourceTypesFhirR4.DocumentReference)
+      .map((entry: any) => entry.resource?.id)).toEqual(['document-smart-section-contract']);
+    const medicationSummarySection = composition.section.find(
+      (section: any) => section.code.coding[0].code === medicationSection.split('|')[1],
+    );
+    expect(medicationSummarySection.entry).toContainEqual({
+      reference: 'urn:uuid:document-smart-section-contract',
+    });
+  });
+
   it('rejects digitaltwin materialization for an operational subject DID', async () => {
     const operationalSubjectDid = 'did:web:api.acme.org:individual:summary-subject-001';
     const job = createJob({

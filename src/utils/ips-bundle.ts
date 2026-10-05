@@ -54,25 +54,57 @@ function matchesRequiredTypes(actualType: string, requiredTypes: string[]): bool
   return requiredTypes.some((requiredType) => extractTokenCode(requiredType) === actualCode);
 }
 
+function matchesSectionToken(actual: string, expected: string): boolean {
+  const split = (value: string): { system: string; code: string } => {
+    const normalized = String(value || '').trim();
+    const delimiter = normalized.lastIndexOf('|');
+    const rawSystem = delimiter >= 0 ? normalized.slice(0, delimiter) : '';
+    let system = rawSystem.toLowerCase().replace(/\/$/, '');
+    if (system === 'loinc' || system === 'http://loinc.org') system = 'http://loinc.org';
+    if (['snomed', 'snomedct', 'http://snomed.info/sct'].includes(system)) {
+      system = 'http://snomed.info/sct';
+    }
+    return {
+      system,
+      code: extractTokenCode(normalized).toLowerCase(),
+    };
+  };
+  const left = split(actual);
+  const right = split(expected);
+  return left.code === right.code
+    && (!left.system || !right.system || left.system === right.system);
+}
+
 function belongsToSection(
   record: Record<string, any>,
   sectionToken: string,
   allowImplicitMembership: boolean,
 ): boolean {
-  const expected = extractTokenCode(sectionToken).toLowerCase();
   const memberships = String(
     getClaimValue<string>(record, 'Composition.section') || '',
   )
     .split(',')
-    .map((value) => extractTokenCode(value).toLowerCase())
+    .map((value) => value.trim())
     .filter(Boolean);
   // A legacy single-section ingestion stored the resource in the section's
   // dedicated collection without repeating Composition.section. That is
   // unambiguous only while reconstructing exactly one Composition section.
   if (memberships.length === 0) return allowImplicitMembership;
-  return memberships.includes(expected);
+  return memberships.some((membership) => matchesSectionToken(membership, sectionToken));
 }
 
+/**
+ * Reconstructs the authorized FHIR document graph for one subject summary.
+ *
+ * Clinical facts belong to the selected Composition section through their
+ * persisted `Composition.section` membership. Supporting DocumentReferences
+ * keep membership derived at ingestion from direct or transitive document
+ * references, including `Composition -> Consent -> DocumentReference`.
+ * Unrelated Communication attachment/index records are not assigned to a
+ * section merely because they share the subject. The returned Composition is
+ * therefore the authoritative list of sections and references disclosed to
+ * the caller.
+ */
 export async function buildConsolidatedIpsBundleDocument(
   params: BuildConsolidatedIpsBundleDocumentParams,
 ): Promise<Record<string, any>> {
@@ -96,8 +128,9 @@ export async function buildConsolidatedIpsBundleDocument(
       getClaimValue<string>(compositionRecord, 'Composition.section') || '',
     ).split(',').map((value) => value.trim()).filter(Boolean);
     for (const sectionToken of sectionTokens) {
-      if (params.excludedSections.includes(sectionToken)) continue;
-      if (params.requiredSections.length > 0 && !params.requiredSections.includes(sectionToken)) continue;
+      if (params.excludedSections.some((excluded) => matchesSectionToken(sectionToken, excluded))) continue;
+      if (params.requiredSections.length > 0
+        && !params.requiredSections.some((required) => matchesSectionToken(sectionToken, required))) continue;
       includedSectionTokens.add(sectionToken);
       ensureSection(sectionRefs, sectionToken);
     }
@@ -156,6 +189,11 @@ export async function buildConsolidatedIpsBundleDocument(
   const documentReferenceSectionId = getSubjectScopedSectionId(params.subject, params.scope, DataCollectionIds.documentReferences);
   const documentReferenceRecords = await params.vaultRepository.listContainersInSection(params.tenantVaultId, documentReferenceSectionId);
   for (const documentReferenceRecord of documentReferenceRecords) {
+    const matchingSectionTokens = Array.from(includedSectionTokens)
+      .filter((sectionToken) => belongsToSection(documentReferenceRecord, sectionToken, false));
+    if (params.requiredSections.length > 0 && matchingSectionTokens.length === 0) {
+      continue;
+    }
     const resource = buildFhirResourceFromIndexedClaims(ResourceTypesFhirR4.DocumentReference, documentReferenceRecord);
     const entryKey = resolveBundleEntryKey(undefined, resource);
     if (!bundleEntries.has(entryKey)) {
@@ -163,6 +201,9 @@ export async function buildConsolidatedIpsBundleDocument(
         fullUrl: resolveBundleEntryFullUrl(undefined, { resource }),
         resource,
       });
+    }
+    for (const sectionToken of matchingSectionTokens) {
+      addSectionReference(sectionRefs, sectionToken, entryKey);
     }
   }
 

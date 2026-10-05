@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+- Prepare GW CORE `1.25.32` with server-side SMART subject/section enforcement
+  for `Subject/$summary` and document-graph-aware filtering.
+
+- Enforce the authenticated SMART `organization/Composition` subject and
+  section constraints while materializing `Subject/$summary`. An omitted
+  application filter now inherits the token's allowed sections, an explicit
+  filter is intersected with them, and an authorization-scoped summary no
+  longer exposes unrelated clinical sections or unrelated
+  `DocumentReference` entries. A `DocumentReference` explicitly linked from an
+  authorized section, directly or through a section resource such as
+  `Consent.sourceReference`, remains part of that section; multi-section
+  documents no longer assign an unrelated resource to their first section.
+  The returned `Composition.section` is the disclosed intersection and lets an
+  SDK/UI compare requested versus returned sections before requesting the
+  missing permissions.
+
 - Derive the employee URN path from the shared canonical stable actor
   identifier instead of a duplicated SHA2-256 implementation. Licence, profile
   and DCR validation now resolve the same normalized email identity.

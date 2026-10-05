@@ -1,5 +1,7 @@
 // Flow contract: shared local-network data drives the complete SMART access journeys without ad-hoc identifiers.
 // Always create JSDoc, do not use strings inline in keys nor values, use types instead, and reuse the data test examples.
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
 import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 
@@ -33,6 +35,12 @@ import {
   createVP,
   addVC,
 } from 'gdc-common-utils-ts';
+import { buildExampleCommunicationIngestionPayload } from 'gdc-common-utils-ts/examples/shared';
+import {
+  BundleDocumentRequestMessageTypes,
+  buildCommunicationRequestOperationWithAttachedParametersClaims,
+} from 'gdc-common-utils-ts/utils/communication-bundle-document-request';
+import { transformCommunicationClaimsToResourceFhirR4 } from 'gdc-common-utils-ts/utils/communication-fhir-r4';
 import { demoCommunicationMedicationIpsDefaults } from './demo-communication-medications-ips.data';
 
 type ConsentRuleWithSourceReference = ConsentRule
@@ -47,6 +55,8 @@ type ConsentRuleWithSourceReference = ConsentRule
 export const DEMO_SMART_ACCESS_LOCAL_IDS = Object.freeze({
   individualSmartThreadId: 'local-network-individual-smart-token-001',
   individualBundleSearchThreadId: 'local-network-individual-bundle-search-001',
+  individualAllSectionsIngestionThreadId: 'local-network-individual-all-sections-ingestion-001',
+  individualScopedSummaryThreadId: 'local-network-individual-scoped-summary-001',
   individualConsentIdentifier: 'urn:uuid:local-network-individual-ips-consent-001',
   secretarySmartThreadId: 'local-network-secretary-smart-token-001',
   secretaryDeniedSmartThreadId: 'local-network-secretary-smart-token-denied-001',
@@ -62,6 +72,16 @@ export const DEMO_SMART_ACCESS_LOCAL_IDS = Object.freeze({
   researchDirectEmailConsentIdentifier: 'urn:uuid:local-network-research-email-consent-001',
   researchUseReference: 'https://portal.example.org/research/local-network-study-001',
 } as const);
+
+/**
+ * Exact section constraint from the production regression reported by the
+ * portal integrator. The local-network gate intentionally keeps both sections
+ * so a one-section happy path cannot conceal a broken comma-separated scope.
+ */
+export const DEMO_SMART_SUMMARY_ALLOWED_SECTIONS = Object.freeze([
+  HealthcareBasicSections.HistoryOfMedicationUse.claim,
+  HealthcareBasicSections.ProblemList.claim,
+] as const);
 
 export const DEMO_SMART_ACCESS_LOCAL_EMAILS = Object.freeze({
   individualProfessional: 'doctor1@acme.org',
@@ -144,7 +164,7 @@ export function buildDemoIndividualIpsPermitConsent(input: Readonly<{
     [ClaimConsent.actorRole]: HealthcareActorRoles.Physician,
     [ClaimConsent.decision]: ConsentDecisions.Permit,
     [ClaimConsent.purpose]: HealthcareConsentPurposes.EmergencyTreatment,
-    [ClaimConsent.action]: HealthcareBasicSections.PatientSummaryDocument.claim,
+    [ClaimConsent.action]: DEMO_SMART_SUMMARY_ALLOWED_SECTIONS.join(','),
     [ClaimConsent.date]: '2026-08-01',
     [ClaimConsent.attachmentContentType]: EXAMPLE_CONSENT_ATTACHMENT_CONTENT_TYPE,
     [ClaimConsent.attachmentData]: EXAMPLE_CONSENT_ATTACHMENT_DATA_BASE64,
@@ -164,7 +184,7 @@ export async function buildDemoIndividualSmartTokenRequest(input: Readonly<{
   const audience = buildProviderOrganizationDid(input.tenantId);
   const scope =
     `${ServiceCapability.IndexReader}?subject=${String(input.subjectDid || '').trim()}`
-    + `&section=${HealthcareBasicSections.PatientSummaryDocument.claim}`;
+    + `&section=${DEMO_SMART_SUMMARY_ALLOWED_SECTIONS.join(',')}`;
   return {
     thid: DEMO_SMART_ACCESS_LOCAL_IDS.individualSmartThreadId,
     iss: clientId,
@@ -182,6 +202,111 @@ export async function buildDemoIndividualSmartTokenRequest(input: Readonly<{
       expires_in: 60,
       vp_token: buildDemoIndividualProfessionalVpToken({ tenantId: input.tenantId }),
       acr_values: 'urn:antifraud:acr:openid4vp:employee',
+    },
+  };
+}
+
+/**
+ * Loads the canonical all-sections IPS used by the local-network authorization
+ * proof and rewrites only subject/provenance fields required by this tenant.
+ */
+export function buildDemoIndividualAllSectionsIngestionRequest(input: Readonly<{
+  subjectDid: string;
+}>): Record<string, unknown> {
+  const fixturePath = path.join(
+    process.cwd(),
+    'node_modules',
+    'gdc-common-utils-ts',
+    'fixtures',
+    'fhir-ips-bundle-all-sections.json',
+  );
+  const bundle = JSON.parse(readFileSync(fixturePath, 'utf8'));
+  const subjectDid = String(input.subjectDid || '').trim();
+  for (const entry of Array.isArray(bundle?.entry) ? bundle.entry : []) {
+    const resource = entry?.resource;
+    if (!resource || typeof resource !== 'object') continue;
+    if (resource.resourceType === ResourceTypesFhirR4.Composition) {
+      resource.author = [{ reference: demoCommunicationMedicationIpsDefaults.externalAuthorUrn }];
+    }
+    if (resource?.subject?.reference) resource.subject.reference = subjectDid;
+    if (resource?.patient?.reference) resource.patient.reference = subjectDid;
+    for (const codeableConcept of [
+      resource?.medicationCodeableConcept,
+      resource?.code,
+      resource?.vaccineCode,
+      resource?.category?.[0],
+    ]) {
+      const coding = codeableConcept?.coding?.[0];
+      if (!coding) continue;
+      coding.userSelected = true;
+      codeableConcept.text ||= coding.display;
+    }
+  }
+
+  // Exercise both DocumentReference authorization classes in one real flow:
+  // the official fixture's advance directive is transitively reachable from
+  // its Consent and belongs to different, non-authorized sections. This added
+  // document is directly linked from the authorized medication section and
+  // must therefore survive the SMART section filter. Neither is an orphan.
+  const composition = bundle.entry.find(
+    (entry: any) => entry?.resource?.resourceType === ResourceTypesFhirR4.Composition,
+  )?.resource;
+  const medicationSection = composition?.section?.find(
+    (section: any) => section?.code?.coding?.some((coding: any) => coding?.code === '10160-0'),
+  );
+  medicationSection?.entry?.push({
+    reference: 'DocumentReference/smart-summary-authorized-medication-document',
+  });
+  bundle.entry.push({
+    fullUrl: 'DocumentReference/smart-summary-authorized-medication-document',
+    resource: {
+      resourceType: ResourceTypesFhirR4.DocumentReference,
+      id: 'smart-summary-authorized-medication-document',
+      status: 'current',
+      subject: { reference: subjectDid },
+      date: '2026-08-01T10:00:00Z',
+      identifier: [{ value: 'urn:uuid:smart-summary-authorized-medication-document' }],
+      content: [{ attachment: {
+        contentType: 'application/pdf',
+        url: 'https://records.example.org/smart-summary-authorized-medication-document.pdf',
+        title: 'Authorized medication document',
+      } }],
+    },
+  });
+
+  return {
+    thid: DEMO_SMART_ACCESS_LOCAL_IDS.individualAllSectionsIngestionThreadId,
+    ...buildExampleCommunicationIngestionPayload({
+      subjectDid,
+      ipsBundleBase64: Buffer.from(JSON.stringify(bundle), 'utf8').toString('base64'),
+    }),
+  };
+}
+
+/**
+ * Builds the exact regression request: the application supplies no section
+ * filter, so GW must inherit the authorized sections from the SMART token.
+ */
+export function buildDemoIndividualScopedSummaryRequest(input: Readonly<{
+  tenantId: string;
+  subjectDid: string;
+}>): Record<string, unknown> {
+  const claims = buildCommunicationRequestOperationWithAttachedParametersClaims({
+    subjectId: String(input.subjectDid || '').trim(),
+    requesterId: buildIndividualProfessionalDid(input.tenantId),
+    thid: DEMO_SMART_ACCESS_LOCAL_IDS.individualScopedSummaryThreadId,
+  });
+  const resource = transformCommunicationClaimsToResourceFhirR4([claims], {
+    mode: 'strict',
+    defaultStatus: 'completed',
+  }).resources[0];
+  return {
+    thid: DEMO_SMART_ACCESS_LOCAL_IDS.individualScopedSummaryThreadId,
+    body: {
+      data: [{
+        type: BundleDocumentRequestMessageTypes.CommunicationRequestSearchWithReferenceUrl,
+        resource,
+      }],
     },
   };
 }

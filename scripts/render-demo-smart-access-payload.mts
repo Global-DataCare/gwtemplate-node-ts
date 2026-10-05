@@ -1,8 +1,10 @@
 import {
   DEMO_SMART_ACCESS_LOCAL_DIDS,
   buildDemoDigitalTwinResearchSubjectSearchRequest,
+  buildDemoIndividualAllSectionsIngestionRequest,
   buildDemoIndividualIpsPermitConsent,
   buildDemoIndividualIpsSearchRequest,
+  buildDemoIndividualScopedSummaryRequest,
   buildDemoIndividualSmartTokenRequest,
   buildDemoResearchPermitByEmailConsent,
   buildDemoResearchPermitByRoleConsent,
@@ -25,6 +27,8 @@ type PayloadName =
   | 'INDIVIDUAL_RULE_ID_LIST'
   | 'INDIVIDUAL_SMART_TOKEN_REQUEST'
   | 'INDIVIDUAL_IPS_SEARCH_REQUEST'
+  | 'INDIVIDUAL_ALL_SECTIONS_INGESTION_REQUEST'
+  | 'INDIVIDUAL_SCOPED_SUMMARY_REQUEST'
   | 'SECRETARY_CONSENT_BATCH_REQUEST'
   | 'SECRETARY_RULE_ID_LIST'
   | 'SECRETARY_SMART_TOKEN_REQUEST_ALLOW'
@@ -111,6 +115,10 @@ const rendered = await (async () => {
       return buildDemoIndividualSmartTokenRequest({ tenantId, subjectDid, clientAssertionAudience });
     case 'INDIVIDUAL_IPS_SEARCH_REQUEST':
       return buildDemoIndividualIpsSearchRequest({ subjectDid });
+    case 'INDIVIDUAL_ALL_SECTIONS_INGESTION_REQUEST':
+      return buildDemoIndividualAllSectionsIngestionRequest({ subjectDid });
+    case 'INDIVIDUAL_SCOPED_SUMMARY_REQUEST':
+      return buildDemoIndividualScopedSummaryRequest({ tenantId, subjectDid });
     case 'SECRETARY_CONSENT_BATCH_REQUEST':
       return buildConsentBatch(buildDemoSecretaryIpsPermitConsent({ tenantId, subjectDid }) as Record<string, unknown>);
     case 'SECRETARY_RULE_ID_LIST': {
