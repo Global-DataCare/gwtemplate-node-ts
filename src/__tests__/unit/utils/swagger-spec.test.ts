@@ -68,6 +68,10 @@ describe('Swagger Spec Generation', () => {
     ).toContain('requestClinicalSummary');
     expect(
       spec.paths['/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.api/Subject/$summary']
+        ?.post?.description,
+    ).toContain('authenticated SMART scope');
+    expect(
+      spec.paths['/{tenantId}/cds-{jurisdiction}/v1/{sector}/individual/org.hl7.fhir.api/Subject/$summary']
         ?.post?.['x-contract-level'],
     ).toBe('internal-compatibility');
     expect(spec.paths['/host/ping']).toBeDefined();

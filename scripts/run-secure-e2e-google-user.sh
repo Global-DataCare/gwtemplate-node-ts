@@ -219,6 +219,19 @@ run_e2e_pass() {
     npm run test:e2e:live-gw
   ) 2>&1 | tee "$e2e_log_file"
   local e2e_status=${PIPESTATUS[0]}
+
+  if [[ "$e2e_status" -eq 0 && "$suite_profile" == 'all' ]]; then
+    (
+      cd "$SDK_PROJECT_ROOT"
+      RUN_LIVE_DIALOGUE_CONSENT_PROFESSIONAL_E2E=1 \
+      SMART_SCOPE_SECTION='LOINC|10160-0' \
+      TENANT_ID="$pass_tenant_id" \
+      TENANT_ROUTE_ID="$pass_tenant_route_id" \
+      BASE_URL="$BASE_URL" \
+      npm run test:e2e:live-dialogue:consent-professional
+    ) 2>&1 | tee -a "$e2e_log_file"
+    e2e_status=${PIPESTATUS[0]}
+  fi
   set -e
 
   cleanup_gw

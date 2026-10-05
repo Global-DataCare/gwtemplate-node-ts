@@ -52,7 +52,8 @@ grep -Fq 'wait_for_public_endpoint' ./cloud_deploy.sh
 grep -Fq '"${GDC_PUBLIC_URL%/}/host/ping"' ./cloud_deploy.sh
 grep -Fq '"${GDC_PUBLIC_URL%/}/api-docs/"' ./cloud_deploy.sh
 grep -Fq 'DATASPACE_ICA_ROOT=' ./scripts/run-secure-e2e-google-user.sh
-grep -Fq 'npm run api:local' ./scripts/run-secure-e2e-google-user.sh
+grep -Fq 'GW_API_SCRIPT="${LIVE_GW_API_SCRIPT:-api:local-demo}"' ./scripts/run-secure-e2e-google-user.sh
+grep -Fq 'npm run "$GW_API_SCRIPT"' ./scripts/run-secure-e2e-google-user.sh
 grep -Fq 'curl -fsS "${ICA_BASE_URL}/"' ./scripts/run-secure-e2e-google-user.sh
 grep -Fq 'ICA_URL_INTERNAL="$ICA_BASE_URL"' ./scripts/run-secure-e2e-google-user.sh
 grep -Fq 'HOST_LEGACY_REPRESENTATIVE_CONTROLLER="$HOST_LEGACY_REPRESENTATIVE_CONTROLLER"' ./cloud_deploy.sh
@@ -303,6 +304,10 @@ grep -Fq "case 'INDIVIDUAL_CONSENT_BATCH_REQUEST':" \
   ./scripts/render-demo-smart-access-payload.mts
 grep -Fq "case 'INDIVIDUAL_RULE_ID_LIST':" \
   ./scripts/render-demo-smart-access-payload.mts
+grep -Fq "case 'INDIVIDUAL_ALL_SECTIONS_INGESTION_REQUEST':" \
+  ./scripts/render-demo-smart-access-payload.mts
+grep -Fq "case 'INDIVIDUAL_SCOPED_SUMMARY_REQUEST':" \
+  ./scripts/render-demo-smart-access-payload.mts
 grep -Fq 'clientAssertionAudience = process.env.SMART_TOKEN_AUDIENCE' \
   ./scripts/render-demo-smart-access-payload.mts
 grep -Fq 'PROVIDER_ORGANIZATION_DID="${PROVIDER_ORGANIZATION_DID:-$(resolve_provider_organization_did)}"' \
@@ -317,6 +322,9 @@ if grep -Fq 'digitaltwin/org.hl7.fhir.r4/Composition/_search' ./scripts/smoke-sm
 fi
 grep -Fq 'medical-secretary-consent-smart-bundle-search-allow' \
   ./scripts/smoke-smart-access-local-network.sh
+grep -Fq 'individual-consent-smart-scoped-summary' \
+  ./scripts/smoke-smart-access-local-network.sh
+grep -Fq 'DocumentReference' ./scripts/smoke-smart-access-local-network.sh
 grep -Fq 'humanAccessProof' ./scripts/build-open-source-evidence-manifest.mjs
 grep -Fq "Password: (?!\\[REDACTED\\])" ./scripts/collect-open-source-production-readiness-evidence.sh
 grep -Fq '60-public-secret-scan' ./scripts/collect-open-source-production-readiness-evidence.sh

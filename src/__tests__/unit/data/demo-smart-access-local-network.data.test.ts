@@ -13,8 +13,11 @@ import {
   DEMO_SMART_ACCESS_LOCAL_DIDS,
   DEMO_SMART_ACCESS_LOCAL_EMAILS,
   DEMO_SMART_ACCESS_LOCAL_IDS,
+  DEMO_SMART_SUMMARY_ALLOWED_SECTIONS,
   buildDemoDigitalTwinResearchSubjectSearchRequest,
+  buildDemoIndividualAllSectionsIngestionRequest,
   buildDemoIndividualIpsSearchRequest,
+  buildDemoIndividualScopedSummaryRequest,
   buildDemoIndividualSmartTokenRequest,
   buildDemoResearchPermitByEmailConsent,
   buildDemoResearchPermitByRoleConsent,
@@ -26,6 +29,49 @@ describe('demo smart access local-network builders', () => {
   const tenantId = 'acme-id';
   const subjectDid = `did:web:api.${tenantId}.org:individual:subject-001`;
 
+  it('builds the exact two-section consent and SMART scope reported by the integrator', async () => {
+    const payload = await buildDemoIndividualSmartTokenRequest({ tenantId, subjectDid });
+
+    expect((payload as any).body.scope).toBe(
+      `${ServiceCapability.IndexReader}?subject=${subjectDid}`
+      + `&section=${DEMO_SMART_SUMMARY_ALLOWED_SECTIONS.join(',')}`,
+    );
+  });
+
+  it('builds an all-sections IPS ingestion and an unfiltered $summary request', () => {
+    const ingestion = buildDemoIndividualAllSectionsIngestionRequest({ subjectDid });
+    const summary = buildDemoIndividualScopedSummaryRequest({ tenantId, subjectDid });
+    const ingestedBundle = JSON.parse(Buffer.from(
+      (ingestion as any).body.data[0].resource.payload[0].contentAttachment.data,
+      'base64',
+    ).toString('utf8'));
+
+    expect(ingestedBundle.resourceType).toBe(ResourceTypesFhirR4.Bundle);
+    expect(ingestedBundle.entry.find((entry: any) => entry.resource?.resourceType === 'Composition')
+      ?.resource?.section).toHaveLength(16);
+    const medicationSection = ingestedBundle.entry
+      .find((entry: any) => entry.resource?.resourceType === 'Composition')
+      ?.resource?.section
+      ?.find((section: any) => section?.code?.coding?.some((coding: any) => coding?.code === '10160-0'));
+    expect(medicationSection?.entry).toContainEqual({
+      reference: 'DocumentReference/smart-summary-authorized-medication-document',
+    });
+    expect(ingestedBundle.entry).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        resource: expect.objectContaining({
+          resourceType: ResourceTypesFhirR4.DocumentReference,
+          id: 'smart-summary-authorized-medication-document',
+        }),
+      }),
+    ]));
+    expect((summary as any).thid).toBe(DEMO_SMART_ACCESS_LOCAL_IDS.individualScopedSummaryThreadId);
+    expect(JSON.stringify(summary)).toContain('Subject/$summary');
+    expect(JSON.stringify(summary)).not.toContain('filterSections');
+    for (const section of DEMO_SMART_SUMMARY_ALLOWED_SECTIONS) {
+      expect(JSON.stringify(summary)).not.toContain(section);
+    }
+  });
+
   it('builds one individual smart token request rooted at organization/Composition.rs', async () => {
     const payload = await buildDemoIndividualSmartTokenRequest({ tenantId, subjectDid });
 
@@ -33,7 +79,7 @@ describe('demo smart access local-network builders', () => {
       thid: DEMO_SMART_ACCESS_LOCAL_IDS.individualSmartThreadId,
       body: {
         purpose: HealthcareConsentPurposes.EmergencyTreatment,
-        scope: `${ServiceCapability.IndexReader}?subject=${subjectDid}&section=${HealthcareBasicSections.PatientSummaryDocument.claim}`,
+        scope: `${ServiceCapability.IndexReader}?subject=${subjectDid}&section=${DEMO_SMART_SUMMARY_ALLOWED_SECTIONS.join(',')}`,
         client_assertion_type: 'private_key_jwt',
       },
     });

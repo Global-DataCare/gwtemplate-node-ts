@@ -262,16 +262,52 @@ description: Enforce branch, TDD, canonical FHIR and schema.org vocabulary, fixt
   that proof to the correct lower-level suite and leave the high-level example
   copyable.
 
+## Preserve SMART summary authorization and the document graph
+
+- Treat a section-limited SMART token as the server-side security boundary for
+  `Subject/$summary`. If the application omits `filterSections`, materialize
+  only the token-authorized sections. If it supplies sections, materialize
+  `requested sections ∩ authorized sections`; reject an empty intersection and
+  a subject mismatch with `403`.
+- Keep FHIR token matching coding-system aware. A LOINC code is not equivalent
+  to the same code value from SNOMED CT. `section=*` is an authorization
+  wildcard and is never an application-level summary selector.
+- Return `Composition.section` as the authoritative description of the
+  sections actually disclosed. High-level SDK examples enumerate it with
+  `BundleReader.getDocumentSections()` and test each requested FHIR token with
+  `getDocumentSectionByCode(...)`, which normalizes equivalent system aliases,
+  when the UI needs to identify missing permissions and start a separate
+  consent request. Never compare `section.code` directly with `system|code`.
+- Do not call a Bundle resource orphan merely because it is absent from the
+  immediate `Composition.section[].entry[]`. Determine reachability through
+  the complete document reference graph. In particular,
+  `Composition -> Consent -> DocumentReference` makes that document part of
+  the originating section.
+- Preserve authorized `DocumentReference` resources reached directly or
+  transitively from an authorized section. Exclude transport-wrapper or index
+  records that have no membership in an authorized section. Never assign an
+  unrelated resource to the first section of a multi-section document.
+- Regression proof must cover the canonical all-sections fixture, an omitted
+  application filter, a mixed authorized/unauthorized request, an empty
+  intersection, coding-system collisions, one transitively linked document
+  and one unrelated Communication wrapper. A BFF-only filter is never proof of
+  authorization.
+- Keep high-level docs, public SDK JSDoc, snippets, flow-contract comments and
+  local-network smoke assertions synchronized. Use public actor facades and
+  `BundleReader`/document-facade getters; never teach callers to construct the
+  internal `$summary` route.
+
 ## Preserve shared-package neutrality
 
 - Treat `gdc-*` as frozen for new product functionality. Change it only for a
   confirmed shared bug or security correction, unless a separate explicit
   promotion review approves an already-proven product capability as genuinely
   product-neutral.
-- Incubate every new SOS capability in `sos-*` first. Keep VetChain and UHC
-  specialization in `vet-*` and `uhc-*`; do not use a `gdc-*` release to make a
-  product experiment available to its first consumer.
-- Before proposing promotion from `sos-*` to `gdc-*`, prove the product-local
+- Incubate every new cross-product candidate in the designated incubation
+  package family first. Keep sector and product specialization in the owning
+  extension packages; do not use a `gdc-*` release to make a product experiment
+  available to its first consumer.
+- Before proposing promotion from an incubation package to `gdc-*`, prove the product-local
   implementation through the real local UI -> BFF -> high-level SDK -> service
   journey with Playwright, plus its affected unit and integration suites. The
   promotion is a later compatibility task with its own red test and neutral
@@ -302,8 +338,9 @@ after the previous immutable version exists in the registry and its integrity
 and exported surface have been verified.
 
 For a previously promoted, standards-neutral FHIR contract already owned by
-`gdc-common-utils-ts`, fix it once in that owner. New SOS claims, converters or
-typed editors start in `sos-*` and can move to `gdc-*` only through the explicit
+`gdc-common-utils-ts`, fix it once in that owner. New cross-product claims,
+converters or typed editors start in the designated incubation package family
+and can move to `gdc-*` only through the explicit
 promotion review above. After promotion, publish and verify the one immutable
 package artifact, then run affected SDK and E2E contracts before pinning it in
 a deployable consumer. Never repair the same promoted FHIR field independently
