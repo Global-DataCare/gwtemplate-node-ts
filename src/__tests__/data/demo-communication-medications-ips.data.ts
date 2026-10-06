@@ -1,4 +1,7 @@
 // Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
+import { CompositionAttesterModes } from 'gdc-common-utils-ts';
+import { EXAMPLE_KYC_CONTROLLER_UUID } from 'gdc-common-utils-ts/examples/shared';
+
 // TDD contract: write this test red first; make it green only with the complete real behavior.
 import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
 import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
@@ -99,6 +102,10 @@ export function buildDemoDocumentBundle(config: DemoConfig) {
           },
           subject: { reference: config.subjectId },
           author: [{ reference: config.externalAuthorUrn }],
+          attester: [{
+            mode: CompositionAttesterModes.Professional,
+            party: { reference: `urn:uuid:${EXAMPLE_KYC_CONTROLLER_UUID}` },
+          }],
           date: config.demoTimestamp,
           title: config.demoCompositionTitle,
           section: [

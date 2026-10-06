@@ -13,7 +13,7 @@ import {
   ResourceTypesFhirR4,
 } from 'gdc-common-utils-ts/constants/index';
 import { CommunicationClaim } from 'gdc-common-utils-ts/models/interoperable-claims/communication-claims';
-import { CompositionClaim } from 'gdc-common-utils-ts/models/interoperable-claims/composition-claims';
+import { CompositionAttesterModes, CompositionClaim } from 'gdc-common-utils-ts/models/interoperable-claims/composition-claims';
 import { Format } from 'gdc-common-utils-ts/constants/Schemas';
 import { IssueType } from 'gdc-common-utils-ts/models/issue';
 import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
@@ -30,6 +30,7 @@ import { compositionFhirR4ToFlat } from 'gdc-common-utils-ts/convert/convert-com
 import { buildConfidentialDocumentIndexedAttributes } from 'gdc-common-utils-ts/utils/confidential-document-provenance';
 import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-message';
 import { BundleJsonApi, BundleEntryResponse, ErrorEntry } from 'gdc-common-utils-ts/models/bundle';
+import type { OperationOutcome } from 'gdc-common-utils-ts/models/operation-outcome';
 import { determineResourceId } from '../utils/resource';
 import { v4 as uuidv4 } from 'uuid';
 import { IJobProcessor } from './registry';
@@ -54,7 +55,9 @@ import { SUBJECT_SECTION_DIGITAL_TWIN, SUBJECT_SECTION_INDIVIDUAL } from '../con
 import { GatewayResponseEntryTypes } from '../shared/gateway-response-types';
 import {
   getOrCreateDigitalTwinSubjectId,
+  isFinalizedDigitalTwinResearchRecord,
   isDigitalTwinResearchResourceType,
+  isProfessionallyAttestedResearchRecord,
   resolveAndProjectClaimsForDigitalTwin,
 } from '../utils/digital-twin-research-projection';
 import { isDigitalTwinSecondaryUseEnabled } from '../utils/digital-twin-secondary-use';
@@ -355,7 +358,7 @@ export class CommunicationManager implements IJobProcessor {
             fhirResource,
             compositionEvidence ? [compositionEvidence] : [],
           )
-          : { responses: [], receipt: undefined };
+          : { responses: [], receipt: undefined, warnings: [] };
 
         const embeddedSearchResponseEntries = projectsAttachedClinicalState
           ? await this.executeEmbeddedSearchRequest(job, entry, fhirResource)
@@ -386,7 +389,15 @@ export class CommunicationManager implements IJobProcessor {
           };
         }
         bundleEntries.push({
-          response: { status: String(HttpStatusCodes.Ok) },
+          response: {
+            status: String(HttpStatusCodes.Ok),
+            ...(clinicalProjection.warnings.length > 0 ? {
+              outcome: {
+                resourceType: ResourceTypesFhirR4.OperationOutcome,
+                issue: clinicalProjection.warnings.flatMap((warning) => warning.issue || []),
+              },
+            } : {}),
+          },
           id: resourceId,
           type: COMMUNICATION_ENTRY_TYPE,
           resource: commMsg,
@@ -806,6 +817,8 @@ export class CommunicationManager implements IJobProcessor {
       [CompositionClaim.Subject]: subject,
       [CompositionClaim.Section]: sectionValue,
       [CompositionClaim.Author]: this.resolveClinicalResourceAuthor(job, entry, fhirResource) || serverDid,
+      'Composition.status': payloadComposition?.status
+        || getClaimValue<string>(embeddedClaims, 'Composition.status'),
       'Composition.date': sent,
       [CompositionClaim.Type]: typeCode,
       'Composition.source': 'Communication',
@@ -864,6 +877,8 @@ export class CommunicationManager implements IJobProcessor {
     }
     const record = { id: recordId, ...claims } as any;
     await this.vaultRepository.put(tenantVaultId, [record], individualSectionId);
+    if (!isFinalizedDigitalTwinResearchRecord(ResourceTypesFhirR4.Composition, claims)) return compositionEvidence;
+    if (!isProfessionallyAttestedResearchRecord(claims)) return compositionEvidence;
     if (!await isDigitalTwinSecondaryUseEnabled({
       vaultRepository: this.vaultRepository,
       tenantVaultId,
@@ -874,7 +889,7 @@ export class CommunicationManager implements IJobProcessor {
       tenantVaultId,
       sourceSubject: subject,
     });
-    const researchClaims = await resolveAndProjectClaimsForDigitalTwin({
+    const { claims: researchClaims } = await resolveAndProjectClaimsForDigitalTwin({
       claims,
       resourceType: ResourceTypesFhirR4.Composition,
       twinSubjectId,
@@ -1174,12 +1189,14 @@ export class CommunicationManager implements IJobProcessor {
   ): Promise<{
     responses: Array<BundleEntryResponse | ErrorEntry>;
     receipt?: ClinicalLedgerReceipt;
+    warnings: OperationOutcome[];
   }> {
     const tenantVaultId = getTenantVaultId(job.sector as string, job.tenantId as string);
     const tenantExists = await this.tenantsCacheManager.tenantExists(tenantVaultId);
-    if (!tenantExists) return { responses: [] };
+    if (!tenantExists) return { responses: [], warnings: [] };
 
     const batchResponses: Array<BundleEntryResponse | ErrorEntry> = [];
+    const warnings: OperationOutcome[] = [];
     const evidence = [...initialEvidence];
 
     const communicationSubject = this.resolveCommunicationSubject(entry, fhirResource);
@@ -1274,6 +1291,7 @@ export class CommunicationManager implements IJobProcessor {
           isSubsettedDocumentIndex,
         });
         evidence.push(persisted.evidence);
+        if (persisted.terminologyWarning) warnings.push(persisted.terminologyWarning);
       }
     }
     const uniqueEvidence = Array.from(new Map(
@@ -1296,7 +1314,7 @@ export class CommunicationManager implements IJobProcessor {
         };
       }
     }
-    return { responses: batchResponses, ...(receipt ? { receipt } : {}) };
+    return { responses: batchResponses, warnings, ...(receipt ? { receipt } : {}) };
   }
 
   /**
@@ -1392,7 +1410,11 @@ export class CommunicationManager implements IJobProcessor {
         return {
           id: created.recordId,
           type: responseType,
-          response: { status: created.created ? '201' : '200', etag: `W/"${created.versionId}"` },
+          response: {
+            status: created.created ? '201' : '200',
+            etag: `W/"${created.versionId}"`,
+            ...(created.terminologyWarning ? { outcome: created.terminologyWarning } : {}),
+          },
           resource: {
             resourceType,
             id: created.recordId,
@@ -1477,7 +1499,11 @@ export class CommunicationManager implements IJobProcessor {
         return {
           id: updated.recordId,
           type: responseType,
-          response: { status: String(HttpStatusCodes.Ok), etag: `W/"${updated.versionId}"` },
+          response: {
+            status: String(HttpStatusCodes.Ok),
+            etag: `W/"${updated.versionId}"`,
+            ...(updated.terminologyWarning ? { outcome: updated.terminologyWarning } : {}),
+          },
           resource: {
             resourceType,
             id: updated.recordId,
@@ -1622,6 +1648,7 @@ export class CommunicationManager implements IJobProcessor {
     versionId: string;
     created: boolean;
     evidence: FhirCidVersionMapping;
+    terminologyWarning?: OperationOutcome;
   }> {
     // A source-authored URN is import provenance, not the importing BFF's
     // identity. Generated content may name the registered owner or creator;
@@ -1785,6 +1812,7 @@ export class CommunicationManager implements IJobProcessor {
         vaultRepository: this.vaultRepository,
         tenantVaultId: input.tenantVaultId,
         sector: String(input.job.sector || ''),
+        jurisdiction: String(input.job.jurisdiction || ''),
         claims: persistedClaims,
       });
       return { recordId, versionId, created: true, evidence };
@@ -1819,7 +1847,9 @@ export class CommunicationManager implements IJobProcessor {
     await this.vaultRepository.put(input.tenantVaultId, [record as any], sectionId);
     if (
       !isMinimalIndexProjection
+      && isFinalizedDigitalTwinResearchRecord(input.resourceType, persistedClaims)
       && isDigitalTwinResearchResourceType(input.resourceType)
+      && isProfessionallyAttestedResearchRecord(persistedClaims)
       && await isDigitalTwinSecondaryUseEnabled({
         vaultRepository: this.vaultRepository,
         tenantVaultId: input.tenantVaultId,
@@ -1831,13 +1861,14 @@ export class CommunicationManager implements IJobProcessor {
         tenantVaultId: input.tenantVaultId,
         sourceSubject: subjectRef,
       });
-      const researchClaims = await resolveAndProjectClaimsForDigitalTwin({
+      const researchProjection = await resolveAndProjectClaimsForDigitalTwin({
         claims: persistedClaims,
         resourceType: input.resourceType,
         twinSubjectId,
         sector: String(input.job.sector || ''),
         jurisdiction: String(input.job.jurisdiction || ''),
       });
+      const researchClaims = researchProjection.claims;
       const researchVersionId = claimsToContentCid(this.clinicalContentVersionClaims(researchClaims)).cid;
       researchClaims[`${input.resourceType}.meta.versionId`] = researchVersionId;
       researchClaims[`org.hl7.fhir.r4.${input.resourceType}.meta.versionId`] = researchVersionId;
@@ -1883,6 +1914,13 @@ export class CommunicationManager implements IJobProcessor {
           digitalTwinSectionId,
         );
       }
+      return {
+        recordId,
+        versionId,
+        created: true,
+        evidence,
+        ...(researchProjection.warning ? { terminologyWarning: researchProjection.warning } : {}),
+      };
     }
     return { recordId, versionId, created: true, evidence };
   }
@@ -2093,6 +2131,11 @@ export class CommunicationManager implements IJobProcessor {
         IssueType.Security,
       );
     }
+    if (!getClaimValue<string>(claims, CompositionClaim.AttesterMode)) {
+      claims[CompositionClaim.AttesterMode] = binding.kind === FhirIpsCreatorKinds.Professional
+        ? CompositionAttesterModes.Professional
+        : CompositionAttesterModes.Personal;
+    }
   }
 
   /**
@@ -2232,9 +2275,10 @@ export class CommunicationManager implements IJobProcessor {
     authorDid?: string,
     documentClaims?: Record<string, unknown>,
   ): Record<string, any> {
-    const embeddedClaims = resource?.meta?.claims && typeof resource.meta.claims === 'object'
-      ? normalizeContextualizedClaims(resource.meta.claims as Record<string, any>)
+    const rawEmbeddedClaims = resource?.meta?.claims && typeof resource.meta.claims === 'object'
+      ? resource.meta.claims as Record<string, any>
       : {};
+    const embeddedClaims = normalizeContextualizedClaims(rawEmbeddedClaims);
     const nativeResource = {
       ...resource,
       ...(resource?.meta ? { meta: { ...resource.meta, claims: undefined } } : {}),
@@ -2245,10 +2289,21 @@ export class CommunicationManager implements IJobProcessor {
     const definedNativeClaims = Object.fromEntries(Object.entries(nativeClaims)
       .filter(([, value]) => value !== undefined && value !== null && String(value).trim() !== ''));
     const indexTagClaims = this.extractMinimalDocumentIndexTagClaims(resourceType, resource);
-    const embeddedVersionId = getClaimValue<string>(embeddedClaims, `${resourceType}.meta.versionId`);
+    // A versioned embedded representation is stale update evidence: native
+    // POST/PUT fields win even if the legacy version key is later omitted by
+    // strict claim normalization. Unversioned flat claims remain the explicit
+    // source for labels not represented faithfully by the native converter.
+    const embeddedVersionId = rawEmbeddedClaims[`${resourceType}.meta.versionId`]
+      || getClaimValue<string>(rawEmbeddedClaims, `${resourceType}.meta.versionId`);
     const baseClaims = normalizeContextualizedClaims(embeddedVersionId
       ? { ...indexTagClaims, ...embeddedClaims, ...definedNativeClaims }
       : { ...indexTagClaims, ...definedNativeClaims, ...embeddedClaims });
+    if (typeof resource?.status === 'string' && resource.status.trim()) {
+      for (const key of Object.keys(baseClaims)) {
+        if (key === `${resourceType}.status` || key.endsWith(`.${resourceType}.status`)) delete baseClaims[key];
+      }
+      baseClaims[`${resourceType}.status`] = resource.status.trim();
+    }
     baseClaims['@context'] = baseClaims['@context'] || 'org.hl7.fhir.api';
     if (authorDid) baseClaims[CompositionClaim.Author] = authorDid;
     for (const claimName of [

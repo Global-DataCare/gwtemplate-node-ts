@@ -16,6 +16,7 @@ import type { ITenantsManager } from './ITenantsManager';
 import { getEnvSectionId } from '../utils/section-env';
 import {
   getOrCreateDigitalTwinSubjectId,
+  isProfessionallyAttestedResearchRecord,
   resolveAndProjectClaimsForDigitalTwin,
 } from '../utils/digital-twin-research-projection';
 import { isDigitalTwinSecondaryUseEnabled } from '../utils/digital-twin-secondary-use';
@@ -182,8 +183,10 @@ export class MedicationStatementManager implements IJobProcessor {
           } as any;
           const sectionId = getSubjectScopedSectionId(subject, scope, 'medications');
           await this.vaultRepository.put(tenantVaultId, [record], sectionId);
+          let terminologyWarning;
           if (
             scope === SUBJECT_SECTION_INDIVIDUAL
+            && isProfessionallyAttestedResearchRecord(claims)
             && await isDigitalTwinSecondaryUseEnabled({
               vaultRepository: this.vaultRepository,
               tenantVaultId,
@@ -195,13 +198,14 @@ export class MedicationStatementManager implements IJobProcessor {
               tenantVaultId,
               sourceSubject: subject,
             });
-            const researchClaims = await resolveAndProjectClaimsForDigitalTwin({
+            const researchProjection = await resolveAndProjectClaimsForDigitalTwin({
               claims,
               resourceType: ResourceTypesFhirR4.MedicationStatement,
               twinSubjectId,
               sector: job.sector,
               jurisdiction,
             });
+            const researchClaims = researchProjection.claims;
             const researchId = String(
               researchClaims['MedicationStatement.identifier']
               || researchClaims['org.hl7.fhir.api.MedicationStatement.identifier']
@@ -218,6 +222,7 @@ export class MedicationStatementManager implements IJobProcessor {
                 }),
               },
             } as any], digitalTwinSectionId);
+            terminologyWarning = researchProjection.warning;
           }
 
           responseEntries.push({
@@ -225,6 +230,7 @@ export class MedicationStatementManager implements IJobProcessor {
             response: {
               status: String(HttpStatusCodes.Created),
               location: `/${job.tenantId}/cds-${jurisdiction}/v1/${job.sector}/${normalizedSection}/${job.format}/MedicationStatement/_batch-response`,
+              ...(terminologyWarning ? { outcome: terminologyWarning } : {}),
             },
             resource: { resourceType: ResourceTypesFhirR4.MedicationStatement, meta: { claims } },
           });

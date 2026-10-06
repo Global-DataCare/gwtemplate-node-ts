@@ -79,6 +79,8 @@ describe('MedicationStatementManager', () => {
                 EXAMPLE_PROVIDER_ORGANIZATION_DID,
                 EXAMPLE_SUBJECT_DID,
               ].join(','),
+              [CompositionClaim.Attester]: EXAMPLE_PROVIDER_ORGANIZATION_DID,
+              [CompositionClaim.AttesterMode]: 'professional',
             } } },
         }],
       },
@@ -163,7 +165,8 @@ describe('MedicationStatementManager', () => {
     const researchRecord = digitalTwinPutArgs[1][0];
     const subjectKey = Object.keys(researchRecord).find((key) => key.endsWith('MedicationStatement.subject'));
     expect(researchRecord[subjectKey as string]).toBe(twinSubjectId);
-    expect(Object.keys(researchRecord).some((key) => key.endsWith('MedicationStatement.code-text'))).toBe(false);
+    const codeTextKey = Object.keys(researchRecord).find((key) => key.endsWith('MedicationStatement.code-text'));
+    expect(researchRecord[codeTextKey as string]).toBe('Paracetamol');
   });
 
   it('does not search digital twin medications by free text', async () => {

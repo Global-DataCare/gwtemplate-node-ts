@@ -9,8 +9,10 @@ import { SUBJECT_SECTION_DIGITAL_TWIN, SUBJECT_SECTION_INDIVIDUAL } from '../con
 import { getClaimValue } from './claims';
 import {
   getOrCreateDigitalTwinSubjectId,
+  isFinalizedDigitalTwinResearchRecord,
   isDigitalTwinResearchResourceType,
-  projectClaimsForDigitalTwin,
+  isProfessionallyAttestedResearchRecord,
+  resolveAndProjectClaimsForDigitalTwin,
 } from './digital-twin-research-projection';
 import { getEnvSectionId } from './section-env';
 import { getSubjectScopedSectionId } from './individual-sections';
@@ -84,6 +86,8 @@ async function rebuildProjection(
   vaultRepository: IVaultRepository,
   tenantVaultId: string,
   sourceSubject: string,
+  sector: string,
+  jurisdiction: string,
 ): Promise<void> {
   const twinSubjectId = await getOrCreateDigitalTwinSubjectId({ vaultRepository, tenantVaultId, sourceSubject });
   await clearSubjectProjection(vaultRepository, tenantVaultId, sourceSubject);
@@ -95,10 +99,15 @@ async function rebuildProjection(
     const sourceSectionId = getSubjectScopedSectionId(sourceSubject, SUBJECT_SECTION_INDIVIDUAL, collectionId);
     const sourceRecords = await vaultRepository.listContainersInSection<RecordBase>(tenantVaultId, sourceSectionId);
     for (const sourceRecord of sourceRecords) {
-      const projectedClaims = projectClaimsForDigitalTwin({
-        claims: cleanStoredClaims(sourceRecord as Record<string, any>),
+      const sourceClaims = cleanStoredClaims(sourceRecord as Record<string, any>);
+      if (!isFinalizedDigitalTwinResearchRecord(resourceType, sourceClaims)) continue;
+      if (!isProfessionallyAttestedResearchRecord(sourceClaims)) continue;
+      const { claims: projectedClaims } = await resolveAndProjectClaimsForDigitalTwin({
+        claims: sourceClaims,
         resourceType,
         twinSubjectId,
+        sector,
+        jurisdiction,
       });
       const targetSectionId = getSubjectScopedSectionId(twinSubjectId, SUBJECT_SECTION_DIGITAL_TWIN, collectionId);
       await vaultRepository.put(tenantVaultId, [{
@@ -113,6 +122,8 @@ async function rebuildProjection(
   const grouped = new Map<string, Record<string, any>>();
   for (const sourceRecord of sourceCompositions) {
     const claims = cleanStoredClaims(sourceRecord as Record<string, any>);
+    if (!isFinalizedDigitalTwinResearchRecord(ResourceTypesFhirR4.Composition, claims)) continue;
+    if (!isProfessionallyAttestedResearchRecord(claims)) continue;
     const identifier = String(getClaimValue(claims, 'Composition.identifier') || sourceRecord.id).trim();
     const previous = grouped.get(identifier);
     const sections = new Set([
@@ -123,7 +134,13 @@ async function rebuildProjection(
   }
   const targetCompositionSection = getSubjectScopedSectionId(twinSubjectId, SUBJECT_SECTION_DIGITAL_TWIN, 'composition');
   for (const claims of grouped.values()) {
-    const projectedClaims = projectClaimsForDigitalTwin({ claims, resourceType: ResourceTypesFhirR4.Composition, twinSubjectId });
+    const { claims: projectedClaims } = await resolveAndProjectClaimsForDigitalTwin({
+      claims,
+      resourceType: ResourceTypesFhirR4.Composition,
+      twinSubjectId,
+      sector,
+      jurisdiction,
+    });
     await vaultRepository.put(tenantVaultId, [{
       id: projectedRecordId('Composition', projectedClaims),
       ...projectedClaims,
@@ -158,6 +175,8 @@ export async function applyDigitalTwinSecondaryUseDecision(input: {
   vaultRepository: IVaultRepository;
   tenantVaultId: string;
   claims: Record<string, any>;
+  sector?: string;
+  jurisdiction?: string;
 }): Promise<boolean> {
   if (!isResearchSecondaryUseRule(input.claims)) return false;
   const sourceSubject = String(getClaimValue(input.claims, ClaimConsent.subject) || '').trim();
@@ -198,7 +217,13 @@ export async function applyDigitalTwinSecondaryUseDecision(input: {
   await input.vaultRepository.put(input.tenantVaultId, [status], statusSectionId());
 
   if (enabled) {
-    await rebuildProjection(input.vaultRepository, input.tenantVaultId, sourceSubject);
+    await rebuildProjection(
+      input.vaultRepository,
+      input.tenantVaultId,
+      sourceSubject,
+      String(input.sector || input.tenantVaultId.split('_')[0] || ''),
+      String(input.jurisdiction || ''),
+    );
   }
   return true;
 }

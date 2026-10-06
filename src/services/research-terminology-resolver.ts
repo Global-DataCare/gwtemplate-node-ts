@@ -28,6 +28,11 @@ const TERMINOLOGY_PROJECTIONS: Readonly<Record<string, TerminologyProjection>> =
   Procedure: { codeClaim: 'Procedure.code', textClaim: 'Procedure.code-text', displayClaim: 'Procedure.code-display' },
 });
 
+/** Returns the canonical code claim governed by the exact-label service. */
+export function getResearchTerminologyCodeClaim(resourceType: string): string | undefined {
+  return TERMINOLOGY_PROJECTIONS[String(resourceType || '').trim()]?.codeClaim;
+}
+
 function parseFhirToken(value: unknown): { system: string; code: string } | undefined {
   const token = String(value || '').trim();
   const separator = token.indexOf('|');

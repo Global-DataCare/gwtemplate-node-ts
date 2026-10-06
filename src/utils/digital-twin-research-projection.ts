@@ -1,8 +1,14 @@
 import { createHash, randomUUID } from 'crypto';
 import type { RecordBase } from 'gdc-common-utils-ts/models/resource-document';
 import type { IVaultRepository } from '../database/repositories/vault/vault.repository';
+import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
+import type { OperationOutcome } from 'gdc-common-utils-ts/models/operation-outcome';
+import { IssueLevel, IssueType } from 'gdc-common-utils-ts/models/issue';
 import { getEnvSectionId } from './section-env';
+import { getClaimValue } from './claims';
+import { createOperationOutcome } from './outcome';
 import {
+  getResearchTerminologyCodeClaim,
   resolveResearchTerminologyLabels,
   type ResolvedResearchTerminology,
 } from '../services/research-terminology-resolver';
@@ -19,6 +25,11 @@ export const DIGITAL_TWIN_SEARCH_TEXT_CLAIM = '__digitalTwinSearch.text';
 export const DIGITAL_TWIN_SEARCH_DATE_CLAIM = '__digitalTwinSearch.date';
 export const DIGITAL_TWIN_SEARCH_LANGUAGE_CLAIM = '__digitalTwinSearch.language';
 export const DIGITAL_TWIN_SEARCH_CLAIM_PREFIX = '__digitalTwinSearch.';
+
+export type DigitalTwinResearchProjectionResult = Readonly<{
+  claims: Record<string, unknown>;
+  warning?: OperationOutcome;
+}>;
 
 export type DigitalTwinSubjectAlias = RecordBase & {
   type: 'digital-twin-subject-alias';
@@ -48,6 +59,9 @@ const RESEARCH_RESOURCE_TYPES = new Set([
   'AdverseEvent',
   'Composition',
 ]);
+
+const FINALIZED_OBSERVATION_STATUSES = new Set(['final', 'amended', 'corrected']);
+const FINALIZED_COMPOSITION_STATUSES = new Set(['final', 'amended']);
 
 function sourceSubjectHash(sourceSubject: string): string {
   return createHash('sha256').update(String(sourceSubject || '').trim(), 'utf8').digest('hex');
@@ -125,6 +139,32 @@ export function isDigitalTwinResearchResourceType(resourceType: string): boolean
   return RESEARCH_RESOURCE_TYPES.has(String(resourceType || '').trim());
 }
 
+/** Research accepts only records backed by an explicit professional attester. */
+export function isProfessionallyAttestedResearchRecord(claims: Record<string, unknown>): boolean {
+  const attesters = String(getClaimValue(claims, 'Composition.attester') || '')
+    .split(',').map((value) => value.trim());
+  const modes = String(getClaimValue(claims, 'Composition.attester-mode') || '')
+    .split(',').map((value) => value.trim().toLowerCase());
+  return modes.some((mode, index) => mode === 'professional' && Boolean(attesters[index]));
+}
+
+/** Keeps draft measurements and documents in the operational plane only. */
+export function isFinalizedDigitalTwinResearchRecord(
+  resourceType: string,
+  claims: Record<string, unknown>,
+): boolean {
+  const normalizedType = String(resourceType || '').trim();
+  if (normalizedType === ResourceTypesFhirR4.Observation) {
+    const status = String(getClaimValue(claims, 'Observation.status') || '').trim().toLowerCase();
+    return FINALIZED_OBSERVATION_STATUSES.has(status);
+  }
+  if (normalizedType === ResourceTypesFhirR4.Composition) {
+    const status = String(getClaimValue(claims, 'Composition.status') || '').trim().toLowerCase();
+    return FINALIZED_COMPOSITION_STATUSES.has(status);
+  }
+  return true;
+}
+
 /**
  * Builds the fail-closed minimal research projection used before DataConv is
  * integrated. Canonical `system|code` remains the integration key. Received
@@ -154,12 +194,30 @@ export function projectClaimsForDigitalTwin(input: {
   }
   if (!twinSubjectId) throw new Error('twinSubjectId is required');
 
+  const terminologyCodeClaim = getResearchTerminologyCodeClaim(resourceType);
+  const hasTerminologyCode = Boolean(
+    terminologyCodeClaim && String(getClaimValue(input.claims, terminologyCodeClaim) || '').trim(),
+  );
+  const usesVaccineCode = resourceType === ResourceTypesFhirR4.Immunization;
+  const sourceTextClaim = `${resourceType}.${usesVaccineCode ? 'vaccine-code-text' : 'code-text'}`;
+  const sourceDisplayClaim = `${resourceType}.${usesVaccineCode ? 'vaccine-code-display' : 'code-display'}`;
+  const mayUseClinicalFallback = !input.terminology && isProfessionallyAttestedResearchRecord(input.claims);
+  const clinicalFallbackText = mayUseClinicalFallback
+    ? String(getClaimValue(input.claims, sourceTextClaim) || '').trim()
+    : '';
+  const clinicalFallbackDisplay = mayUseClinicalFallback
+    ? String(getClaimValue(input.claims, sourceDisplayClaim) || '').trim()
+    : '';
+  const isUncodedMedication = resourceType === ResourceTypesFhirR4.MedicationStatement && !hasTerminologyCode;
+
   const searchableText = Array.from(new Set([
     ...Object.entries(input.claims || {})
       .filter(([key]) => /\.code$/i.test(String(key || '').trim()))
       .map(([, value]) => String(value || '').trim()),
     String(input.terminology?.text || '').trim(),
     String(input.terminology?.display || '').trim(),
+    clinicalFallbackText,
+    clinicalFallbackDisplay,
   ].filter(Boolean)));
   const searchableDate = Object.entries(input.claims || {})
     .filter(([key]) => /\.(?:effective(?:-?datetime)?|issued|recorded(?:date|on)?|occurrence-?datetime|onset-?datetime|performed-?datetime|date|datetime|period-start)$/i.test(String(key || '').trim()))
@@ -177,6 +235,10 @@ export function projectClaimsForDigitalTwin(input: {
       continue;
     }
     if (/\.code-(?:display|text)$/i.test(normalizedKey)) continue;
+    if (isUncodedMedication && /(?:^|\.)MedicationStatement\.user-selected$/i.test(normalizedKey)) {
+      projected[normalizedKey] = 'false';
+      continue;
+    }
     if (RESEARCH_PROVENANCE_REFERENCE_CLAIM.test(normalizedKey)) continue;
     if (BLOCKED_RESEARCH_CLAIM_SEGMENT.test(normalizedKey)) continue;
     if (RESEARCH_PATIENT_CLAIM.test(normalizedKey)) continue;
@@ -192,6 +254,14 @@ export function projectClaimsForDigitalTwin(input: {
   }
   if (input.terminology?.text) projected[input.terminology.textClaim] = input.terminology.text;
   if (input.terminology?.display) projected[input.terminology.displayClaim] = input.terminology.display;
+  if (clinicalFallbackText) projected[sourceTextClaim] = clinicalFallbackText;
+  if (clinicalFallbackDisplay) projected[sourceDisplayClaim] = clinicalFallbackDisplay;
+  if (
+    isUncodedMedication
+    && !Object.keys(projected).some((key) => /(?:^|\.)MedicationStatement\.user-selected$/i.test(key))
+  ) {
+    projected['MedicationStatement.user-selected'] = 'false';
+  }
   if (searchableText.length > 0) projected[DIGITAL_TWIN_SEARCH_TEXT_CLAIM] = searchableText.join('\u001f');
   if (searchableDate) projected[DIGITAL_TWIN_SEARCH_DATE_CLAIM] = searchableDate;
   const normalizedLanguage = input.terminology?.textLanguage || searchableLanguage;
@@ -206,17 +276,39 @@ export async function resolveAndProjectClaimsForDigitalTwin(input: {
   twinSubjectId: string;
   sector: string;
   jurisdiction: string;
-}): Promise<Record<string, unknown>> {
+}): Promise<DigitalTwinResearchProjectionResult> {
   let terminology: ResolvedResearchTerminology | undefined;
+  let warning: OperationOutcome | undefined;
+  const codeClaim = getResearchTerminologyCodeClaim(input.resourceType);
+  const hasCode = Boolean(codeClaim && String(getClaimValue(input.claims, codeClaim) || '').trim());
   try {
     terminology = await resolveResearchTerminologyLabels(input);
+    if (codeClaim && !hasCode) {
+      warning = createOperationOutcome(
+        IssueLevel.Warning,
+        IssueType.Incomplete,
+        `${input.resourceType} terminology requires professional review because its canonical code is missing.`,
+      );
+    } else if (codeClaim && !terminology) {
+      warning = createOperationOutcome(
+        IssueLevel.Warning,
+        IssueType.Processing,
+        `${input.resourceType} terminology labels are temporarily unavailable.`,
+      );
+    }
   } catch (error) {
     console.error('[ResearchTerminology] Exact-label resolution failed; projecting canonical code only.', error);
+    warning = createOperationOutcome(
+      IssueLevel.Warning,
+      IssueType.Processing,
+      `${input.resourceType} terminology labels are temporarily unavailable.`,
+    );
   }
-  return projectClaimsForDigitalTwin({
+  const claims = projectClaimsForDigitalTwin({
     claims: input.claims,
     resourceType: input.resourceType,
     twinSubjectId: input.twinSubjectId,
     ...(terminology ? { terminology } : {}),
   });
+  return { claims, ...(warning ? { warning } : {}) };
 }

@@ -156,6 +156,7 @@ describe('CommunicationManager Unit Tests', () => {
       attesterReference?: string,
       authenticatedActorDid: string = creatorDid,
       communicationStatus = 'completed',
+      attesterMode = CompositionAttesterModes.Personal,
     ): JobRequest {
       const attachedBundle = {
         resourceType: ResourceTypesFhirR4.Bundle,
@@ -164,7 +165,7 @@ describe('CommunicationManager Unit Tests', () => {
           [CompositionClaim.Author]: authorDid,
           ...(attesterReference ? {
             [CompositionClaim.Attester]: attesterReference,
-            [CompositionClaim.AttesterMode]: CompositionAttesterModes.Personal,
+            [CompositionClaim.AttesterMode]: attesterMode,
           } : {}),
         } } } : {}),
         data: innerEntries,
@@ -404,10 +405,10 @@ describe('CommunicationManager Unit Tests', () => {
         request: { method: HttpRequestMethods.Post, url: ResourceTypesFhirR4.Observation },
         resource: {
           resourceType: ResourceTypesFhirR4.Observation, id: recordId,
-          subject: { reference: subjectDid }, status: ObservationStatuses.Preliminary,
+          subject: { reference: subjectDid }, status: ObservationStatuses.Final,
           code: { text: 'Telephone assistant observation' },
         },
-      }]));
+      }], creatorDid, creatorDid, creatorDid, 'completed', CompositionAttesterModes.Professional));
       const sourceSectionId = getSubjectScopedSectionId(subjectDid, 'individual', 'observations');
       const initialSource = storedRecords.get(`${tenantVaultId}|${sourceSectionId}|${recordId}`);
       const initialVersion = initialSource?.['Observation.meta.versionId'];
@@ -448,7 +449,7 @@ describe('CommunicationManager Unit Tests', () => {
           },
           effectiveDateTime: EXAMPLE_VITAL_SIGNS_EFFECTIVE_DATE_TIME,
         },
-      }]));
+      }], creatorDid, creatorDid, creatorDid, 'completed', CompositionAttesterModes.Professional));
 
       expect((updateResponse.body as any).data[0].response.status).toBe('200');
       const updatedSource = storedRecords.get(`${tenantVaultId}|${sourceSectionId}|${recordId}`);
@@ -460,11 +461,14 @@ describe('CommunicationManager Unit Tests', () => {
         .toBe(String(EXAMPLE_VITAL_SIGN_VALUE_BODY_TEMPERATURE));
       expect(sourceClaim('Observation.effective-datetime')).toBe(EXAMPLE_VITAL_SIGNS_EFFECTIVE_DATE_TIME);
       expect(sourceClaim('Observation.meta.versionId')).not.toBe(initialVersion);
+      expect(sourceClaim('Observation.status')).toBe(ObservationStatuses.Final);
+      expect(sourceClaim('Composition.attester-mode')).toBe(CompositionAttesterModes.Professional);
 
       const updatedTwinEntry = Array.from(storedRecords.entries())
         .find(([key, record]) => key.startsWith(`${tenantVaultId}|${twinSectionId}|`)
           && record?.audit?.sourceRecordId === recordId);
       expect(updatedTwinEntry?.[1]?.id).toBe(initialTwinId);
+      expect(mockVaultRepository.delete).toHaveBeenCalledWith(tenantVaultId, legacyTwinId, twinSectionId);
       expect(storedRecords.has(`${tenantVaultId}|${twinSectionId}|${legacyTwinId}`)).toBe(false);
       const twinClaim = (suffix: string) => updatedTwinEntry?.[1]?.[
         Object.keys(updatedTwinEntry?.[1] || {}).find((key) => key.endsWith(suffix)) as string
@@ -2456,6 +2460,10 @@ describe('CommunicationManager Unit Tests', () => {
               id: 'ips-composition-sections-001',
               status: 'final',
               subject: { reference: subjectDid },
+              attester: [{
+                mode: CompositionAttesterModes.Professional,
+                party: { reference: 'did:web:sender.example' },
+              }],
               type: {
                 coding: [{ system: 'http://loinc.org', code: '60591-5' }],
               },
@@ -2531,6 +2539,8 @@ describe('CommunicationManager Unit Tests', () => {
                     'Communication.subject': subjectDid,
                     'Communication.sent': '2026-05-22T10:00:00Z',
                     'Composition.type': 'http://loinc.org|60591-5',
+                    [CompositionClaim.Attester]: 'did:web:sender.example',
+                    [CompositionClaim.AttesterMode]: CompositionAttesterModes.Professional,
                   },
                 },
                 resource: {
@@ -2554,7 +2564,17 @@ describe('CommunicationManager Unit Tests', () => {
         },
       };
 
-      await communicationManager.process(job);
+      const response = await communicationManager.process(job);
+
+      expect((response.body as any).data[0].response).toEqual(expect.objectContaining({
+        status: String(HttpStatusCodes.Ok),
+        outcome: expect.objectContaining({
+          resourceType: ResourceTypesFhirR4.OperationOutcome,
+          issue: expect.arrayContaining([
+            expect.objectContaining({ severity: 'warning' }),
+          ]),
+        }),
+      }));
 
       const tenantVaultId = 'health-care_acme';
       const individualCompositionSectionId = getSubjectScopedSectionId(subjectDid, 'individual', 'composition');

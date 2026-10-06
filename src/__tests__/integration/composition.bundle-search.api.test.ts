@@ -9,6 +9,7 @@ import { resolveHostPhysicalCollectionName } from '../../config/storage-layout';
 // the separate consent/offboarding lifecycle contracts remain intact.
 // TDD contract: write this test red first; make it green only with complete behavior.
 import { DidcommPayloadTypes } from 'gdc-common-utils-ts/constants/didcomm';
+import { CompositionAttesterModes } from 'gdc-common-utils-ts';
 import { GatewayRequestEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
 import { invokeExpress } from './helpers/invokeExpress';
 import { createHash } from 'node:crypto';
@@ -105,6 +106,10 @@ describe('Composition Bundle _search API (integration)', () => {
         // The imported IPS keeps its external issuer as provenance; the BFF is
         // the verified transport actor and must not impersonate that issuer.
         resource.author = [{ reference: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_PROVIDER_ORGANIZATION_URN }];
+        resource.attester = [{
+          mode: CompositionAttesterModes.Professional,
+          party: { reference: `urn:uuid:${EXAMPLE_KYC_CONTROLLER_UUID}` },
+        }];
       }
       if (resource?.medicationCodeableConcept?.coding?.[0]) {
         resource.medicationCodeableConcept.coding[0].userSelected = true;
@@ -1161,16 +1166,8 @@ describe('Composition Bundle _search API (integration)', () => {
         tenantVaultId,
         getSubjectScopedSectionId(sectionTwinSubjectId, 'digitaltwin', 'composition'),
       );
-      expect(allergyRecords.some((record: any) =>
-        (record['AllergyIntolerance.identifier'] || record['org.hl7.fhir.api.AllergyIntolerance.identifier'])
-          !== 'urn:uuid:allergy-section-update-integration-001'
-        && (record['AllergyIntolerance.subject'] || record['org.hl7.fhir.api.AllergyIntolerance.subject'])
-          === sectionTwinSubjectId,
-      )).toBe(true);
-      expect(updatedCompositionRecords.some((record: any) =>
-        record['Composition.section'] === allergiesSection
-        || record['org.hl7.fhir.r4.Composition.section'] === allergiesSection,
-      )).toBe(true);
+      expect(allergyRecords).toHaveLength(0);
+      expect(updatedCompositionRecords).toHaveLength(0);
 
       // Step 3: read the section-only update through the canonical summary
       // contract and prove the claims-first AllergyIntolerance is returned.
@@ -1257,14 +1254,6 @@ describe('Composition Bundle _search API (integration)', () => {
           parameters: [
             { name: 'section', valueString: HealthcareBasicSections.VitalSigns.attributeValue },
             { name: 'Observation.code', valueString: 'http://loinc.org|85354-9' },
-          ],
-        },
-        {
-          thid: 'allergy-section-update-search-001',
-          expectedSubject: twinFor(sectionSubjectDid),
-          parameters: [
-            { name: 'section', valueString: allergiesSection },
-            { name: 'AllergyIntolerance.criticality', valueString: 'high' },
           ],
         },
       ];
@@ -1967,17 +1956,21 @@ describe('Composition Bundle _search API (integration)', () => {
       const r4Procedure = findCodedResource(ResourceTypesFhirR4.Procedure, sourceProcedureCoding.code);
       expect(r4Medication?.medicationCodeableConcept).toMatchObject({
         coding: [expect.objectContaining({ system: sourceMedicationCoding.system, code: sourceMedicationCoding.code })],
+        text: sourceMedication.medicationCodeableConcept.text,
       });
-      expect(r4Medication?.medicationCodeableConcept).not.toHaveProperty('text');
-      expect(r4Medication?.medicationCodeableConcept?.coding?.[0]).not.toHaveProperty('display');
+      expect(r4Medication?.medicationCodeableConcept?.coding?.[0]?.display).toBe(sourceMedicationCoding.display);
       expect(r4Medication?.effectivePeriod).toEqual({ start: medicationPeriodStart, end: medicationPeriodEnd });
       expect(r4Observation?.code).toMatchObject({
         coding: [expect.objectContaining({ system: sourceObservationCoding.system, code: sourceObservationCoding.code })],
+        text: sourceObservation.code.text,
       });
+      expect(r4Observation?.code?.coding?.[0]?.display).toBe(sourceObservationCoding.display);
       expect(r4Observation?.component).toHaveLength(2);
       expect(r4Immunization?.vaccineCode).toMatchObject({
         coding: [expect.objectContaining({ system: sourceImmunizationCoding.system, code: sourceImmunizationCoding.code })],
+        text: sourceImmunization.vaccineCode.text,
       });
+      expect(r4Immunization?.vaccineCode?.coding?.[0]?.display).toBe(sourceImmunizationCoding.display);
       expect(r4Allergy?.reaction?.[0]?.severity).toBe(AllergyIntoleranceReactionSeverities.Severe);
       expect(r4Condition?.code?.coding?.[0]).toMatchObject({
         system: sourceConditionCoding.system,
@@ -1987,8 +1980,6 @@ describe('Composition Bundle _search API (integration)', () => {
         system: sourceProcedureCoding.system,
         code: sourceProcedureCoding.code,
       });
-      expect(JSON.stringify(r4Payload?.data?.[0]?.resource)).not.toContain(sourceObservationCoding.display);
-      expect(JSON.stringify(r4Payload?.data?.[0]?.resource)).not.toContain(sourceImmunizationCoding.display);
       expect(JSON.stringify(r4Payload?.data?.[0]?.resource)).not.toContain('PractitionerRole/');
       expect(JSON.stringify(r4Payload?.data?.[0]?.resource)).not.toContain('Practitioner/');
 
@@ -2063,8 +2054,10 @@ describe('Composition Bundle _search API (integration)', () => {
       expect(apiMedicationEntry.resource.meta.claims).toBeDefined();
       expect(apiMedicationEntry.resource.meta.claims['MedicationStatement.subject']).toBe(twinSubjectId);
       expect(apiMedicationEntry.resource.meta.claims['MedicationStatement.code']).toBe(medicationCodeToken);
-      expect(Object.hasOwn(apiMedicationEntry.resource.meta.claims, 'MedicationStatement.code-display')).toBe(false);
-      expect(Object.hasOwn(apiMedicationEntry.resource.meta.claims, 'MedicationStatement.code-text')).toBe(false);
+      expect(apiMedicationEntry.resource.meta.claims['MedicationStatement.code-display'])
+        .toBe(sourceMedicationCoding.display);
+      expect(apiMedicationEntry.resource.meta.claims['MedicationStatement.code-text'])
+        .toBe(sourceMedication.medicationCodeableConcept.text);
       expect(apiMedicationEntry.resource.meta.claims).not.toHaveProperty('indexed');
       expect(JSON.stringify(apiMedicationEntry.resource)).not.toContain('__digitalTwinSearch');
     } finally {
