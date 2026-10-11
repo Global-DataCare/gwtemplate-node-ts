@@ -151,8 +151,12 @@ describe('MedicationStatementManager', () => {
 
   it('mirrors individual medication updates only after explicit secondary-use consent', async () => {
     mockVaultRepository.get.mockResolvedValueOnce({ status: 'enabled' } as any);
+    const blockchainAdapter = {
+      registerResearchVersionMappings: jest.fn(async (mappings: any[]) => ({ accepted: mappings.length })),
+    } as any;
+    const researchManager = new MedicationStatementManager(mockVaultRepository, undefined, blockchainAdapter);
     const job = createBatchJob();
-    await manager.process(job);
+    await researchManager.process(job);
 
     expect(mockVaultRepository.put).toHaveBeenCalledTimes(3);
     const aliasPutArgs = (mockVaultRepository.put as any).mock.calls.find((args: any[]) =>
@@ -165,8 +169,45 @@ describe('MedicationStatementManager', () => {
     const researchRecord = digitalTwinPutArgs[1][0];
     const subjectKey = Object.keys(researchRecord).find((key) => key.endsWith('MedicationStatement.subject'));
     expect(researchRecord[subjectKey as string]).toBe(twinSubjectId);
-    const codeTextKey = Object.keys(researchRecord).find((key) => key.endsWith('MedicationStatement.code-text'));
-    expect(researchRecord[codeTextKey as string]).toBe('Paracetamol');
+    expect(Object.keys(researchRecord).some((key) => key.endsWith('MedicationStatement.code-text'))).toBe(false);
+    expect(Object.keys(researchRecord).some((key) => key.endsWith('MedicationStatement.code-display'))).toBe(false);
+    expect(blockchainAdapter.registerResearchVersionMappings).toHaveBeenCalledWith(
+      [expect.objectContaining({
+        resourceType: ResourceTypesFhirR4.MedicationStatement,
+        research: true,
+        tags: [{
+          id: 'MedicationStatement.code',
+          system: 'http://www.nlm.nih.gov/research/umls/rxnorm',
+          code: '161',
+        }],
+      })],
+      'health-care-eu-research',
+      'artifact-sc',
+    );
+  });
+
+  it('keeps the medication write successful and returns a warning when research registration fails', async () => {
+    mockVaultRepository.get.mockResolvedValueOnce({ status: 'enabled' } as any);
+    const blockchainAdapter = {
+      registerResearchVersionMappings: jest.fn(async () => { throw new Error('ledger unavailable'); }),
+    } as any;
+    const researchManager = new MedicationStatementManager(mockVaultRepository, undefined, blockchainAdapter);
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      const response = await researchManager.process(createBatchJob());
+      expect((response.body as any).data[0]).toEqual(expect.objectContaining({
+        response: expect.objectContaining({
+          status: '201',
+          outcome: expect.objectContaining({
+            resourceType: ResourceTypesFhirR4.OperationOutcome,
+            issue: [expect.objectContaining({ severity: 'warning', code: 'processing' })],
+          }),
+        }),
+      }));
+      expect(mockVaultRepository.put).toHaveBeenCalledTimes(3);
+    } finally {
+      errorSpy.mockRestore();
+    }
   });
 
   it('does not search digital twin medications by free text', async () => {

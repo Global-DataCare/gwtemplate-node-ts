@@ -94,7 +94,95 @@ function parseFhirEvidenceBatch(payload) {
   });
 }
 
+function parseResearchVersionBatch(payload) {
+  if (!Array.isArray(payload.data) || payload.data.length === 0) {
+    throw new Error("payload.data must be a non-empty array");
+  }
+  const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return payload.data.map((entry, index) => {
+    const researchAsset = entry?.researchAsset;
+    const versionAsset = entry?.versionAsset;
+    if (!researchAsset || researchAsset.type !== "ResearchAsset" || researchAsset.resource?.resourceType !== "ResearchAsset") {
+      throw new Error(`data[${index}].researchAsset must be a ResearchAsset`);
+    }
+    if (!versionAsset || versionAsset.type !== "VersionAsset" || versionAsset.resource?.resourceType !== "VersionAsset") {
+      throw new Error(`data[${index}].versionAsset must be a VersionAsset`);
+    }
+    if (!uuidPattern.test(String(researchAsset.id || "")) || !uuidPattern.test(String(versionAsset.id || ""))) {
+      throw new Error(`data[${index}] asset ids must be opaque UUIDs`);
+    }
+    if (versionAsset.resource.parent !== researchAsset.id) {
+      throw new Error(`data[${index}].versionAsset.resource.parent must equal researchAsset.id`);
+    }
+    if (versionAsset.resource.research !== true) {
+      throw new Error(`data[${index}].versionAsset.resource.research must equal true`);
+    }
+    const tags = Array.isArray(researchAsset.resource?.meta?.tag)
+      ? researchAsset.resource.meta.tag.map((tag, tagIndex) => {
+        if (!tag || typeof tag !== "object" || Array.isArray(tag)) {
+          throw new Error(`data[${index}].researchAsset.resource.meta.tag[${tagIndex}] must be an object`);
+        }
+        const id = String(tag.id || "");
+        const system = String(tag.system || "");
+        const code = String(tag.code || "");
+        const canonicalCodeClaim = /^[A-Z][A-Za-z0-9]+\.(?:code|vaccine-code)$/.test(id);
+        let canonicalSystem = false;
+        try {
+          canonicalSystem = Boolean(new URL(system).protocol);
+        } catch {
+          canonicalSystem = false;
+        }
+        if (!canonicalCodeClaim || !canonicalSystem || !code) {
+          throw new Error(`data[${index}].researchAsset.resource.meta.tag[${tagIndex}] must contain code-only id, system and code`);
+        }
+        return { id, system, code };
+      })
+      : [];
+    if (tags.length === 0) {
+      throw new Error(`data[${index}].researchAsset.resource.meta.tag must contain at least one code`);
+    }
+    return {
+      researchAssetId: researchAsset.id,
+      versionAssetId: versionAsset.id,
+      tags,
+    };
+  });
+}
+
 class ArtifactContract extends Contract {
+  /** Writes one code-only research parent before its opaque research version. */
+  async UpsertResearchVersions(ctx, payloadJson) {
+    const payload = parseJson(payloadJson, "payload");
+    const mappings = parseResearchVersionBatch(payload);
+    const data = [];
+    for (const mapping of mappings) {
+      const previousResearch = (await existsAsset(ctx.stub, mapping.researchAssetId))
+        ? await readAsset(ctx.stub, mapping.researchAssetId, ARTIFACT_ASSET_LABEL)
+        : undefined;
+      const researchAsset = buildStoredArtifactAsset(ctx, mapping.researchAssetId, {
+        artifactType: "research-asset",
+        meta: { attributes: { tag: mapping.tags } },
+      }, previousResearch);
+      await writeJsonAsset(ctx.stub, mapping.researchAssetId, researchAsset);
+      data.push({ type: "ResearchAsset", id: mapping.researchAssetId, resource: researchAsset });
+
+      const previousVersion = (await existsAsset(ctx.stub, mapping.versionAssetId))
+        ? await readAsset(ctx.stub, mapping.versionAssetId, ARTIFACT_ASSET_LABEL)
+        : undefined;
+      const versionAsset = buildStoredArtifactAsset(ctx, mapping.versionAssetId, {
+        artifactType: "version-asset",
+        meta: { attributes: { parent: mapping.researchAssetId, research: true } },
+      }, previousVersion);
+      await writeJsonAsset(ctx.stub, mapping.versionAssetId, versionAsset);
+      data.push({ type: "VersionAsset", id: mapping.versionAssetId, resource: versionAsset });
+    }
+    return { data };
+  }
+
+  async upsertResearchVersions(ctx, payloadJson) {
+    return this.UpsertResearchVersions(ctx, payloadJson);
+  }
+
   /**
    * Processes a JSON:API-style data[] in one Fabric transaction. Each entry is
    * persisted as its own CID-keyed asset; the primary document itself is never

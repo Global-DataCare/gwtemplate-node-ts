@@ -4,6 +4,11 @@
 import { ManageAssetConsentAccess } from '../blockchain/fabric/v3/manageAssetConsentAccess';
 import { ManageAssetArtifact } from '../blockchain/fabric/v3/manageAssetArtifact';
 import type { FhirCidVersionMapping } from '../utils/fhir-versioning';
+import {
+  RESEARCH_ASSET_RESOURCE_TYPE,
+  VERSION_ASSET_RESOURCE_TYPE,
+  type ResearchAssetVersionMapping,
+} from '../utils/research-asset-versioning';
 import type { IBlockchainAdapter } from './IBlockchainAdapter';
 import { ManageAssetSubjectIdentifier } from '../blockchain/fabric/v3/manageAssetSubjectIdentifier';
 
@@ -33,6 +38,36 @@ function loadFabricBlockchainConfig(): FabricBlockchainConfig {
  * registration does not currently expose DID discovery semantics.
  */
 export class BlockchainAdapterFabric implements IBlockchainAdapter {
+  public async registerResearchVersionMappings(
+    mappings: ResearchAssetVersionMapping[],
+    channel: string,
+    chaincode: string,
+  ): Promise<{ accepted: number; txId?: string }> {
+    const config = loadFabricBlockchainConfig();
+    const manager = new ManageAssetArtifact({ chaincodeName: chaincode, channelName: channel });
+    const data = mappings.map((mapping) => ({
+      researchAsset: {
+        type: RESEARCH_ASSET_RESOURCE_TYPE,
+        id: mapping.researchAssetId,
+        resource: {
+          resourceType: RESEARCH_ASSET_RESOURCE_TYPE,
+          meta: { tag: mapping.tags },
+        },
+      },
+      versionAsset: {
+        type: VERSION_ASSET_RESOURCE_TYPE,
+        id: mapping.versionAssetId,
+        resource: {
+          resourceType: VERSION_ASSET_RESOURCE_TYPE,
+          parent: mapping.parent,
+          research: true,
+        },
+      },
+    }));
+    const submitted = await manager.upsertResearchVersionsWithTransactionId(config.mspId, { data });
+    return { accepted: data.length, txId: submitted.transactionId };
+  }
+
   public async readSubjectIdentifierPayloads(
     assetIds: string[],
     channel: string,

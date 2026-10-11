@@ -2,6 +2,7 @@
 
 import { IBlockchainAdapter } from './IBlockchainAdapter';
 import type { FhirCidVersionMapping } from '../utils/fhir-versioning';
+import type { ResearchAssetVersionMapping } from '../utils/research-asset-versioning';
 
 /**
  * An in-memory mock implementation of the IBlockchainAdapter for testing and local development.
@@ -40,6 +41,14 @@ export class BlockchainAdapterMem implements IBlockchainAdapter {
       accepted: mappings.length,
       txId: `mem-tx-${Date.now()}`,
     };
+  }
+
+  public async registerResearchVersionMappings(
+    mappings: ResearchAssetVersionMapping[],
+    _channel: string,
+    _chaincode: string,
+  ): Promise<{ accepted: number; txId?: string }> {
+    return { accepted: mappings.length, txId: `mem-research-${Date.now()}` };
   }
 
   public async registerConsentAccessBundle(params: {

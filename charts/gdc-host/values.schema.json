@@ -49,6 +49,7 @@
         "fabricPeerEndpoint": { "type": "string" },
         "existingSecret": { "type": "string", "minLength": 1 },
         "researchTerminologyBaseUrl": { "type": "string" },
+        "researchTerminologyLabelsEnabled": { "type": "boolean" },
         "awsCredentials": {
           "type": "object",
           "required": ["mode", "rolesAnywhere"],

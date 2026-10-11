@@ -3,6 +3,7 @@
 
 import type { IBlockchainAdapter } from './IBlockchainAdapter';
 import type { FhirCidVersionMapping } from '../utils/fhir-versioning';
+import type { ResearchAssetVersionMapping } from '../utils/research-asset-versioning';
 
 /**
  * Combines a read/discovery adapter with an optional Fabric-backed write adapter.
@@ -11,6 +12,20 @@ import type { FhirCidVersionMapping } from '../utils/fhir-versioning';
  * progressively enabling real Fabric writes for selected chaincodes.
  */
 export class BlockchainAdapterMulti implements IBlockchainAdapter {
+  public async registerResearchVersionMappings(
+    mappings: ResearchAssetVersionMapping[],
+    channel: string,
+    chaincode: string,
+  ): Promise<{ accepted: number; txId?: string }> {
+    if (this.writeAdapter?.registerResearchVersionMappings) {
+      return this.writeAdapter.registerResearchVersionMappings(mappings, channel, chaincode);
+    }
+    if (this.discoveryAdapter.registerResearchVersionMappings) {
+      return this.discoveryAdapter.registerResearchVersionMappings(mappings, channel, chaincode);
+    }
+    return { accepted: 0 };
+  }
+
   private readonly discoveryAdapter: IBlockchainAdapter;
   private readonly writeAdapter?: IBlockchainAdapter;
 

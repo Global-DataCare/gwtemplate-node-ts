@@ -965,10 +965,10 @@ describe('MedicationStatement API (integration)', () => {
       expect(digitalTwinRecords[0]['org.hl7.fhir.api.MedicationStatement.code']).toBe(medicationCode);
       expect(digitalTwinRecords[0]['org.hl7.fhir.api.MedicationStatement.identifier']).not.toBe('urn:uuid:medication-digitaltwin-001');
       expect(digitalTwinRecords[0][DIGITAL_TWIN_SEARCH_TEXT_CLAIM]).toContain(medicationCode);
-      expect(digitalTwinRecords[0][DIGITAL_TWIN_SEARCH_TEXT_CLAIM]).toContain('Paracetamol 500mg cada 8 horas');
-      expect(digitalTwinRecords[0][DIGITAL_TWIN_SEARCH_TEXT_CLAIM]).toContain('Paracetamol 500 MG Oral Tablet');
-      expect(digitalTwinRecords[0]['MedicationStatement.code-text']).toBe('Paracetamol 500mg cada 8 horas');
-      expect(digitalTwinRecords[0]['MedicationStatement.code-display']).toBe('Paracetamol 500 MG Oral Tablet');
+      expect(digitalTwinRecords[0][DIGITAL_TWIN_SEARCH_TEXT_CLAIM]).not.toContain('Paracetamol 500mg cada 8 horas');
+      expect(digitalTwinRecords[0][DIGITAL_TWIN_SEARCH_TEXT_CLAIM]).not.toContain('Paracetamol 500 MG Oral Tablet');
+      expect(digitalTwinRecords[0]).not.toHaveProperty('MedicationStatement.code-text');
+      expect(digitalTwinRecords[0]).not.toHaveProperty('MedicationStatement.code-display');
       expect(Object.keys(digitalTwinRecords[0]).some((key) => /(?:^|[.\-_])note(?:$|[.\-_])/i.test(key))).toBe(false);
       expect(JSON.stringify(digitalTwinRecords[0])).not.toContain(subjectDid);
       expect(digitalTwinRecords[0]['org.hl7.fhir.api.MedicationStatement.language']).toBe('es');

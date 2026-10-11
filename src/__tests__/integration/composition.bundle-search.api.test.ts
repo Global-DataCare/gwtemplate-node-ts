@@ -1956,21 +1956,21 @@ describe('Composition Bundle _search API (integration)', () => {
       const r4Procedure = findCodedResource(ResourceTypesFhirR4.Procedure, sourceProcedureCoding.code);
       expect(r4Medication?.medicationCodeableConcept).toMatchObject({
         coding: [expect.objectContaining({ system: sourceMedicationCoding.system, code: sourceMedicationCoding.code })],
-        text: sourceMedication.medicationCodeableConcept.text,
       });
-      expect(r4Medication?.medicationCodeableConcept?.coding?.[0]?.display).toBe(sourceMedicationCoding.display);
+      expect(r4Medication?.medicationCodeableConcept?.text).toBeUndefined();
+      expect(r4Medication?.medicationCodeableConcept?.coding?.[0]?.display).toBeUndefined();
       expect(r4Medication?.effectivePeriod).toEqual({ start: medicationPeriodStart, end: medicationPeriodEnd });
       expect(r4Observation?.code).toMatchObject({
         coding: [expect.objectContaining({ system: sourceObservationCoding.system, code: sourceObservationCoding.code })],
-        text: sourceObservation.code.text,
       });
-      expect(r4Observation?.code?.coding?.[0]?.display).toBe(sourceObservationCoding.display);
+      expect(r4Observation?.code?.text).toBeUndefined();
+      expect(r4Observation?.code?.coding?.[0]?.display).toBeUndefined();
       expect(r4Observation?.component).toHaveLength(2);
       expect(r4Immunization?.vaccineCode).toMatchObject({
         coding: [expect.objectContaining({ system: sourceImmunizationCoding.system, code: sourceImmunizationCoding.code })],
-        text: sourceImmunization.vaccineCode.text,
       });
-      expect(r4Immunization?.vaccineCode?.coding?.[0]?.display).toBe(sourceImmunizationCoding.display);
+      expect(r4Immunization?.vaccineCode?.text).toBeUndefined();
+      expect(r4Immunization?.vaccineCode?.coding?.[0]?.display).toBeUndefined();
       expect(r4Allergy?.reaction?.[0]?.severity).toBe(AllergyIntoleranceReactionSeverities.Severe);
       expect(r4Condition?.code?.coding?.[0]).toMatchObject({
         system: sourceConditionCoding.system,
@@ -2054,10 +2054,8 @@ describe('Composition Bundle _search API (integration)', () => {
       expect(apiMedicationEntry.resource.meta.claims).toBeDefined();
       expect(apiMedicationEntry.resource.meta.claims['MedicationStatement.subject']).toBe(twinSubjectId);
       expect(apiMedicationEntry.resource.meta.claims['MedicationStatement.code']).toBe(medicationCodeToken);
-      expect(apiMedicationEntry.resource.meta.claims['MedicationStatement.code-display'])
-        .toBe(sourceMedicationCoding.display);
-      expect(apiMedicationEntry.resource.meta.claims['MedicationStatement.code-text'])
-        .toBe(sourceMedication.medicationCodeableConcept.text);
+      expect(apiMedicationEntry.resource.meta.claims).not.toHaveProperty('MedicationStatement.code-display');
+      expect(apiMedicationEntry.resource.meta.claims).not.toHaveProperty('MedicationStatement.code-text');
       expect(apiMedicationEntry.resource.meta.claims).not.toHaveProperty('indexed');
       expect(JSON.stringify(apiMedicationEntry.resource)).not.toContain('__digitalTwinSearch');
     } finally {

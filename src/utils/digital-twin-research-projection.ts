@@ -28,6 +28,8 @@ export const DIGITAL_TWIN_SEARCH_CLAIM_PREFIX = '__digitalTwinSearch.';
 
 export type DigitalTwinResearchProjectionResult = Readonly<{
   claims: Record<string, unknown>;
+  /** True only when the code-only research asset can be registered safely. */
+  researchReady: boolean;
   warning?: OperationOutcome;
 }>;
 
@@ -201,15 +203,16 @@ export function projectClaimsForDigitalTwin(input: {
   const usesVaccineCode = resourceType === ResourceTypesFhirR4.Immunization;
   const sourceTextClaim = `${resourceType}.${usesVaccineCode ? 'vaccine-code-text' : 'code-text'}`;
   const sourceDisplayClaim = `${resourceType}.${usesVaccineCode ? 'vaccine-code-display' : 'code-display'}`;
-  const mayUseClinicalFallback = !input.terminology && isProfessionallyAttestedResearchRecord(input.claims);
+  const isUncodedMedication = resourceType === ResourceTypesFhirR4.MedicationStatement && !hasTerminologyCode;
+  const mayUseClinicalFallback = isUncodedMedication
+    && !input.terminology
+    && isProfessionallyAttestedResearchRecord(input.claims);
   const clinicalFallbackText = mayUseClinicalFallback
     ? String(getClaimValue(input.claims, sourceTextClaim) || '').trim()
     : '';
   const clinicalFallbackDisplay = mayUseClinicalFallback
     ? String(getClaimValue(input.claims, sourceDisplayClaim) || '').trim()
     : '';
-  const isUncodedMedication = resourceType === ResourceTypesFhirR4.MedicationStatement && !hasTerminologyCode;
-
   const searchableText = Array.from(new Set([
     ...Object.entries(input.claims || {})
       .filter(([key]) => /\.code$/i.test(String(key || '').trim()))
@@ -281,20 +284,25 @@ export async function resolveAndProjectClaimsForDigitalTwin(input: {
   let warning: OperationOutcome | undefined;
   const codeClaim = getResearchTerminologyCodeClaim(input.resourceType);
   const hasCode = Boolean(codeClaim && String(getClaimValue(input.claims, codeClaim) || '').trim());
+  const labelsEnabled = String(process.env.RESEARCH_TERMINOLOGY_LABELS_ENABLED || 'false')
+    .trim().toLowerCase() === 'true';
+  let researchReady = Boolean(codeClaim && hasCode && !labelsEnabled);
   try {
-    terminology = await resolveResearchTerminologyLabels(input);
+    terminology = labelsEnabled ? await resolveResearchTerminologyLabels(input) : undefined;
     if (codeClaim && !hasCode) {
       warning = createOperationOutcome(
         IssueLevel.Warning,
         IssueType.Incomplete,
         `${input.resourceType} terminology requires professional review because its canonical code is missing.`,
       );
-    } else if (codeClaim && !terminology) {
+    } else if (labelsEnabled && codeClaim && !terminology) {
       warning = createOperationOutcome(
         IssueLevel.Warning,
         IssueType.Processing,
         `${input.resourceType} terminology labels are temporarily unavailable.`,
       );
+    } else if (codeClaim && hasCode) {
+      researchReady = true;
     }
   } catch (error) {
     console.error('[ResearchTerminology] Exact-label resolution failed; projecting canonical code only.', error);
@@ -310,5 +318,5 @@ export async function resolveAndProjectClaimsForDigitalTwin(input: {
     twinSubjectId: input.twinSubjectId,
     ...(terminology ? { terminology } : {}),
   });
-  return { claims, ...(warning ? { warning } : {}) };
+  return { claims, researchReady, ...(warning ? { warning } : {}) };
 }

@@ -57,6 +57,118 @@ describe("ArtifactContract", () => {
     expect(contractModule.contracts[0]).to.equal(ArtifactContract);
   });
 
+  it("registers each code-only ResearchAsset before its VersionAsset marked research=true", async () => {
+    const ctx = createContractContext({ txSeconds: 10, txId: "TX-RESEARCH-1" });
+    const payload = { data: [{
+      researchAsset: {
+        type: "ResearchAsset",
+        id: "8c942c42-6d54-4f76-97ef-058953b20001",
+        resource: {
+          resourceType: "ResearchAsset",
+          meta: { tag: [{ id: "MedicationStatement.code", system: "http://snomed.info/sct", code: "108575001" }] },
+        },
+      },
+      versionAsset: {
+        type: "VersionAsset",
+        id: "8c942c42-6d54-4f76-97ef-058953b20002",
+        resource: {
+          resourceType: "VersionAsset",
+          parent: "8c942c42-6d54-4f76-97ef-058953b20001",
+          research: true,
+        },
+      },
+    }] };
+
+    const result = await contract.UpsertResearchVersions(ctx, JSON.stringify(payload));
+
+    expect(result.data.map((entry) => entry.type)).to.deep.equal(["ResearchAsset", "VersionAsset"]);
+    const researchAsset = ctx.readJson(payload.data[0].researchAsset.id);
+    const versionAsset = ctx.readJson(payload.data[0].versionAsset.id);
+    expect(researchAsset.meta.attributes.tag).to.deep.equal(payload.data[0].researchAsset.resource.meta.tag);
+    expect(JSON.stringify(researchAsset)).not.to.match(/text|display/i);
+    expect(versionAsset.meta.attributes).to.deep.equal({
+      parent: payload.data[0].researchAsset.id,
+      research: true,
+    });
+    expect(ctx.writes.filter(({ key }) => !key.startsWith("cid~artifact"))
+      .map(({ key }) => key)).to.deep.equal([
+        payload.data[0].researchAsset.id,
+        payload.data[0].versionAsset.id,
+      ]);
+
+    const replayCtx = createContractContext({
+      txSeconds: 11,
+      txId: "TX-RESEARCH-2",
+      existingState: {
+        [payload.data[0].researchAsset.id]: researchAsset,
+        [payload.data[0].versionAsset.id]: versionAsset,
+      },
+    });
+    const replay = await contract.upsertResearchVersions(replayCtx, JSON.stringify(payload));
+    expect(replay.data[0].resource.meta.audit.version).to.equal(2);
+    expect(replay.data[1].resource.meta.audit.version).to.equal(2);
+  });
+
+  it("rejects malformed, identifying, uncoded, or unlinked research asset pairs", async () => {
+    const valid = {
+      researchAsset: {
+        type: "ResearchAsset",
+        id: "8c942c42-6d54-4f76-97ef-058953b20001",
+        resource: {
+          resourceType: "ResearchAsset",
+          meta: { tag: [{ id: "Observation.code", system: "http://loinc.org", code: "8310-5" }] },
+        },
+      },
+      versionAsset: {
+        type: "VersionAsset",
+        id: "8c942c42-6d54-4f76-97ef-058953b20002",
+        resource: {
+          resourceType: "VersionAsset",
+          parent: "8c942c42-6d54-4f76-97ef-058953b20001",
+          research: true,
+        },
+      },
+    };
+    const reject = async (entry, message) => expect(
+      contract.UpsertResearchVersions(createContractContext(), JSON.stringify({ data: [entry] })),
+    ).to.be.rejectedWith(message);
+
+    await expect(contract.UpsertResearchVersions(createContractContext(), JSON.stringify({ data: [] })))
+      .to.be.rejectedWith("payload.data must be a non-empty array");
+    for (const researchAsset of [undefined, null, [], {}, { ...valid.researchAsset, type: "VersionAsset" }, { ...valid.researchAsset, resource: {} }]) {
+      await reject({ ...valid, researchAsset }, "researchAsset must be a ResearchAsset");
+    }
+    for (const versionAsset of [undefined, null, [], {}, { ...valid.versionAsset, type: "ResearchAsset" }, { ...valid.versionAsset, resource: {} }]) {
+      await reject({ ...valid, versionAsset }, "versionAsset must be a VersionAsset");
+    }
+    await reject({ ...valid, researchAsset: { ...valid.researchAsset, id: "source-resource-id" } }, "asset ids must be opaque UUIDs");
+    await reject({ ...valid, versionAsset: { ...valid.versionAsset, id: "source-version-id" } }, "asset ids must be opaque UUIDs");
+    await reject({ ...valid, researchAsset: { ...valid.researchAsset, id: undefined } }, "asset ids must be opaque UUIDs");
+    await reject({ ...valid, versionAsset: { ...valid.versionAsset, id: undefined } }, "asset ids must be opaque UUIDs");
+    await reject({ ...valid, versionAsset: { ...valid.versionAsset, resource: { ...valid.versionAsset.resource, parent: "8c942c42-6d54-4f76-97ef-058953b29999" } } }, "parent must equal researchAsset.id");
+    await reject({ ...valid, versionAsset: { ...valid.versionAsset, resource: { ...valid.versionAsset.resource, research: false } } }, "research must equal true");
+    await reject({ ...valid, researchAsset: { ...valid.researchAsset, resource: { ...valid.researchAsset.resource, meta: {} } } }, "meta.tag must contain at least one code");
+    for (const tag of [null, [], "code", {}, { id: "Observation.code" }, { id: "Observation.code", system: "http://loinc.org" }, { id: "Observation.code-text", system: "http://loinc.org", code: "8310-5" }, { id: "Observation.name", system: "http://loinc.org", code: "8310-5" }, { id: "Observation.code", system: "not-a-uri", code: "8310-5" }]) {
+      const expected = tag === null || Array.isArray(tag) || typeof tag !== "object"
+        ? "must be an object"
+        : "must contain code-only id, system and code";
+      await reject({
+        ...valid,
+        researchAsset: {
+          ...valid.researchAsset,
+          resource: { ...valid.researchAsset.resource, meta: { tag: [tag] } },
+        },
+      }, expected);
+    }
+    await reject({
+      ...valid,
+      researchAsset: {
+        ...valid.researchAsset,
+        resource: { ...valid.researchAsset.resource, meta: { tag: [{ id: "Observation.code", code: "8310-5" }] } },
+      },
+    }, "must contain code-only id, system and code");
+  });
+
   it("creates, upserts, reads and returns history for artifact assets", async () => {
     const createCtx = createContractContext({ txSeconds: 11, txId: "TX-A-1" });
     const created = await contract.CreateArtifact(createCtx, ARTIFACT_ID, JSON.stringify(buildPayload({ cid: "bafy123" })));

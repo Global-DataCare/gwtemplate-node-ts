@@ -2,12 +2,23 @@
 
 ## [Unreleased]
 
+- Separate private digital-twin terminology from research-ledger registration.
+  Host configuration now controls whether exact labels are added privately;
+  the default remains code-only. Terminology and research-ledger outages return
+  warnings without rolling back operational writes. Fabric registers a
+  code-only `ResearchAsset` before an opaque child `VersionAsset` marked
+  `research=true`; uncoded professional MedicationStatement text/display stays
+  private and is not registered as coded research evidence. The local Fabric
+  bootstrap provisions a separate `health-care-local-research` channel and
+  deploys `artifact-sc` there for the same boundary proof.
+
 - Admit only finalized, professionally attested clinical-service records to
   the research twin. Resolve canonical terminology codes into localized
-  `code-text` and English `code-display`; when terminology is unavailable,
-  return a warning and retain only the professional source labels as fallback.
-  Uncoded MedicationStatement fallback is marked `user-selected=false`, and
-  consent rebuilds apply the same provenance and terminology rules.
+  `code-text` and English `code-display` only when host enrichment is enabled;
+  when terminology is unavailable, return a warning and retain the canonical
+  code without copying source labels. Uncoded MedicationStatement fallback is
+  marked `user-selected=false`, and consent rebuilds apply the same provenance
+  and terminology rules.
 
 - Prepare GW CORE `1.25.32` with server-side SMART subject/section enforcement
   for `Subject/$summary` and document-graph-aware filtering.

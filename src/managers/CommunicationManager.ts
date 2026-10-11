@@ -79,6 +79,11 @@ import {
 import { getClinicalCreatorBindingsSectionId } from '../utils/clinical-creator-binding';
 import type { IBlockchainAdapter } from '../adapters/IBlockchainAdapter';
 import { extractLedgerSafeResearchTags } from '../utils/fhir-ingestion';
+import {
+  buildResearchAssetVersionMapping,
+  resolveResearchDataChannel,
+  type ResearchAssetVersionMapping,
+} from '../utils/research-asset-versioning';
 
 type SupportedProjectedResourceType =
   | 'MedicationStatement'
@@ -234,6 +239,8 @@ type ClinicalLedgerReceipt = Readonly<{
 type ClinicalBatchEntryResult = (BundleEntryResponse | ErrorEntry) & {
   /** Internal handoff removed before the public batch response is returned. */
   ledgerEvidence?: FhirCidVersionMapping;
+  /** Internal research handoff removed before the public batch response is returned. */
+  researchLedgerEvidence?: ResearchAssetVersionMapping;
 };
 
 const COMMUNICATION_RESOURCE_TYPE = 'Communication' as const;
@@ -1198,6 +1205,7 @@ export class CommunicationManager implements IJobProcessor {
     const batchResponses: Array<BundleEntryResponse | ErrorEntry> = [];
     const warnings: OperationOutcome[] = [];
     const evidence = [...initialEvidence];
+    const researchEvidence: ResearchAssetVersionMapping[] = [];
 
     const communicationSubject = this.resolveCommunicationSubject(entry, fhirResource);
     const communicationSender = this.resolveCommunicationSender(entry, fhirResource);
@@ -1263,7 +1271,10 @@ export class CommunicationManager implements IJobProcessor {
             batchResponses.push(response);
             const ledgerEvidence = (response as any)?.ledgerEvidence as FhirCidVersionMapping | undefined;
             if (ledgerEvidence) evidence.push(ledgerEvidence);
+            const researchLedgerEvidence = (response as any)?.researchLedgerEvidence as ResearchAssetVersionMapping | undefined;
+            if (researchLedgerEvidence) researchEvidence.push(researchLedgerEvidence);
             delete (response as any).ledgerEvidence;
+            delete (response as any).researchLedgerEvidence;
           }
           continue;
         }
@@ -1291,6 +1302,7 @@ export class CommunicationManager implements IJobProcessor {
           isSubsettedDocumentIndex,
         });
         evidence.push(persisted.evidence);
+        if (persisted.researchEvidence) researchEvidence.push(persisted.researchEvidence);
         if (persisted.terminologyWarning) warnings.push(persisted.terminologyWarning);
       }
     }
@@ -1298,6 +1310,17 @@ export class CommunicationManager implements IJobProcessor {
       evidence.map((item) => [`${item.resourceType}|${item.resourceId}|${item.versionId}`, item]),
     ).values());
     const receipt = await this.registerClinicalEvidenceBundle(job, uniqueEvidence);
+    const uniqueResearchEvidence = Array.from(new Map(
+      researchEvidence.map((item) => [item.versionAssetId, item]),
+    ).values());
+    const researchWarning = await this.registerResearchEvidenceBundle(job, uniqueResearchEvidence);
+    if (researchWarning) {
+      warnings.push(researchWarning);
+      for (const response of batchResponses) {
+        if (!('response' in response) || !String(response.response?.status || '').startsWith('2')) continue;
+        response.response.outcome = researchWarning;
+      }
+    }
     if (receipt) {
       for (const response of batchResponses) {
         const responseResource = (response as any)?.resource;
@@ -1339,6 +1362,38 @@ export class CommunicationManager implements IJobProcessor {
       ...(submitted.txId ? { transactionId: submitted.txId } : {}),
       evidence,
     };
+  }
+
+  /**
+   * Registers code-only ResearchAsset parents followed by opaque VersionAsset
+   * children. A ledger outage never rolls back the private operational write.
+   */
+  private async registerResearchEvidenceBundle(
+    job: JobRequest,
+    evidence: ResearchAssetVersionMapping[],
+  ): Promise<OperationOutcome | undefined> {
+    if (evidence.length === 0 || !this.blockchainAdapter?.registerResearchVersionMappings) return undefined;
+    try {
+      const submitted = await this.blockchainAdapter.registerResearchVersionMappings(
+        evidence,
+        resolveResearchDataChannel(job.sector, job.jurisdiction),
+        ClinicalEvidenceChaincode,
+      );
+      if (submitted.accepted !== evidence.length) {
+        throw new Error(`Research registration accepted ${submitted.accepted}/${evidence.length} resources.`);
+      }
+      return undefined;
+    } catch (error) {
+      console.error('[ResearchLedger] Registration failed after private projection.', error);
+      return {
+        resourceType: ResourceTypesFhirR4.OperationOutcome,
+        issue: [{
+          severity: 'warning',
+          code: 'processing',
+          diagnostics: 'Research registration is temporarily unavailable.',
+        }],
+      } as OperationOutcome;
+    }
   }
 
   private async processProjectedClinicalBatchEntry(input: {
@@ -1424,6 +1479,7 @@ export class CommunicationManager implements IJobProcessor {
             },
           },
           ledgerEvidence: created.evidence,
+          ...(created.researchEvidence ? { researchLedgerEvidence: created.researchEvidence } : {}),
         };
       } catch (error) {
         const status = error instanceof ManagerError ? error.status : '400';
@@ -1513,6 +1569,7 @@ export class CommunicationManager implements IJobProcessor {
             },
           },
           ledgerEvidence: updated.evidence,
+          ...(updated.researchEvidence ? { researchLedgerEvidence: updated.researchEvidence } : {}),
         };
       } catch (error) {
         const status = error instanceof ManagerError ? error.status : '400';
@@ -1648,6 +1705,7 @@ export class CommunicationManager implements IJobProcessor {
     versionId: string;
     created: boolean;
     evidence: FhirCidVersionMapping;
+    researchEvidence?: ResearchAssetVersionMapping;
     terminologyWarning?: OperationOutcome;
   }> {
     // A source-authored URN is import provenance, not the importing BFF's
@@ -1808,14 +1866,21 @@ export class CommunicationManager implements IJobProcessor {
       && (!consentStatus || consentStatus === ConsentStatuses.Active)
       && Boolean(this.getFirstClaimValue(persistedClaims, [ClaimConsent.decision]));
     if (isConsentRule) {
-      await persistConsentRuleAndAttachment({
+      const persistedConsent = await persistConsentRuleAndAttachment({
         vaultRepository: this.vaultRepository,
+        blockchainAdapter: this.blockchainAdapter,
         tenantVaultId: input.tenantVaultId,
         sector: String(input.job.sector || ''),
         jurisdiction: String(input.job.jurisdiction || ''),
         claims: persistedClaims,
       });
-      return { recordId, versionId, created: true, evidence };
+      return {
+        recordId,
+        versionId,
+        created: true,
+        evidence,
+        ...(persistedConsent.warnings?.[0] ? { terminologyWarning: persistedConsent.warnings[0] } : {}),
+      };
     }
 
     const signingKeyId = clinicalCreatorEvidence(input.job).keyId;
@@ -1919,6 +1984,15 @@ export class CommunicationManager implements IJobProcessor {
         versionId,
         created: true,
         evidence,
+        ...(researchProjection.researchReady ? {
+          researchEvidence: buildResearchAssetVersionMapping({
+            resourceType: input.resourceType,
+            sourceResourceId: recordId,
+            sourceVersionId: versionId,
+            twinSubjectId,
+            claims: researchClaims,
+          }),
+        } : {}),
         ...(researchProjection.warning ? { terminologyWarning: researchProjection.warning } : {}),
       };
     }

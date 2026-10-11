@@ -131,6 +131,10 @@ describe('CommunicationManager Unit Tests', () => {
         accepted: mappings.length,
         txId: ledgerTransactionId,
       })),
+      registerResearchVersionMappings: jest.fn(async (mappings: any[]) => ({
+        accepted: mappings.length,
+        txId: ledgerTransactionId,
+      })),
     } as jest.Mocked<IBlockchainAdapter>;
     
     communicationManager = new CommunicationManager({
@@ -288,6 +292,42 @@ describe('CommunicationManager Unit Tests', () => {
         else process.env.FHIR_VERSION_LEDGER_CHAINCODE = previousChaincode;
         if (previousNetworkMode === undefined) delete process.env.NETWORK_MODE;
         else process.env.NETWORK_MODE = previousNetworkMode;
+      }
+    });
+
+    it('keeps the operational write successful and warns when research ledger registration fails', async () => {
+      mockTenantsCacheManager.getTenantDid.mockResolvedValue(testServerDid as any);
+      mockVaultRepository.get.mockImplementation(async (vaultId: string, id: string, sectionId?: string) => {
+        if (String(sectionId).includes('digitaltwin_secondary_use_status')) return { status: 'enabled' } as any;
+        return storedRecords.get(`${vaultId}|${sectionId}|${id}`);
+      });
+      mockBlockchainAdapter.registerResearchVersionMappings.mockRejectedValueOnce(new Error('research ledger unavailable'));
+      const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+      try {
+        const response = await communicationManager.process(buildClinicalBatchJob([{
+          type: GatewayRequestEntryTypes.ObservationCreate,
+          request: { method: HttpRequestMethods.Post, url: ResourceTypesFhirR4.Observation },
+          resource: {
+            resourceType: ResourceTypesFhirR4.Observation,
+            id: EXAMPLE_OBSERVATION_IDENTIFIER,
+            subject: { reference: subjectDid },
+            status: ObservationStatuses.Final,
+            code: { coding: [VitalSignsCodes.BodyTemperature] },
+          },
+        }], creatorDid, creatorDid, creatorDid, 'completed', CompositionAttesterModes.Professional));
+
+        expect((response.body as any).data[0].response).toMatchObject({
+          status: '201',
+          outcome: {
+            resourceType: ResourceTypesFhirR4.OperationOutcome,
+            issue: [{ severity: 'warning', code: 'processing' }],
+          },
+        });
+        expect(mockBlockchainAdapter.registerResearchVersionMappings).toHaveBeenCalledTimes(1);
+        expect(Array.from(storedRecords.values()).some((record) =>
+          Object.keys(record).some((key) => key.endsWith('Observation.code')))).toBe(true);
+      } finally {
+        errorSpy.mockRestore();
       }
     });
 
@@ -477,6 +517,25 @@ describe('CommunicationManager Unit Tests', () => {
       expect(twinClaim('Observation.value-quantity-number'))
         .toBe(String(EXAMPLE_VITAL_SIGN_VALUE_BODY_TEMPERATURE));
       expect(twinClaim('Observation.effective-datetime')).toBe(EXAMPLE_VITAL_SIGNS_EFFECTIVE_DATE_TIME);
+      expect(mockBlockchainAdapter.registerResearchVersionMappings).toHaveBeenCalledTimes(1);
+      expect(mockBlockchainAdapter.registerResearchVersionMappings).toHaveBeenCalledWith(
+        [expect.objectContaining({
+          resourceType: ResourceTypesFhirR4.Observation,
+          parent: expect.any(String),
+          research: true,
+          tags: [{
+            id: 'Observation.code',
+            system: VitalSignsCodes.BodyTemperature.system,
+            code: VitalSignsCodes.BodyTemperature.code,
+          }],
+        })],
+        'animal-care-global-research',
+        'artifact-sc',
+      );
+      const researchMapping = (mockBlockchainAdapter.registerResearchVersionMappings as jest.Mock).mock.calls[0][0][0];
+      expect(researchMapping.researchAssetId).toMatch(/^[0-9a-f-]{36}$/);
+      expect(researchMapping.versionAssetId).toMatch(/^[0-9a-f-]{36}$/);
+      expect(researchMapping.versionAssetId).not.toBe(researchMapping.sourceVersionId);
     });
 
     it('removes the correlated digital-twin projection when the creator deletes an erroneous record', async () => {

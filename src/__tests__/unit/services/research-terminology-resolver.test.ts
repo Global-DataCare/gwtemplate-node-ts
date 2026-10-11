@@ -7,6 +7,7 @@ describe('research terminology resolver', () => {
   let server: Server | undefined;
 
   afterEach(async () => {
+    delete process.env.RESEARCH_TERMINOLOGY_LABELS_ENABLED;
     delete process.env.RESEARCH_TERMINOLOGY_BASE_URL;
     delete process.env.RESEARCH_TERMINOLOGY_SERVICE_TOKEN;
     if (server) await new Promise<void>((resolve) => server!.close(() => resolve()));
@@ -34,6 +35,7 @@ describe('research terminology resolver', () => {
     const address = server.address();
     if (!address || typeof address === 'string') throw new Error('Expected TCP address');
     process.env.RESEARCH_TERMINOLOGY_BASE_URL = `http://127.0.0.1:${address.port}`;
+    process.env.RESEARCH_TERMINOLOGY_LABELS_ENABLED = 'true';
     process.env.RESEARCH_TERMINOLOGY_SERVICE_TOKEN = 'local-service-token';
 
     await expect(resolveResearchTerminologyLabels({

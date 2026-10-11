@@ -641,6 +641,16 @@ These configure the main operational PostgreSQL connection.
 
 ### Research terminology
 
+`RESEARCH_TERMINOLOGY_LABELS_ENABLED`
+- Host-wide default for private digital-twin terminology enrichment. The
+  default is `false`; tenants inherit it until a separate governed tenant
+  override exists.
+- `false` keeps coded private projections code-only and performs no terminology
+  request. `true` permits exact `system|code` resolution into local
+  `code-text` and international English `code-display` in the private index.
+- This setting never changes the ledger payload: `ResearchAsset` is always
+  code-only.
+
 `RESEARCH_TERMINOLOGY_BASE_URL`
 - Optional base URL of the governed terminology API used for new digital-twin
   research projections.
@@ -649,8 +659,13 @@ These configure the main operational PostgreSQL connection.
 `RESEARCH_TERMINOLOGY_SERVICE_TOKEN`
 - Optional bearer token for the terminology API. It belongs in the deployment
   Secret, never in a ConfigMap or Helm values file.
-- Lookup failures leave a code-only projection and never make an already
+- When enrichment is enabled, lookup failures leave a code-only private
+  projection, return an `OperationOutcome` warning and do not mark its opaque
+  `VersionAsset` as registered for research. They never make the already
   persisted operational clinical write appear to fail.
+- A professionally attested uncoded `MedicationStatement` remains private with
+  its original local text, or its original display when text is absent, and
+  `user-selected=false`. It cannot produce a code-only `ResearchAsset`.
 
 ## 23. Auth And Federation
 

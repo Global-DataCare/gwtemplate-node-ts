@@ -7,6 +7,7 @@ cd "${ROOT}"
 GWTEMPLATE_DIR="${GWTEMPLATE_DIR:-$(cd "${ROOT}/../../.." && pwd)}"
 IDENTITY_CHANNEL_NAME="${HLF_IDENTITY_CHANNEL_NAME:-identity-local}"
 DATA_CHANNEL_NAME="${HLF_DATA_CHANNEL_NAME:-${HLF_CHANNEL_NAME:-health-care-local}}"
+RESEARCH_CHANNEL_NAME="${HLF_RESEARCH_CHANNEL_NAME:-health-care-local-research}"
 CHANNEL_NAME="${CHANNEL_NAME:-${IDENTITY_CHANNEL_NAME}}"
 
 CHAINCODE_VERSION="${CHAINCODE_VERSION:-1.0}"
@@ -44,6 +45,7 @@ deploy_chaincode "evidence-sc" "${GWTEMPLATE_DIR}/chaincode/evidence-sc-javascri
 deploy_chaincode "credential-sc" "${GWTEMPLATE_DIR}/chaincode/credential-sc-javascript"
 deploy_chaincode "artifact-sc" "${GWTEMPLATE_DIR}/chaincode/artifact-sc-javascript"
 deploy_chaincode "artifact-sc" "${GWTEMPLATE_DIR}/chaincode/artifact-sc-javascript" "${DATA_CHANNEL_NAME}" true
+deploy_chaincode "artifact-sc" "${GWTEMPLATE_DIR}/chaincode/artifact-sc-javascript" "${RESEARCH_CHANNEL_NAME}" true
 deploy_chaincode "artifactevent-sc" "${GWTEMPLATE_DIR}/chaincode/artifactevent-sc-javascript"
 deploy_chaincode "subjectkeybinding-sc" "${GWTEMPLATE_DIR}/chaincode/subjectkeybinding-sc-javascript"
 deploy_chaincode "subjectidentifier-sc" "${GWTEMPLATE_DIR}/chaincode/subjectidentifier-sc-javascript"
