@@ -128,6 +128,7 @@ export class ConsentManager implements IJobProcessor {
               vaultRepository: this.vaultRepository,
               tenantVaultId,
               sector: job.sector as string,
+              jurisdiction,
               claims,
               researchTags,
             });

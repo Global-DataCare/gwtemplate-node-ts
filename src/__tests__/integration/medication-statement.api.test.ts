@@ -28,7 +28,6 @@ import { getEnvSectionId } from '../../utils/section-env';
 import { getSubjectScopedSectionId } from '../../utils/individual-sections';
 import { testTenant1TenantId } from '../data/organization.data';
 import {
-  DIGITAL_TWIN_SEARCH_CLAIM_PREFIX,
   DIGITAL_TWIN_SEARCH_TEXT_CLAIM,
   getDigitalTwinSubjectAliasSectionId,
 } from '../../utils/digital-twin-research-projection';
@@ -478,6 +477,10 @@ describe('MedicationStatement API (integration)', () => {
               },
               subject: { reference: subjectDid },
               author: [{ reference: demoCommunicationMedicationIpsDefaults.externalAuthorUrn }],
+              attester: [{
+                mode: CompositionAttesterModes.Professional,
+                party: { reference: `urn:uuid:${EXAMPLE_KYC_CONTROLLER_UUID}` },
+              }],
               date: '2026-05-22T10:00:00Z',
               title: 'IPS Medication Summary',
               section: [
@@ -835,6 +838,10 @@ describe('MedicationStatement API (integration)', () => {
               status: 'final',
               subject: { reference: subjectDid },
               author: [{ reference: demoCommunicationMedicationIpsDefaults.externalAuthorUrn }],
+              attester: [{
+                mode: CompositionAttesterModes.Professional,
+                party: { reference: `urn:uuid:${EXAMPLE_KYC_CONTROLLER_UUID}` },
+              }],
               date: '2026-05-22T10:00:00Z',
               type: {
                 coding: [{
@@ -957,13 +964,12 @@ describe('MedicationStatement API (integration)', () => {
       expect(digitalTwinRecords[0]['org.hl7.fhir.api.MedicationStatement.subject']).toBe(twinSubjectId);
       expect(digitalTwinRecords[0]['org.hl7.fhir.api.MedicationStatement.code']).toBe(medicationCode);
       expect(digitalTwinRecords[0]['org.hl7.fhir.api.MedicationStatement.identifier']).not.toBe('urn:uuid:medication-digitaltwin-001');
-      // Source labels are not research search data. The canonical token remains
-      // searchable, and trusted text/display may be added only by terminology.
-      expect(digitalTwinRecords[0][DIGITAL_TWIN_SEARCH_TEXT_CLAIM]).toBe(medicationCode);
-      expect(Object.keys(digitalTwinRecords[0]).some((key) =>
-        key !== '@context'
-        && !key.startsWith(DIGITAL_TWIN_SEARCH_CLAIM_PREFIX)
-        && /(?:[.\-_])(text|display|note)$/i.test(key))).toBe(false);
+      expect(digitalTwinRecords[0][DIGITAL_TWIN_SEARCH_TEXT_CLAIM]).toContain(medicationCode);
+      expect(digitalTwinRecords[0][DIGITAL_TWIN_SEARCH_TEXT_CLAIM]).toContain('Paracetamol 500mg cada 8 horas');
+      expect(digitalTwinRecords[0][DIGITAL_TWIN_SEARCH_TEXT_CLAIM]).toContain('Paracetamol 500 MG Oral Tablet');
+      expect(digitalTwinRecords[0]['MedicationStatement.code-text']).toBe('Paracetamol 500mg cada 8 horas');
+      expect(digitalTwinRecords[0]['MedicationStatement.code-display']).toBe('Paracetamol 500 MG Oral Tablet');
+      expect(Object.keys(digitalTwinRecords[0]).some((key) => /(?:^|[.\-_])note(?:$|[.\-_])/i.test(key))).toBe(false);
       expect(JSON.stringify(digitalTwinRecords[0])).not.toContain(subjectDid);
       expect(digitalTwinRecords[0]['org.hl7.fhir.api.MedicationStatement.language']).toBe('es');
       expect(digitalTwinRecords[0]['org.hl7.fhir.api.MedicationStatement.user-selected']).toBe('true');

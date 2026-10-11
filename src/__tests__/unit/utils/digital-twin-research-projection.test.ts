@@ -1,4 +1,4 @@
-// Flow contract: pseudonymize research facts, retain coded/date/category data, and never expose submitted labels or author identity.
+// Flow contract: admit only professionally attested clinical records to research, prefer governed terminology labels, and retain clinical-service labels only as a visible fallback when exact translation is unavailable.
 import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 import {
   DIGITAL_TWIN_SEARCH_DATE_CLAIM,
@@ -6,6 +6,7 @@ import {
   DIGITAL_TWIN_SEARCH_TEXT_CLAIM,
   getDigitalTwinSubjectAliasSectionId,
   getOrCreateDigitalTwinSubjectId,
+  isProfessionallyAttestedResearchRecord,
   isDigitalTwinResearchResourceType,
   projectClaimsForDigitalTwin,
   resolveAndProjectClaimsForDigitalTwin,
@@ -108,29 +109,76 @@ describe('digital twin research projection', () => {
     ]));
   });
 
-  it('keeps a code-only projection when the configured terminology boundary is unavailable', async () => {
+  it('accepts only a professional attester as clinical research provenance', () => {
+    expect(isProfessionallyAttestedResearchRecord({
+      'Composition.attester': 'PractitionerRole/clinician-1',
+      'Composition.attester-mode': 'professional',
+    })).toBe(true);
+    expect(isProfessionallyAttestedResearchRecord({
+      'Composition.attester': 'RelatedPerson/family-1',
+      'Composition.attester-mode': 'personal',
+    })).toBe(false);
+    expect(isProfessionallyAttestedResearchRecord({
+      'Composition.attester': 'PractitionerRole/untyped-1',
+    })).toBe(false);
+  });
+
+  it('falls back to professionally attested clinical labels and returns a warning when terminology is unavailable', async () => {
     process.env.RESEARCH_TERMINOLOGY_BASE_URL = 'https://terminology.example';
     const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({ ok: false, status: 503 } as Response);
     const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
     try {
-      const projected = await resolveAndProjectClaimsForDigitalTwin({
+      const result = await resolveAndProjectClaimsForDigitalTwin({
         resourceType: 'Observation', sector: 'health-care', jurisdiction: 'ES',
         twinSubjectId: 'urn:uuid:00000000-0000-4000-8000-000000000001',
         claims: {
           'Observation.code': 'http://loinc.org|8310-5',
-          'Observation.code-text': 'texto no confiable',
-          'Observation.code-display': 'untrusted display',
+          'Observation.code-text': 'Temperatura corporal',
+          'Observation.code-display': 'Body temperature',
+          'Composition.attester': 'PractitionerRole/clinician-1',
+          'Composition.attester-mode': 'professional',
         },
       });
-      expect(projected['Observation.code']).toBe('http://loinc.org|8310-5');
-      expect(projected).not.toHaveProperty('Observation.code-text');
-      expect(projected).not.toHaveProperty('Observation.code-display');
+      expect(result.claims['Observation.code']).toBe('http://loinc.org|8310-5');
+      expect(result.claims['Observation.code-text']).toBe('Temperatura corporal');
+      expect(result.claims['Observation.code-display']).toBe('Body temperature');
+      expect(result.warning).toMatchObject({
+        resourceType: 'OperationOutcome',
+        issue: [{ severity: 'warning', code: 'processing' }],
+      });
       expect(errorSpy).toHaveBeenCalled();
     } finally {
       delete process.env.RESEARCH_TERMINOLOGY_BASE_URL;
       fetchSpy.mockRestore();
       errorSpy.mockRestore();
     }
+  });
+
+  it('keeps the original medication code-text as an explicit unreviewed fallback when code is absent', async () => {
+    const result = await resolveAndProjectClaimsForDigitalTwin({
+      resourceType: 'MedicationStatement', sector: 'health-care', jurisdiction: 'ES',
+      twinSubjectId: 'urn:uuid:00000000-0000-4000-8000-000000000001',
+      claims: {
+        'MedicationStatement.subject': 'did:web:api.example:individual:123',
+        'MedicationStatement.code-text': 'Ibuprofeno preparado para Alice',
+        'MedicationStatement.user-selected': 'true',
+        'MedicationStatement.language': 'es',
+        'MedicationStatement.note': 'Call Alice on 555-0100',
+        'Composition.attester': 'PractitionerRole/clinician-1',
+        'Composition.attester-mode': 'professional',
+      },
+    });
+
+    expect(result.claims['MedicationStatement.code']).toBeUndefined();
+    expect(result.claims['MedicationStatement.code-text']).toBe('Ibuprofeno preparado para Alice');
+    expect(result.claims['MedicationStatement.user-selected']).toBe('false');
+    expect(result.claims).not.toHaveProperty('MedicationStatement.code-display');
+    expect(result.claims).not.toHaveProperty('MedicationStatement.note');
+    expect(result.claims[DIGITAL_TWIN_SEARCH_TEXT_CLAIM]).toBe('Ibuprofeno preparado para Alice');
+    expect(result.warning).toMatchObject({
+      resourceType: 'OperationOutcome',
+      issue: [{ severity: 'warning', code: 'incomplete' }],
+    });
   });
 
   it('rejects identity-bearing resource families from the research plane', () => {

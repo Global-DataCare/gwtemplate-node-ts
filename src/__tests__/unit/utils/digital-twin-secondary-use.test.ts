@@ -1,4 +1,4 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: secondary-use consent rebuilds only finalized, professionally attested clinical records and never promotes personal records into the research repository.
 import { ClaimConsent } from 'gdc-common-utils-ts/models/consent-rule';
 import { ServiceCapability } from 'gdc-common-utils-ts/constants/service-capabilities';
 import { HealthcareConsentPurposes } from 'gdc-common-utils-ts/constants/healthcare';
@@ -24,6 +24,10 @@ describe('digital twin secondary-use lifecycle', () => {
     [ClaimConsent.subject]: sourceSubject,
     [ClaimConsent.purpose]: HealthcareConsentPurposes.Research,
     [ClaimConsent.action]: ServiceCapability.DigitalTwinReader,
+  };
+  const professionalProvenance = {
+    'Composition.attester': 'PractitionerRole/clinician-1',
+    'Composition.attester-mode': 'professional',
   };
 
   it('does not project before an explicit secondary-use permit', async () => {
@@ -61,6 +65,8 @@ describe('digital twin secondary-use lifecycle', () => {
         'Composition.subject': sourceSubject,
         'Composition.section': 'LOINC|10160-0',
         'Composition.type': 'LOINC|60591-5',
+        'Composition.status': 'final',
+        ...professionalProvenance,
       },
       {
         id: 'legacy-composition-vitals',
@@ -69,6 +75,8 @@ describe('digital twin secondary-use lifecycle', () => {
         'Composition.subject': sourceSubject,
         'Composition.section': 'LOINC|8716-3',
         'Composition.type': 'LOINC|60591-5',
+        'Composition.status': 'final',
+        ...professionalProvenance,
       },
     ], sourceCompositionSection);
     await vaultRepository.put(tenantVaultId, [{
@@ -78,6 +86,15 @@ describe('digital twin secondary-use lifecycle', () => {
       'MedicationStatement.subject': sourceSubject,
       'MedicationStatement.code': 'http://snomed.info/sct|108575001',
       'Composition.section': 'LOINC|10160-0',
+      ...professionalProvenance,
+    }, {
+      id: 'medication-personal',
+      '@context': 'org.hl7.fhir.r4',
+      'MedicationStatement.identifier': 'urn:uuid:medication-personal',
+      'MedicationStatement.subject': sourceSubject,
+      'MedicationStatement.code-text': 'Personal medication report',
+      'Composition.attester': 'RelatedPerson/family-1',
+      'Composition.attester-mode': 'personal',
     }], sourceMedicationSection);
     await vaultRepository.put(tenantVaultId, [{
       id: 'published-before-withdrawal',
@@ -127,6 +144,8 @@ describe('digital twin secondary-use lifecycle', () => {
       'Composition.subject': sourceSubject,
       'Composition.section': 'LOINC|10160-0',
       'Composition.type': 'LOINC|60591-5',
+      'Composition.status': 'final',
+      ...professionalProvenance,
     }], sourceCompositionSection);
     await vaultRepository.put(tenantVaultId, [{
       id: 'anonymous-twin-before-offboarding',

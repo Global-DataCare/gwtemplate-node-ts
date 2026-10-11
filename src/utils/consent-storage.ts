@@ -105,6 +105,7 @@ export type PersistConsentRuleInput = {
   vaultRepository: IVaultRepository;
   tenantVaultId: string;
   sector: string;
+  jurisdiction?: string;
   claims: Record<string, any>;
   researchTags?: string[];
 };
@@ -112,7 +113,7 @@ export type PersistConsentRuleInput = {
 export async function persistConsentRuleAndAttachment(
   input: PersistConsentRuleInput,
 ): Promise<{ subjectId: string; attachmentHash?: string; ruleId: string }> {
-  const { vaultRepository, tenantVaultId, sector, claims, researchTags } = input;
+  const { vaultRepository, tenantVaultId, sector, jurisdiction, claims, researchTags } = input;
 
   const actorIdentifier =
     getClaimValue<string>(claims, ClaimConsent.actorIdentifier) ??
@@ -204,6 +205,6 @@ export async function persistConsentRuleAndAttachment(
     [consentRule],
     getSubjectScopedSectionId(subjectId, 'individual', 'consents'),
   );
-  await applyDigitalTwinSecondaryUseDecision({ vaultRepository, tenantVaultId, claims });
+  await applyDigitalTwinSecondaryUseDecision({ vaultRepository, tenantVaultId, claims, sector, jurisdiction });
   return { subjectId, attachmentHash, ruleId };
 }
