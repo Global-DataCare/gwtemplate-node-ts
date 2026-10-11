@@ -38,6 +38,14 @@ export class ManageAssetArtifact extends ManageAsset {
   ): Promise<{ result: object; transactionId: string }> {
     return this.submitWithTransactionId(mspId, 'UpsertArtifacts', JSON.stringify(payload));
   }
+
+  /** Registers code-only research parents before their opaque version assets. */
+  public async upsertResearchVersionsWithTransactionId(
+    mspId: string,
+    payload: object,
+  ): Promise<{ result: object; transactionId: string }> {
+    return this.submitWithTransactionId(mspId, 'UpsertResearchVersions', JSON.stringify(payload));
+  }
 }
 
 export const manageAssetArtifact = new ManageAssetArtifact();

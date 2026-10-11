@@ -145,11 +145,16 @@ Verify current branches, versions and published npm state before release claims.
   from search matches and materialized resources.
 - Preserve `<Resource>.code = system|code` and language, but remove received
   `code-display` and `code-text` from the research projection. The terminology
-  boundary must re-resolve standardized display and configured translations
-  from the preserved code before either label can enter research data. Keep
+  boundary may re-resolve standardized display and configured translations
+  from the preserved code before either label can enter the private index, and
+  that host-wide enrichment is disabled by default. It never changes the
+  ledger projection. Keep
   submitted labels only in the operational clinical record as provenance. An
   absent or unsupported code cannot be integrated into research and never
-  produces an invented official translation. `Coding.userSelected` means a
+  produces an invented official translation. The sole private fallback is a
+  professionally attested uncoded MedicationStatement: retain its original
+  local text, or display when text is absent, force `user-selected=false`, and
+  do not register it as coded research evidence. `Coding.userSelected` means a
   person explicitly selected the coding; it does not distinguish a patient
   from a professional. Preserve only a non-identifying resource/provenance
   category such as self-reported versus professional clinical data. Remove
@@ -158,6 +163,11 @@ Verify current branches, versions and published npm state before release claims.
   the protected operational record. Bare envelope
   `status` remains distinct from namespaced clinical claims such as
   `Observation.status`.
+- Register research evidence as a code-only `ResearchAsset` followed by its
+  opaque `VersionAsset` child with `research=true`. Neither source resource ids
+  nor version hashes are ledger asset ids. Terminology or research-ledger
+  failures surface as retryable OperationOutcome warnings and never roll back
+  the protected operational write.
 - Keep age range and host-wide aggregation out of the MVP.
 - For a tenant DID created before ResearchSubject became the public aggregate,
   accept its existing read-only digitaltwin Composition `_search` declaration

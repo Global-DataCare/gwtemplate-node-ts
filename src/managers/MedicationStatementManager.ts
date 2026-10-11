@@ -24,6 +24,13 @@ import { buildSearchResponseEntries } from '../utils/didcomm-response';
 import { GatewayResponseEntryTypes } from '../shared/gateway-response-types';
 import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 import { buildConfidentialDocumentIndexedAttributes } from 'gdc-common-utils-ts/utils/confidential-document-provenance';
+import { claimsToContentCid } from 'gdc-common-utils-ts/utils/fhir-cid';
+import type { IBlockchainAdapter } from '../adapters/IBlockchainAdapter';
+import { ClinicalEvidenceChaincode } from '../utils/ledger';
+import {
+  buildResearchAssetVersionMapping,
+  resolveResearchDataChannel,
+} from '../utils/research-asset-versioning';
 
 type FhirBundleEntryLike = {
   type?: string;
@@ -64,6 +71,7 @@ export class MedicationStatementManager implements IJobProcessor {
   constructor(
     private readonly vaultRepository: IVaultRepository,
     private readonly tenantsCacheManager?: ITenantsManager,
+    private readonly blockchainAdapter?: IBlockchainAdapter,
   ) {}
 
   private async tenantExists(tenantVaultId: string): Promise<boolean> {
@@ -176,10 +184,11 @@ export class MedicationStatementManager implements IJobProcessor {
             claims,
             sector: job.sector,
           });
+          const versionId = claimsToContentCid(claims).cid;
           const record = {
             id,
             ...claims,
-            indexed: { attributes: indexedAttributes },
+            indexed: { attributes: indexedAttributes, versionId },
           } as any;
           const sectionId = getSubjectScopedSectionId(subject, scope, 'medications');
           await this.vaultRepository.put(tenantVaultId, [record], sectionId);
@@ -223,6 +232,32 @@ export class MedicationStatementManager implements IJobProcessor {
               },
             } as any], digitalTwinSectionId);
             terminologyWarning = researchProjection.warning;
+            if (researchProjection.researchReady && this.blockchainAdapter?.registerResearchVersionMappings) {
+              try {
+                const mapping = buildResearchAssetVersionMapping({
+                  resourceType: ResourceTypesFhirR4.MedicationStatement,
+                  sourceResourceId: id,
+                  sourceVersionId: versionId,
+                  twinSubjectId,
+                  claims: researchClaims,
+                });
+                const registered = await this.blockchainAdapter.registerResearchVersionMappings(
+                  [mapping],
+                  resolveResearchDataChannel(job.sector, jurisdiction),
+                  ClinicalEvidenceChaincode,
+                );
+                if (registered.accepted !== 1) {
+                  throw new Error(`Research registration accepted ${registered.accepted}/1 resources.`);
+                }
+              } catch (error) {
+                console.error('[ResearchLedger] Medication registration failed after private projection.', error);
+                terminologyWarning = createOperationOutcome(
+                  IssueLevel.Warning,
+                  IssueType.Processing,
+                  'Research registration is temporarily unavailable.',
+                );
+              }
+            }
           }
 
           responseEntries.push({

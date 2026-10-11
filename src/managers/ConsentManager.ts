@@ -124,8 +124,9 @@ export class ConsentManager implements IJobProcessor {
               resourceId: fallbackId,
             });
 
-            await persistConsentRuleAndAttachment({
+            const persistedConsent = await persistConsentRuleAndAttachment({
               vaultRepository: this.vaultRepository,
+              blockchainAdapter: this.blockchainAdapter,
               tenantVaultId,
               sector: job.sector as string,
               jurisdiction,
@@ -140,6 +141,12 @@ export class ConsentManager implements IJobProcessor {
                 response: {
                     status: String(HttpStatusCodes.Created),
                     location: `/${job.tenantId}/cds-${jurisdiction}/v1/${job.sector}/${normalizedSection}/${normalizedFormat}/Consent/${responseAction}`,
+                    ...(persistedConsent.warnings?.length ? {
+                      outcome: {
+                        resourceType: ResourceTypesFhirR4.OperationOutcome,
+                        issue: persistedConsent.warnings.flatMap((warning) => warning.issue || []),
+                      },
+                    } : {}),
                 },
                 ...(researchTags && researchTags.length > 0 ? { meta: { tag: researchTags } } : {}),
                 type: ResourceTypesFhirR4.Consent

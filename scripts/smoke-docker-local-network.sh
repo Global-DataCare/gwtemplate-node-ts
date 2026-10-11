@@ -11,6 +11,7 @@ DEVNET_NETWORK_NAME="${DEVNET_NETWORK_NAME:-gdc-public-local-network}"
 DOCKER_NETWORK="${DOCKER_NETWORK:-${DEVNET_NETWORK_NAME}}"
 FABRIC_PEER_CONTAINER="${GDC_CONTAINER_PREFIX}-peer0-host1"
 FABRIC_TOOLS_CONTAINER="${GDC_CONTAINER_PREFIX}-fabric-tools"
+RESEARCH_CHANNEL_NAME="${RESEARCH_CHANNEL_NAME:-health-care-local-research}"
 ENV_FILE="${ENV_FILE:-${ROOT_DIR}/.env.local-fabric}"
 BASE_URL="http://127.0.0.1:${HOST_PORT}"
 RUN_FULL_SMOKE="${RUN_FULL_SMOKE:-true}"
@@ -160,6 +161,21 @@ if [[ "$RUN_FULL_SMOKE" == "true" ]]; then
     bash ./scripts/smoke-consentaccess-local-network.sh
   BASE_URL="$BASE_URL" FABRIC_TOOLS_CONTAINER="$FABRIC_TOOLS_CONTAINER" \
     bash ./scripts/smoke-smart-access-local-network.sh
+
+  research_channel_info="$(docker exec "$FABRIC_TOOLS_CONTAINER" bash -lc \
+    "CORE_PEER_LOCALMSPID=Host1MSP \
+CORE_PEER_MSPCONFIGPATH=/workspace/organizations/peerOrganizations/host1.example.com/users/Admin@host1.example.com/msp \
+CORE_PEER_ADDRESS=peer0-host1:7051 \
+CORE_PEER_TLS_ENABLED=true \
+CORE_PEER_TLS_ROOTCERT_FILE=/workspace/organizations/peerOrganizations/host1.example.com/peers/peer0.host1.example.com/tls/ca.crt \
+peer channel getinfo -c ${RESEARCH_CHANNEL_NAME}" 2>&1)"
+  research_channel_height="$(sed -n 's/^Blockchain info: //p' <<<"${research_channel_info}" | jq -r '.height // 0')"
+  [[ "${research_channel_height}" -gt 3 ]] || {
+    echo "${research_channel_info}" >&2
+    echo 'ERROR: Research channel contains no post-deployment registration transaction.' >&2
+    exit 1
+  }
+  echo "Research registration channel validated: channel=${RESEARCH_CHANNEL_NAME} height=${research_channel_height}"
 fi
 
 if [[ "$PERSISTENCE_PROFILE" == "postgres-ipfs" ]]; then

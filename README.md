@@ -97,6 +97,12 @@ E2E gates before `npm publish` or any container image build.
   A non-identifying provenance category distinguishes self-reported from
   professional clinical data; the research output never reveals the author.
   Storage, audit and query metadata never become clinical content.
+- Private terminology enrichment is disabled by default and can be enabled
+  host-wide with `RESEARCH_TERMINOLOGY_LABELS_ENABLED=true`. Regardless of that
+  private choice, Fabric receives a code-only `ResearchAsset` followed by an
+  opaque `VersionAsset` whose `parent` is that research asset and whose
+  `research` marker is `true`; neither source labels nor source identifiers are
+  used as ledger asset ids.
 - DIDComm `from` is the sender DID, JWT `iss` is the signing entity, `kid` is
   the concrete key DID URL, and SMART `sub` is the authorized actor. A direct
   actor flow may deliberately share the actor DID across `from`, `iss` and

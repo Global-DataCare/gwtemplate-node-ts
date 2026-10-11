@@ -92,6 +92,7 @@ gw:
   securityMode: strict
   didcommPlain: disabled
   researchTerminologyBaseUrl: ""
+  researchTerminologyLabelsEnabled: false
   extraEnv: {}
 
 peer:

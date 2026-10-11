@@ -27,12 +27,14 @@ if (args.help) {
   process.exit(0);
 }
 
+const defaultDataChannel = args.dataChannel || 'health-care-local';
 const config = {
   tenantId: args.tenantId || 'acme-id',
   envFile: resolve(repoRoot, args.envFile || '.env.local-fabric'),
   baseUrl: args.baseUrl || 'http://localhost:3000',
   hostJurisdiction: args.hostJurisdiction || 'eu',
-  dataChannel: args.dataChannel || 'health-care-local',
+  dataChannel: defaultDataChannel,
+  researchChannel: args.researchChannel || `${defaultDataChannel.replace(/-local$/, '')}-local-research`,
   identityChannel: args.identityChannel || 'identity-local',
   bootstrapTenant: args.bootstrapTenant,
   bootstrapIndividual: args.bootstrapIndividual,
@@ -109,7 +111,7 @@ async function main() {
     env: {
       HLF_DATA_CHANNEL_NAME: config.dataChannel,
       HLF_IDENTITY_CHANNEL_NAME: config.identityChannel,
-      HLF_BOOTSTRAP_CHANNELS: `${config.identityChannel},${config.dataChannel}`,
+      HLF_BOOTSTRAP_CHANNELS: `${config.identityChannel},${config.dataChannel},${config.researchChannel}`,
     },
   });
   await runStep('fabric-generate-backend-env', {
@@ -119,7 +121,7 @@ async function main() {
     env: {
       HLF_DATA_CHANNEL_NAME: config.dataChannel,
       HLF_IDENTITY_CHANNEL_NAME: config.identityChannel,
-      HLF_BOOTSTRAP_CHANNELS: `${config.identityChannel},${config.dataChannel}`,
+      HLF_BOOTSTRAP_CHANNELS: `${config.identityChannel},${config.dataChannel},${config.researchChannel}`,
     },
   });
 
@@ -130,7 +132,7 @@ async function main() {
     env: {
       CHANNEL_NAME: config.dataChannel,
       IDENTITY_CHANNEL_NAME: config.identityChannel,
-      BOOTSTRAP_CHANNELS_VALUE: `${config.identityChannel},${config.dataChannel}`,
+      BOOTSTRAP_CHANNELS_VALUE: `${config.identityChannel},${config.dataChannel},${config.researchChannel}`,
     },
   });
 
@@ -143,6 +145,7 @@ async function main() {
         GWTEMPLATE_DIR: repoRoot,
         CHANNEL_NAME: config.identityChannel,
         HLF_IDENTITY_CHANNEL_NAME: config.identityChannel,
+        HLF_RESEARCH_CHANNEL_NAME: config.researchChannel,
       },
     });
 
@@ -163,6 +166,7 @@ async function main() {
     console.log('\n[local-fabric-stack] local-network prepared without starting GW');
     console.log(`  env: ${config.envFile}`);
     console.log(`  data channel: ${config.dataChannel}`);
+    console.log(`  research channel: ${config.researchChannel}`);
     console.log(`  identity channel: ${config.identityChannel}`);
     return;
   }
@@ -240,6 +244,7 @@ function parseArgs(argv) {
     else if (arg === '--base-url') result.baseUrl = argv[++i];
     else if (arg === '--host-jurisdiction') result.hostJurisdiction = argv[++i];
     else if (arg === '--data-channel') result.dataChannel = argv[++i];
+    else if (arg === '--research-channel') result.researchChannel = argv[++i];
     else if (arg === '--identity-channel') result.identityChannel = argv[++i];
     else if (arg === '--no-bootstrap-tenant') result.bootstrapTenant = false;
     else if (arg === '--bootstrap-individual') result.bootstrapIndividual = true;
@@ -266,6 +271,7 @@ Options:
   --base-url <url>           GW base URL. Default: http://localhost:3000
   --host-jurisdiction <cc>   Host route jurisdiction. Default: eu
   --data-channel <name>      Fabric data channel. Default: health-care-local
+  --research-channel <name>  Fabric research channel. Default: health-care-local-research
   --identity-channel <name>  Fabric identity channel. Default: identity-local
   --no-bootstrap-tenant      Skip host-side bootstrap of the tenant
   --bootstrap-individual     Also create the canonical individual baseline

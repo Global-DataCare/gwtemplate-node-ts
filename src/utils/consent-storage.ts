@@ -6,6 +6,8 @@ import { getClaimValue } from './claims';
 import { buildConsentRuleStorageKey, hashConsentRuleId } from './consent';
 import { getIndividualSectionId, getSubjectScopedSectionId } from './individual-sections';
 import { applyDigitalTwinSecondaryUseDecision } from './digital-twin-secondary-use';
+import type { IBlockchainAdapter } from '../adapters/IBlockchainAdapter';
+import type { OperationOutcome } from 'gdc-common-utils-ts/models/operation-outcome';
 import { HealthcareConsentPurposes } from 'gdc-common-utils-ts/constants/healthcare';
 import { ServiceCapability } from 'gdc-common-utils-ts/constants/service-capabilities';
 
@@ -108,12 +110,13 @@ export type PersistConsentRuleInput = {
   jurisdiction?: string;
   claims: Record<string, any>;
   researchTags?: string[];
+  blockchainAdapter?: IBlockchainAdapter;
 };
 
 export async function persistConsentRuleAndAttachment(
   input: PersistConsentRuleInput,
-): Promise<{ subjectId: string; attachmentHash?: string; ruleId: string }> {
-  const { vaultRepository, tenantVaultId, sector, jurisdiction, claims, researchTags } = input;
+): Promise<{ subjectId: string; attachmentHash?: string; ruleId: string; warnings?: OperationOutcome[] }> {
+  const { vaultRepository, tenantVaultId, sector, jurisdiction, claims, researchTags, blockchainAdapter } = input;
 
   const actorIdentifier =
     getClaimValue<string>(claims, ClaimConsent.actorIdentifier) ??
@@ -205,6 +208,15 @@ export async function persistConsentRuleAndAttachment(
     [consentRule],
     getSubjectScopedSectionId(subjectId, 'individual', 'consents'),
   );
-  await applyDigitalTwinSecondaryUseDecision({ vaultRepository, tenantVaultId, claims, sector, jurisdiction });
-  return { subjectId, attachmentHash, ruleId };
+  const warnings: OperationOutcome[] = [];
+  await applyDigitalTwinSecondaryUseDecision({
+    vaultRepository,
+    tenantVaultId,
+    claims,
+    sector,
+    jurisdiction,
+    blockchainAdapter,
+    warnings,
+  });
+  return { subjectId, attachmentHash, ruleId, ...(warnings.length ? { warnings } : {}) };
 }

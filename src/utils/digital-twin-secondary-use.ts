@@ -8,6 +8,16 @@ import type { IVaultRepository } from '../database/repositories/vault/vault.repo
 import { SUBJECT_SECTION_DIGITAL_TWIN, SUBJECT_SECTION_INDIVIDUAL } from '../constants/domain';
 import { getClaimValue } from './claims';
 import {
+  buildResearchAssetVersionMapping,
+  resolveResearchDataChannel,
+  type ResearchAssetVersionMapping,
+} from './research-asset-versioning';
+import type { IBlockchainAdapter } from '../adapters/IBlockchainAdapter';
+import type { OperationOutcome } from 'gdc-common-utils-ts/models/operation-outcome';
+import { IssueLevel, IssueType } from 'gdc-common-utils-ts/models/issue';
+import { createOperationOutcome } from './outcome';
+import { ClinicalEvidenceChaincode } from './ledger';
+import {
   getOrCreateDigitalTwinSubjectId,
   isFinalizedDigitalTwinResearchRecord,
   isDigitalTwinResearchResourceType,
@@ -88,7 +98,12 @@ async function rebuildProjection(
   sourceSubject: string,
   sector: string,
   jurisdiction: string,
-): Promise<void> {
+): Promise<Readonly<{
+  researchMappings: ResearchAssetVersionMapping[];
+  warnings: OperationOutcome[];
+}>> {
+  const researchMappings: ResearchAssetVersionMapping[] = [];
+  const warnings: OperationOutcome[] = [];
   const twinSubjectId = await getOrCreateDigitalTwinSubjectId({ vaultRepository, tenantVaultId, sourceSubject });
   await clearSubjectProjection(vaultRepository, tenantVaultId, sourceSubject);
   await clearSubjectProjection(vaultRepository, tenantVaultId, twinSubjectId);
@@ -102,18 +117,34 @@ async function rebuildProjection(
       const sourceClaims = cleanStoredClaims(sourceRecord as Record<string, any>);
       if (!isFinalizedDigitalTwinResearchRecord(resourceType, sourceClaims)) continue;
       if (!isProfessionallyAttestedResearchRecord(sourceClaims)) continue;
-      const { claims: projectedClaims } = await resolveAndProjectClaimsForDigitalTwin({
+      const projection = await resolveAndProjectClaimsForDigitalTwin({
         claims: sourceClaims,
         resourceType,
         twinSubjectId,
         sector,
         jurisdiction,
       });
+      if (projection.warning) warnings.push(projection.warning);
+      const projectedClaims = projection.claims;
       const targetSectionId = getSubjectScopedSectionId(twinSubjectId, SUBJECT_SECTION_DIGITAL_TWIN, collectionId);
       await vaultRepository.put(tenantVaultId, [{
         id: projectedRecordId(resourceType, projectedClaims, String(sourceRecord.id)),
         ...projectedClaims,
       }], targetSectionId);
+      const sourceVersionId = String(
+        (sourceRecord as Record<string, any>)?.indexed?.versionId
+        || getClaimValue(sourceClaims, `${resourceType}.meta.versionId`)
+        || '',
+      ).trim();
+      if (projection.researchReady && sourceVersionId) {
+        researchMappings.push(buildResearchAssetVersionMapping({
+          resourceType,
+          sourceResourceId: String(sourceRecord.id),
+          sourceVersionId,
+          twinSubjectId,
+          claims: projectedClaims,
+        }));
+      }
     }
   }
 
@@ -146,6 +177,7 @@ async function rebuildProjection(
       ...projectedClaims,
     }], targetCompositionSection);
   }
+  return { researchMappings, warnings };
 }
 
 /** Returns true only after at least one explicit secondary-use permit. */
@@ -177,6 +209,8 @@ export async function applyDigitalTwinSecondaryUseDecision(input: {
   claims: Record<string, any>;
   sector?: string;
   jurisdiction?: string;
+  blockchainAdapter?: IBlockchainAdapter;
+  warnings?: OperationOutcome[];
 }): Promise<boolean> {
   if (!isResearchSecondaryUseRule(input.claims)) return false;
   const sourceSubject = String(getClaimValue(input.claims, ClaimConsent.subject) || '').trim();
@@ -217,13 +251,34 @@ export async function applyDigitalTwinSecondaryUseDecision(input: {
   await input.vaultRepository.put(input.tenantVaultId, [status], statusSectionId());
 
   if (enabled) {
-    await rebuildProjection(
+    const projection = await rebuildProjection(
       input.vaultRepository,
       input.tenantVaultId,
       sourceSubject,
       String(input.sector || input.tenantVaultId.split('_')[0] || ''),
       String(input.jurisdiction || ''),
     );
+    input.warnings?.push(...projection.warnings);
+    const { researchMappings } = projection;
+    if (researchMappings.length > 0 && input.blockchainAdapter?.registerResearchVersionMappings) {
+      try {
+        const submitted = await input.blockchainAdapter.registerResearchVersionMappings(
+          researchMappings,
+          resolveResearchDataChannel(input.sector, input.jurisdiction),
+          ClinicalEvidenceChaincode,
+        );
+        if (submitted.accepted !== researchMappings.length) {
+          throw new Error(`Research registration accepted ${submitted.accepted}/${researchMappings.length} resources.`);
+        }
+      } catch (error) {
+        console.error('[ResearchLedger] Consent rebuild registration failed after private projection.', error);
+        input.warnings?.push(createOperationOutcome(
+          IssueLevel.Warning,
+          IssueType.Processing,
+          'Research registration is temporarily unavailable.',
+        ));
+      }
+    }
   }
   return true;
 }

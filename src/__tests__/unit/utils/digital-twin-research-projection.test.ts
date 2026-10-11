@@ -1,4 +1,4 @@
-// Flow contract: admit only professionally attested clinical records to research, prefer governed terminology labels, and retain clinical-service labels only as a visible fallback when exact translation is unavailable.
+// Flow contract: admit only professionally attested clinical records to research, keep source labels private, and retain professional fallback labels only for an uncoded MedicationStatement.
 import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 import {
   DIGITAL_TWIN_SEARCH_DATE_CLAIM,
@@ -123,7 +123,8 @@ describe('digital twin research projection', () => {
     })).toBe(false);
   });
 
-  it('falls back to professionally attested clinical labels and returns a warning when terminology is unavailable', async () => {
+  it('keeps a coded projection code-only and returns a warning when enabled terminology is unavailable', async () => {
+    process.env.RESEARCH_TERMINOLOGY_LABELS_ENABLED = 'true';
     process.env.RESEARCH_TERMINOLOGY_BASE_URL = 'https://terminology.example';
     const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({ ok: false, status: 503 } as Response);
     const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
@@ -140,8 +141,10 @@ describe('digital twin research projection', () => {
         },
       });
       expect(result.claims['Observation.code']).toBe('http://loinc.org|8310-5');
-      expect(result.claims['Observation.code-text']).toBe('Temperatura corporal');
-      expect(result.claims['Observation.code-display']).toBe('Body temperature');
+      expect(result.claims).not.toHaveProperty('Observation.code-text');
+      expect(result.claims).not.toHaveProperty('Observation.code-display');
+      expect(result.claims[DIGITAL_TWIN_SEARCH_TEXT_CLAIM]).toBe('http://loinc.org|8310-5');
+      expect(result.researchReady).toBe(false);
       expect(result.warning).toMatchObject({
         resourceType: 'OperationOutcome',
         issue: [{ severity: 'warning', code: 'processing' }],
@@ -149,6 +152,7 @@ describe('digital twin research projection', () => {
       expect(errorSpy).toHaveBeenCalled();
     } finally {
       delete process.env.RESEARCH_TERMINOLOGY_BASE_URL;
+      delete process.env.RESEARCH_TERMINOLOGY_LABELS_ENABLED;
       fetchSpy.mockRestore();
       errorSpy.mockRestore();
     }
@@ -175,10 +179,56 @@ describe('digital twin research projection', () => {
     expect(result.claims).not.toHaveProperty('MedicationStatement.code-display');
     expect(result.claims).not.toHaveProperty('MedicationStatement.note');
     expect(result.claims[DIGITAL_TWIN_SEARCH_TEXT_CLAIM]).toBe('Ibuprofeno preparado para Alice');
+    expect(result.researchReady).toBe(false);
     expect(result.warning).toMatchObject({
       resourceType: 'OperationOutcome',
       issue: [{ severity: 'warning', code: 'incomplete' }],
     });
+  });
+
+  it('uses the professional display only when an uncoded medication has no local text', async () => {
+    const result = await resolveAndProjectClaimsForDigitalTwin({
+      resourceType: 'MedicationStatement', sector: 'health-care', jurisdiction: 'ES',
+      twinSubjectId: 'urn:uuid:00000000-0000-4000-8000-000000000001',
+      claims: {
+        'MedicationStatement.subject': 'did:web:api.example:individual:123',
+        'MedicationStatement.code-display': 'Extemporaneous medicinal product',
+        'Composition.attester': 'PractitionerRole/clinician-1',
+        'Composition.attester-mode': 'professional',
+      },
+    });
+
+    expect(result.claims).not.toHaveProperty('MedicationStatement.code-text');
+    expect(result.claims['MedicationStatement.code-display']).toBe('Extemporaneous medicinal product');
+    expect(result.claims['MedicationStatement.user-selected']).toBe('false');
+    expect(result.researchReady).toBe(false);
+  });
+
+  it('does not call terminology when host label enrichment is disabled and marks coded projection ready', async () => {
+    process.env.RESEARCH_TERMINOLOGY_LABELS_ENABLED = 'false';
+    process.env.RESEARCH_TERMINOLOGY_BASE_URL = 'https://terminology.example';
+    const fetchSpy = jest.spyOn(global, 'fetch');
+    try {
+      const result = await resolveAndProjectClaimsForDigitalTwin({
+        resourceType: 'Observation', sector: 'health-care', jurisdiction: 'ES',
+        twinSubjectId: 'urn:uuid:00000000-0000-4000-8000-000000000001',
+        claims: {
+          'Observation.code': 'http://loinc.org|8310-5',
+          'Observation.code-text': 'Temperatura corporal',
+          'Observation.code-display': 'Body temperature',
+        },
+      });
+
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(result.claims).not.toHaveProperty('Observation.code-text');
+      expect(result.claims).not.toHaveProperty('Observation.code-display');
+      expect(result.researchReady).toBe(true);
+      expect(result.warning).toBeUndefined();
+    } finally {
+      delete process.env.RESEARCH_TERMINOLOGY_LABELS_ENABLED;
+      delete process.env.RESEARCH_TERMINOLOGY_BASE_URL;
+      fetchSpy.mockRestore();
+    }
   });
 
   it('rejects identity-bearing resource families from the research plane', () => {

@@ -23,7 +23,8 @@ El flujo realiza:
 3. registro y enrollment de orderer, administradores y peers en la ICA de
    Fabric;
 4. generación local de claves MSP/TLS;
-5. creación de `identity-local` y `health-care-local`;
+5. creación de `identity-local`, `health-care-local` y
+   `health-care-local-research`;
 6. unión de los peers autorizados.
 
 Los certificados de los peers deben verificar contra la Root usando la ICA de
@@ -40,10 +41,10 @@ entonces arranca y une el segundo peer:
 node "${REPO_ROOT}/scripts/onboarding/create-local-audit-authorization.mjs" \
   --output /tmp/host2-authorization.json \
   --bundle-dir /tmp/host2-governance
-SINGLE_HOST=true HLF_BOOTSTRAP_CHANNELS=identity-local,health-care-local \
+SINGLE_HOST=true HLF_BOOTSTRAP_CHANNELS=identity-local,health-care-local,health-care-local-research \
   ./scripts/02-bootstrap-network.sh
 HOST_AUTHORIZATION_JSON=/tmp/host2-authorization.json \
-SINGLE_HOST=true HLF_BOOTSTRAP_CHANNELS=identity-local,health-care-local \
+SINGLE_HOST=true HLF_BOOTSTRAP_CHANNELS=identity-local,health-care-local,health-care-local-research \
   ./scripts/06-admit-host2.sh
 ```
 

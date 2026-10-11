@@ -185,7 +185,7 @@ export function buildManagers(options: {
     buildBreakGlassAuthorizer(blockchainAdapter, vaultRepository),
   );
   const observationManager = new ObservationManager(vaultRepository, blockchainAdapter, tenantManager);
-  const medicationStatementManager = new MedicationStatementManager(vaultRepository, tenantManager);
+  const medicationStatementManager = new MedicationStatementManager(vaultRepository, tenantManager, blockchainAdapter);
   const relatedPersonManager = new RelatedPersonManager(vaultRepository, blockchainAdapter, tenantManager);
   const consentManager = new ConsentManager({ vaultRepository, blockchainAdapter, tenantsCacheManager: tenantManager });
   const discoveryService = new DiscoveryService(tenantManager);

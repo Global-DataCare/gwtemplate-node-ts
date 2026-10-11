@@ -44,6 +44,27 @@ export interface IBlockchainAdapter {
     chaincode: string,
   ): Promise<{ accepted: number; txId?: string }>;
 
+  /** Registers code-only research parents followed by opaque research versions. */
+  registerResearchVersionMappings?(
+    mappings: Array<{
+      resourceType: string;
+      researchAssetId: string;
+      versionAssetId: string;
+      sourceVersionId: string;
+      parent: string;
+      research: true;
+      tags: Array<{
+        id: string;
+        system?: string;
+        code?: string;
+        version?: string;
+        userSelected?: boolean;
+      }>;
+    }>,
+    channel: string,
+    chaincode: string,
+  ): Promise<{ accepted: number; txId?: string }>;
+
   /**
    * Optional write path for registering one content-addressed artifact payload
    * on-chain.
