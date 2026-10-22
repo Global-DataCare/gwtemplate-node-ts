@@ -1,0 +1,1276 @@
+
+> gwtemplate-node-ts@1.25.24 docker:smoke:open-source-local-network
+> PERSISTENCE_PROFILE=postgres-ipfs bash ./scripts/smoke-docker-local-network.sh
+
+Public identity chaincodes verified: organization-sc, cryptographickey-sc
+[local-fabric-chaincode-readiness] organization-sc: ready
+[local-fabric-chaincode-readiness] cryptographickey-sc: ready
+[local-fabric-chaincode-readiness] employee-sc: ready
+[local-fabric-chaincode-readiness] evidence-sc: ready
+[local-fabric-chaincode-readiness] credential-sc: ready
+[local-fabric-chaincode-readiness] artifact-sc: ready
+[local-fabric-chaincode-readiness] artifactevent-sc: ready
+[local-fabric-chaincode-readiness] subjectkeybinding-sc: ready
+[local-fabric-chaincode-readiness] subjectidentifier-sc: ready
+
+> gwtemplate-node-ts@1.25.24 prepare:local-fabric-env
+> bash ./scripts/prepare-consentaccess-local-fabric-env.sh
+
+Fabric devnet env already present: ${HOME}/GITS/gdc-workspace/gwtemplate-node-ts/infra/fabric/local-network/.env.fabric-devnet
+Wrote ${HOME}/GITS/gdc-workspace/gwtemplate-node-ts/.env.local-fabric
+
+Consent access local Fabric env:
+  healthcare channel: health-care-local
+  identity channel:   identity-local
+  bootstrap channels: identity-local,health-care-local
+  sector:     health-care
+  host jurisdiction:eu
+  tenant jurisdiction:ES
+  mspId:      Host1MSP
+  chaincode:  consentaccess-sc
+  peer:       peer0-host1:7051
+  legacy representative controller: false
+  tenant service routes configured: no
+
+Run GW CORE with:
+  cd ${HOME}/GITS/gdc-workspace/gwtemplate-node-ts
+  npm run api:local-fabric
+Wrote compatibility alias ${HOME}/GITS/gdc-workspace/gwtemplate-node-ts/.env.local-fabric-devnet
+ Volume gdc-host040-local-network_gw-open-source-postgres-data  Removing
+ Volume gdc-host040-local-network_gw-open-source-ipfs-data  Removing
+ Volume gdc-host040-local-network_gw-open-source-ipfs-data  Removed
+ Volume gdc-host040-local-network_gw-open-source-postgres-data  Removed
+ Volume "gdc-host040-local-network_gw-open-source-postgres-data"  Creating
+ Volume "gdc-host040-local-network_gw-open-source-postgres-data"  Created
+ Volume "gdc-host040-local-network_gw-open-source-ipfs-data"  Creating
+ Volume "gdc-host040-local-network_gw-open-source-ipfs-data"  Created
+time="2026-09-21T12:16:44-07:00" level=warning msg="Found orphan containers ([gdc-host040-peer0-host2 gdc-host040-peer0-host1 gdc-host040-orderer gdc-host040-fabric-tools gdc-host040-fabric-ca-client gdc-host040-ica gdc-host040-root-ca]) for this project. If you removed or renamed this service in your compose file, you can run this command with the --remove-orphans flag to clean it up."
+ Container gw-open-source-postgres  Creating
+ Container gw-open-source-ipfs  Creating
+ Container gw-open-source-ipfs  Created
+ Container gw-open-source-postgres  Created
+ Container gw-open-source-ipfs  Starting
+ Container gw-open-source-postgres  Starting
+ Container gw-open-source-ipfs  Started
+ Container gw-open-source-postgres  Started
+ Container gw-open-source-postgres  Waiting
+ Container gw-open-source-ipfs  Waiting
+ Container gw-open-source-postgres  Healthy
+ Container gw-open-source-ipfs  Healthy
+619282738b424d07368addf8d9782014e0d98a3f8d7d46f0ac6cccf58f6d9b0b
+Container 'gw-core-local-network-smoke' maps localhost:18081 to container:3000
+Docker local-network ping succeeded: http://127.0.0.1:18081/host/cds-eu/v1/local-network/.well-known/ping
+[bootstrap] ping: http://127.0.0.1:18081/host/ping
+[bootstrap] ping: http://127.0.0.1:18081/host/cds-eu/v1/local-network/.well-known/ping
+(node:73138) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("ts-node/esm", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:73138) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[bootstrap] organization registration (taxId=acme-id)
+{
+  "data": [
+    {
+      "type": "Organization-registration-offer-v1.0",
+      "resource": {
+        "resourceType": "Organization",
+        "id": "7a8737ea-f00d-4356-8290-11d632cd00b6",
+        "meta": {
+          "claims": {
+            "@context": "org.schema",
+            "@type": "Service",
+            "org.schema.Organization.address.addressCountry": "ES",
+            "org.schema.Organization.identifier.additionalType": "TAX",
+            "org.schema.Organization.identifier.value": "acme-id",
+            "org.schema.Organization.legalName": "Acme Organization SL",
+            "org.schema.Organization.name": "Acme Org",
+            "org.schema.Organization.numberOfEmployees.value": 2,
+            "org.schema.Organization.url": "api.acme.org",
+            "org.schema.Person.email": "admin1@acme.org",
+            "org.schema.Person.hasOccupation": "ISCO-08|1120",
+            "org.schema.Service.areaServed": "ES",
+            "org.schema.Service.category": "health-care",
+            "org.schema.Service.identifier": "did:web:api-provider.example.com",
+            "org.schema.Service.serviceType": "organization/Composition.cruds,organization/ResearchSubject.rs",
+            "org.schema.Service.termsOfService": "https://example.com/terms",
+            "org.schema.Service.url": "http://127.0.0.1:18081/acme-id/cds-es/v1/health-care",
+            "org.schema.Organization.alternateName": "acme-id",
+            "org.schema.Organization.identifier": "urn:gdc:test:es:v1:health-care:entity:tax:acme-id",
+            "org.schema.Offer.acceptedPaymentMethod": "Stripe",
+            "org.schema.Offer.category": "health-care",
+            "org.schema.Offer.checkoutPageURLTemplate": "<payment-url>",
+            "org.schema.Offer.eligibleCustomerType": "employee",
+            "org.schema.Offer.eligibleQuantity.value": 2,
+            "org.schema.Offer.identifier": "urn:cds:EU:v1:health-care:product:org.schema:Offer:ce452e32-de4c-4610-86ea-5805e2834550",
+            "org.schema.Offer.itemOffered.name": "License Tier XS",
+            "org.schema.Offer.itemOffered.sku": "web-or-app-identifier",
+            "org.schema.Offer.offeredBy": "did:web:localhost%3A3000",
+            "org.schema.Offer.price": "0.00",
+            "org.schema.Offer.priceCurrency": "EUR",
+            "org.schema.Offer.serialNumber": "lic-d9cecf23,lic-426be679"
+          }
+        }
+      },
+      "response": {
+        "status": "201"
+      }
+    }
+  ],
+  "resourceType": "Bundle",
+  "type": "batch-response",
+  "total": 1
+}
+(node:73232) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("ts-node/esm", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:73232) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[bootstrap] order confirmation
+{
+  "data": [
+    {
+      "type": "Organization-order-response-v1.0",
+      "resource": {
+        "resourceType": "Bundle",
+        "type": "collection",
+        "entry": [
+          {
+            "resource": {
+              "resourceType": "Invoice",
+              "id": "urn:cds:EU:v1:health-care:product:org.schema:Offer:ce452e32-de4c-4610-86ea-5805e2834550",
+              "status": "issued",
+              "identifier": [
+                {
+                  "value": "urn:cds:EU:v1:health-care:product:org.schema:Offer:ce452e32-de4c-4610-86ea-5805e2834550"
+                }
+              ],
+              "subject": {
+                "reference": "did:web:localhost%3A3000:acme-id:cds-ES:v1:health-care"
+              },
+              "recipient": {
+                "reference": "did:web:localhost%3A3000:acme-id:cds-ES:v1:health-care"
+              },
+              "issuer": {
+                "reference": "did:web:localhost%3A3000"
+              },
+              "date": "2026-09-21T19:17:20.152Z",
+              "totalNet": {
+                "value": 0,
+                "currency": "EUR"
+              },
+              "totalGross": {
+                "value": 0,
+                "currency": "EUR"
+              }
+            }
+          },
+          {
+            "resource": {
+              "resourceType": "DocumentReference",
+              "id": "urn:cds:EU:v1:health-care:product:org.schema:Offer:ce452e32-de4c-4610-86ea-5805e2834550-pdf",
+              "status": "current",
+              "identifier": [
+                {
+                  "value": "urn:cds:EU:v1:health-care:product:org.schema:Offer:ce452e32-de4c-4610-86ea-5805e2834550-pdf"
+                }
+              ],
+              "subject": {
+                "reference": "did:web:localhost%3A3000:acme-id:cds-ES:v1:health-care"
+              },
+              "date": "2026-09-21T19:17:20.152Z",
+              "description": "Human-readable invoice PDF",
+              "content": [
+                {
+                  "attachment": {
+                    "contentType": "application/pdf",
+                    "data": "JVBERi0xLjQKSW52b2ljZSB1cm46Y2RzOkVVOnYxOmhlYWx0aC1jYXJlOnByb2R1Y3Q6b3JnLnNjaGVtYTpPZmZlcjpjZTQ1MmUzMi1kZTRjLTQ2MTAtODZlYS01ODA1ZTI4MzQ1NTAKSXNzdWVkIDIwMjYtMDktMjFUMTk6MTc6MjAuMTUyWgpBbW91bnQgMC4wMCBFVVIKUGF5bWVudAolJUVPRg==",
+                    "title": "urn:cds:EU:v1:health-care:product:org.schema:Offer:ce452e32-de4c-4610-86ea-5805e2834550.pdf",
+                    "language": "en",
+                    "creation": "2026-09-21T19:17:20.152Z"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "resource": {
+              "resourceType": "DocumentReference",
+              "id": "urn:cds:EU:v1:health-care:product:org.schema:Offer:ce452e32-de4c-4610-86ea-5805e2834550-json",
+              "status": "current",
+              "identifier": [
+                {
+                  "value": "urn:cds:EU:v1:health-care:product:org.schema:Offer:ce452e32-de4c-4610-86ea-5805e2834550-json"
+                }
+              ],
+              "subject": {
+                "reference": "did:web:localhost%3A3000:acme-id:cds-ES:v1:health-care"
+              },
+              "date": "2026-09-21T19:17:20.152Z",
+              "description": "Structured invoice payloads",
+              "content": [
+                {
+                  "attachment": {
+                    "contentType": "application/json",
+                    "data": "eyJpbnZvaWNlSWQiOiJ1cm46Y2RzOkVVOnYxOmhlYWx0aC1jYXJlOnByb2R1Y3Q6b3JnLnNjaGVtYTpPZmZlcjpjZTQ1MmUzMi1kZTRjLTQ2MTAtODZlYS01ODA1ZTI4MzQ1NTAiLCJpc3N1ZWRBdCI6IjIwMjYtMDktMjFUMTk6MTc6MjAuMTUyWiIsImFtb3VudCI6IjAuMDAiLCJjdXJyZW5jeSI6IkVVUiIsInN1YmplY3RSZWZlcmVuY2UiOiJkaWQ6d2ViOmxvY2FsaG9zdCUzQTMwMDA6YWNtZS1pZDpjZHMtRVM6djE6aGVhbHRoLWNhcmUiLCJyZWNpcGllbnRSZWZlcmVuY2UiOiJkaWQ6d2ViOmxvY2FsaG9zdCUzQTMwMDA6YWNtZS1pZDpjZHMtRVM6djE6aGVhbHRoLWNhcmUiLCJpc3N1ZXJSZWZlcmVuY2UiOiJkaWQ6d2ViOmxvY2FsaG9zdCUzQTMwMDAifQ==",
+                    "title": "urn:cds:EU:v1:health-care:product:org.schema:Offer:ce452e32-de4c-4610-86ea-5805e2834550.json",
+                    "language": "en",
+                    "creation": "2026-09-21T19:17:20.152Z"
+                  }
+                },
+                {
+                  "attachment": {
+                    "contentType": "application/xml",
+                    "data": "PEludm9pY2UgeG1sbnM9InVybjpvYXNpczpuYW1lczpzcGVjaWZpY2F0aW9uOnVibDpzY2hlbWE6eHNkOkludm9pY2UtMiI+CiAgPElEPnVybjpjZHM6RVU6djE6aGVhbHRoLWNhcmU6cHJvZHVjdDpvcmcuc2NoZW1hOk9mZmVyOmNlNDUyZTMyLWRlNGMtNDYxMC04NmVhLTU4MDVlMjgzNDU1MDwvSUQ+CiAgPElzc3VlRGF0ZT4yMDI2LTA5LTIxPC9Jc3N1ZURhdGU+CiAgPERvY3VtZW50Q3VycmVuY3lDb2RlPkVVUjwvRG9jdW1lbnRDdXJyZW5jeUNvZGU+CiAgPE5vdGU+PC9Ob3RlPgogIDxBY2NvdW50aW5nQ3VzdG9tZXJQYXJ0eT48UGFydHk+PEVuZHBvaW50SUQ+ZGlkOndlYjpsb2NhbGhvc3QlM0EzMDAwOmFjbWUtaWQ6Y2RzLUVTOnYxOmhlYWx0aC1jYXJlPC9FbmRwb2ludElEPjwvUGFydHk+PC9BY2NvdW50aW5nQ3VzdG9tZXJQYXJ0eT4KICA8QWNjb3VudGluZ1N1cHBsaWVyUGFydHk+PFBhcnR5PjxFbmRwb2ludElEPmRpZDp3ZWI6bG9jYWxob3N0JTNBMzAwMDwvRW5kcG9pbnRJRD48L1BhcnR5PjwvQWNjb3VudGluZ1N1cHBsaWVyUGFydHk+CiAgPExlZ2FsTW9uZXRhcnlUb3RhbD48UGF5YWJsZUFtb3VudCBjdXJyZW5jeUlEPSJFVVIiPjAuMDA8L1BheWFibGVBbW91bnQ+PC9MZWdhbE1vbmV0YXJ5VG90YWw+CjwvSW52b2ljZT4=",
+                    "title": "urn:cds:EU:v1:health-care:product:org.schema:Offer:ce452e32-de4c-4610-86ea-5805e2834550.xml",
+                    "language": "en",
+                    "creation": "2026-09-21T19:17:20.152Z",
+                    "hash": "2a2745f5b4dc1e0d20dc7a47245a454e3474c2a85eb7e6f01a6d3b4e57d8f1af"
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "meta": {
+          "claims": {
+            "@context": "org.schema",
+            "@type": "Order:Invoice",
+            "org.schema.Order.acceptedOffer.identifier": "urn:cds:EU:v1:health-care:product:org.schema:Offer:ce452e32-de4c-4610-86ea-5805e2834550",
+            "org.schema.Order.invoiceIssuedAt": "2026-09-21T19:17:20.152Z",
+            "org.schema.IndividualProduct.serialNumber": "lic-T-aDmUL9NbM4",
+            "org.schema.IndividualProduct.category": "professional"
+          }
+        }
+      },
+      "response": {
+        "status": "201"
+      }
+    }
+  ],
+  "resourceType": "Bundle",
+  "type": "batch-response",
+  "total": 1
+}
+OK: tenant taxId='acme-id' ready for individual/org.schema and FHIR flows
+[smoke-consentaccess] rendering canonical consent bundle from common-utils fixtures
+(node:73345) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("ts-node/esm", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:73345) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:73386) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("ts-node/esm", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:73386) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:73417) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("ts-node/esm", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:73417) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:73453) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("ts-node/esm", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:73453) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[smoke-consentaccess] POST http://127.0.0.1:18081/acme-id/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Consent/_batch
+[smoke-consentaccess] polling http://127.0.0.1:18081/acme-id/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Consent/_batch-response
+[smoke-consentaccess] verifying 3 independent rule assets on health-care-local
+[smoke-consentaccess] verified rule asset zKYrhR7Hsce8zwjY37c8xdb2Epzb4CfpDe3GrjAZoUSoJLtUFV7ZvuWTqqeLvGTydnQxpvF
+[smoke-consentaccess] verified rule asset zKYrhNwwyqaFJP4xbJBKyj6kUhTUYuMxi3SsGjmZmKBvcABFRNGTPosrgqoMvhPiWym9VMr
+[smoke-consentaccess] verified rule asset zKYrhTu2XiYSVmqEUKguawfx9EaXGqCLN9n8kDVVUNcwjKYpGWZhZrMER3yZTE7AuCLP9ev
+[smoke-consentaccess] POST duplicate batch http://127.0.0.1:18081/acme-id/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Consent/_batch
+[smoke-consentaccess] polling duplicate batch http://127.0.0.1:18081/acme-id/cds-ES/v1/health-care/individual/org.hl7.fhir.r4/Consent/_batch-response
+[smoke-consentaccess] verifying second batch assets and duplicate no-op behavior
+[smoke-consentaccess] verified rule asset zKYrhR7Hsce8zwjY37c8xdb2Epzb4CfpDe3GrjAZoUSoJLtUFV7ZvuWTqqeLvGTydnQxpvF
+[smoke-consentaccess] verified rule asset zKYrhVCdsmcs5nyG1rj27K5FqRuwS5TeunZY4akYcDTWkxpHCEm9R7UvpeWU2KfHu3BQm8e
+[smoke-consentaccess] verified rule asset zKYrhUgGEA4cgKGA59TatYPYqD3sH1suzvmvoxU5GityT7iRL5CuzqGmHRn5CJnYRsaGJpw
+[smoke-consentaccess] success: first batch 3 rules, second batch 3 rules, unique on-chain rule assets 5
+[smart-access-smoke] preparing canonical individual baseline and demo clinical data
+[0/5] Preparing canonical individual baseline...
+[individual] Rendering canonical individual-organization registration payload...
+(node:73725) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("ts-node/esm", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:73725) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[individual] POST http://127.0.0.1:18081/acme-id/cds-ES/v1/health-care/individual/org.schema/Organization/_transaction
+[individual] Polling http://127.0.0.1:18081/acme-id/cds-ES/v1/health-care/individual/org.schema/Organization/_transaction-response
+{
+  "data": [
+    {
+      "type": "Family-registration-offer-v1.0",
+      "resource": {
+        "resourceType": "Organization",
+        "id": "00000000-0000-4000-8000-000000000001",
+        "meta": {
+          "claims": {
+            "@context": "org.schema",
+            "@type": "receipt",
+            "org.schema.Organization.address.addressCountry": "ES",
+            "org.schema.Organization.address.addressLocality": "Madrid",
+            "org.schema.Organization.address.postalCode": "28001",
+            "org.schema.Organization.address.streetAddress": "Calle Demo 1",
+            "org.schema.Organization.alternateName": "Doraemon",
+            "org.schema.Organization.identifier.additionalType": "UUID",
+            "org.schema.Organization.identifier.value": "00000000-0000-4000-8000-000000000001",
+            "org.schema.Organization.member.birthDate": "2010",
+            "org.schema.Organization.member.role": "ONESELF",
+            "org.schema.Organization.owner.alternateName": "Doraemon",
+            "org.schema.Organization.owner.email": "adult1@example.com",
+            "org.schema.Organization.owner.identifier.value": "97bfb7b5-4473-4838-9127-9cb1d0f630e9",
+            "org.schema.Organization.owner.telephone": "",
+            "org.schema.Person.birthDate": "1985",
+            "org.schema.Person.email": "child1@example.com",
+            "org.schema.Person.familyName": "NOBI",
+            "org.schema.Person.gender": "F",
+            "org.schema.Person.givenName": "DORA",
+            "org.schema.Person.identifier": "urn:person:identifier:ID-DEMO-DORAEMON-001",
+            "org.schema.Person.identifier.additionalType": "UUID",
+            "org.schema.Person.identifier.value": "ID-DEMO-DORAEMON-001",
+            "org.schema.Person.name": "DORA NOBI",
+            "org.schema.Service.category": "health-care",
+            "org.schema.Service.identifier": "did:web:api-provider.example.com",
+            "org.schema.Service.serviceType": "organization/Composition.cruds,organization/ResearchSubject.rs",
+            "org.schema.Service.termsOfService": "https://portal.example.org/files/legal-organization-signed-terms.pdf",
+            "org.schema.Offer.acceptedPaymentMethod": "Stripe",
+            "org.schema.Offer.category": "health-care",
+            "org.schema.Offer.checkoutPageURLTemplate": "<payment-url>",
+            "org.schema.Offer.eligibleCustomerType": "individual",
+            "org.schema.Offer.eligibleQuantity.value": 2,
+            "org.schema.Offer.identifier": "urn:cds:ES:v1:health-care:product:org.schema:Offer:828f460c-1740-4cb7-8db4-3903b6a6eab5",
+            "org.schema.Offer.itemOffered.name": "License Tier XS",
+            "org.schema.Offer.itemOffered.sku": "web-or-app-identifier",
+            "org.schema.Offer.offeredBy": "did:web:localhost%3A3000:acme-id:cds-ES:v1:health-care",
+            "org.schema.Offer.price": "0.00",
+            "org.schema.Offer.priceCurrency": "EUR",
+            "org.schema.Offer.serialNumber": "lic-c32ad539,lic-0a724f40",
+            "org.schema.FamilyRegistration.status": "new_created"
+          }
+        }
+      },
+      "response": {
+        "status": "201"
+      }
+    }
+  ],
+  "resourceType": "Bundle",
+  "type": "transaction-response",
+  "total": 1
+}
+[individual] Rendering canonical individual order payload...
+(node:73791) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("ts-node/esm", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:73791) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[individual] POST http://127.0.0.1:18081/acme-id/cds-ES/v1/health-care/individual/org.schema/Order/_batch
+[individual] Polling http://127.0.0.1:18081/acme-id/cds-ES/v1/health-care/individual/org.schema/Order/_batch-response
+{
+  "data": [
+    {
+      "type": "Family-order-response-v1.0",
+      "resource": {
+        "resourceType": "Bundle",
+        "type": "collection",
+        "entry": [
+          {
+            "resource": {
+              "resourceType": "Invoice",
+              "id": "urn:cds:ES:v1:health-care:product:org.schema:Offer:828f460c-1740-4cb7-8db4-3903b6a6eab5",
+              "status": "issued",
+              "identifier": [
+                {
+                  "value": "urn:cds:ES:v1:health-care:product:org.schema:Offer:828f460c-1740-4cb7-8db4-3903b6a6eab5"
+                }
+              ],
+              "subject": {
+                "reference": "adult1@example.com"
+              },
+              "recipient": {
+                "reference": "adult1@example.com"
+              },
+              "issuer": {
+                "reference": "did:web:localhost%3A3000:acme-id:cds-ES:v1:health-care"
+              },
+              "date": "2026-09-21T19:17:42.513Z",
+              "totalNet": {
+                "value": 0,
+                "currency": "EUR"
+              },
+              "totalGross": {
+                "value": 0,
+                "currency": "EUR"
+              }
+            }
+          },
+          {
+            "resource": {
+              "resourceType": "DocumentReference",
+              "id": "urn:cds:ES:v1:health-care:product:org.schema:Offer:828f460c-1740-4cb7-8db4-3903b6a6eab5-pdf",
+              "status": "current",
+              "identifier": [
+                {
+                  "value": "urn:cds:ES:v1:health-care:product:org.schema:Offer:828f460c-1740-4cb7-8db4-3903b6a6eab5-pdf"
+                }
+              ],
+              "subject": {
+                "reference": "adult1@example.com"
+              },
+              "date": "2026-09-21T19:17:42.513Z",
+              "description": "Human-readable invoice PDF",
+              "content": [
+                {
+                  "attachment": {
+                    "contentType": "application/pdf",
+                    "data": "JVBERi0xLjQKSW52b2ljZSB1cm46Y2RzOkVTOnYxOmhlYWx0aC1jYXJlOnByb2R1Y3Q6b3JnLnNjaGVtYTpPZmZlcjo4MjhmNDYwYy0xNzQwLTRjYjctOGRiNC0zOTAzYjZhNmVhYjUKSXNzdWVkIDIwMjYtMDktMjFUMTk6MTc6NDIuNTEzWgpBbW91bnQgMC4wMCBFVVIKUGF5bWVudAolJUVPRg==",
+                    "title": "urn:cds:ES:v1:health-care:product:org.schema:Offer:828f460c-1740-4cb7-8db4-3903b6a6eab5.pdf",
+                    "language": "en",
+                    "creation": "2026-09-21T19:17:42.513Z"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "resource": {
+              "resourceType": "DocumentReference",
+              "id": "urn:cds:ES:v1:health-care:product:org.schema:Offer:828f460c-1740-4cb7-8db4-3903b6a6eab5-json",
+              "status": "current",
+              "identifier": [
+                {
+                  "value": "urn:cds:ES:v1:health-care:product:org.schema:Offer:828f460c-1740-4cb7-8db4-3903b6a6eab5-json"
+                }
+              ],
+              "subject": {
+                "reference": "adult1@example.com"
+              },
+              "date": "2026-09-21T19:17:42.513Z",
+              "description": "Structured invoice payloads",
+              "content": [
+                {
+                  "attachment": {
+                    "contentType": "application/json",
+                    "data": "eyJpbnZvaWNlSWQiOiJ1cm46Y2RzOkVTOnYxOmhlYWx0aC1jYXJlOnByb2R1Y3Q6b3JnLnNjaGVtYTpPZmZlcjo4MjhmNDYwYy0xNzQwLTRjYjctOGRiNC0zOTAzYjZhNmVhYjUiLCJpc3N1ZWRBdCI6IjIwMjYtMDktMjFUMTk6MTc6NDIuNTEzWiIsImFtb3VudCI6IjAuMDAiLCJjdXJyZW5jeSI6IkVVUiIsInN1YmplY3RSZWZlcmVuY2UiOiJhZHVsdDFAZXhhbXBsZS5jb20iLCJyZWNpcGllbnRSZWZlcmVuY2UiOiJhZHVsdDFAZXhhbXBsZS5jb20iLCJpc3N1ZXJSZWZlcmVuY2UiOiJkaWQ6d2ViOmxvY2FsaG9zdCUzQTMwMDA6YWNtZS1pZDpjZHMtRVM6djE6aGVhbHRoLWNhcmUifQ==",
+                    "title": "urn:cds:ES:v1:health-care:product:org.schema:Offer:828f460c-1740-4cb7-8db4-3903b6a6eab5.json",
+                    "language": "en",
+                    "creation": "2026-09-21T19:17:42.513Z"
+                  }
+                },
+                {
+                  "attachment": {
+                    "contentType": "application/xml",
+                    "data": "PEludm9pY2UgeG1sbnM9InVybjpvYXNpczpuYW1lczpzcGVjaWZpY2F0aW9uOnVibDpzY2hlbWE6eHNkOkludm9pY2UtMiI+CiAgPElEPnVybjpjZHM6RVM6djE6aGVhbHRoLWNhcmU6cHJvZHVjdDpvcmcuc2NoZW1hOk9mZmVyOjgyOGY0NjBjLTE3NDAtNGNiNy04ZGI0LTM5MDNiNmE2ZWFiNTwvSUQ+CiAgPElzc3VlRGF0ZT4yMDI2LTA5LTIxPC9Jc3N1ZURhdGU+CiAgPERvY3VtZW50Q3VycmVuY3lDb2RlPkVVUjwvRG9jdW1lbnRDdXJyZW5jeUNvZGU+CiAgPE5vdGU+PC9Ob3RlPgogIDxBY2NvdW50aW5nQ3VzdG9tZXJQYXJ0eT48UGFydHk+PEVuZHBvaW50SUQ+YWR1bHQxQGV4YW1wbGUuY29tPC9FbmRwb2ludElEPjwvUGFydHk+PC9BY2NvdW50aW5nQ3VzdG9tZXJQYXJ0eT4KICA8QWNjb3VudGluZ1N1cHBsaWVyUGFydHk+PFBhcnR5PjxFbmRwb2ludElEPmRpZDp3ZWI6bG9jYWxob3N0JTNBMzAwMDphY21lLWlkOmNkcy1FUzp2MTpoZWFsdGgtY2FyZTwvRW5kcG9pbnRJRD48L1BhcnR5PjwvQWNjb3VudGluZ1N1cHBsaWVyUGFydHk+CiAgPExlZ2FsTW9uZXRhcnlUb3RhbD48UGF5YWJsZUFtb3VudCBjdXJyZW5jeUlEPSJFVVIiPjAuMDA8L1BheWFibGVBbW91bnQ+PC9MZWdhbE1vbmV0YXJ5VG90YWw+CjwvSW52b2ljZT4=",
+                    "title": "urn:cds:ES:v1:health-care:product:org.schema:Offer:828f460c-1740-4cb7-8db4-3903b6a6eab5.xml",
+                    "language": "en",
+                    "creation": "2026-09-21T19:17:42.513Z",
+                    "hash": "0ac329f20542616067be4cae932edee4bb67f002814ecb063f4b615fada36913"
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "meta": {
+          "claims": {
+            "@context": "org.schema",
+            "@type": "Order:Invoice",
+            "org.schema.Order.acceptedOffer.identifier": "urn:cds:ES:v1:health-care:product:org.schema:Offer:828f460c-1740-4cb7-8db4-3903b6a6eab5",
+            "org.schema.Order.invoiceIssuedAt": "2026-09-21T19:17:42.513Z",
+            "org.schema.IndividualProduct.serialNumber": "lic-UbQiQZhdChPv",
+            "org.schema.IndividualProduct.category": "individual"
+          }
+        }
+      },
+      "response": {
+        "status": "201"
+      }
+    },
+    {
+      "type": "RelatedPerson",
+      "resource": {
+        "resourceType": "RelatedPerson",
+        "id": "97bfb7b5-4473-4838-9127-9cb1d0f630e9",
+        "meta": {
+          "claims": {
+            "@context": "org.hl7.fhir.api",
+            "org.hl7.fhir.api.RelatedPerson.active": "true",
+            "org.hl7.fhir.api.RelatedPerson.identifier": "97bfb7b5-4473-4838-9127-9cb1d0f630e9",
+            "org.hl7.fhir.api.RelatedPerson.patient": "did:web:localhost%3A3000:acme-id:cds-ES:v1:health-care:individual:multibase:zG9MJU4Yjo8Y1E2bzGNuKiw3N9pvm7E3nCLYetSYdL6G5awoCgGSCzWw7PiFhZ8fMNYTh",
+            "org.hl7.fhir.api.RelatedPerson.relationship": "http://terminology.hl7.org/CodeSystem/v3-RoleCode|RESPRSN",
+            "org.hl7.fhir.api.RelatedPerson.telecom": "mailto:adult1@example.com"
+          }
+        }
+      },
+      "response": {
+        "status": "201"
+      }
+    }
+  ],
+  "resourceType": "Bundle",
+  "type": "batch-response",
+  "total": 2
+}
+[individual] OK: legacy-compatible individual organization prepared
+[individual] Expected subject DID for follow-up demos: did:web:api.acme-id.org:individual:subject-001
+[1/4] Rendering canonical synthetic demo payloads...
+(node:73877) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("ts-node/esm", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:73877) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:73892) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("ts-node/esm", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:73892) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:73919) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("ts-node/esm", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:73919) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:73934) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("ts-node/esm", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:73934) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[2/4] Polling Communication/_batch-response...
+{
+  "resourceType": "Bundle",
+  "type": "_batch-response",
+  "data": [
+    {
+      "response": {
+        "status": "200"
+      },
+      "id": "4fa2a371-9208-425a-ada7-34a1af5904ed",
+      "type": "CommMsgExtended",
+      "resource": {
+        "id": "5b85940b-6e0f-4d99-97ec-28475e5b1713",
+        "type": "https://didcomm.org/v2/communication",
+        "thid": "comm-medications-1790018257",
+        "from": "did:web:localhost%3A3000:acme-id:cds-ES:v1:health-care",
+        "created_time": 1780300800,
+        "body": {
+          "data": [
+            {
+              "type": "Attachment",
+              "id": "76244562-1aa6-4b8f-b447-64cdbce997fc",
+              "resource": {
+                "contentType": "application/fhir+json",
+                "data": "eyJyZXNvdXJjZVR5cGUiOiJCdW5kbGUiLCJ0eXBlIjoiZG9jdW1lbnQiLCJlbnRyeSI6W3sicmVzb3VyY2UiOnsicmVzb3VyY2VUeXBlIjoiQ29tcG9zaXRpb24iLCJpZCI6Imlwcy1jb21wb3NpdGlvbi0wMDEiLCJzdGF0dXMiOiJmaW5hbCIsInR5cGUiOnsiY29kaW5nIjpbeyJzeXN0ZW0iOiJodHRwOi8vbG9pbmMub3JnIiwiY29kZSI6IjYwNTkxLTUiLCJkaXNwbGF5IjoiUGF0aWVudCBzdW1tYXJ5IERvY3VtZW50In1dfSwic3ViamVjdCI6eyJyZWZlcmVuY2UiOiJkaWQ6d2ViOmFwaS5hY21lLWlkLm9yZzppbmRpdmlkdWFsOnN1YmplY3QtMDAxIn0sImF1dGhvciI6W3sicmVmZXJlbmNlIjoidXJuOnV1aWQ6ZXh0ZXJuYWwtaXBzLXNvdXJjZS0wMDEifV0sImRhdGUiOiIyMDI2LTA1LTIyVDEwOjAwOjAwWiIsInRpdGxlIjoiSVBTIE1lZGljYXRpb24gU3VtbWFyeSIsInNlY3Rpb24iOlt7ImNvZGUiOnsiY29kaW5nIjpbeyJzeXN0ZW0iOiJodHRwOi8vbG9pbmMub3JnIiwiY29kZSI6IjEwMTYwLTAiLCJkaXNwbGF5IjoiSGlzdG9yeSBvZiBNZWRpY2F0aW9uIFVzZSJ9XX0sImVudHJ5IjpbeyJyZWZlcmVuY2UiOiJ1cm46dXVpZDptZWRpY2F0aW9uLWlidXByb2Zlbi0wMDEifV19XX19LHsicmVzb3VyY2UiOnsicmVzb3VyY2VUeXBlIjoiTWVkaWNhdGlvblN0YXRlbWVudCIsImlkIjoibWVkaWNhdGlvbi1pYnVwcm9mZW4tMDAxIiwic3RhdHVzIjoiYWN0aXZlIiwic3ViamVjdCI6eyJyZWZlcmVuY2UiOiJkaWQ6d2ViOmFwaS5hY21lLWlkLm9yZzppbmRpdmlkdWFsOnN1YmplY3QtMDAxIn0sImVmZmVjdGl2ZURhdGVUaW1lIjoiMjAyNi0wNi0wMVQwODowMDowMFoiLCJtZWRpY2F0aW9uQ29kZWFibGVDb25jZXB0Ijp7InRleHQiOiJJYnVwcm9mZW4gNDAwIG1nIiwiY29kaW5nIjpbeyJzeXN0ZW0iOiJodHRwOi8vc25vbWVkLmluZm8vc2N0IiwiY29kZSI6IjM4NzIwNzAwOCJ9XX0sIm5vdGUiOlt7InRleHQiOiJUYWtlIGV2ZXJ5IDggaG91cnMgYXMgbmVlZGVkLiBLZWVwIGEgNCBob3VyIGdhcCBmcm9tIHBhcmFjZXRhbW9sLiJ9XSwiaWRlbnRpZmllciI6W3sic3lzdGVtIjoidXJuOmlldGY6cmZjOjM5ODYiLCJ2YWx1ZSI6InVybjp1dWlkOm1lZGljYXRpb24taWJ1cHJvZmVuLTAwMSJ9XSwibWV0YSI6eyJjbGFpbXMiOnsiQGNvbnRleHQiOiJvcmcuaGw3LmZoaXIuYXBpIiwiTWVkaWNhdGlvblN0YXRlbWVudC5pZGVudGlmaWVyIjoidXJuOnV1aWQ6bWVkaWNhdGlvbi1pYnVwcm9mZW4tMDAxIiwiTWVkaWNhdGlvblN0YXRlbWVudC5zdWJqZWN0IjoiZGlkOndlYjphcGkuYWNtZS1pZC5vcmc6aW5kaXZpZHVhbDpzdWJqZWN0LTAwMSIsIk1lZGljYXRpb25TdGF0ZW1lbnQuc3RhdHVzIjoiYWN0aXZlIiwiTWVkaWNhdGlvblN0YXRlbWVudC5tZWRpY2F0aW9uLXRleHQiOiJJYnVwcm9mZW4gNDAwIG1nIiwiTWVkaWNhdGlvblN0YXRlbWVudC5jb2RlIjoiaHR0cDovL3Nub21lZC5pbmZvL3NjdHwzODcyMDcwMDgiLCJNZWRpY2F0aW9uU3RhdGVtZW50LmVmZmVjdGl2ZSI6IjIwMjYtMDYtMDFUMDg6MDA6MDBaIiwiTWVkaWNhdGlvblN0YXRlbWVudC5ub3RlIjoiVGFrZSBldmVyeSA4IGhvdXJzIGFzIG5lZWRlZC4gS2VlcCBhIDQgaG91ciBnYXAgZnJvbSBwYXJhY2V0YW1vbC4iLCJNZWRpY2F0aW9uU3RhdGVtZW50LmNhdGVnb3J5IjoiTE9JTkN8MTAxNjAtMCIsIm9yZy5obDcuZmhpci5hcGkuTWVkaWNhdGlvblN0YXRlbWVudC5kb3NlLXF1YW50aXR5LXZhbHVlIjo0MDAsIm9yZy5obDcuZmhpci5hcGkuTWVkaWNhdGlvblN0YXRlbWVudC5kb3NlLXF1YW50aXR5LXVuaXQiOiJtZyIsIm9yZy5obDcuZmhpci5hcGkuTWVkaWNhdGlvblN0YXRlbWVudC50aW1pbmctZnJlcXVlbmN5IjoxLCJvcmcuaGw3LmZoaXIuYXBpLk1lZGljYXRpb25TdGF0ZW1lbnQudGltaW5nLXBlcmlvZCI6OCwib3JnLmhsNy5maGlyLmFwaS5NZWRpY2F0aW9uU3RhdGVtZW50LnRpbWluZy1wZXJpb2QtdW5pdCI6ImgiLCJvcmcuaGw3LmZoaXIuYXBpLk1lZGljYXRpb25TdGF0ZW1lbnQuZG9zYWdlLWFzbmVlZGVkIjp0cnVlfX19fV19",
+                "title": "IPS Medication Summary"
+              }
+            }
+          ]
+        },
+        "meta": {
+          "evidence": [
+            {
+              "resourceType": "Composition",
+              "resourceId": "composition-from-communication-0bfac0f716dad0bf39b5eb42a7d1d36b9adb520ddbbc297a10a03f5a18f0197f",
+              "cid": "z4EBG9j2vVZQYgqA5TYqZGZWqHst5sNWzAieG8QABzztgD8Jm3H",
+              "versionId": "z4EBG9j2vVZQYgqA5TYqZGZWqHst5sNWzAieG8QABzztgD8Jm3H",
+              "relationships": {
+                "author": [
+                  "zG9EedXnojy4zga3tqfzifwsSQXMx485BJpAp7V5ZWxXJbwidUnRKnQQ327oEysPQs6jB"
+                ]
+              },
+              "ownerships": [
+                "zG9FYeoUJ1YK2CaPKa5trzLSej34RnwZSkjHEonAw2numRLo977zseDDL4o9pjEztqAh9"
+              ],
+              "artifactId": "z4EBG9j2vVZQYgqA5TYqZGZWqHst5sNWzAieG8QABzztgD8Jm3H",
+              "transactionId": "af8b677153321840aee4cfc2106f60e992140a034025d0c621deefd240ff8e8d"
+            },
+            {
+              "resourceType": "MedicationStatement",
+              "resourceId": "medication-ibuprofen-001",
+              "cid": "z4EBG9j4cFjGGFsi1BW57itBGSUTnm91aEb4udjQWS5PKRWdvfo",
+              "versionId": "z4EBG9j4cFjGGFsi1BW57itBGSUTnm91aEb4udjQWS5PKRWdvfo",
+              "relationships": {
+                "author": [
+                  "zG9EedXnojy4zga3tqfzifwsSQXMx485BJpAp7V5ZWxXJbwidUnRKnQQ327oEysPQs6jB"
+                ]
+              },
+              "ownerships": [
+                "zG9FYeoUJ1YK2CaPKa5trzLSej34RnwZSkjHEonAw2numRLo977zseDDL4o9pjEztqAh9"
+              ],
+              "artifactId": "z4EBG9j4cFjGGFsi1BW57itBGSUTnm91aEb4udjQWS5PKRWdvfo",
+              "transactionId": "af8b677153321840aee4cfc2106f60e992140a034025d0c621deefd240ff8e8d"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
+{
+  "resourceType": "Bundle",
+  "type": "_batch-response",
+  "data": [
+    {
+      "response": {
+        "status": "500",
+        "outcome": {
+          "resourceType": "OperationOutcome",
+          "issue": [
+            {
+              "severity": "error",
+              "code": "processing",
+              "details": {
+                "text": "duplicate key value violates unique constraint \"idx_vault_indexes_unique_attr\""
+              }
+            }
+          ]
+        }
+      },
+      "id": "707f5e82-83a6-41de-98c9-ce6797911b68",
+      "type": "OperationOutcome"
+    }
+  ]
+}
+[3/4] Searching MedicationStatement/_search...
+(node:74002) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("ts-node/esm", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:74002) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[3/4] Polling MedicationStatement search...
+{
+  "resourceType": "Bundle",
+  "type": "batch-response",
+  "data": [
+    {
+      "type": "MedicationStatement-search-response-v1.0",
+      "resource": {
+        "total": 1,
+        "data": [
+          {
+            "id": "medication-ibuprofen-001",
+            "audit": {
+              "creatorDid": "urn:uuid:external-ips-source-001"
+            },
+            "indexed": {
+              "attributes": [
+                {
+                  "name": "sector",
+                  "value": "health-care"
+                },
+                {
+                  "name": "audit.creatorDid",
+                  "value": "urn:uuid:external-ips-source-001"
+                },
+                {
+                  "name": "Composition.author",
+                  "value": "urn:uuid:external-ips-source-001"
+                },
+                {
+                  "name": "org.hl7.fhir.api.Composition.author",
+                  "value": "urn:uuid:external-ips-source-001"
+                },
+                {
+                  "name": "Composition.date",
+                  "value": "2026-05-22T10:00:00Z"
+                },
+                {
+                  "name": "org.hl7.fhir.api.Composition.date",
+                  "value": "2026-05-22T10:00:00Z"
+                },
+                {
+                  "name": "Composition.title",
+                  "value": "IPS Medication Summary"
+                },
+                {
+                  "name": "org.hl7.fhir.api.Composition.title",
+                  "value": "IPS Medication Summary"
+                },
+                {
+                  "name": "Composition.type",
+                  "value": "http://loinc.org|60591-5"
+                },
+                {
+                  "name": "org.hl7.fhir.api.Composition.type",
+                  "value": "http://loinc.org|60591-5"
+                },
+                {
+                  "name": "org.hl7.fhir.api.MedicationStatement.category",
+                  "value": "LOINC|10160-0"
+                },
+                {
+                  "name": "org.hl7.fhir.api.MedicationStatement.code",
+                  "value": "http://snomed.info/sct|387207008"
+                },
+                {
+                  "name": "org.hl7.fhir.api.MedicationStatement.code-text",
+                  "value": "Ibuprofen 400 mg"
+                },
+                {
+                  "name": "org.hl7.fhir.api.MedicationStatement.dosage-asneeded",
+                  "value": "true"
+                },
+                {
+                  "name": "org.hl7.fhir.api.MedicationStatement.dose-quantity-unit",
+                  "value": "mg"
+                },
+                {
+                  "name": "org.hl7.fhir.api.MedicationStatement.dose-quantity-value",
+                  "value": "400"
+                },
+                {
+                  "name": "org.hl7.fhir.api.MedicationStatement.effective",
+                  "value": "2026-06-01T08:00:00Z"
+                },
+                {
+                  "name": "org.hl7.fhir.api.MedicationStatement.identifier",
+                  "value": "urn:uuid:medication-ibuprofen-001",
+                  "unique": true
+                },
+                {
+                  "name": "org.hl7.fhir.api.MedicationStatement.medication-text",
+                  "value": "Ibuprofen 400 mg"
+                },
+                {
+                  "name": "org.hl7.fhir.api.MedicationStatement.note",
+                  "value": "Take every 8 hours as needed. Keep a 4 hour gap from paracetamol."
+                },
+                {
+                  "name": "org.hl7.fhir.api.MedicationStatement.status",
+                  "value": "active"
+                },
+                {
+                  "name": "org.hl7.fhir.api.MedicationStatement.subject",
+                  "value": "did:web:api.acme-id.org:individual:subject-001"
+                },
+                {
+                  "name": "org.hl7.fhir.api.MedicationStatement.timing-frequency",
+                  "value": "1"
+                },
+                {
+                  "name": "org.hl7.fhir.api.MedicationStatement.timing-period",
+                  "value": "8"
+                },
+                {
+                  "name": "org.hl7.fhir.api.MedicationStatement.timing-period-unit",
+                  "value": "h"
+                },
+                {
+                  "name": "Composition.section",
+                  "value": "LOINC|10160-0"
+                },
+                {
+                  "name": "MedicationStatement.meta.versionId",
+                  "value": "z4EBG9j4cFjGGFsi1BW57itBGSUTnm91aEb4udjQWS5PKRWdvfo"
+                },
+                {
+                  "name": "org.hl7.fhir.api.MedicationStatement.meta.versionId",
+                  "value": "zG9JQ6jbTtqLgZhu18vKNSuJCH3GLk8byevoTeG85quMtYJdpKVZwpT647uUnvsxZj1Cn"
+                },
+                {
+                  "name": "org.hl7.fhir.r4.MedicationStatement.meta.versionId",
+                  "value": "z4EBG9j4cFjGGFsi1BW57itBGSUTnm91aEb4udjQWS5PKRWdvfo"
+                }
+              ]
+            },
+            "@context": "org.hl7.fhir.api",
+            "Composition.date": "2026-05-22T10:00:00Z",
+            "Composition.type": "http://loinc.org|60591-5",
+            "Composition.title": "IPS Medication Summary",
+            "Composition.author": "urn:uuid:external-ips-source-001",
+            "Composition.section": "LOINC|10160-0",
+            "org.hl7.fhir.api.Composition.date": "2026-05-22T10:00:00Z",
+            "org.hl7.fhir.api.Composition.type": "http://loinc.org|60591-5",
+            "MedicationStatement.meta.versionId": "z4EBG9j4cFjGGFsi1BW57itBGSUTnm91aEb4udjQWS5PKRWdvfo",
+            "org.hl7.fhir.api.Composition.title": "IPS Medication Summary",
+            "org.hl7.fhir.api.Composition.author": "urn:uuid:external-ips-source-001",
+            "org.hl7.fhir.api.MedicationStatement.code": "http://snomed.info/sct|387207008",
+            "org.hl7.fhir.api.MedicationStatement.note": "Take every 8 hours as needed. Keep a 4 hour gap from paracetamol.",
+            "org.hl7.fhir.api.MedicationStatement.status": "active",
+            "org.hl7.fhir.api.MedicationStatement.subject": "did:web:api.acme-id.org:individual:subject-001",
+            "org.hl7.fhir.api.MedicationStatement.category": "LOINC|10160-0",
+            "org.hl7.fhir.api.MedicationStatement.code-text": "Ibuprofen 400 mg",
+            "org.hl7.fhir.api.MedicationStatement.effective": "2026-06-01T08:00:00Z",
+            "org.hl7.fhir.api.MedicationStatement.identifier": "urn:uuid:medication-ibuprofen-001",
+            "org.hl7.fhir.api.MedicationStatement.timing-period": 8,
+            "org.hl7.fhir.r4.MedicationStatement.meta.versionId": "z4EBG9j4cFjGGFsi1BW57itBGSUTnm91aEb4udjQWS5PKRWdvfo",
+            "org.hl7.fhir.api.MedicationStatement.meta.versionId": "zG9JQ6jbTtqLgZhu18vKNSuJCH3GLk8byevoTeG85quMtYJdpKVZwpT647uUnvsxZj1Cn",
+            "org.hl7.fhir.api.MedicationStatement.dosage-asneeded": true,
+            "org.hl7.fhir.api.MedicationStatement.medication-text": "Ibuprofen 400 mg",
+            "org.hl7.fhir.api.MedicationStatement.timing-frequency": 1,
+            "org.hl7.fhir.api.MedicationStatement.dose-quantity-unit": "mg",
+            "org.hl7.fhir.api.MedicationStatement.timing-period-unit": "h",
+            "org.hl7.fhir.api.MedicationStatement.dose-quantity-value": 400
+          }
+        ]
+      },
+      "response": {
+        "status": "200"
+      }
+    }
+  ],
+  "total": 1
+}
+[4/4] Searching IPS Bundle/_search by subject + IPS document type...
+(node:74056) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("ts-node/esm", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:74056) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[4/4] Polling IPS Bundle search...
+{
+  "resourceType": "Bundle",
+  "type": "batch-response",
+  "data": [
+    {
+      "type": "Bundle-search-response-v1.0",
+      "resource": {
+        "resourceType": "Bundle",
+        "type": "document",
+        "entry": [
+          {
+            "fullUrl": "urn:uuid:ips-composition-did:web:api.acme-id.org:individual:subject-001",
+            "resource": {
+              "resourceType": "Composition",
+              "id": "ips-composition-did:web:api.acme-id.org:individual:subject-001",
+              "identifier": [
+                {
+                  "value": "urn:uuid:ips-composition-did:web:api.acme-id.org:individual:subject-001"
+                }
+              ],
+              "status": "final",
+              "meta": {
+                "claims": {
+                  "@context": "org.hl7.fhir.api",
+                  "Composition.identifier": "urn:uuid:ips-composition-did:web:api.acme-id.org:individual:subject-001",
+                  "Composition.subject": "did:web:api.acme-id.org:individual:subject-001",
+                  "Composition.type": "LOINC|60591-5",
+                  "Composition.date": "2026-06-01T08:00:00Z",
+                  "Composition.section": "LOINC|10160-0",
+                  "Composition.author": "urn:uuid:external-ips-source-001"
+                }
+              },
+              "type": {
+                "coding": [
+                  {
+                    "system": "http://loinc.org",
+                    "code": "60591-5",
+                    "display": "Patient summary Document"
+                  }
+                ]
+              },
+              "subject": {
+                "reference": "did:web:api.acme-id.org:individual:subject-001"
+              },
+              "date": "2026-06-01T08:00:00Z",
+              "title": "International Patient Summary",
+              "section": [
+                {
+                  "code": {
+                    "coding": [
+                      {
+                        "system": "http://loinc.org",
+                        "code": "10160-0"
+                      }
+                    ]
+                  },
+                  "entry": [
+                    {
+                      "reference": "urn:uuid:medication-ibuprofen-001"
+                    }
+                  ]
+                }
+              ],
+              "author": [
+                {
+                  "reference": "urn:uuid:external-ips-source-001"
+                }
+              ]
+            }
+          },
+          {
+            "fullUrl": "urn:uuid:medication-ibuprofen-001",
+            "resource": {
+              "resourceType": "MedicationStatement",
+              "identifier": [
+                {
+                  "value": "urn:uuid:medication-ibuprofen-001"
+                }
+              ],
+              "status": "active",
+              "subject": {
+                "reference": "did:web:api.acme-id.org:individual:subject-001"
+              },
+              "effectiveDateTime": "2026-06-01T08:00:00Z",
+              "medicationCodeableConcept": {
+                "text": "Ibuprofen 400 mg",
+                "coding": [
+                  {
+                    "system": "http://snomed.info/sct",
+                    "code": "387207008"
+                  }
+                ]
+              },
+              "dosage": [
+                {
+                  "timing": {
+                    "repeat": {
+                      "frequency": 1,
+                      "period": 8,
+                      "periodUnit": "h"
+                    }
+                  },
+                  "doseAndRate": [
+                    {
+                      "doseQuantity": {
+                        "value": 400,
+                        "unit": "mg",
+                        "code": "mg"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "note": [
+                {
+                  "text": "Take every 8 hours as needed. Keep a 4 hour gap from paracetamol."
+                }
+              ],
+              "id": "medication-ibuprofen-001",
+              "meta": {
+                "claims": {
+                  "@context": "org.hl7.fhir.api",
+                  "audit": {
+                    "creatorDid": "urn:uuid:external-ips-source-001"
+                  },
+                  "Composition.author": "urn:uuid:external-ips-source-001",
+                  "Composition.date": "2026-05-22T10:00:00Z",
+                  "Composition.section": "LOINC|10160-0",
+                  "Composition.title": "IPS Medication Summary",
+                  "Composition.type": "http://loinc.org|60591-5",
+                  "id": "medication-ibuprofen-001",
+                  "indexed": {
+                    "attributes": [
+                      {
+                        "name": "sector",
+                        "value": "health-care"
+                      },
+                      {
+                        "name": "audit.creatorDid",
+                        "value": "urn:uuid:external-ips-source-001"
+                      },
+                      {
+                        "name": "Composition.author",
+                        "value": "urn:uuid:external-ips-source-001"
+                      },
+                      {
+                        "name": "org.hl7.fhir.api.Composition.author",
+                        "value": "urn:uuid:external-ips-source-001"
+                      },
+                      {
+                        "name": "Composition.date",
+                        "value": "2026-05-22T10:00:00Z"
+                      },
+                      {
+                        "name": "org.hl7.fhir.api.Composition.date",
+                        "value": "2026-05-22T10:00:00Z"
+                      },
+                      {
+                        "name": "Composition.title",
+                        "value": "IPS Medication Summary"
+                      },
+                      {
+                        "name": "org.hl7.fhir.api.Composition.title",
+                        "value": "IPS Medication Summary"
+                      },
+                      {
+                        "name": "Composition.type",
+                        "value": "http://loinc.org|60591-5"
+                      },
+                      {
+                        "name": "org.hl7.fhir.api.Composition.type",
+                        "value": "http://loinc.org|60591-5"
+                      },
+                      {
+                        "name": "org.hl7.fhir.api.MedicationStatement.category",
+                        "value": "LOINC|10160-0"
+                      },
+                      {
+                        "name": "org.hl7.fhir.api.MedicationStatement.code",
+                        "value": "http://snomed.info/sct|387207008"
+                      },
+                      {
+                        "name": "org.hl7.fhir.api.MedicationStatement.code-text",
+                        "value": "Ibuprofen 400 mg"
+                      },
+                      {
+                        "name": "org.hl7.fhir.api.MedicationStatement.dosage-asneeded",
+                        "value": "true"
+                      },
+                      {
+                        "name": "org.hl7.fhir.api.MedicationStatement.dose-quantity-unit",
+                        "value": "mg"
+                      },
+                      {
+                        "name": "org.hl7.fhir.api.MedicationStatement.dose-quantity-value",
+                        "value": "400"
+                      },
+                      {
+                        "name": "org.hl7.fhir.api.MedicationStatement.effective",
+                        "value": "2026-06-01T08:00:00Z"
+                      },
+                      {
+                        "name": "org.hl7.fhir.api.MedicationStatement.identifier",
+                        "value": "urn:uuid:medication-ibuprofen-001",
+                        "unique": true
+                      },
+                      {
+                        "name": "org.hl7.fhir.api.MedicationStatement.medication-text",
+                        "value": "Ibuprofen 400 mg"
+                      },
+                      {
+                        "name": "org.hl7.fhir.api.MedicationStatement.note",
+                        "value": "Take every 8 hours as needed. Keep a 4 hour gap from paracetamol."
+                      },
+                      {
+                        "name": "org.hl7.fhir.api.MedicationStatement.status",
+                        "value": "active"
+                      },
+                      {
+                        "name": "org.hl7.fhir.api.MedicationStatement.subject",
+                        "value": "did:web:api.acme-id.org:individual:subject-001"
+                      },
+                      {
+                        "name": "org.hl7.fhir.api.MedicationStatement.timing-frequency",
+                        "value": "1"
+                      },
+                      {
+                        "name": "org.hl7.fhir.api.MedicationStatement.timing-period",
+                        "value": "8"
+                      },
+                      {
+                        "name": "org.hl7.fhir.api.MedicationStatement.timing-period-unit",
+                        "value": "h"
+                      },
+                      {
+                        "name": "Composition.section",
+                        "value": "LOINC|10160-0"
+                      },
+                      {
+                        "name": "MedicationStatement.meta.versionId",
+                        "value": "z4EBG9j4cFjGGFsi1BW57itBGSUTnm91aEb4udjQWS5PKRWdvfo"
+                      },
+                      {
+                        "name": "org.hl7.fhir.api.MedicationStatement.meta.versionId",
+                        "value": "zG9JQ6jbTtqLgZhu18vKNSuJCH3GLk8byevoTeG85quMtYJdpKVZwpT647uUnvsxZj1Cn"
+                      },
+                      {
+                        "name": "org.hl7.fhir.r4.MedicationStatement.meta.versionId",
+                        "value": "z4EBG9j4cFjGGFsi1BW57itBGSUTnm91aEb4udjQWS5PKRWdvfo"
+                      }
+                    ]
+                  },
+                  "MedicationStatement.category": "LOINC|10160-0",
+                  "MedicationStatement.code": "http://snomed.info/sct|387207008",
+                  "MedicationStatement.code-text": "Ibuprofen 400 mg",
+                  "MedicationStatement.dosage-asneeded": true,
+                  "MedicationStatement.dose-quantity-unit": "mg",
+                  "MedicationStatement.dose-quantity-value": 400,
+                  "MedicationStatement.effective": "2026-06-01T08:00:00Z",
+                  "MedicationStatement.identifier": "urn:uuid:medication-ibuprofen-001",
+                  "MedicationStatement.medication-text": "Ibuprofen 400 mg",
+                  "MedicationStatement.note": "Take every 8 hours as needed. Keep a 4 hour gap from paracetamol.",
+                  "MedicationStatement.status": "active",
+                  "MedicationStatement.subject": "did:web:api.acme-id.org:individual:subject-001",
+                  "MedicationStatement.timing-frequency": 1,
+                  "MedicationStatement.timing-period": 8,
+                  "MedicationStatement.timing-period-unit": "h"
+                }
+              }
+            }
+          },
+          {
+            "fullUrl": "urn:uuid:3ef15b2e-37a8-4380-858e-905a48b268f7",
+            "resource": {
+              "resourceType": "DocumentReference",
+              "identifier": [
+                {
+                  "value": "urn:uuid:3ef15b2e-37a8-4380-858e-905a48b268f7"
+                }
+              ],
+              "subject": {
+                "reference": "did:web:api.acme-id.org:individual:subject-001"
+              },
+              "description": "IPS Medication Summary",
+              "date": "2026-06-01T08:00:00Z",
+              "content": [
+                {
+                  "attachment": {
+                    "contentType": "application/fhir+json",
+                    "id": "zG9CpbfEi3Xbwj3V3fRghSYpRcKURf8t8RKHQaDL9bMzo7fAj39nyCoWSoewAKoGMwQxi"
+                  }
+                }
+              ],
+              "id": "documentreference-from-communication-608405bf938cb0075dcf71dfb192aa1ab2d37e0c91e9f5a9601b12431f4c1f22",
+              "meta": {
+                "claims": {
+                  "@context": "org.hl7.fhir.api",
+                  "DocumentReference.contenthash": "zG9CpbfEi3Xbwj3V3fRghSYpRcKURf8t8RKHQaDL9bMzo7fAj39nyCoWSoewAKoGMwQxi",
+                  "DocumentReference.contenttype": "application/fhir+json",
+                  "DocumentReference.date": "2026-06-01T08:00:00Z",
+                  "DocumentReference.description": "IPS Medication Summary",
+                  "DocumentReference.identifier": "urn:uuid:3ef15b2e-37a8-4380-858e-905a48b268f7",
+                  "DocumentReference.subject": "did:web:api.acme-id.org:individual:subject-001",
+                  "id": "documentreference-from-communication-608405bf938cb0075dcf71dfb192aa1ab2d37e0c91e9f5a9601b12431f4c1f22"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "response": {
+        "status": "200"
+      }
+    }
+  ],
+  "total": 1
+}
+[smart-access-smoke] provider organization DID: did:web:localhost%3A3000:acme-id:cds-ES:v1:health-care
+[smart-access-smoke] verifying individual SMART access
+(node:74108) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("ts-node/esm", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:74108) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:74165) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("ts-node/esm", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:74165) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[smart-access-smoke] POST consent batch INDIVIDUAL_CONSENT_BATCH_REQUEST
+[smart-access-smoke] verified rule asset zKYrhVCL9ufyphipDUYG5uEWiH8vuXD4ekCkmuS3LjjPLD6bGEtQciaEYo2UrC2JCzUZEvV
+(node:74311) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("ts-node/esm", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:74311) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[smart-access-smoke] POST smart token INDIVIDUAL_SMART_TOKEN_REQUEST
+(node:74386) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("ts-node/esm", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:74386) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[smart-access-smoke] POST individual Bundle/_search
+[smart-access-smoke] verified individual Bundle/_search through SMART token
+[smart-access-smoke] verifying authorized medical-secretary access and negative control
+(node:74442) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("ts-node/esm", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:74442) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:74514) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("ts-node/esm", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:74514) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[smart-access-smoke] POST consent batch SECRETARY_CONSENT_BATCH_REQUEST
+[smart-access-smoke] verified rule asset zKYrhUNQLrXjSKJWZbxycTqQdEtsnWcpEYs78Jceq4QMrMjD3YdFC5zvJE11dHZmjcYPAfF
+(node:74674) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("ts-node/esm", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:74674) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[smart-access-smoke] POST smart token SECRETARY_SMART_TOKEN_REQUEST_ALLOW
+(node:74733) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("ts-node/esm", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:74733) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[smart-access-smoke] POST individual Bundle/_search
+[smart-access-smoke] verified individual Bundle/_search through SMART token
+(node:74846) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("ts-node/esm", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:74846) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[smart-access-smoke] POST smart token SECRETARY_SMART_TOKEN_REQUEST_DENY
+[smart-access-smoke] seeding research consent rules on ledger
+(node:74939) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("ts-node/esm", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:74939) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:74998) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("ts-node/esm", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:74998) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[smart-access-smoke] POST consent batch RESEARCH_CONSENT_BATCH_REQUEST_ROLE
+[smart-access-smoke] verified rule asset zKYrhSkqbvFXpwnMjdTWEzBRhkpRYJV4Z83UTidPQX6YSaakGJt9GERTMtdqgKjSwbzhgrR
+(node:75148) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("ts-node/esm", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:75148) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:75226) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("ts-node/esm", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:75226) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[smart-access-smoke] POST consent batch RESEARCH_CONSENT_BATCH_REQUEST_EMAIL
+[smart-access-smoke] verified rule asset zKYrhPpySUYNHuFQNaTQtA9ZwrVmoNsTD2TNxQzJavgfhfVhYkBmk2K55yEpAHvLEpKPUDT
+[smart-access-smoke] verifying research SMART access allow/deny matrix
+(node:75466) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("ts-node/esm", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:75466) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[smart-access-smoke] POST smart token RESEARCH_SMART_TOKEN_REQUEST_ROLE_ALLOW
+(node:75618) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("ts-node/esm", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:75618) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[smart-access-smoke] POST digitaltwin ResearchSubject/_search
+[smart-access-smoke] verified digitaltwin ResearchSubject/_search through SMART token
+(node:75756) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("ts-node/esm", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:75756) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[smart-access-smoke] POST smart token RESEARCH_SMART_TOKEN_REQUEST_ROLE_DENY
+(node:75837) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("ts-node/esm", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:75837) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[smart-access-smoke] POST smart token RESEARCH_SMART_TOKEN_REQUEST_EMAIL_ALLOW
+(node:75935) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("ts-node/esm", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:75935) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[smart-access-smoke] POST digitaltwin ResearchSubject/_search
+[smart-access-smoke] verified digitaltwin ResearchSubject/_search through SMART token
+(node:75989) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("ts-node/esm", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:75989) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[smart-access-smoke] POST smart token RESEARCH_SMART_TOKEN_REQUEST_EMAIL_DENY
+[smart-access-smoke] success
+{
+  "subject": "did:web:api.acme-id.org:individual:subject-001",
+  "channel": "health-care-local",
+  "chaincode": "consentaccess-sc",
+  "verifiedFlows": [
+    "individual-consent-smart-bundle-search",
+    "medical-secretary-consent-smart-bundle-search-allow",
+    "medical-secretary-without-consent-smart-token-deny",
+    "research-contract-consent-smart-digitaltwin-search-role-allow",
+    "research-contract-consent-smart-digitaltwin-search-role-deny",
+    "research-contract-consent-smart-digitaltwin-search-email-allow",
+    "research-contract-consent-smart-digitaltwin-search-email-deny"
+  ]
+}
+Open-source persistence validated: postgres_documents=55 ipfs_jwe_blobs=15 restart=ok tenant_rehydration=ok
+Validated image: gw-core:1.25.24-e7fdd71
+Image ID: sha256:c02a3fda7dd7068fb3560f33c8c50ad8c3a0b65e0592b74eb62735d7ec951d87

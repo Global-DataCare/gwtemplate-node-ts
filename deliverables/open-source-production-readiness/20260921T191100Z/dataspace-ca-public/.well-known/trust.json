@@ -1,0 +1,15 @@
+{
+  "profile": "staging",
+  "root": {
+    "did": "did:web:ca.local.example.test",
+    "kid": "fKeP30MnIVgIkGZyT5UD3n8x1-X3iUYYCkjuoxhhwQs",
+    "certificateSha256": "51B59C749C0EC63F41B005F367827F3331EE80693F417364979ED322CDA4DD1D",
+    "x5u": "https://ca.local.example.test/pki/root-ca.pem"
+  },
+  "issuer": {
+    "did": "did:web:ca.local.example.test:issuer",
+    "kid": "CwBOA4zlmCU5WrcUh4a84bItzWUymvj4_UwTnSjEqqY",
+    "certificateSha256": "6E0C292CCB997FF16216C82B14AADE6818A6293371C735197239AF6BD03855F3",
+    "x5u": "https://ca.local.example.test/pki/issuer-ca.chain.pem"
+  }
+}

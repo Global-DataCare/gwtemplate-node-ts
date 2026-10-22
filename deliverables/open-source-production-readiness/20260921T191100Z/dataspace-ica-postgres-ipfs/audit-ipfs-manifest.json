@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "gdc.dataspace-ica.audit-ipfs-migration/v1",
+  "migratedAt": "2026-09-21T19:11:20.281Z",
+  "objectCount": 1,
+  "totalBytes": 48,
+  "objects": [
+    {
+      "sourceObjectKey": "ica-audit/health-care/test/contract/2030-01-02/synthetic.pdf",
+      "targetUri": "ipfs://bafkreihtkeofbn4tof2lhi7rupghujysfkzodwkkn6bhw3v7svm2y3tzn4",
+      "cid": "bafkreihtkeofbn4tof2lhi7rupghujysfkzodwkkn6bhw3v7svm2y3tzn4",
+      "contentType": "application/pdf",
+      "sizeBytes": 48,
+      "sha256": "f3511c50b7937174b3a3f1a3cc7a27122ab2e1d94a6f827b6ebf9559ac6e796f"
+    }
+  ]
+}

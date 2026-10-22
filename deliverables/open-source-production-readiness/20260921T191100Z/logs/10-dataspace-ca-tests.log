@@ -1,0 +1,21 @@
+
+> dataspace-ca@0.2.3 test
+> node --test ./test/*.test.js
+
+✔ static publication binds DID, JWKS, X.509 chain and trust pins (973.09875ms)
+✔ publication rejects Root artifacts created for another domain (949.878495ms)
+✔ leaf CSR request keeps the private key local and offline signing returns only public activation material (1316.965206ms)
+✔ ICA runtime derivation profile reproduces the dataspace-ica VC signing key contract (269.185536ms)
+✔ organization CA CSR stays with the ICA operator and Root signs a pathLen zero subordinate (1471.390924ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5280.437267
+
+> dataspace-ca@0.2.3 check
+> node --check ./bin/dataspace-ca-cli.js && node --check ./bin/lib/bootstrap-common.js && node --check ./bin/lib/dataspace-ca-bootstrap.js && node --check ./bin/lib/dataspace-ca-publish.js && node --check ./bin/lib/dataspace-ca-deploy.js
+

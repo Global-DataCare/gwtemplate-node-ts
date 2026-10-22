@@ -1,0 +1,368 @@
+{
+  "specVersion": "gdc.open-source.production-readiness-evidence/v1",
+  "generatedAt": "2026-09-21T19:29:18.521Z",
+  "scope": "reproducible local-network baseline for production promotion",
+  "trustBoundaries": {
+    "offlineDataspaceCa": "publishes the trust anchor and signs issuer requests",
+    "dataspaceIca": "verifies signed legal evidence and issues participant or host VCs",
+    "fabricIca": "enrolls Fabric MSP, peer, orderer and client identities"
+  },
+  "localNetwork": {
+    "networkMode": "local-network",
+    "sector": "onehealth-research",
+    "identityChannel": "identity-local",
+    "dataChannel": "health-care-local",
+    "fabricMembers": [
+      "Host1MSP",
+      "Host2MSP"
+    ],
+    "tenantBoundary": "VAT-addressed tenant Organizations are hosted application data, not Fabric MSPs"
+  },
+  "productionChannelProjection": {
+    "euOrganizationsAndEmployees": "identity-eu",
+    "humanIndividuals": "identity-global",
+    "euHealthData": "health-care-eu"
+  },
+  "humanAccessProof": {
+    "hostedRoutes": [
+      "entity",
+      "individual"
+    ],
+    "employeeRole": "ISCO-08|4226",
+    "positiveControl": "explicit consent permits SMART IPS read by the selected medical secretary",
+    "negativeControl": "a different medical secretary without consent receives no access token"
+  },
+  "kubernetesProof": {
+    "components": [
+      "peer",
+      "couchdb",
+      "gw-core",
+      "postgresql",
+      "ipfs",
+      "ccaas"
+    ],
+    "fabricMsp": "Host2MSP",
+    "joinedChannels": [
+      "identity-local",
+      "health-care-local"
+    ],
+    "endorsementPeer": "kubernetes",
+    "ccaasLifecycle": "ten exact packages installed and approved on Host2MSP",
+    "persistence": "peer channels, PostgreSQL documents and IPFS JWE blobs survive pod restart"
+  },
+  "repositories": [
+    {
+      "name": "gwtemplate-node-ts",
+      "commit": "e7fdd717a486318bfcf8ff0b9ea224bc275a9e73",
+      "branch": "release/gdc-host-0.4.0",
+      "dirty": false
+    },
+    {
+      "name": "dataspace-ca-ts",
+      "commit": "71d0f7e028ccc8eaf5bc582da0961b49d6c55722",
+      "branch": "main",
+      "dirty": false
+    },
+    {
+      "name": "dataspace-ica-ts",
+      "commit": "7c277ecc9e0f19dfa14aad647679bb1b332b3386",
+      "branch": "main",
+      "dirty": false
+    }
+  ],
+  "image": {
+    "name": "gw-core:1.25.24-e7fdd71",
+    "id": "sha256:c02a3fda7dd7068fb3560f33c8c50ad8c3a0b65e0592b74eb62735d7ec951d87",
+    "repoDigests": [],
+    "platform": "linux/amd64"
+  },
+  "gates": [
+    {
+      "id": "00-environment",
+      "status": "PASS"
+    },
+    {
+      "id": "10-dataspace-ca-tests",
+      "status": "PASS"
+    },
+    {
+      "id": "11-dataspace-ca-publication",
+      "status": "PASS"
+    },
+    {
+      "id": "20-dataspace-ica-host-activation",
+      "status": "PASS"
+    },
+    {
+      "id": "21-dataspace-ica-postgres-ipfs-migration",
+      "status": "PASS"
+    },
+    {
+      "id": "30-fabric-governance-contract",
+      "status": "PASS"
+    },
+    {
+      "id": "31-fabric-multi-host-topology",
+      "status": "PASS"
+    },
+    {
+      "id": "35-human-channel-taxonomy",
+      "status": "PASS"
+    },
+    {
+      "id": "36-employee-onboarding-contract",
+      "status": "PASS"
+    },
+    {
+      "id": "40-gw-postgres-ipfs-fabric-runtime",
+      "status": "PASS"
+    },
+    {
+      "id": "45-helm-kubernetes-runtime",
+      "status": "PASS"
+    },
+    {
+      "id": "50-evidence-summary",
+      "status": "PASS"
+    },
+    {
+      "id": "60-public-secret-scan",
+      "status": "PASS"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "dataspace-ca-public/.well-known/dcat3/catalog.json",
+      "bytes": 1039,
+      "sha256": "19f46148cedf810f08f825ede42914834fed2653eed79ac9d6cc7c0e6b4b3d5b"
+    },
+    {
+      "path": "dataspace-ca-public/.well-known/did.json",
+      "bytes": 2517,
+      "sha256": "d2ff76751bc46d3306afe4e104eb7d0a0b419398b315f810f564759d3d71c1de"
+    },
+    {
+      "path": "dataspace-ca-public/.well-known/jwks.json",
+      "bytes": 3554,
+      "sha256": "38cccbadb9c6319824381903742a40cc54045fcab0936d6538408e21a5fdfe28"
+    },
+    {
+      "path": "dataspace-ca-public/.well-known/openapi.json",
+      "bytes": 935,
+      "sha256": "3113c12d0c1be01dc80cb1e919dec881c4613d48111850907d15e3bd91659731"
+    },
+    {
+      "path": "dataspace-ca-public/.well-known/trust.json",
+      "bytes": 585,
+      "sha256": "6544b69a55db1b8c5128a770288444ac766d61156908ca0c4f4a3260b8542b6d"
+    },
+    {
+      "path": "dataspace-ca-public/issuer/did.json",
+      "bytes": 3298,
+      "sha256": "2ae191ce9143fd06a691f1dd223bad7ee79c2f0682ebdbb516253c7a0b997b29"
+    },
+    {
+      "path": "dataspace-ca-public/pki/issuer-ca.chain.pem",
+      "bytes": 1937,
+      "sha256": "77fd1f8b865f0730e3e166f2c75d294486e35964c26d6975051a71b58214284f"
+    },
+    {
+      "path": "dataspace-ca-public/pki/issuer-ca.der",
+      "bytes": 678,
+      "sha256": "6e0c292ccb997ff16216c82b14aade6818a6293371c735197239af6bd03855f3"
+    },
+    {
+      "path": "dataspace-ca-public/pki/issuer-ca.pem",
+      "bytes": 973,
+      "sha256": "606854b676c040714b157f7ad8f42193ee09c259050a98eaf82a3a9a5b73045c"
+    },
+    {
+      "path": "dataspace-ca-public/pki/root-ca.der",
+      "bytes": 672,
+      "sha256": "51b59c749c0ec63f41b005f367827f3331ee80693f417364979ed322cda4dd1d"
+    },
+    {
+      "path": "dataspace-ca-public/pki/root-ca.pem",
+      "bytes": 964,
+      "sha256": "d56314747c972e6260c628bd9591fc9cb93d7ca9eda661c31d07ec450b4ee57e"
+    },
+    {
+      "path": "dataspace-ca-public/publish-metadata.json",
+      "bytes": 609,
+      "sha256": "b87c6b2966ff2e8813033a5546a9ccfe4a2e7bab1bd0398529ee4a2a4e1dc6f2"
+    },
+    {
+      "path": "dataspace-ica-postgres-ipfs/audit-ipfs-manifest.json",
+      "bytes": 583,
+      "sha256": "0d5831403504800fe3d407ace0ea3b249a92a0ed52a9ae5bbf6528ac619ebbb1"
+    },
+    {
+      "path": "dataspace-ica-postgres-ipfs/PASS",
+      "bytes": 5,
+      "sha256": "c26de83abdc9496cd1301470918ec39ecca1cf389ef0ae1c6504da1800d1c431"
+    },
+    {
+      "path": "dataspace-ica-postgres-ipfs/postgres-migration-report.json",
+      "bytes": 448,
+      "sha256": "21bba248a3a3a6f9ae9bc292523d8ac430bf0a4c6cc0559f0872cec3052fd788"
+    },
+    {
+      "path": "dataspace-ica-postgres-ipfs/SHA256SUMS",
+      "bytes": 188,
+      "sha256": "4b2620692926543f59bda4a120571f8090285db1dc0ba2f626182e1e1e629c25"
+    },
+    {
+      "path": "gates/00-environment.status",
+      "bytes": 5,
+      "sha256": "c26de83abdc9496cd1301470918ec39ecca1cf389ef0ae1c6504da1800d1c431"
+    },
+    {
+      "path": "gates/10-dataspace-ca-tests.status",
+      "bytes": 5,
+      "sha256": "c26de83abdc9496cd1301470918ec39ecca1cf389ef0ae1c6504da1800d1c431"
+    },
+    {
+      "path": "gates/11-dataspace-ca-publication.status",
+      "bytes": 5,
+      "sha256": "c26de83abdc9496cd1301470918ec39ecca1cf389ef0ae1c6504da1800d1c431"
+    },
+    {
+      "path": "gates/20-dataspace-ica-host-activation.status",
+      "bytes": 5,
+      "sha256": "c26de83abdc9496cd1301470918ec39ecca1cf389ef0ae1c6504da1800d1c431"
+    },
+    {
+      "path": "gates/21-dataspace-ica-postgres-ipfs-migration.status",
+      "bytes": 5,
+      "sha256": "c26de83abdc9496cd1301470918ec39ecca1cf389ef0ae1c6504da1800d1c431"
+    },
+    {
+      "path": "gates/30-fabric-governance-contract.status",
+      "bytes": 5,
+      "sha256": "c26de83abdc9496cd1301470918ec39ecca1cf389ef0ae1c6504da1800d1c431"
+    },
+    {
+      "path": "gates/31-fabric-multi-host-topology.status",
+      "bytes": 5,
+      "sha256": "c26de83abdc9496cd1301470918ec39ecca1cf389ef0ae1c6504da1800d1c431"
+    },
+    {
+      "path": "gates/35-human-channel-taxonomy.status",
+      "bytes": 5,
+      "sha256": "c26de83abdc9496cd1301470918ec39ecca1cf389ef0ae1c6504da1800d1c431"
+    },
+    {
+      "path": "gates/36-employee-onboarding-contract.status",
+      "bytes": 5,
+      "sha256": "c26de83abdc9496cd1301470918ec39ecca1cf389ef0ae1c6504da1800d1c431"
+    },
+    {
+      "path": "gates/40-gw-postgres-ipfs-fabric-runtime.status",
+      "bytes": 5,
+      "sha256": "c26de83abdc9496cd1301470918ec39ecca1cf389ef0ae1c6504da1800d1c431"
+    },
+    {
+      "path": "gates/45-helm-kubernetes-runtime.status",
+      "bytes": 5,
+      "sha256": "c26de83abdc9496cd1301470918ec39ecca1cf389ef0ae1c6504da1800d1c431"
+    },
+    {
+      "path": "gates/50-evidence-summary.status",
+      "bytes": 5,
+      "sha256": "c26de83abdc9496cd1301470918ec39ecca1cf389ef0ae1c6504da1800d1c431"
+    },
+    {
+      "path": "gates/60-public-secret-scan.status",
+      "bytes": 5,
+      "sha256": "c26de83abdc9496cd1301470918ec39ecca1cf389ef0ae1c6504da1800d1c431"
+    },
+    {
+      "path": "host2-authorization.json",
+      "bytes": 486,
+      "sha256": "be93cabe4064fd81ee2afde2558b4042856c9372557dbd6cbaa412b7af73fe22"
+    },
+    {
+      "path": "host2-reconciler-audit.jsonl",
+      "bytes": 2228,
+      "sha256": "38bccdea04d8e0ccf4f033d2d83450068f7822a354a43f03372797e2652f6a80"
+    },
+    {
+      "path": "logs/00-environment.log",
+      "bytes": 532,
+      "sha256": "080c2b2324d9d276504fc83ad8b9248ebbe9280776cb970eca276f3bf0fc7b52"
+    },
+    {
+      "path": "logs/10-dataspace-ca-tests.log",
+      "bytes": 942,
+      "sha256": "560b813d1b73700ec7a1b221f60180b0a645631edff89307a2a6618848bedf4e"
+    },
+    {
+      "path": "logs/11-dataspace-ca-publication.log",
+      "bytes": 1642,
+      "sha256": "4a566a9b0a27f03537f317107ef735c8a9de8a94dca78235985f58a65eef1930"
+    },
+    {
+      "path": "logs/20-dataspace-ica-host-activation.log",
+      "bytes": 5017,
+      "sha256": "e79b6c8b5303d56a5a92ec75a64b59496d5f6f69efe3ebdadb23c45c782c34ca"
+    },
+    {
+      "path": "logs/21-dataspace-ica-postgres-ipfs-migration.log",
+      "bytes": 1720,
+      "sha256": "ababce99a00de49a11793ef28ee2728ac832a70bcf46830f9308877b98c776a7"
+    },
+    {
+      "path": "logs/30-fabric-governance-contract.log",
+      "bytes": 4134,
+      "sha256": "941f39cbac23e167e1550a5b2315ec5d86e8fcce017fe2d7edcb1131738bda65"
+    },
+    {
+      "path": "logs/31-fabric-multi-host-topology.log",
+      "bytes": 57317,
+      "sha256": "8b07f6c746d8116f100e2549bebdb9627025ef7d3e2bf90f68ac823df1da35b1"
+    },
+    {
+      "path": "logs/35-human-channel-taxonomy.log",
+      "bytes": 996,
+      "sha256": "a74b2cbfbcf1f9df25c31c29a364cf2d05a4f253162b49708a3f7f6cf6ad882f"
+    },
+    {
+      "path": "logs/36-employee-onboarding-contract.log",
+      "bytes": 14394,
+      "sha256": "fb8083b0a2f2e84dabc07d81294dec945c432a679fd5041de62b163c6fc6d8e9"
+    },
+    {
+      "path": "logs/40-gw-postgres-ipfs-fabric-runtime.log",
+      "bytes": 71664,
+      "sha256": "c07128567110c70f7869a3784b906805ce715af9c6bd72cffb391f238b184ed4"
+    },
+    {
+      "path": "logs/45-helm-kubernetes-runtime.log",
+      "bytes": 424774,
+      "sha256": "626bf67a9277de325191ae4db2ebf2514adee8641562f017782cd5e1e5577810"
+    },
+    {
+      "path": "logs/50-evidence-summary.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "logs/60-public-secret-scan.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "SUMMARY.md",
+      "bytes": 3043,
+      "sha256": "db3cb5df80471e50bd00f7ba4675e97e9abfbcdc0f894c1c7049a4a9f6436bc0"
+    }
+  ],
+  "productionPromotionConditions": [
+    "replace the local KEK with one process-owned KEK unwrapped once through the configured KMS adapter",
+    "use production DNS, TLS, secret custody, persistent volumes and monitored backup/recovery",
+    "use production Fabric Root/ICA material and governed channel inventory",
+    "exercise the real operator-owned Fabric reconciliation driver before claiming dynamic host admission",
+    "promote the locally proven CCAAS images and connection packages by approved immutable digests",
+    "deploy the already-tested image by immutable registry digest"
+  ]
+}

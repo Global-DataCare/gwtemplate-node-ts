@@ -1,0 +1,49 @@
+GW local Fabric host naming contract: ok
+[evidence] deliberate-failure
+before-failure
+[evidence] FAIL deliberate-failure; see /var/folders/b4/22t6q0l16jd7fcdqqg6pwtrm0000gn/T/tmp.qYlhy1WU2D/evidence/logs/deliberate-failure.log
+✔ validates inventory-bound decisions and builds an exact deterministic plan (27.11413ms)
+✔ rotates every channel-group occurrence of an existing MSP without changing grants, peers or lifecycle (1.653785ms)
+✔ reconciles chaincode lifecycle without changing channel membership, grants or peer joins (0.966222ms)
+✔ rejects request-selected channels, peers, mismatched operator identity and expiry (0.698219ms)
+✔ orders every organization approval before one governance-executor commit (1.300766ms)
+✔ verifies a detached ES256 controller signature against DID assertionMethod (6.855103ms)
+✔ verifies a detached ML-DSA-44 controller signature against DID assertionMethod (69.283029ms)
+✔ verifies current operator token and exact issuer, subject, email and tenant (48.810106ms)
+✔ authorizes host enrollment only when Host VC and Root governance decision match the same host MSP (48.922443ms)
+✔ requires a HostingServiceCredential in every network, including local and test (274.59727ms)
+✔ fails closed when a production host omits HostingServiceCredential (30.647879ms)
+✔ apply re-inspects every step, persists completion and is idempotent (5301.022743ms)
+✔ uses one activation and a locally generated request key to obtain a governed Host VC without a PDF (90.141851ms)
+✔ accepts logically isolated shared staging infrastructure (2.984762ms)
+✔ accepts a disposable local-network manifest with shared infrastructure (1.137041ms)
+✔ rejects a production manifest that claims shared infrastructure (0.68665ms)
+✔ ships a valid isolated production manifest with host-local key output (1.040695ms)
+✔ keeps plan mode as default and requires an explicit role (2.285688ms)
+✔ explains that host enrollment creates local keys and receives certificates (0.406028ms)
+✔ keeps the governed MSP administrator under the Fabric authority management (0.335135ms)
+✔ places peer runtime reconciliation before governed channel joins (0.405449ms)
+ℹ tests 21
+ℹ suites 0
+ℹ pass 21
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6109.802798
+Governed HOSTEXAMPLEMSP administrator retained in /var/folders/b4/22t6q0l16jd7fcdqqg6pwtrm0000gn/T/tmp.zqfTbrj4ia/authority/HOSTEXAMPLEMSP-admin; public MSP definition written to /var/folders/b4/22t6q0l16jd7fcdqqg6pwtrm0000gn/T/tmp.zqfTbrj4ia/authority/HOSTEXAMPLEMSP-public.
+Reusing governed HOSTEXAMPLEMSP administrator from /var/folders/b4/22t6q0l16jd7fcdqqg6pwtrm0000gn/T/tmp.zqfTbrj4ia/authority/HOSTEXAMPLEMSP-admin.
+Bounded two-use peer MSP/TLS enrollment grant written to /var/folders/b4/22t6q0l16jd7fcdqqg6pwtrm0000gn/T/tmp.c2bdNfSErQ/weekend-grant.json
+Host MSP and TLS identities generated locally in /var/folders/b4/22t6q0l16jd7fcdqqg6pwtrm0000gn/T/tmp.c2bdNfSErQ/valid-host
+Bounded one-use GW client enrollment grant written to /var/folders/b4/22t6q0l16jd7fcdqqg6pwtrm0000gn/T/tmp.JLv7FBDq9K/client-grant.json
+Bounded one-use GW client enrollment grant written to /var/folders/b4/22t6q0l16jd7fcdqqg6pwtrm0000gn/T/tmp.JLv7FBDq9K/weekend-client-grant.json
+GW Fabric client identity generated locally in /var/folders/b4/22t6q0l16jd7fcdqqg6pwtrm0000gn/T/tmp.JLv7FBDq9K/gw-client
+Private GW Fabric environment written to /var/folders/b4/22t6q0l16jd7fcdqqg6pwtrm0000gn/T/tmp.JLv7FBDq9K/gw.fabric.env
+Sanitized local Host2 authorization written to /var/folders/b4/22t6q0l16jd7fcdqqg6pwtrm0000gn/T/tmp.1nVamoUXqS/authorization.json.
+Host runtime package created at /var/folders/b4/22t6q0l16jd7fcdqqg6pwtrm0000gn/T/tmp.iKaLRxKmim/runtime; enrollment grant was not copied.
+msp.tgz: OK
+tls.tgz: OK
+authorization.json: OK
+Ten deterministic CCAAS packages written to /var/folders/b4/22t6q0l16jd7fcdqqg6pwtrm0000gn/T/tmp.HFAIhCnjR4/first.
+Ten deterministic CCAAS packages written to /var/folders/b4/22t6q0l16jd7fcdqqg6pwtrm0000gn/T/tmp.HFAIhCnjR4/second.
+Public identity chaincodes verified: organization-sc, cryptographickey-sc

@@ -1,0 +1,753 @@
+Warning: No resource found to remove for project "gdc-host040-local-network".
+Copied dataspace-ca material into Fabric devnet:
+- Root CA source: /var/folders/b4/22t6q0l16jd7fcdqqg6pwtrm0000gn/T/tmp.mqn48vTFNt/root
+- Issuer source:  /var/folders/b4/22t6q0l16jd7fcdqqg6pwtrm0000gn/T/tmp.mqn48vTFNt/issuer
+- Root CA dest:   ${HOME}/GITS/gdc-workspace/gwtemplate-node-ts/infra/fabric/local-network/crypto/ca/root
+- ICA dest:       ${HOME}/GITS/gdc-workspace/gwtemplate-node-ts/infra/fabric/local-network/crypto/ca/ica
+
+Next steps:
+  1) cd ${HOME}/GITS/gdc-workspace/gwtemplate-node-ts/infra/fabric/local-network
+  2) ./scripts/01-up-cas.sh
+  3) ./scripts/02-bootstrap-network.sh
+ Network gdc-host040-local-network  Creating
+ Network gdc-host040-local-network  Created
+ Volume "gdc-host040-local-network_ica-db"  Creating
+ Volume "gdc-host040-local-network_ica-db"  Created
+ Volume "gdc-host040-local-network_root-ca-db"  Creating
+ Volume "gdc-host040-local-network_root-ca-db"  Created
+ Container gdc-host040-root-ca  Creating
+ Container gdc-host040-root-ca  Created
+ Container gdc-host040-ica  Creating
+ Container gdc-host040-ica  Created
+ Container gdc-host040-root-ca  Starting
+ Container gdc-host040-root-ca  Started
+ Container gdc-host040-ica  Starting
+ Container gdc-host040-ica  Started
+CAs are starting...
+Root CA: https://127.0.0.1:27054
+ICA:     https://127.0.0.1:27056
+ Container gdc-host040-root-ca  Running
+ Container gdc-host040-ica  Running
+ Container gdc-host040-fabric-ca-client  Creating
+ Container gdc-host040-fabric-tools  Creating
+ Container gdc-host040-fabric-ca-client  Created
+ Container gdc-host040-fabric-tools  Created
+ Container gdc-host040-fabric-ca-client  Starting
+ Container gdc-host040-fabric-tools  Starting
+ Container gdc-host040-fabric-tools  Started
+ Container gdc-host040-fabric-ca-client  Started
+Waiting for CAs...
+2026/09/21 19:11:53 [INFO] Created a default configuration file at /workspace/organizations/fabric-ca-client/ica-admin/fabric-ca-client-config.yaml
+2026/09/21 19:11:53 [INFO] TLS Enabled
+2026/09/21 19:11:53 [INFO] generating key: &{A:ecdsa S:256}
+2026/09/21 19:11:53 [INFO] encoded CSR
+2026/09/21 19:11:53 [INFO] Stored client certificate at /workspace/organizations/fabric-ca-client/ica-admin/msp/signcerts/cert.pem
+2026/09/21 19:11:53 [INFO] Stored root CA certificate at /workspace/organizations/fabric-ca-client/ica-admin/msp/cacerts/ica-7054.pem
+2026/09/21 19:11:53 [INFO] Stored intermediate CA certificates at /workspace/organizations/fabric-ca-client/ica-admin/msp/intermediatecerts/ica-7054.pem
+2026/09/21 19:11:53 [INFO] Stored Issuer public key at /workspace/organizations/fabric-ca-client/ica-admin/msp/IssuerPublicKey
+2026/09/21 19:11:53 [INFO] Stored Issuer revocation public key at /workspace/organizations/fabric-ca-client/ica-admin/msp/IssuerRevocationPublicKey
+2026/09/21 19:11:53 [INFO] Configuration file location: /workspace/organizations/fabric-ca-client/ica-admin/fabric-ca-client-config.yaml
+2026/09/21 19:11:53 [INFO] TLS Enabled
+2026/09/21 19:11:53 [INFO] TLS Enabled
+Successfully added affiliation: host1
+2026/09/21 19:11:53 [INFO] Configuration file location: /workspace/organizations/fabric-ca-client/ica-admin/fabric-ca-client-config.yaml
+2026/09/21 19:11:53 [INFO] TLS Enabled
+2026/09/21 19:11:54 [INFO] TLS Enabled
+Successfully added affiliation: host1.department1
+2026/09/21 19:11:54 [INFO] Configuration file location: /workspace/organizations/fabric-ca-client/ica-admin/fabric-ca-client-config.yaml
+2026/09/21 19:11:54 [INFO] TLS Enabled
+2026/09/21 19:11:54 [INFO] TLS Enabled
+Successfully added affiliation: orderer
+2026/09/21 19:11:54 [INFO] Configuration file location: /workspace/organizations/fabric-ca-client/ica-admin/fabric-ca-client-config.yaml
+2026/09/21 19:11:54 [INFO] TLS Enabled
+2026/09/21 19:11:54 [INFO] TLS Enabled
+Successfully added affiliation: orderer.department1
+2026/09/21 19:11:54 [INFO] Configuration file location: /workspace/organizations/fabric-ca-client/ica-admin/fabric-ca-client-config.yaml
+2026/09/21 19:11:54 [INFO] TLS Enabled
+2026/09/21 19:11:54 [INFO] TLS Enabled
+Password: [REDACTED]
+2026/09/21 19:11:55 [INFO] Configuration file location: /workspace/organizations/fabric-ca-client/ica-admin/fabric-ca-client-config.yaml
+2026/09/21 19:11:55 [INFO] TLS Enabled
+2026/09/21 19:11:55 [INFO] TLS Enabled
+Password: [REDACTED]
+2026/09/21 19:11:55 [INFO] Configuration file location: /workspace/organizations/fabric-ca-client/ica-admin/fabric-ca-client-config.yaml
+2026/09/21 19:11:55 [INFO] TLS Enabled
+2026/09/21 19:11:55 [INFO] TLS Enabled
+Password: [REDACTED]
+2026/09/21 19:11:56 [INFO] Configuration file location: /workspace/organizations/fabric-ca-client/ica-admin/fabric-ca-client-config.yaml
+2026/09/21 19:11:56 [INFO] TLS Enabled
+2026/09/21 19:11:56 [INFO] TLS Enabled
+Password: [REDACTED]
+2026/09/21 19:11:56 [INFO] TLS Enabled
+2026/09/21 19:11:56 [INFO] generating key: &{A:ecdsa S:256}
+2026/09/21 19:11:56 [INFO] encoded CSR
+2026/09/21 19:11:56 [INFO] Stored client certificate at /workspace/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/msp/signcerts/cert.pem
+2026/09/21 19:11:56 [INFO] Stored root CA certificate at /workspace/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/msp/cacerts/ica-7054.pem
+2026/09/21 19:11:56 [INFO] Stored intermediate CA certificates at /workspace/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/msp/intermediatecerts/ica-7054.pem
+2026/09/21 19:11:56 [INFO] Stored Issuer public key at /workspace/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/msp/IssuerPublicKey
+2026/09/21 19:11:56 [INFO] Stored Issuer revocation public key at /workspace/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/msp/IssuerRevocationPublicKey
+2026/09/21 19:11:57 [INFO] TLS Enabled
+2026/09/21 19:11:57 [INFO] generating key: &{A:ecdsa S:256}
+2026/09/21 19:11:57 [INFO] encoded CSR
+2026/09/21 19:11:57 [INFO] Stored client certificate at /workspace/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls/signcerts/cert.pem
+2026/09/21 19:11:57 [INFO] Stored TLS root CA certificate at /workspace/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls/tlscacerts/tls-ica-7054.pem
+2026/09/21 19:11:57 [INFO] Stored TLS intermediate certificates at /workspace/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls/tlsintermediatecerts/tls-ica-7054.pem
+2026/09/21 19:11:57 [INFO] Stored Issuer public key at /workspace/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls/IssuerPublicKey
+2026/09/21 19:11:57 [INFO] Stored Issuer revocation public key at /workspace/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls/IssuerRevocationPublicKey
+2026/09/21 19:11:57 [INFO] TLS Enabled
+2026/09/21 19:11:57 [INFO] generating key: &{A:ecdsa S:256}
+2026/09/21 19:11:57 [INFO] encoded CSR
+2026/09/21 19:11:58 [INFO] Stored client certificate at /workspace/organizations/peerOrganizations/host1.example.com/peers/peer0.host1.example.com/msp/signcerts/cert.pem
+2026/09/21 19:11:58 [INFO] Stored root CA certificate at /workspace/organizations/peerOrganizations/host1.example.com/peers/peer0.host1.example.com/msp/cacerts/ica-7054.pem
+2026/09/21 19:11:58 [INFO] Stored intermediate CA certificates at /workspace/organizations/peerOrganizations/host1.example.com/peers/peer0.host1.example.com/msp/intermediatecerts/ica-7054.pem
+2026/09/21 19:11:58 [INFO] Stored Issuer public key at /workspace/organizations/peerOrganizations/host1.example.com/peers/peer0.host1.example.com/msp/IssuerPublicKey
+2026/09/21 19:11:58 [INFO] Stored Issuer revocation public key at /workspace/organizations/peerOrganizations/host1.example.com/peers/peer0.host1.example.com/msp/IssuerRevocationPublicKey
+2026/09/21 19:11:58 [INFO] TLS Enabled
+2026/09/21 19:11:58 [INFO] generating key: &{A:ecdsa S:256}
+2026/09/21 19:11:58 [INFO] encoded CSR
+2026/09/21 19:11:58 [INFO] Stored client certificate at /workspace/organizations/peerOrganizations/host1.example.com/peers/peer0.host1.example.com/tls/signcerts/cert.pem
+2026/09/21 19:11:58 [INFO] Stored TLS root CA certificate at /workspace/organizations/peerOrganizations/host1.example.com/peers/peer0.host1.example.com/tls/tlscacerts/tls-ica-7054.pem
+2026/09/21 19:11:58 [INFO] Stored TLS intermediate certificates at /workspace/organizations/peerOrganizations/host1.example.com/peers/peer0.host1.example.com/tls/tlsintermediatecerts/tls-ica-7054.pem
+2026/09/21 19:11:58 [INFO] Stored Issuer public key at /workspace/organizations/peerOrganizations/host1.example.com/peers/peer0.host1.example.com/tls/IssuerPublicKey
+2026/09/21 19:11:58 [INFO] Stored Issuer revocation public key at /workspace/organizations/peerOrganizations/host1.example.com/peers/peer0.host1.example.com/tls/IssuerRevocationPublicKey
+2026/09/21 19:11:58 [INFO] TLS Enabled
+2026/09/21 19:11:58 [INFO] generating key: &{A:ecdsa S:256}
+2026/09/21 19:11:58 [INFO] encoded CSR
+2026/09/21 19:11:59 [INFO] Stored client certificate at /workspace/organizations/peerOrganizations/host1.example.com/users/Admin@host1.example.com/msp/signcerts/cert.pem
+2026/09/21 19:11:59 [INFO] Stored root CA certificate at /workspace/organizations/peerOrganizations/host1.example.com/users/Admin@host1.example.com/msp/cacerts/ica-7054.pem
+2026/09/21 19:11:59 [INFO] Stored intermediate CA certificates at /workspace/organizations/peerOrganizations/host1.example.com/users/Admin@host1.example.com/msp/intermediatecerts/ica-7054.pem
+2026/09/21 19:11:59 [INFO] Stored Issuer public key at /workspace/organizations/peerOrganizations/host1.example.com/users/Admin@host1.example.com/msp/IssuerPublicKey
+2026/09/21 19:11:59 [INFO] Stored Issuer revocation public key at /workspace/organizations/peerOrganizations/host1.example.com/users/Admin@host1.example.com/msp/IssuerRevocationPublicKey
+[34m2026-09-21 19:11:59.484 UTC 0001 INFO[0m [common.tools.configtxgen] [34;1mmain[0m -> Loading configuration
+[34m2026-09-21 19:11:59.519 UTC 0002 INFO[0m [common.tools.configtxgen.localconfig] [34;1mcompleteInitialization[0m -> Orderer.BatchTimeout unset, setting to 2s
+[34m2026-09-21 19:11:59.519 UTC 0003 INFO[0m [common.tools.configtxgen.localconfig] [34;1mcompleteInitialization[0m -> Orderer.BatchSize.MaxMessageCount unset, setting to 500
+[34m2026-09-21 19:11:59.519 UTC 0004 INFO[0m [common.tools.configtxgen.localconfig] [34;1mcompleteInitialization[0m -> Orderer.BatchSize.AbsoluteMaxBytes unset, setting to 10485760
+[34m2026-09-21 19:11:59.519 UTC 0005 INFO[0m [common.tools.configtxgen.localconfig] [34;1mcompleteInitialization[0m -> Orderer.BatchSize.PreferredMaxBytes unset, setting to 2097152
+[34m2026-09-21 19:11:59.519 UTC 0006 INFO[0m [common.tools.configtxgen.localconfig] [34;1mcompleteInitialization[0m -> orderer type: etcdraft
+[34m2026-09-21 19:11:59.520 UTC 0007 INFO[0m [common.tools.configtxgen.localconfig] [34;1mcompleteInitialization[0m -> Orderer.EtcdRaft.Options unset, setting to tick_interval:"500ms" election_tick:10 heartbeat_tick:1 max_inflight_blocks:5 snapshot_interval_size:16777216 
+[34m2026-09-21 19:11:59.520 UTC 0008 INFO[0m [common.tools.configtxgen.localconfig] [34;1mLoad[0m -> Loaded configuration: /workspace/configtx/configtx.yaml
+[34m2026-09-21 19:11:59.606 UTC 0009 INFO[0m [common.tools.configtxgen] [34;1mdoOutputBlock[0m -> Generating genesis block
+[34m2026-09-21 19:11:59.607 UTC 000a INFO[0m [common.tools.configtxgen] [34;1mdoOutputBlock[0m -> Creating application channel genesis block
+[34m2026-09-21 19:11:59.608 UTC 000b INFO[0m [common.tools.configtxgen] [34;1mdoOutputBlock[0m -> Writing genesis block
+[34m2026-09-21 19:11:59.853 UTC 0001 INFO[0m [common.tools.configtxgen] [34;1mmain[0m -> Loading configuration
+[34m2026-09-21 19:11:59.874 UTC 0002 INFO[0m [common.tools.configtxgen.localconfig] [34;1mcompleteInitialization[0m -> Orderer.BatchTimeout unset, setting to 2s
+[34m2026-09-21 19:11:59.874 UTC 0003 INFO[0m [common.tools.configtxgen.localconfig] [34;1mcompleteInitialization[0m -> Orderer.BatchSize.MaxMessageCount unset, setting to 500
+[34m2026-09-21 19:11:59.874 UTC 0004 INFO[0m [common.tools.configtxgen.localconfig] [34;1mcompleteInitialization[0m -> Orderer.BatchSize.AbsoluteMaxBytes unset, setting to 10485760
+[34m2026-09-21 19:11:59.874 UTC 0005 INFO[0m [common.tools.configtxgen.localconfig] [34;1mcompleteInitialization[0m -> Orderer.BatchSize.PreferredMaxBytes unset, setting to 2097152
+[34m2026-09-21 19:11:59.874 UTC 0006 INFO[0m [common.tools.configtxgen.localconfig] [34;1mcompleteInitialization[0m -> orderer type: etcdraft
+[34m2026-09-21 19:11:59.875 UTC 0007 INFO[0m [common.tools.configtxgen.localconfig] [34;1mcompleteInitialization[0m -> Orderer.EtcdRaft.Options unset, setting to tick_interval:"500ms" election_tick:10 heartbeat_tick:1 max_inflight_blocks:5 snapshot_interval_size:16777216 
+[34m2026-09-21 19:11:59.875 UTC 0008 INFO[0m [common.tools.configtxgen.localconfig] [34;1mLoad[0m -> Loaded configuration: /workspace/configtx/configtx.yaml
+[34m2026-09-21 19:11:59.950 UTC 0009 INFO[0m [common.tools.configtxgen] [34;1mdoOutputBlock[0m -> Generating genesis block
+[34m2026-09-21 19:11:59.950 UTC 000a INFO[0m [common.tools.configtxgen] [34;1mdoOutputBlock[0m -> Creating application channel genesis block
+[34m2026-09-21 19:11:59.952 UTC 000b INFO[0m [common.tools.configtxgen] [34;1mdoOutputBlock[0m -> Writing genesis block
+ Volume "gdc-host040-local-network_orderer-data"  Creating
+ Volume "gdc-host040-local-network_orderer-data"  Created
+ Volume "gdc-host040-local-network_peer0-host1-data"  Creating
+ Volume "gdc-host040-local-network_peer0-host1-data"  Created
+ Container gdc-host040-fabric-tools  Running
+ Container gdc-host040-orderer  Creating
+ Container gdc-host040-orderer  Created
+ Container gdc-host040-peer0-host1  Creating
+ Container gdc-host040-peer0-host1  Created
+ Container gdc-host040-orderer  Starting
+ Container gdc-host040-orderer  Started
+ Container gdc-host040-peer0-host1  Starting
+ Container gdc-host040-peer0-host1  Started
+Waiting for orderer...
+Peer peer0-host1:7051 is ready.
+Status: 201
+{
+	"name": "identity-local",
+	"url": "/participation/v1/channels/identity-local",
+	"consensusRelation": "consenter",
+	"status": "active",
+	"height": 1
+}
+Status: 201
+{
+	"name": "health-care-local",
+	"url": "/participation/v1/channels/health-care-local",
+	"consensusRelation": "consenter",
+	"status": "active",
+	"height": 1
+}
+[34m2026-09-21 19:12:07.005 UTC 0001 INFO[0m [channelCmd] [34;1mInitCmdFactory[0m -> Endorser and orderer connections initialized
+[34m2026-09-21 19:12:07.134 UTC 0002 INFO[0m [channelCmd] [34;1mexecuteJoin[0m -> Successfully submitted proposal to join channel
+[34m2026-09-21 19:12:07.786 UTC 0001 INFO[0m [channelCmd] [34;1mInitCmdFactory[0m -> Endorser and orderer connections initialized
+[34m2026-09-21 19:12:07.911 UTC 0002 INFO[0m [channelCmd] [34;1mexecuteJoin[0m -> Successfully submitted proposal to join channel
+✅ Fabric devnet bootstrapped. Channels: identity-local health-care-local
+Sanitized local Host2 authorization written to /var/folders/b4/22t6q0l16jd7fcdqqg6pwtrm0000gn/T/tmp.mqn48vTFNt/host2-authorization.json.
+{
+  "mode": "apply",
+  "verified": true,
+  "signature": {
+    "alg": "ES256",
+    "kid": "did:web:ca.localhost#root-controller"
+  },
+  "authenticatedOperator": {
+    "issuer": "https://identity.localhost",
+    "subject": "local-auditor",
+    "email": "controller@example.invalid",
+    "tenantId": "local-governor",
+    "issuedAt": 1790017898,
+    "expiresAt": 1790018228
+  },
+  "decisionDigest": "ebe531db8c9d9cce71e8859675f52bdc29e1f5eb1c3f967967969b297fe595bc",
+  "plan": {
+    "specVersion": "gdc.fabric.reconciliation-plan/v1",
+    "requestId": "urn:uuid:e2719876-efeb-4e4d-91c5-086f65dbab41",
+    "network": "local-audit",
+    "steps": [
+      {
+        "id": "327e1ef6ac5864ec1586308f5b0e0920d3f67f27429e2cbbe8bd4dffde48b021",
+        "type": "ensure-application-msp",
+        "target": "local-orderer",
+        "input": {
+          "network": "local-audit",
+          "channel": "identity-local",
+          "mspId": "Host2MSP",
+          "mspDefinitionSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      },
+      {
+        "id": "11e72360b1bb1e15616fc2dd34e443fec4e8848853767a345227b9b5c01d3a7e",
+        "type": "ensure-application-msp",
+        "target": "local-orderer",
+        "input": {
+          "network": "local-audit",
+          "channel": "health-care-local",
+          "mspId": "Host2MSP",
+          "mspDefinitionSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      },
+      {
+        "id": "57b6d3e28af7c3ea70d380b007e32974c3672327b481fc6d328ba87201b22dba",
+        "type": "ensure-channel-grants",
+        "target": "local-orderer",
+        "input": {
+          "network": "local-audit",
+          "channel": "identity-local",
+          "mspId": "Host2MSP",
+          "grants": [
+            "read",
+            "write"
+          ]
+        }
+      },
+      {
+        "id": "e602ab1d3aa18080f99606a0ebf9dacbd3c58b1eaccac933bebb77b91e26597a",
+        "type": "ensure-channel-grants",
+        "target": "local-orderer",
+        "input": {
+          "network": "local-audit",
+          "channel": "health-care-local",
+          "mspId": "Host2MSP",
+          "grants": [
+            "read",
+            "write"
+          ]
+        }
+      },
+      {
+        "id": "7f47b8b26e44714ef258f9d4b5fd20fb11ac02d0bd1efef01e77bdf32487a43b",
+        "type": "ensure-peer-runtime",
+        "target": "host2-peer",
+        "input": {
+          "network": "local-audit",
+          "mspId": "Host2MSP",
+          "channels": [
+            "health-care-local",
+            "identity-local"
+          ]
+        }
+      },
+      {
+        "id": "80f456ca5054cde66463258a96ca00f36a85eb24676d611ad069fa285137343c",
+        "type": "ensure-peer-channel",
+        "target": "host2-peer",
+        "input": {
+          "network": "local-audit",
+          "channel": "identity-local",
+          "mspId": "Host2MSP"
+        }
+      },
+      {
+        "id": "89453e441bfaf9ad66e773f769d77567fe1015738bb75cf31f7dd06f026d506c",
+        "type": "ensure-peer-channel",
+        "target": "host2-peer",
+        "input": {
+          "network": "local-audit",
+          "channel": "health-care-local",
+          "mspId": "Host2MSP"
+        }
+      }
+    ],
+    "digest": "dae5379d7a89f6713b540efd846c1d627ee4c28cdb0632f7e48de98d744ed2d3"
+  }
+}
+Wrote ${HOME}/GITS/gdc-workspace/gwtemplate-node-ts/infra/fabric/local-network/.env.fabric-devnet
+---> Deploying organization-sc from ${HOME}/GITS/gdc-workspace/gwtemplate-node-ts/chaincode/organization-sc-javascript on identity-local
+Packaging chaincode organization-sc from ${HOME}/GITS/gdc-workspace/gwtemplate-node-ts/chaincode/organization-sc-javascript...
+Installing on Host1 peer...
+[34m2026-09-21 19:12:45.432 UTC 0001 INFO[0m [cli.lifecycle.chaincode] [34;1msubmitInstallProposal[0m -> Installed remotely: response:<status:200 payload:"\nTorganization-sc_1.0:5907662823662ee8cc6a6292efb7934ebcdb59f6ed3769cdfae6a18746c22620\022\023organization-sc_1.0" > 
+[34m2026-09-21 19:12:45.432 UTC 0002 INFO[0m [cli.lifecycle.chaincode] [34;1msubmitInstallProposal[0m -> Chaincode code package identifier: organization-sc_1.0:5907662823662ee8cc6a6292efb7934ebcdb59f6ed3769cdfae6a18746c22620
+Installing on Host2 peer...
+[34m2026-09-21 19:12:45.897 UTC 0001 INFO[0m [cli.lifecycle.chaincode] [34;1msubmitInstallProposal[0m -> Installed remotely: response:<status:200 payload:"\nTorganization-sc_1.0:5907662823662ee8cc6a6292efb7934ebcdb59f6ed3769cdfae6a18746c22620\022\023organization-sc_1.0" > 
+[34m2026-09-21 19:12:45.897 UTC 0002 INFO[0m [cli.lifecycle.chaincode] [34;1msubmitInstallProposal[0m -> Chaincode code package identifier: organization-sc_1.0:5907662823662ee8cc6a6292efb7934ebcdb59f6ed3769cdfae6a18746c22620
+Approving for Host1...
+[34m2026-09-21 19:12:48.744 UTC 0001 INFO[0m [chaincodeCmd] [34;1mClientWait[0m -> txid [8b7a1f538a40a6fa6d99b155fb33e8e4b056b09a46366fcd17a8adfd99d47e12] committed with status (VALID) at peer0-host1:7051
+Approving for Host2...
+[34m2026-09-21 19:12:51.211 UTC 0001 INFO[0m [chaincodeCmd] [34;1mClientWait[0m -> txid [d254dda0ec1343be5c730eb0cb2e6b6b50a6797e0d1df21c5c2af1da833cd550] committed with status (VALID) at peer0-host2:7051
+Committing chaincode definition...
+[34m2026-09-21 19:12:53.665 UTC 0001 INFO[0m [chaincodeCmd] [34;1mClientWait[0m -> txid [114415ccd6ada1bf7ab5063d5518fd2df20aacf22a7791e904e5c771b47f0a61] committed with status (VALID) at peer0-host2:7051
+[34m2026-09-21 19:12:53.666 UTC 0002 INFO[0m [chaincodeCmd] [34;1mClientWait[0m -> txid [114415ccd6ada1bf7ab5063d5518fd2df20aacf22a7791e904e5c771b47f0a61] committed with status (VALID) at peer0-host1:7051
+✅ Chaincode deployed: organization-sc on identity-local
+---> Deploying cryptographickey-sc from ${HOME}/GITS/gdc-workspace/gwtemplate-node-ts/chaincode/cryptographickey-sc-javascript on identity-local
+Packaging chaincode cryptographickey-sc from ${HOME}/GITS/gdc-workspace/gwtemplate-node-ts/chaincode/cryptographickey-sc-javascript...
+Installing on Host1 peer...
+[34m2026-09-21 19:13:09.218 UTC 0001 INFO[0m [cli.lifecycle.chaincode] [34;1msubmitInstallProposal[0m -> Installed remotely: response:<status:200 payload:"\nXcryptographickey-sc_1.0:6eda641c87d10214e41c77026099b2a10c3f85fcfd032088d27e011c1e7bdd7f\022\027cryptographickey-sc_1.0" > 
+[34m2026-09-21 19:13:09.218 UTC 0002 INFO[0m [cli.lifecycle.chaincode] [34;1msubmitInstallProposal[0m -> Chaincode code package identifier: cryptographickey-sc_1.0:6eda641c87d10214e41c77026099b2a10c3f85fcfd032088d27e011c1e7bdd7f
+Installing on Host2 peer...
+[34m2026-09-21 19:13:09.731 UTC 0001 INFO[0m [cli.lifecycle.chaincode] [34;1msubmitInstallProposal[0m -> Installed remotely: response:<status:200 payload:"\nXcryptographickey-sc_1.0:6eda641c87d10214e41c77026099b2a10c3f85fcfd032088d27e011c1e7bdd7f\022\027cryptographickey-sc_1.0" > 
+[34m2026-09-21 19:13:09.731 UTC 0002 INFO[0m [cli.lifecycle.chaincode] [34;1msubmitInstallProposal[0m -> Chaincode code package identifier: cryptographickey-sc_1.0:6eda641c87d10214e41c77026099b2a10c3f85fcfd032088d27e011c1e7bdd7f
+Approving for Host1...
+[34m2026-09-21 19:13:12.661 UTC 0001 INFO[0m [chaincodeCmd] [34;1mClientWait[0m -> txid [9d0c64a7e46bb5ec2325c6443c7f91eac98ce5a3b43bd713653a9c7164f0b656] committed with status (VALID) at peer0-host1:7051
+Approving for Host2...
+[34m2026-09-21 19:13:15.112 UTC 0001 INFO[0m [chaincodeCmd] [34;1mClientWait[0m -> txid [afcdda22d3e749e4f583c15d97095c55781d0015471a91339a84d6dd11bb66df] committed with status (VALID) at peer0-host2:7051
+Committing chaincode definition...
+[34m2026-09-21 19:13:17.554 UTC 0001 INFO[0m [chaincodeCmd] [34;1mClientWait[0m -> txid [e238555315c2f941224732a5fe24e0c957f79f95ce29d246b4a5578aa46a8702] committed with status (VALID) at peer0-host2:7051
+[34m2026-09-21 19:13:17.555 UTC 0002 INFO[0m [chaincodeCmd] [34;1mClientWait[0m -> txid [e238555315c2f941224732a5fe24e0c957f79f95ce29d246b4a5578aa46a8702] committed with status (VALID) at peer0-host1:7051
+✅ Chaincode deployed: cryptographickey-sc on identity-local
+---> Deploying employee-sc from ${HOME}/GITS/gdc-workspace/gwtemplate-node-ts/chaincode/employee-sc-javascript on identity-local
+Packaging chaincode employee-sc from ${HOME}/GITS/gdc-workspace/gwtemplate-node-ts/chaincode/employee-sc-javascript...
+Installing on Host1 peer...
+[34m2026-09-21 19:13:24.984 UTC 0001 INFO[0m [cli.lifecycle.chaincode] [34;1msubmitInstallProposal[0m -> Installed remotely: response:<status:200 payload:"\nPemployee-sc_1.0:ae50b50640cc0668b88cb374ff4c9a935f13f31b83aeb71592af966ee99ec628\022\017employee-sc_1.0" > 
+[34m2026-09-21 19:13:24.984 UTC 0002 INFO[0m [cli.lifecycle.chaincode] [34;1msubmitInstallProposal[0m -> Chaincode code package identifier: employee-sc_1.0:ae50b50640cc0668b88cb374ff4c9a935f13f31b83aeb71592af966ee99ec628
+Installing on Host2 peer...
+[34m2026-09-21 19:13:25.442 UTC 0001 INFO[0m [cli.lifecycle.chaincode] [34;1msubmitInstallProposal[0m -> Installed remotely: response:<status:200 payload:"\nPemployee-sc_1.0:ae50b50640cc0668b88cb374ff4c9a935f13f31b83aeb71592af966ee99ec628\022\017employee-sc_1.0" > 
+[34m2026-09-21 19:13:25.442 UTC 0002 INFO[0m [cli.lifecycle.chaincode] [34;1msubmitInstallProposal[0m -> Chaincode code package identifier: employee-sc_1.0:ae50b50640cc0668b88cb374ff4c9a935f13f31b83aeb71592af966ee99ec628
+Approving for Host1...
+[34m2026-09-21 19:13:28.288 UTC 0001 INFO[0m [chaincodeCmd] [34;1mClientWait[0m -> txid [03f3f264ac0a48cba50d34e9696c2641965bc6560c58cf87be4b84a08cef9b75] committed with status (VALID) at peer0-host1:7051
+Approving for Host2...
+[34m2026-09-21 19:13:30.730 UTC 0001 INFO[0m [chaincodeCmd] [34;1mClientWait[0m -> txid [1af61e98955ecbfe2b3595d7d2091205902a628e3731507ce08fc807b5e3d0b1] committed with status (VALID) at peer0-host2:7051
+Committing chaincode definition...
+[34m2026-09-21 19:13:33.190 UTC 0001 INFO[0m [chaincodeCmd] [34;1mClientWait[0m -> txid [7bba48262a6f6af104e61f937687712e793cc91e1f49985017349dae290d51e4] committed with status (VALID) at peer0-host1:7051
+[34m2026-09-21 19:13:33.190 UTC 0002 INFO[0m [chaincodeCmd] [34;1mClientWait[0m -> txid [7bba48262a6f6af104e61f937687712e793cc91e1f49985017349dae290d51e4] committed with status (VALID) at peer0-host2:7051
+✅ Chaincode deployed: employee-sc on identity-local
+---> Deploying evidence-sc from ${HOME}/GITS/gdc-workspace/gwtemplate-node-ts/chaincode/evidence-sc-javascript on identity-local
+Packaging chaincode evidence-sc from ${HOME}/GITS/gdc-workspace/gwtemplate-node-ts/chaincode/evidence-sc-javascript...
+Installing on Host1 peer...
+[34m2026-09-21 19:13:34.268 UTC 0001 INFO[0m [cli.lifecycle.chaincode] [34;1msubmitInstallProposal[0m -> Installed remotely: response:<status:200 payload:"\nPevidence-sc_1.0:ef49e44c47417a56c4a9780c189715229f0c3333d1be700603aed9b2d0552a76\022\017evidence-sc_1.0" > 
+[34m2026-09-21 19:13:34.268 UTC 0002 INFO[0m [cli.lifecycle.chaincode] [34;1msubmitInstallProposal[0m -> Chaincode code package identifier: evidence-sc_1.0:ef49e44c47417a56c4a9780c189715229f0c3333d1be700603aed9b2d0552a76
+Installing on Host2 peer...
+[34m2026-09-21 19:13:34.847 UTC 0001 INFO[0m [cli.lifecycle.chaincode] [34;1msubmitInstallProposal[0m -> Installed remotely: response:<status:200 payload:"\nPevidence-sc_1.0:ef49e44c47417a56c4a9780c189715229f0c3333d1be700603aed9b2d0552a76\022\017evidence-sc_1.0" > 
+[34m2026-09-21 19:13:34.847 UTC 0002 INFO[0m [cli.lifecycle.chaincode] [34;1msubmitInstallProposal[0m -> Chaincode code package identifier: evidence-sc_1.0:ef49e44c47417a56c4a9780c189715229f0c3333d1be700603aed9b2d0552a76
+Approving for Host1...
+[34m2026-09-21 19:13:37.909 UTC 0001 INFO[0m [chaincodeCmd] [34;1mClientWait[0m -> txid [9e2ce26be94f182a914fa82700355ca6e1ead9fc9d96e0fcc9b7933e3b521f26] committed with status (VALID) at peer0-host1:7051
+Approving for Host2...
+[34m2026-09-21 19:13:40.338 UTC 0001 INFO[0m [chaincodeCmd] [34;1mClientWait[0m -> txid [c97629cb43c4c5834b365b28a6bb55a0f2ec78a66dafa9d03be6c4f33cb722fb] committed with status (VALID) at peer0-host2:7051
+Committing chaincode definition...
+[34m2026-09-21 19:13:42.802 UTC 0001 INFO[0m [chaincodeCmd] [34;1mClientWait[0m -> txid [ce331708d184faa1bbebcbbc419779c29b76b50d0e5b05e0a822f7056870f8fd] committed with status (VALID) at peer0-host1:7051
+[34m2026-09-21 19:13:42.804 UTC 0002 INFO[0m [chaincodeCmd] [34;1mClientWait[0m -> txid [ce331708d184faa1bbebcbbc419779c29b76b50d0e5b05e0a822f7056870f8fd] committed with status (VALID) at peer0-host2:7051
+✅ Chaincode deployed: evidence-sc on identity-local
+---> Deploying credential-sc from ${HOME}/GITS/gdc-workspace/gwtemplate-node-ts/chaincode/credential-sc-javascript on identity-local
+Packaging chaincode credential-sc from ${HOME}/GITS/gdc-workspace/gwtemplate-node-ts/chaincode/credential-sc-javascript...
+Installing on Host1 peer...
+[34m2026-09-21 19:13:43.798 UTC 0001 INFO[0m [cli.lifecycle.chaincode] [34;1msubmitInstallProposal[0m -> Installed remotely: response:<status:200 payload:"\nRcredential-sc_1.0:dc7fb797c7b0a55bc9dda33995a51ab5493ea09e6fd60b45b24ec0e28c5ceca7\022\021credential-sc_1.0" > 
+[34m2026-09-21 19:13:43.798 UTC 0002 INFO[0m [cli.lifecycle.chaincode] [34;1msubmitInstallProposal[0m -> Chaincode code package identifier: credential-sc_1.0:dc7fb797c7b0a55bc9dda33995a51ab5493ea09e6fd60b45b24ec0e28c5ceca7
+Installing on Host2 peer...
+[34m2026-09-21 19:13:44.435 UTC 0001 INFO[0m [cli.lifecycle.chaincode] [34;1msubmitInstallProposal[0m -> Installed remotely: response:<status:200 payload:"\nRcredential-sc_1.0:dc7fb797c7b0a55bc9dda33995a51ab5493ea09e6fd60b45b24ec0e28c5ceca7\022\021credential-sc_1.0" > 
+[34m2026-09-21 19:13:44.436 UTC 0002 INFO[0m [cli.lifecycle.chaincode] [34;1msubmitInstallProposal[0m -> Chaincode code package identifier: credential-sc_1.0:dc7fb797c7b0a55bc9dda33995a51ab5493ea09e6fd60b45b24ec0e28c5ceca7
+Approving for Host1...
+[34m2026-09-21 19:13:47.406 UTC 0001 INFO[0m [chaincodeCmd] [34;1mClientWait[0m -> txid [610444084b4b843d9dd22c7f9e80efee6cdf82efd1e1359f91061a5ebe785959] committed with status (VALID) at peer0-host1:7051
+Approving for Host2...
+[34m2026-09-21 19:13:49.827 UTC 0001 INFO[0m [chaincodeCmd] [34;1mClientWait[0m -> txid [df9aee06fa56f8a950af61590ef3c65574ba4c80ff632918c432e18760d00c65] committed with status (VALID) at peer0-host2:7051
+Committing chaincode definition...
+[34m2026-09-21 19:13:52.275 UTC 0001 INFO[0m [chaincodeCmd] [34;1mClientWait[0m -> txid [dd77d31d914e08acaaaa0734146bfcd38e9ab725911bc9b3c2ce4865149e4330] committed with status (VALID) at peer0-host1:7051
+[34m2026-09-21 19:13:52.275 UTC 0002 INFO[0m [chaincodeCmd] [34;1mClientWait[0m -> txid [dd77d31d914e08acaaaa0734146bfcd38e9ab725911bc9b3c2ce4865149e4330] committed with status (VALID) at peer0-host2:7051
+✅ Chaincode deployed: credential-sc on identity-local
+---> Deploying artifact-sc from ${HOME}/GITS/gdc-workspace/gwtemplate-node-ts/chaincode/artifact-sc-javascript on identity-local
+Packaging chaincode artifact-sc from ${HOME}/GITS/gdc-workspace/gwtemplate-node-ts/chaincode/artifact-sc-javascript...
+Installing on Host1 peer...
+[34m2026-09-21 19:14:07.293 UTC 0001 INFO[0m [cli.lifecycle.chaincode] [34;1msubmitInstallProposal[0m -> Installed remotely: response:<status:200 payload:"\nPartifact-sc_1.0:497b458dc043048ef876eba4d48db48ce8da3845c88deb250518ac432ac0dba6\022\017artifact-sc_1.0" > 
+[34m2026-09-21 19:14:07.293 UTC 0002 INFO[0m [cli.lifecycle.chaincode] [34;1msubmitInstallProposal[0m -> Chaincode code package identifier: artifact-sc_1.0:497b458dc043048ef876eba4d48db48ce8da3845c88deb250518ac432ac0dba6
+Installing on Host2 peer...
+[34m2026-09-21 19:14:07.786 UTC 0001 INFO[0m [cli.lifecycle.chaincode] [34;1msubmitInstallProposal[0m -> Installed remotely: response:<status:200 payload:"\nPartifact-sc_1.0:497b458dc043048ef876eba4d48db48ce8da3845c88deb250518ac432ac0dba6\022\017artifact-sc_1.0" > 
+[34m2026-09-21 19:14:07.786 UTC 0002 INFO[0m [cli.lifecycle.chaincode] [34;1msubmitInstallProposal[0m -> Chaincode code package identifier: artifact-sc_1.0:497b458dc043048ef876eba4d48db48ce8da3845c88deb250518ac432ac0dba6
+Approving for Host1...
+[34m2026-09-21 19:14:10.604 UTC 0001 INFO[0m [chaincodeCmd] [34;1mClientWait[0m -> txid [614850da5f9ed123a5fc05d5153608a3ccc19d6aa5b42b475f14bc273008e940] committed with status (VALID) at peer0-host1:7051
+Approving for Host2...
+[34m2026-09-21 19:14:13.023 UTC 0001 INFO[0m [chaincodeCmd] [34;1mClientWait[0m -> txid [04cacbfd4dd7b542d623261ae801947da214ccfb16335b5e51b05d8b0596ce3e] committed with status (VALID) at peer0-host2:7051
+Committing chaincode definition...
+[34m2026-09-21 19:14:15.471 UTC 0001 INFO[0m [chaincodeCmd] [34;1mClientWait[0m -> txid [3daf5179aad8cb4ff1f0eb290e05915c23a25c19f7e98e65a691f64bbceccaf2] committed with status (VALID) at peer0-host2:7051
+[34m2026-09-21 19:14:15.472 UTC 0002 INFO[0m [chaincodeCmd] [34;1mClientWait[0m -> txid [3daf5179aad8cb4ff1f0eb290e05915c23a25c19f7e98e65a691f64bbceccaf2] committed with status (VALID) at peer0-host1:7051
+✅ Chaincode deployed: artifact-sc on identity-local
+---> Deploying artifact-sc from ${HOME}/GITS/gdc-workspace/gwtemplate-node-ts/chaincode/artifact-sc-javascript on health-care-local
+Reusing installed package artifact-sc_1.0 for channel health-care-local...
+Approving for Host1...
+[34m2026-09-21 19:14:18.573 UTC 0001 INFO[0m [chaincodeCmd] [34;1mClientWait[0m -> txid [52c898e20053d800678c757975189387145b9a6c62f3f86ab6589ac72e5ea15d] committed with status (VALID) at peer0-host1:7051
+Approving for Host2...
+[34m2026-09-21 19:14:21.045 UTC 0001 INFO[0m [chaincodeCmd] [34;1mClientWait[0m -> txid [fb5ce5d82ab9af653493b8f4b88d75526e996bac97da2b2678b7415bddd6eb3c] committed with status (VALID) at peer0-host2:7051
+Committing chaincode definition...
+[34m2026-09-21 19:14:23.497 UTC 0001 INFO[0m [chaincodeCmd] [34;1mClientWait[0m -> txid [01a775f8266a01d5873bec35371e240b96fbc20326f39400b83af35208ca471e] committed with status (VALID) at peer0-host1:7051
+[34m2026-09-21 19:14:23.498 UTC 0002 INFO[0m [chaincodeCmd] [34;1mClientWait[0m -> txid [01a775f8266a01d5873bec35371e240b96fbc20326f39400b83af35208ca471e] committed with status (VALID) at peer0-host2:7051
+✅ Chaincode deployed: artifact-sc on health-care-local
+---> Deploying artifactevent-sc from ${HOME}/GITS/gdc-workspace/gwtemplate-node-ts/chaincode/artifactevent-sc-javascript on identity-local
+Packaging chaincode artifactevent-sc from ${HOME}/GITS/gdc-workspace/gwtemplate-node-ts/chaincode/artifactevent-sc-javascript...
+Installing on Host1 peer...
+[34m2026-09-21 19:14:39.404 UTC 0001 INFO[0m [cli.lifecycle.chaincode] [34;1msubmitInstallProposal[0m -> Installed remotely: response:<status:200 payload:"\nUartifactevent-sc_1.0:9c7f8290aa86070eb9fc4ff175a6305882201f0916c36b4e6bdba29c68047ba2\022\024artifactevent-sc_1.0" > 
+[34m2026-09-21 19:14:39.405 UTC 0002 INFO[0m [cli.lifecycle.chaincode] [34;1msubmitInstallProposal[0m -> Chaincode code package identifier: artifactevent-sc_1.0:9c7f8290aa86070eb9fc4ff175a6305882201f0916c36b4e6bdba29c68047ba2
+Installing on Host2 peer...
+[34m2026-09-21 19:14:39.907 UTC 0001 INFO[0m [cli.lifecycle.chaincode] [34;1msubmitInstallProposal[0m -> Installed remotely: response:<status:200 payload:"\nUartifactevent-sc_1.0:9c7f8290aa86070eb9fc4ff175a6305882201f0916c36b4e6bdba29c68047ba2\022\024artifactevent-sc_1.0" > 
+[34m2026-09-21 19:14:39.908 UTC 0002 INFO[0m [cli.lifecycle.chaincode] [34;1msubmitInstallProposal[0m -> Chaincode code package identifier: artifactevent-sc_1.0:9c7f8290aa86070eb9fc4ff175a6305882201f0916c36b4e6bdba29c68047ba2
+Approving for Host1...
+[34m2026-09-21 19:14:42.760 UTC 0001 INFO[0m [chaincodeCmd] [34;1mClientWait[0m -> txid [9e6e90f4cb83e4ef2ffa1f8a5ad3da7b98a01eb5c470d6f8f67f36a70606ceb0] committed with status (VALID) at peer0-host1:7051
+Approving for Host2...
+[34m2026-09-21 19:14:45.182 UTC 0001 INFO[0m [chaincodeCmd] [34;1mClientWait[0m -> txid [0e4c7a51f9952bcb974d848fd4454e9bf0bc4277a18c1745ea7cc839b1315f5f] committed with status (VALID) at peer0-host2:7051
+Committing chaincode definition...
+[34m2026-09-21 19:14:47.627 UTC 0001 INFO[0m [chaincodeCmd] [34;1mClientWait[0m -> txid [dbcd4abbd40a5117c58afdbd3649093e7153ada5bca81f2ecab6cf3c417aa7b1] committed with status (VALID) at peer0-host1:7051
+[34m2026-09-21 19:14:47.634 UTC 0002 INFO[0m [chaincodeCmd] [34;1mClientWait[0m -> txid [dbcd4abbd40a5117c58afdbd3649093e7153ada5bca81f2ecab6cf3c417aa7b1] committed with status (VALID) at peer0-host2:7051
+✅ Chaincode deployed: artifactevent-sc on identity-local
+---> Deploying subjectkeybinding-sc from ${HOME}/GITS/gdc-workspace/gwtemplate-node-ts/chaincode/subjectkeybinding-sc-javascript on identity-local
+Packaging chaincode subjectkeybinding-sc from ${HOME}/GITS/gdc-workspace/gwtemplate-node-ts/chaincode/subjectkeybinding-sc-javascript...
+Installing on Host1 peer...
+[34m2026-09-21 19:15:02.436 UTC 0001 INFO[0m [cli.lifecycle.chaincode] [34;1msubmitInstallProposal[0m -> Installed remotely: response:<status:200 payload:"\nYsubjectkeybinding-sc_1.0:a3704c65b843ca8b9f908a95f3af86847fe945cdb057e274d337671e9a1a7860\022\030subjectkeybinding-sc_1.0" > 
+[34m2026-09-21 19:15:02.437 UTC 0002 INFO[0m [cli.lifecycle.chaincode] [34;1msubmitInstallProposal[0m -> Chaincode code package identifier: subjectkeybinding-sc_1.0:a3704c65b843ca8b9f908a95f3af86847fe945cdb057e274d337671e9a1a7860
+Installing on Host2 peer...
+[34m2026-09-21 19:15:02.954 UTC 0001 INFO[0m [cli.lifecycle.chaincode] [34;1msubmitInstallProposal[0m -> Installed remotely: response:<status:200 payload:"\nYsubjectkeybinding-sc_1.0:a3704c65b843ca8b9f908a95f3af86847fe945cdb057e274d337671e9a1a7860\022\030subjectkeybinding-sc_1.0" > 
+[34m2026-09-21 19:15:02.954 UTC 0002 INFO[0m [cli.lifecycle.chaincode] [34;1msubmitInstallProposal[0m -> Chaincode code package identifier: subjectkeybinding-sc_1.0:a3704c65b843ca8b9f908a95f3af86847fe945cdb057e274d337671e9a1a7860
+Approving for Host1...
+[34m2026-09-21 19:15:05.772 UTC 0001 INFO[0m [chaincodeCmd] [34;1mClientWait[0m -> txid [fd615a58c2d2d1b160459f78fc846a3a1d6d825ab6ce124999b50e5825cdb4ef] committed with status (VALID) at peer0-host1:7051
+Approving for Host2...
+[34m2026-09-21 19:15:08.200 UTC 0001 INFO[0m [chaincodeCmd] [34;1mClientWait[0m -> txid [d0445ecbfdaeb51f49653b5562dbd57cbc6d783d1c46c5d202586731d05145d9] committed with status (VALID) at peer0-host2:7051
+Committing chaincode definition...
+[34m2026-09-21 19:15:10.662 UTC 0001 INFO[0m [chaincodeCmd] [34;1mClientWait[0m -> txid [2196a674f158d6510cff2403a58947679e2e3947f1fc74697f8aa04df0faa2a4] committed with status (VALID) at peer0-host1:7051
+[34m2026-09-21 19:15:10.663 UTC 0002 INFO[0m [chaincodeCmd] [34;1mClientWait[0m -> txid [2196a674f158d6510cff2403a58947679e2e3947f1fc74697f8aa04df0faa2a4] committed with status (VALID) at peer0-host2:7051
+✅ Chaincode deployed: subjectkeybinding-sc on identity-local
+---> Deploying subjectidentifier-sc from ${HOME}/GITS/gdc-workspace/gwtemplate-node-ts/chaincode/subjectidentifier-sc-javascript on identity-local
+Packaging chaincode subjectidentifier-sc from ${HOME}/GITS/gdc-workspace/gwtemplate-node-ts/chaincode/subjectidentifier-sc-javascript...
+Installing on Host1 peer...
+[34m2026-09-21 19:15:18.999 UTC 0001 INFO[0m [cli.lifecycle.chaincode] [34;1msubmitInstallProposal[0m -> Installed remotely: response:<status:200 payload:"\nYsubjectidentifier-sc_1.0:ebd68e9fb4bba9edf06082970b6c204f85d3cc1c9f2e640ca99db6963413b66c\022\030subjectidentifier-sc_1.0" > 
+[34m2026-09-21 19:15:19.000 UTC 0002 INFO[0m [cli.lifecycle.chaincode] [34;1msubmitInstallProposal[0m -> Chaincode code package identifier: subjectidentifier-sc_1.0:ebd68e9fb4bba9edf06082970b6c204f85d3cc1c9f2e640ca99db6963413b66c
+Installing on Host2 peer...
+[34m2026-09-21 19:15:19.459 UTC 0001 INFO[0m [cli.lifecycle.chaincode] [34;1msubmitInstallProposal[0m -> Installed remotely: response:<status:200 payload:"\nYsubjectidentifier-sc_1.0:ebd68e9fb4bba9edf06082970b6c204f85d3cc1c9f2e640ca99db6963413b66c\022\030subjectidentifier-sc_1.0" > 
+[34m2026-09-21 19:15:19.459 UTC 0002 INFO[0m [cli.lifecycle.chaincode] [34;1msubmitInstallProposal[0m -> Chaincode code package identifier: subjectidentifier-sc_1.0:ebd68e9fb4bba9edf06082970b6c204f85d3cc1c9f2e640ca99db6963413b66c
+Approving for Host1...
+[34m2026-09-21 19:15:22.353 UTC 0001 INFO[0m [chaincodeCmd] [34;1mClientWait[0m -> txid [ff5a874d869124fb689e4b0de737ef3f0ff4c7b51d8acd26ba0d546f259e7979] committed with status (VALID) at peer0-host1:7051
+Approving for Host2...
+[34m2026-09-21 19:15:24.789 UTC 0001 INFO[0m [chaincodeCmd] [34;1mClientWait[0m -> txid [19674bc9a0b4df5f779474b54280397ae51e733ca134df3ba247c3e885a15781] committed with status (VALID) at peer0-host2:7051
+Committing chaincode definition...
+[34m2026-09-21 19:15:27.249 UTC 0001 INFO[0m [chaincodeCmd] [34;1mClientWait[0m -> txid [a879007dcbfe4e88173a4b90ac7857175ab84f6b07f05b56872268a9ea2f06bb] committed with status (VALID) at peer0-host1:7051
+[34m2026-09-21 19:15:27.249 UTC 0002 INFO[0m [chaincodeCmd] [34;1mClientWait[0m -> txid [a879007dcbfe4e88173a4b90ac7857175ab84f6b07f05b56872268a9ea2f06bb] committed with status (VALID) at peer0-host2:7051
+✅ Chaincode deployed: subjectidentifier-sc on identity-local
+Identity chaincodes deployed on identity-local
+
+==> Ensuring the Fabric devnet backend env exists
+Fabric devnet env already present: ${HOME}/GITS/gdc-workspace/gwtemplate-node-ts/infra/fabric/local-network/.env.fabric-devnet
+
+==> Installing exact consentaccess-sc dependencies
+npm warn deprecated inflight@1.0.6: This module is not supported, and leaks memory. Do not use it. Check out lru-cache if you want a good and tested way to coalesce async requests by a key value, which is much more comprehensive and powerful.
+npm warn deprecated rimraf@3.0.2: Rimraf versions prior to v4 are no longer supported
+npm warn deprecated glob@8.1.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+npm warn deprecated glob@7.2.3: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+npm warn deprecated glob@7.2.3: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+npm warn deprecated glob@7.2.3: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+npm warn deprecated uuid@8.3.2: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+
+added 333 packages, and audited 334 packages in 6s
+
+51 packages are looking for funding
+  run `npm fund` for details
+
+10 vulnerabilities (6 moderate, 4 high)
+
+To address issues that do not require attention, run:
+  npm audit fix
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+
+==> Running unit tests for consentaccess-sc
+
+> consentaccess-sc@1.0.0 test
+> nyc mocha --recursive
+
+
+
+  ConsentAccessContract
+    ✔ exports the contract entrypoint
+    ✔ exposes thin consent-specific wrappers around the generic primary-document sanitizers
+    ✔ creates a sanitized consent access bundle and writes it to state
+    ✔ creates through the lowercase alias and preserves explicit revoked status
+    ✔ rejects duplicate create requests
+    ✔ rejects invalid payloads and unsupported entry shapes
+    ✔ drops blank references after trimming and keeps only allowed claims
+    ✔ drops numeric zero references because the smart contract treats falsy values as empty
+    ✔ updates an existing bundle and increments audit version
+    ✔ updates through the lowercase alias and allows status transitions
+    ✔ updates with audit version fallback when the stored audit has no numeric version
+    ✔ rejects updates for missing assets
+    ✔ upserts by creating a new asset when state is empty
+    ✔ upserts by returning the previous asset when the sanitized data is identical
+    ✔ treats reordered but semantically identical claims as an upsert no-op
+    ✔ upserts by writing a new version when data changes and supports the lowercase alias
+    ✔ reads assets and checks existence through both method names
+    ✔ builds consent access history through both method names
+
+
+  18 passing (43ms)
+
+
+=============================== Coverage summary ===============================
+Statements   : 100% ( 153/153 )
+Branches     : 100% ( 106/106 )
+Functions    : 100% ( 33/33 )
+Lines        : 100% ( 148/148 )
+================================================================================
+
+==> Generating metadata.json
+
+> consentaccess-sc@1.0.0 metadata
+> set -x && fabric-chaincode-node metadata generate --file metadata.json
+
++ fabric-chaincode-node metadata generate --file metadata.json
+2026-09-21T19:15:39.953Z [32minfo[39m [c-api:contracts-spi/bootstrap.js]                  No metadata file supplied in contract, introspection will generate all the data  
+2026-09-21T19:15:40.005Z [32minfo[39m [c-api:../../../cmds/metadata/lib/generate]         File containing metadata has been saved to ${HOME}/GITS/gdc-workspace/gwtemplate-node-ts/chaincode/consentaccess-sc-javascript/metadata.json  
+2026-09-21T19:15:40.006Z [32minfo[39m [c-api:fabric-shim/cli]                             Bootstrap process completed  
+
+==> Packaging CCAAS archive
+
+==> Building the external service image
+#1 [internal] load .dockerignore
+#1 transferring context: 2B done
+#1 DONE 0.0s
+
+#2 [internal] load build definition from Dockerfile
+#2 transferring dockerfile: 2.11kB done
+#2 DONE 0.1s
+
+#3 [internal] load metadata for docker.io/library/node:18.16
+#3 DONE 0.0s
+
+#4 [builder 1/5] FROM docker.io/library/node:18.16
+#4 DONE 0.0s
+
+#5 [internal] load build context
+#5 ...
+
+#6 https://github.com/krallin/tini/releases/download/v0.19.0/tini-amd64
+#6 DONE 0.4s
+
+#5 [internal] load build context
+#5 transferring context: 57.16MB 2.4s done
+#5 DONE 2.5s
+
+#7 [builder 2/5] WORKDIR /usr/src/app
+#7 CACHED
+
+#8 [builder 3/5] COPY --chown=node:node . /usr/src/app
+#8 DONE 2.1s
+
+#9 [builder 4/5] RUN npm install
+#9 2.273 npm WARN EBADENGINE Unsupported engine {
+#9 2.273 npm WARN EBADENGINE   package: '@eslint/config-array@0.21.2',
+#9 2.273 npm WARN EBADENGINE   required: { node: '^18.18.0 || ^20.9.0 || >=21.1.0' },
+#9 2.273 npm WARN EBADENGINE   current: { node: 'v18.16.1', npm: '9.5.1' }
+#9 2.274 npm WARN EBADENGINE }
+#9 2.276 npm WARN EBADENGINE Unsupported engine {
+#9 2.276 npm WARN EBADENGINE   package: '@eslint/config-helpers@0.4.2',
+#9 2.276 npm WARN EBADENGINE   required: { node: '^18.18.0 || ^20.9.0 || >=21.1.0' },
+#9 2.276 npm WARN EBADENGINE   current: { node: 'v18.16.1', npm: '9.5.1' }
+#9 2.276 npm WARN EBADENGINE }
+#9 2.277 npm WARN EBADENGINE Unsupported engine {
+#9 2.278 npm WARN EBADENGINE   package: '@eslint/core@0.17.0',
+#9 2.278 npm WARN EBADENGINE   required: { node: '^18.18.0 || ^20.9.0 || >=21.1.0' },
+#9 2.278 npm WARN EBADENGINE   current: { node: 'v18.16.1', npm: '9.5.1' }
+#9 2.278 npm WARN EBADENGINE }
+#9 2.279 npm WARN EBADENGINE Unsupported engine {
+#9 2.279 npm WARN EBADENGINE   package: '@eslint/eslintrc@3.3.5',
+#9 2.279 npm WARN EBADENGINE   required: { node: '^18.18.0 || ^20.9.0 || >=21.1.0' },
+#9 2.279 npm WARN EBADENGINE   current: { node: 'v18.16.1', npm: '9.5.1' }
+#9 2.279 npm WARN EBADENGINE }
+#9 2.280 npm WARN EBADENGINE Unsupported engine {
+#9 2.280 npm WARN EBADENGINE   package: '@eslint/js@9.39.4',
+#9 2.280 npm WARN EBADENGINE   required: { node: '^18.18.0 || ^20.9.0 || >=21.1.0' },
+#9 2.280 npm WARN EBADENGINE   current: { node: 'v18.16.1', npm: '9.5.1' }
+#9 2.280 npm WARN EBADENGINE }
+#9 2.281 npm WARN EBADENGINE Unsupported engine {
+#9 2.281 npm WARN EBADENGINE   package: '@eslint/object-schema@2.1.7',
+#9 2.281 npm WARN EBADENGINE   required: { node: '^18.18.0 || ^20.9.0 || >=21.1.0' },
+#9 2.281 npm WARN EBADENGINE   current: { node: 'v18.16.1', npm: '9.5.1' }
+#9 2.281 npm WARN EBADENGINE }
+#9 2.282 npm WARN EBADENGINE Unsupported engine {
+#9 2.282 npm WARN EBADENGINE   package: '@eslint/plugin-kit@0.4.1',
+#9 2.282 npm WARN EBADENGINE   required: { node: '^18.18.0 || ^20.9.0 || >=21.1.0' },
+#9 2.282 npm WARN EBADENGINE   current: { node: 'v18.16.1', npm: '9.5.1' }
+#9 2.282 npm WARN EBADENGINE }
+#9 2.284 npm WARN EBADENGINE Unsupported engine {
+#9 2.284 npm WARN EBADENGINE   package: '@humanfs/core@0.19.2',
+#9 2.284 npm WARN EBADENGINE   required: { node: '>=18.18.0' },
+#9 2.284 npm WARN EBADENGINE   current: { node: 'v18.16.1', npm: '9.5.1' }
+#9 2.284 npm WARN EBADENGINE }
+#9 2.285 npm WARN EBADENGINE Unsupported engine {
+#9 2.285 npm WARN EBADENGINE   package: '@humanfs/node@0.16.8',
+#9 2.285 npm WARN EBADENGINE   required: { node: '>=18.18.0' },
+#9 2.285 npm WARN EBADENGINE   current: { node: 'v18.16.1', npm: '9.5.1' }
+#9 2.285 npm WARN EBADENGINE }
+#9 2.286 npm WARN EBADENGINE Unsupported engine {
+#9 2.286 npm WARN EBADENGINE   package: '@humanfs/types@0.15.0',
+#9 2.287 npm WARN EBADENGINE   required: { node: '>=18.18.0' },
+#9 2.287 npm WARN EBADENGINE   current: { node: 'v18.16.1', npm: '9.5.1' }
+#9 2.287 npm WARN EBADENGINE }
+#9 2.288 npm WARN EBADENGINE Unsupported engine {
+#9 2.288 npm WARN EBADENGINE   package: '@humanwhocodes/retry@0.4.3',
+#9 2.288 npm WARN EBADENGINE   required: { node: '>=18.18' },
+#9 2.288 npm WARN EBADENGINE   current: { node: 'v18.16.1', npm: '9.5.1' }
+#9 2.288 npm WARN EBADENGINE }
+#9 2.292 npm WARN EBADENGINE Unsupported engine {
+#9 2.292 npm WARN EBADENGINE   package: 'eslint@9.39.4',
+#9 2.293 npm WARN EBADENGINE   required: { node: '^18.18.0 || ^20.9.0 || >=21.1.0' },
+#9 2.293 npm WARN EBADENGINE   current: { node: 'v18.16.1', npm: '9.5.1' }
+#9 2.293 npm WARN EBADENGINE }
+#9 2.294 npm WARN EBADENGINE Unsupported engine {
+#9 2.294 npm WARN EBADENGINE   package: 'eslint-scope@8.4.0',
+#9 2.294 npm WARN EBADENGINE   required: { node: '^18.18.0 || ^20.9.0 || >=21.1.0' },
+#9 2.294 npm WARN EBADENGINE   current: { node: 'v18.16.1', npm: '9.5.1' }
+#9 2.294 npm WARN EBADENGINE }
+#9 2.295 npm WARN EBADENGINE Unsupported engine {
+#9 2.295 npm WARN EBADENGINE   package: 'eslint-visitor-keys@4.2.1',
+#9 2.295 npm WARN EBADENGINE   required: { node: '^18.18.0 || ^20.9.0 || >=21.1.0' },
+#9 2.296 npm WARN EBADENGINE   current: { node: 'v18.16.1', npm: '9.5.1' }
+#9 2.296 npm WARN EBADENGINE }
+#9 2.296 npm WARN EBADENGINE Unsupported engine {
+#9 2.297 npm WARN EBADENGINE   package: 'espree@10.4.0',
+#9 2.297 npm WARN EBADENGINE   required: { node: '^18.18.0 || ^20.9.0 || >=21.1.0' },
+#9 2.297 npm WARN EBADENGINE   current: { node: 'v18.16.1', npm: '9.5.1' }
+#9 2.297 npm WARN EBADENGINE }
+#9 4.108 
+#9 4.108 up to date, audited 334 packages in 2s
+#9 4.108 
+#9 4.108 51 packages are looking for funding
+#9 4.108   run `npm fund` for details
+#9 4.129 
+#9 4.129 10 vulnerabilities (6 moderate, 4 high)
+#9 4.129 
+#9 4.129 To address issues that do not require attention, run:
+#9 4.129   npm audit fix
+#9 4.129 
+#9 4.129 To address all issues (including breaking changes), run:
+#9 4.129   npm audit fix --force
+#9 4.129 
+#9 4.129 Run `npm audit` for details.
+#9 4.132 npm notice 
+#9 4.132 npm notice New major version of npm available! 9.5.1 -> 12.0.2
+#9 4.132 npm notice Changelog: <https://github.com/npm/cli/releases/tag/v12.0.2>
+#9 4.132 npm notice Run `npm install -g npm@12.0.2` to update!
+#9 4.132 npm notice 
+#9 DONE 4.2s
+
+#10 [builder 5/5] RUN npm run build && npm shrinkwrap
+#10 2.101 npm notice package-lock.json has been renamed to npm-shrinkwrap.json
+#10 DONE 2.2s
+
+#11 [prod-builder 5/7] COPY --chown=node:node --from=builder /usr/src/app/package.json ./
+#11 CACHED
+
+#12 [prod-builder 7/7] RUN npm ci --omit=dev && npm cache clean --force
+#12 CACHED
+
+#13 [ccaas 5/7] RUN chmod +x /usr/src/app/docker-entrypoint.sh
+#13 CACHED
+
+#14 [prod-builder 3/7] COPY --chown=node:node --from=builder /usr/src/app/index.js ./index.js
+#14 CACHED
+
+#15 [ccaas 3/7] COPY --chown=node:node --from=prod-builder /usr/src/app .
+#15 CACHED
+
+#16 [ccaas 6/7] ADD https://github.com/krallin/tini/releases/download/v0.19.0/tini-amd64 /tini
+#16 CACHED
+
+#17 [prod-builder 4/7] COPY --chown=node:node --from=builder /usr/src/app/lib ./lib
+#17 CACHED
+
+#18 [prod-builder 6/7] COPY --chown=node:node --from=builder /usr/src/app/npm-shrinkwrap.json ./
+#18 CACHED
+
+#19 [ccaas 4/7] COPY --chown=node:node docker/docker-entrypoint.sh /usr/src/app/docker-entrypoint.sh
+#19 CACHED
+
+#20 [ccaas 7/7] RUN chmod +x /tini
+#20 CACHED
+
+#21 exporting to image
+#21 exporting layers done
+#21 writing image sha256:7cd92ac457bb20eba9f35ce4b82686348c2aeeec5c7789a818f6b8e1283d8bd6 done
+#21 naming to docker.io/library/consentaccess-sc:latest done
+#21 DONE 0.0s
+
+==> Copying the CCAAS archive into the devnet workspace
+
+==> Installing consentaccess-sc-caas.tgz on peer0-host1:7051 (Host1MSP)
+[34m2026-09-21 19:15:52.770 UTC 0001 INFO[0m [cli.lifecycle.chaincode] [34;1msubmitInstallProposal[0m -> Installed remotely: response:<status:200 payload:"\nQconsentaccess-sc:2ccf10f83008f7af42d0f0f85c7b2af6f36187a3ae48a9939104452f81b02654\022\020consentaccess-sc" > 
+[34m2026-09-21 19:15:52.770 UTC 0002 INFO[0m [cli.lifecycle.chaincode] [34;1msubmitInstallProposal[0m -> Chaincode code package identifier: consentaccess-sc:2ccf10f83008f7af42d0f0f85c7b2af6f36187a3ae48a9939104452f81b02654
+
+==> Installing consentaccess-sc-caas.tgz on peer0-host2:7051 (Host2MSP)
+[34m2026-09-21 19:15:53.163 UTC 0001 INFO[0m [cli.lifecycle.chaincode] [34;1msubmitInstallProposal[0m -> Installed remotely: response:<status:200 payload:"\nQconsentaccess-sc:2ccf10f83008f7af42d0f0f85c7b2af6f36187a3ae48a9939104452f81b02654\022\020consentaccess-sc" > 
+[34m2026-09-21 19:15:53.164 UTC 0002 INFO[0m [cli.lifecycle.chaincode] [34;1msubmitInstallProposal[0m -> Chaincode code package identifier: consentaccess-sc:2ccf10f83008f7af42d0f0f85c7b2af6f36187a3ae48a9939104452f81b02654
+
+==> Restarting the external service container
+
+==> Approving the chaincode definition for Host1MSP
+[34m2026-09-21 19:15:56.747 UTC 0001 INFO[0m [chaincodeCmd] [34;1mClientWait[0m -> txid [0dadb0a55d1d02c4b9f26a9e951b3c7e59c28f107e204b2b3f1f9be8b3eff92a] committed with status (VALID) at peer0-host1:7051
+
+==> Approving the chaincode definition for Host2MSP
+[34m2026-09-21 19:15:59.212 UTC 0001 INFO[0m [chaincodeCmd] [34;1mClientWait[0m -> txid [45e098ec28d225a7d2ba592529cf7740d1b79ab1592961f8796433c0842e7a86] committed with status (VALID) at peer0-host2:7051
+
+==> Committing the chaincode definition on health-care-local
+[34m2026-09-21 19:16:01.663 UTC 0001 INFO[0m [chaincodeCmd] [34;1mClientWait[0m -> txid [fecac8f949abdffadd04575fe01f8c7bcea0070421bc26e157c74adf99bf5e34] committed with status (VALID) at peer0-host1:7051
+[34m2026-09-21 19:16:01.663 UTC 0002 INFO[0m [chaincodeCmd] [34;1mClientWait[0m -> txid [fecac8f949abdffadd04575fe01f8c7bcea0070421bc26e157c74adf99bf5e34] committed with status (VALID) at peer0-host2:7051
+
+==> Waiting for Gateway Discovery to advertise consentaccess-sc
+
+==> Gateway Discovery advertises an endorser for consentaccess-sc
+
+Consent access CCAAS deployed locally.
+
+Channel:        health-care-local
+Chaincode:      consentaccess-sc
+Version:        1.0
+Sequence:       1
+Signature policy:
+                OR('Host1MSP.member','Host2MSP.member')
+Package label:  consentaccess-sc
+Package id:     consentaccess-sc:2ccf10f83008f7af42d0f0f85c7b2af6f36187a3ae48a9939104452f81b02654
+Server address: gdc-host040-consentaccess-sc:10049
+Image tag:      consentaccess-sc:latest
+
+Recommended GW CORE env:
+  LEDGER_ENABLED=true
+  LEDGER_PROVIDER_DEFAULT=fabric
+  LEDGER_MSP_ID=Host1MSP
+  LEDGER_FABRIC_MSP_ID=Host1MSP
+
+Remember:
+  ConsentManager resolves its governed channel and canonical contract internally.
+  Your consent smoke test must use sector/jurisdiction that resolve to health-care-local.
+  If you rerun this script after changing chaincode packaging inputs, a new
+  package id is expected. That is normal for CCAAS lifecycle installs.
+[34m2026-09-21 19:16:02.477 UTC 0001 INFO[0m [channelCmd] [34;1mInitCmdFactory[0m -> Endorser and orderer connections initialized
+[34m2026-09-21 19:16:02.822 UTC 0001 INFO[0m [channelCmd] [34;1mInitCmdFactory[0m -> Endorser and orderer connections initialized
+Channels peers has joined: 
+identity-local
+health-care-local
+Channels peers has joined: 
+identity-local
+health-care-local
+${HOME}/GITS/gdc-workspace/gwtemplate-node-ts/infra/fabric/local-network/organizations/peerOrganizations/host1.example.com/peers/peer0.host1.example.com/msp/signcerts/cert.pem: OK
+${HOME}/GITS/gdc-workspace/gwtemplate-node-ts/infra/fabric/local-network/organizations/peerOrganizations/host1.example.com/peers/peer0.host1.example.com/tls/signcerts/cert.pem: OK
+${HOME}/GITS/gdc-workspace/gwtemplate-node-ts/infra/fabric/local-network/organizations/peerOrganizations/host2.example.com/peers/peer0.host2.example.com/msp/signcerts/cert.pem: OK
+${HOME}/GITS/gdc-workspace/gwtemplate-node-ts/infra/fabric/local-network/organizations/peerOrganizations/host2.example.com/peers/peer0.host2.example.com/tls/signcerts/cert.pem: OK
+${HOME}/GITS/gdc-workspace/gwtemplate-node-ts/infra/fabric/local-network/organizations/peerOrganizations/host2.example.com/users/GW@host2.example.com/msp/signcerts/cert.pem: OK

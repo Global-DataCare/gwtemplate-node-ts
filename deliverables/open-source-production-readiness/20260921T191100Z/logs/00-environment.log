@@ -1,0 +1,11 @@
+generated_at=2026-09-21T19:10:54Z
+image=gw-core:1.25.24-e7fdd71
+node=v24.15.0
+docker=Docker version 27.3.1, build ce1223035a
+gwtemplate-node-ts_commit=e7fdd717a486318bfcf8ff0b9ea224bc275a9e73
+gwtemplate-node-ts_tracked_tree=clean
+dataspace-ca-ts_commit=71d0f7e028ccc8eaf5bc582da0961b49d6c55722
+dataspace-ca-ts_tracked_tree=clean
+dataspace-ica-ts_commit=7c277ecc9e0f19dfa14aad647679bb1b332b3386
+dataspace-ica-ts_tracked_tree=clean
+image_id=sha256:c02a3fda7dd7068fb3560f33c8c50ad8c3a0b65e0592b74eb62735d7ec951d87 platform=linux/amd64

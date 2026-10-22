@@ -1,0 +1,21 @@
+{
+  "generatedAt": "2024-01-01T00:00:00.000Z",
+  "generatedAtSource": "issuer.validity.notBefore",
+  "reproducibleMetadata": true,
+  "profile": "staging",
+  "command": "publish:static",
+  "domain": "ca.local.example.test",
+  "rootDid": "did:web:ca.local.example.test",
+  "issuerDid": "did:web:ca.local.example.test:issuer",
+  "publishedFiles": [
+    ".well-known/did.json",
+    ".well-known/jwks.json",
+    ".well-known/trust.json",
+    ".well-known/dcat3/catalog.json",
+    ".well-known/openapi.json",
+    "issuer/did.json",
+    "pki/root-ca.pem",
+    "pki/issuer-ca.pem",
+    "pki/issuer-ca.chain.pem"
+  ]
+}
