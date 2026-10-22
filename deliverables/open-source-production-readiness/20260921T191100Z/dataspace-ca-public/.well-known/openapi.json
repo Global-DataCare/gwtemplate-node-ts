@@ -1,0 +1,49 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Dataspace CA Static Metadata",
+    "version": "0.2.0"
+  },
+  "servers": [
+    {
+      "url": "https://ca.local.example.test"
+    }
+  ],
+  "paths": {
+    "/.well-known/did.json": {
+      "get": {
+        "summary": "CA root DID document"
+      }
+    },
+    "/issuer/did.json": {
+      "get": {
+        "summary": "CA issuer DID document"
+      }
+    },
+    "/.well-known/jwks.json": {
+      "get": {
+        "summary": "CA JWKS"
+      }
+    },
+    "/.well-known/trust.json": {
+      "get": {
+        "summary": "Pinned Root and issuer trust metadata"
+      }
+    },
+    "/.well-known/dcat3/catalog.json": {
+      "get": {
+        "summary": "CA ICA discovery catalog"
+      }
+    },
+    "/pki/root-ca.pem": {
+      "get": {
+        "summary": "Root CA certificate"
+      }
+    },
+    "/pki/issuer-ca.chain.pem": {
+      "get": {
+        "summary": "Issuer CA chain"
+      }
+    }
+  }
+}

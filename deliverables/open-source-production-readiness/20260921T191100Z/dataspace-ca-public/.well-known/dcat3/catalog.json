@@ -1,0 +1,35 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/dcat.jsonld",
+    "https://www.w3.org/ns/odrl.jsonld",
+    "https://www.w3.org/ns/dcterms"
+  ],
+  "id": "https://ca.local.example.test/.well-known/dcat3/catalog.json",
+  "type": "Catalog",
+  "title": "Dataspace CA ICA Catalog",
+  "description": "Global discovery catalog for ICA nodes signed by the dataspace CA.",
+  "homepage": "https://ca.local.example.test/",
+  "publisher": {
+    "id": "did:web:ca.local.example.test",
+    "type": "Organization",
+    "name": "Dataspace CA"
+  },
+  "dcat:dataset": [
+    {
+      "id": "https://ca.local.example.test/catalog/icas/EU/onehealth-research.json",
+      "type": "Dataset",
+      "title": "ICA discovery dataset",
+      "description": "Sector-scoped ICA discovery list signed by the dataspace CA.",
+      "keyword": [
+        "ica",
+        "dataspace",
+        "dcat3",
+        "EU",
+        "onehealth-research"
+      ],
+      "theme": "onehealth-research",
+      "spatial": "EU",
+      "issuer": "did:web:ca.local.example.test:issuer"
+    }
+  ]
+}

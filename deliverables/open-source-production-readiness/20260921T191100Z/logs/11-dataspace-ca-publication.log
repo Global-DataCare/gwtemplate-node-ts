@@ -1,0 +1,22 @@
+Dataspace root CA bootstrap generated in /var/folders/b4/22t6q0l16jd7fcdqqg6pwtrm0000gn/T/tmp.mqn48vTFNt/root
+- did: did:web:ca.local.example.test
+- kid: fKeP30MnIVgIkGZyT5UD3n8x1-X3iUYYCkjuoxhhwQs
+- serial: 01780B0D730E7F5702B46E47D2A21747
+- cert: /var/folders/b4/22t6q0l16jd7fcdqqg6pwtrm0000gn/T/tmp.mqn48vTFNt/root/root-cert.pem
+Dataspace issuer CA bootstrap generated in /var/folders/b4/22t6q0l16jd7fcdqqg6pwtrm0000gn/T/tmp.mqn48vTFNt/issuer
+- did: did:web:ca.local.example.test:issuer
+- kid: CwBOA4zlmCU5WrcUh4a84bItzWUymvj4_UwTnSjEqqY
+- serial: 01DEB0A5D99C0A43F52C267E11D6F9CC
+- cert: /var/folders/b4/22t6q0l16jd7fcdqqg6pwtrm0000gn/T/tmp.mqn48vTFNt/issuer/issuer-cert.pem
+- chain: /var/folders/b4/22t6q0l16jd7fcdqqg6pwtrm0000gn/T/tmp.mqn48vTFNt/issuer/issuer.chain.pem
+Dataspace CA static publication generated in /var/folders/b4/22t6q0l16jd7fcdqqg6pwtrm0000gn/T/tmp.mqn48vTFNt/public
+- did: did:web:ca.local.example.test
+- issuer did: did:web:ca.local.example.test:issuer
+- catalog: /var/folders/b4/22t6q0l16jd7fcdqqg6pwtrm0000gn/T/tmp.mqn48vTFNt/public/.well-known/dcat3/catalog.json
+/var/folders/b4/22t6q0l16jd7fcdqqg6pwtrm0000gn/T/tmp.mqn48vTFNt/issuer/issuer-cert.pem: OK
+subject=CN=Dataspace Root CA ca.local.example.test, C=ES
+issuer=CN=Dataspace Root CA ca.local.example.test, C=ES
+sha256 Fingerprint=51:B5:9C:74:9C:0E:C6:3F:41:B0:05:F3:67:82:7F:33:31:EE:80:69:3F:41:73:64:97:9E:D3:22:CD:A4:DD:1D
+subject=CN=Dataspace Issuer CA ca.local.example.test, C=ES
+issuer=CN=Dataspace Root CA ca.local.example.test, C=ES
+sha256 Fingerprint=6E:0C:29:2C:CB:99:7F:F1:62:16:C8:2B:14:AA:DE:68:18:A6:29:33:71:C7:35:19:72:39:AF:6B:D0:38:55:F3

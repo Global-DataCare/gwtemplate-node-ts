@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "gdc.dataspace-ica.postgres-ipfs-migration/v1",
+  "migratedAt": "2026-09-21T19:11:20.281Z",
+  "counts": {
+    "issuedCredentials": 1,
+    "evidenceRecords": 1,
+    "didBindings": 1,
+    "didDocuments": 1
+  },
+  "sourceDigestSha256": "e61b6f215e8a237e12760aa10b59dcf1a5d5cb1e6076095147333ed61583c2f0",
+  "targetDigestSha256": "e61b6f215e8a237e12760aa10b59dcf1a5d5cb1e6076095147333ed61583c2f0",
+  "unresolvedGcsReferences": []
+}

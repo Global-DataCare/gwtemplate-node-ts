@@ -1,0 +1,21 @@
+
+> gwtemplate-node-ts@1.25.24 test
+> NODE_OPTIONS=--experimental-vm-modules jest --runInBand src/__tests__/unit/utils/ledger.test.ts src/__tests__/unit/blockchain/ledger-channel-name.test.ts
+
+  console.log
+    [dotenv@17.2.3] injecting env (112) from .env.local-demo -- tip: ⚙️  load multiple .env files with { path: ['.env.local', '.env'] }
+
+      at _log (node_modules/dotenv/lib/main.js:142:11)
+
+(node:71635) ExperimentalWarning: VM Modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+  console.log
+    [dotenv@17.2.3] injecting env (112) from .env.local-demo -- tip: 🔐 encrypt with Dotenvx: https://dotenvx.com
+
+      at _log (node_modules/dotenv/lib/main.js:142:11)
+
+Test Suites: 2 passed, 2 total
+Tests:       19 passed, 19 total
+Snapshots:   0 total
+Time:        9.18 s
+Ran all test suites matching src/__tests__/unit/utils/ledger.test.ts|src/__tests__/unit/blockchain/ledger-channel-name.test.ts.

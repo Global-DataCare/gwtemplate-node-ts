@@ -20,6 +20,11 @@ dominios, direcciones, credenciales ni inventarios de un despliegue concreto.
   `local-network`, `test-network` y producción.
 - `ENTREGABLE_HOST_REPRODUCIBLE_ES.md`: alcance, ejecución y límites
   verificables del entregable de software.
+- `INFORME_SEDIA_LOCAL_NETWORK.md`: informe consolidado de la ejecución
+  `local-network`, con resultados, cobertura, servicios, puertos y referencias.
+- `INFORME_SEDIA_LOCAL_NETWORK.docx`: versión Word del mismo informe.
+- `open-source-production-readiness/20260921T191100Z/`: paquete completo de
+  evidencia sintética de la ejecución, con resumen, manifiesto, estados y logs.
 
 Versiones inglesas equivalentes:
 

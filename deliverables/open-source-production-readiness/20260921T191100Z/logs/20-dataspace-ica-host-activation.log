@@ -1,0 +1,69 @@
+✔ signed host-service PDF exposes every field required for Service VC issuance (89.984796ms)
+✔ host-service form requires provider identifier value or taxID (0.582426ms)
+✔ host-service PDF contract excludes mutable Fabric governance configuration (0.217898ms)
+✔ HostServiceFormPdfFields exposes camelCase TypeScript properties (0.228442ms)
+✔ buildVerificationVcBundle returns two VCs each with evidence (27.773576ms)
+✔ buildVerificationVcBundle emits a signed HostingServiceCredential only for the signed host form (18.937579ms)
+✔ buildVerificationVcBundle does not expose non-schema.org controller field (2.017666ms)
+✔ buildVerificationVcBundle uses external audit attachment when available (1.307236ms)
+✔ buildVerificationVcBundle maps annex form fields into credential subjects and evidence details (2.135719ms)
+✔ buildVerificationVcBundle hashes plain controller email into credentialSubject.sameAs (1.303789ms)
+✔ buildVerificationVcBundle projects controller binding into person hasCredential.material (7.859805ms)
+✔ buildVerificationVcBundle emits an independently bound organization controller service credential (7.038614ms)
+✔ buildVerificationVcBundle keeps a distinct signed controller pending when the submitted JWK belongs to the representative (4.83446ms)
+✔ buildVerificationVcBundle uses explicit signed PDF ISCO fields when present (5.490369ms)
+✔ buildVerificationVcBundle rejects a malformed signed PDF ISCO field (1.724162ms)
+✔ buildVerificationVcBundle keeps representative and controller credentials distinct for the same actor (5.036484ms)
+✔ buildVerificationVcBundle does not issue an unbound organization controller credential (3.221917ms)
+✔ buildVerificationVcBundle does not trust an unrelated request-only controller alias (4.052155ms)
+✔ buildVerificationVcBundle accepts legalRepresentativePayload.sameAs only in demo mode (7.702728ms)
+✔ buildVerificationVcBundle hashes legalRepresentativePayload.email only in demo mode (5.589849ms)
+✔ buildVerificationVcBundle binds a legacy representative controller only when compat explicitly enables it (9.64061ms)
+✔ buildVerificationVcBundle falls back OrganizationCredential makesOffer category and serviceType only in demo mode (5.42691ms)
+✔ buildVerificationVcBundle omits intermediate crl_check_all verify_error when fallback succeeds (3.329096ms)
+✔ buildVerificationVcBundle filters intermediate CA URLs to signer issuer profile (2.998519ms)
+✔ buildVerificationVcBundle ignores arbitrary payload fields not extracted from PDF (3.69575ms)
+✔ buildVerificationVcBundle allows payload merge when environment variable is set (2.900302ms)
+✔ buildVerificationVcBundle uses visible PDF organization identity when signer certificate is personal (2.969911ms)
+✔ buildVerificationVcBundle uses VATPT when annex fiscal address ends in Portugal on ES jurisdiction route (3.020311ms)
+✔ buildVerificationVcBundle does not duplicate the country prefix when PDF tax ID already starts with it (2.712679ms)
+✔ buildVerificationVcBundle requires visible PDF organization legal name when signer certificate is personal (0.66053ms)
+✔ buildVerificationVcBundle uses deterministic VC/document IDs when DETERMINISTIC_VC_BY_CONTRACT=true (5.254349ms)
+ℹ tests 31
+ℹ suites 0
+ℹ pass 31
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1633.474398
+
+> dataspace-ica@1.3.1 test:host-preauthorization
+> node --test ./test/api.host-activation.test.ts ./test/api.preauthorized-host.test.ts
+
+✔ creates and consumes one activation without persisting its raw code (9.747502ms)
+✔ rejects a valid code for another domain or network and preserves it for its approved scope (2.333791ms)
+✔ rejects an expired activation (0.816008ms)
+✔ preauthorized local-network host is accepted without a PDF and produces governed evidence (90.745474ms)
+✔ one-time host activation verifies the submitted JWK without DNS or a mounted DID document (10.253572ms)
+✔ governance-pinned host DID verifies animal-care staging before host DNS and workload exist (3.779566ms)
+✔ preauthorized CA-BC host preserves its regional BN without inventing VAT or TAX identity (8.311018ms)
+✔ mounted public DID file authorizes another configured animal sector without network resolution (7.358377ms)
+✔ configured host DID policy fails closed instead of falling back to DNS (3.542179ms)
+✔ unlisted host cannot use the PDF-free verification path (2.584182ms)
+✔ preauthorized host cannot move its PDF-free authorization to another network kind (2.356334ms)
+✔ signed governed-host authorization cannot be replayed into another sector route (2.212127ms)
+✔ VerifyRequestManager bypasses both PDF verification and PDF persistence for governed host evidence (13.735127ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 882.953239
+
+> dataspace-ica@1.3.1 check:skills
+> node ./scripts/check-local-skills.mjs
+
+ICA Fabric credential registry skill is synchronized.

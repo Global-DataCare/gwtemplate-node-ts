@@ -1,0 +1,50 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/did/v1",
+    "https://w3id.org/security/suites/jws-2020/v1"
+  ],
+  "id": "did:web:ca.local.example.test",
+  "verificationMethod": [
+    {
+      "id": "did:web:ca.local.example.test#fKeP30MnIVgIkGZyT5UD3n8x1-X3iUYYCkjuoxhhwQs",
+      "type": "JsonWebKey2020",
+      "controller": "did:web:ca.local.example.test",
+      "publicKeyJwk": {
+        "kty": "EC",
+        "crv": "P-384",
+        "x": "eg2CVePfog-s7I30UF9WZqm5-kFARUcZFvB2e3ToU-wT7PJQhXj7sFuYF5lTKevd",
+        "y": "AE-JfB97BA-9eaItHXjG-7HuHASQ5LVrtU_rWNkijXNF6GdI3s0puMhtv0rLUf8j",
+        "kid": "fKeP30MnIVgIkGZyT5UD3n8x1-X3iUYYCkjuoxhhwQs",
+        "alg": "ES384",
+        "use": "sig",
+        "x5c": [
+          "MIICnDCCAiOgAwIBAgIQAXgLDXMOf1cCtG5H0qIXRzAKBggqhkjOPQQDAzA/MTAwLgYDVQQDDCdEYXRhc3BhY2UgUm9vdCBDQSBjYS5sb2NhbC5leGFtcGxlLnRlc3QxCzAJBgNVBAYTAkVTMB4XDTI0MDEwMTAwMDAwMFoXDTMzMTIyOTAwMDAwMFowPzEwMC4GA1UEAwwnRGF0YXNwYWNlIFJvb3QgQ0EgY2EubG9jYWwuZXhhbXBsZS50ZXN0MQswCQYDVQQGEwJFUzB2MBAGByqGSM49AgEGBSuBBAAiA2IABHoNglXj36IPrOyN9FBfVmapufpBQEVHGRbwdnt06FPsE+zyUIV4+7BbmBeZUynr3QBPiXwfewQPvXmiLR14xvux7hwEkOS1a7VP61jZIo1zRehnSN7NKbjIbb9Ky1H/I6OB4zCB4DASBgNVHRMBAf8ECDAGAQH/AgEBMA4GA1UdDwEB/wQEAwIBBjAdBgNVHQ4EFgQUOimasatWp7BI4DNt12hDbGz62aQwHwYDVR0jBBgwFoAUOimasatWp7BI4DNt12hDbGz62aQwIAYDVR0RBBkwF4IVY2EubG9jYWwuZXhhbXBsZS50ZXN0MCAGA1UdEgQZMBeCFWNhLmxvY2FsLmV4YW1wbGUudGVzdDA2BglghkgBhvhCAQ0EKRYnRGF0YXNwYWNlIFJvb3QgQ0EgY2EubG9jYWwuZXhhbXBsZS50ZXN0MAoGCCqGSM49BAMDA2cAMGQCMCz8uiKZ454iXzjiWjLl4i8KVZxxOJeSmlYogBgXSDeQVtuBnIe982jZsa6KhNpHJQIwS+W5jFxSjR7hBeYlmQyUmLWsBZzrSqsgYffxDcFvQv26HUWgwzg6NHZHpkZ/kJpw"
+        ],
+        "x5u": "https://ca.local.example.test/pki/root-ca.pem"
+      }
+    }
+  ],
+  "assertionMethod": [
+    "did:web:ca.local.example.test#fKeP30MnIVgIkGZyT5UD3n8x1-X3iUYYCkjuoxhhwQs"
+  ],
+  "authentication": [
+    "did:web:ca.local.example.test#fKeP30MnIVgIkGZyT5UD3n8x1-X3iUYYCkjuoxhhwQs"
+  ],
+  "service": [
+    {
+      "id": "did:web:ca.local.example.test#dcat3-catalog",
+      "type": "CatalogService",
+      "serviceEndpoint": "https://ca.local.example.test/.well-known/dcat3/catalog.json"
+    },
+    {
+      "id": "did:web:ca.local.example.test#trust-anchor",
+      "type": "TrustAnchorService",
+      "serviceEndpoint": "https://ca.local.example.test/pki/root-ca.pem"
+    },
+    {
+      "id": "did:web:ca.local.example.test#trust-metadata",
+      "type": "CredentialRegistryService",
+      "serviceEndpoint": "https://ca.local.example.test/.well-known/trust.json"
+    }
+  ]
+}

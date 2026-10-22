@@ -1,0 +1,14 @@
+{
+  "authorized": true,
+  "requestId": "urn:uuid:e2719876-efeb-4e4d-91c5-086f65dbab41",
+  "decisionDigest": "ebe531db8c9d9cce71e8859675f52bdc29e1f5eb1c3f967967969b297fe595bc",
+  "hostUrl": "http://host2.localhost",
+  "mspId": "Host2MSP",
+  "networkKind": "local-network",
+  "evidencePolicy": "hosting-service-credential",
+  "hostCredentialId": "urn:uuid:b6f7cc6b-7550-4a8d-aaae-184a7a701a82",
+  "hostCredentialIssuer": "did:web:ica.localhost",
+  "peerTargets": [
+    "host2-peer"
+  ]
+}
