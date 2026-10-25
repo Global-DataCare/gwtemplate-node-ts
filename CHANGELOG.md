@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Define the shared separation between isolated public statistics,
+  study-specific Digital Twins, private tenant research imports and verified
+  clinical provenance in the repository skill. Both canonical `00`
+  entrypoints now also map those boundaries to the applicable products.
+
 - Separate private digital-twin terminology from research-ledger registration.
   Host configuration now controls whether exact labels are added privately;
   the default remains code-only. Terminology and research-ledger outages return
