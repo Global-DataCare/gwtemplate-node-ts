@@ -75,7 +75,7 @@ describe('current documentation source governance', () => {
     ]));
   });
 
-  it('keeps public documentation and repository skills product-neutral', () => {
+  it('keeps public documentation and repository skills product-neutral outside the canonical 00 product maps', () => {
     const forbiddenProductPattern = new RegExp([
       'vet' + 'chain',
       'pet' + 'chain',
@@ -93,8 +93,13 @@ describe('current documentation source governance', () => {
         return entry.name.endsWith('.md') ? [path] : [];
       });
 
+    const productMapEntrypoints = new Set([
+      resolve(process.cwd(), 'docs-v1/00-READING_ORDER.md'),
+      resolve(process.cwd(), 'docs-v2/00-quickstart.md'),
+    ]);
     const roots = ['docs-v1', 'docs-v2', 'deliverables', 'docs-end', '.codex/skills'];
     for (const path of roots.flatMap((root) => markdownFiles(resolve(process.cwd(), root)))) {
+      if (productMapEntrypoints.has(path)) continue;
       expect(readFileSync(path, 'utf8')).not.toMatch(forbiddenProductPattern);
     }
 
