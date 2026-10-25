@@ -1,6 +1,6 @@
 ---
 name: govern-digital-twin-consent
-description: Implement or audit the FHIR Consent, IPS projection, pseudonymous subject, disable and provider-offboarding contracts for Digital Twin flows across GW CORE and gdc-sdk-node-ts. Use for secondary-use permit or deny, HRESCH claims, stable Consent identifiers, individual Communication ingestion, direct digitaltwin Composition routes, twin urn:uuid validation, study-specific consent separation, materialization, purge, 101 docs, tests, SDK releases, or cleanup of erroneous research-index records.
+description: Implement or audit the separation between isolated public statistics, private tenant research imports and consented ResearchStudy Digital Twins, including FHIR Consent, IPS projection, pseudonymous subjects, disable and provider-offboarding across GW CORE and gdc-sdk-node-ts. Use for secondary-use decisions, statistical contribution, study-specific consent, HRESCH claims, twin identities, materialization, purge, 101 docs, tests, SDK releases, or cleanup of erroneous research-index records.
 ---
 
 # Govern Digital Twin Consent
@@ -28,6 +28,30 @@ Read the current files in both repositories:
   - `src/orchestration/individual-controller-sdk.ts`
 
 Verify current branches, versions and published npm state before release claims.
+
+## Keep research-related data planes separate
+
+- **Isolated public statistics** contain only the governed coded or coarse
+  statistical fields. GW assigns an opaque random event identity. They have no
+  subject identity, stable person index, ResearchStudy membership, Digital Twin
+  identity or correlation with another contribution. Creating one must never
+  create, update or join a Digital Twin.
+- **Study-specific Digital Twin** participation is an explicit decision for one
+  exact `ResearchStudy`. It uses its own Consent source reference and a
+  GW-derived pseudonymous twin identity scoped to that study. Do not reuse a
+  statistic identifier, operational subject DID or another study's twin
+  identity.
+- **Private tenant research import** remains inside the importing
+  organization's tenant. Structured-file or governed-conversion rows may
+  create or extend a tenant-managed research subject, but import does not publish a public
+  statistic and does not enroll an individual in an external ResearchStudy.
+- **Verified clinical source** is a provenance boundary, not a fourth research
+  store. Validate professional origin and attestation against the protected
+  operational record before projecting or de-identifying it. A self-report
+  remains self-reported and must never be relabelled as verified clinical data.
+- A source record may contribute to statistics and to a study only through two
+  independent explicit actions. Never create a hidden link between their
+  identifiers, stores, consent or lifecycle.
 
 ## Preserve the application contract
 
