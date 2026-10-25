@@ -41,6 +41,42 @@ Before authoring payloads or integrations, read these source-of-truth docs:
 - [SDK node integration 101](https://github.com/Global-DataCare/gdc-sdk-node-ts/blob/main/docs/101-SDK_INTEGRATION.md)
 - [Core integration baseline for this GW](../docs-v1/02-API-AND-ENDPOINTS/02.D-API-CORE-INTEGRATION.md)
 
+## Do not merge the research-related data planes
+
+- **Isolated public statistics:** a standalone coded and de-identified event.
+  GW creates its random identity; it has no stable subject, `ResearchStudy`,
+  Digital Twin or cross-report correlation.
+- **Study-specific Digital Twin:** an explicit opt-in to one exact
+  `ResearchStudy`, with separate consent and a GW-derived pseudonymous twin
+  identity for that study. Participation in another study is a separate act.
+- **Private tenant research import:** spreadsheet or governed-conversion data
+  imported by a professional organization remains in that organization's tenant. It may
+  populate a tenant-managed research subject but does not become a public
+  statistic or enroll a person in an external study.
+- **Verified clinical source:** a provenance condition checked against the
+  protected operational record before de-identification. It is not another
+  research store, and a self-report is never promoted to verified clinical
+  evidence.
+
+Creating a statistic and contributing to a study are independent explicit
+actions. They never share identifiers or create an implicit link. These
+boundaries are product-neutral; applications choose the relevant flow while GW
+derives authority, routing, pseudonyms and persistence from trusted context.
+
+Product map:
+
+- **SOSChain:** isolated self-reported public-health statistics. Optional
+  sharing of a complete history with a study is a distinct Fundación UNID flow.
+- **Fundación UNID:** current `ResearchStudy` catalogue and study-specific
+  Digital Twins created only after explicit participation.
+- **Connect Health Personal:** the SOSChain profile keeps reports separate from
+  optional UNID sharing. **UHC** and **VetChain Personal**/**PetChain** may also
+  discover other studies and decide independently for each study.
+- **Connect Health Professional:** authorized organizations publish studies;
+  structured research imports stay private to their tenant, and requesting an
+  isolated statistical contribution is a separate clinical-registration
+  choice.
+
 ## What GW CORE expects on the wire
 
 GW CORE does not expect FHIR R4 JSON by itself.
