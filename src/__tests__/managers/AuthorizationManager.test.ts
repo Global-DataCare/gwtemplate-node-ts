@@ -274,6 +274,62 @@ describe('AppAuthorizationManager', () => {
       });
     });
 
+    it('verifies the stored legacy _activate bootstrap key when the proof issuer is its DID alias', async () => {
+      const portalControllerDid = 'did:web:controller-portal.demo.example';
+      const operationalControllerDid = 'did:web:gw.demo.example:controller:bootstrap';
+      const fixture = await buildDeterministicVpTokenFixture({
+        seed: 'gw-controller-proof-legacy-activate-alias-seed-001',
+        issuerDid: portalControllerDid,
+        audience: 'did:web:gw.demo.example',
+        includePublicJwkInHeader: false,
+        credentials: [{ credential: {
+          '@context': ['https://www.w3.org/2018/credentials/v1'],
+          type: ['VerifiableCredential', 'LegalRepresentativeCredential'],
+          issuer: 'did:web:ica.demo.example',
+          issuanceDate: '2040-01-01T00:00:00.000Z',
+          credentialSubject: { id: portalControllerDid },
+        } }],
+      });
+      mockTokenVerifier.verify.mockResolvedValue({ valid: false, error: 'not an id token' });
+      mockKmsService.getHmacBase64Url
+        .mockResolvedValueOnce('protected-kid-name')
+        .mockResolvedValueOnce('protected-kid-value');
+      mockVaultRepository.query.mockResolvedValue([]);
+      mockVaultRepository.getContainersInSection.mockResolvedValue([{
+        id: operationalControllerDid,
+        public: { role: 'host-bootstrap-controller' },
+      }] as any);
+      mockKmsService.unprotectConfidentialData.mockResolvedValue({
+        didDocument: {
+          id: operationalControllerDid,
+          alsoKnownAs: [portalControllerDid],
+          verificationMethod: [{
+            id: `${operationalControllerDid}#${fixture.publicJwk.kid}`,
+            type: 'JsonWebKey2020',
+            controller: operationalControllerDid,
+            publicKeyJwk: fixture.publicJwk,
+          }],
+        },
+      } as any);
+
+      process.env.HOST_LEGACY_REPRESENTATIVE_CONTROLLER = 'true';
+      try {
+        const result = await manager.verifyBearerToken(
+          fixture.compactToken,
+          undefined,
+          { vaultId: 'onehealth-research_registered', collectionName: 'registered_collection' },
+        );
+
+        expect(result.valid).toBe(true);
+        expect(mockVaultRepository.getContainersInSection).toHaveBeenCalledWith(
+          'registered_collection',
+          getEnvSectionId('employees'),
+        );
+      } finally {
+        delete process.env.HOST_LEGACY_REPRESENTATIVE_CONTROLLER;
+      }
+    });
+
     it('rejects a tenant-scoped proof when its kid is not registered by DCR', async () => {
       const fixture = await buildDeterministicVpTokenFixture({
         seed: 'gw-controller-proof-unregistered-seed-001',

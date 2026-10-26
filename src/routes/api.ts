@@ -1050,8 +1050,13 @@ export function createApiRouter(
    *         (include that claim in `meta.claims` to size requested seats)
    *         so clients can continue with order/payment and licensing without a separate `_batch` submit
    *       - next mandatory step is `Order/_batch` with `Order.acceptedOffer.identifier` from activation result
-   *       - after Order, the controller uses activation code (`org.schema.IndividualProduct.serialNumber`)
-   *         to run `Token/_exchange` + `Device/_dcr` before creating additional employees
+   *       - the historical representative key bound by this legacy `_activate`
+   *         is already the operational bootstrap-controller key and does not
+   *         repeat `Token/_exchange` or `Device/_dcr`
+   *       - a separately designated service controller, employee or later
+   *         replacement device uses its own activation code
+   *         (`org.schema.IndividualProduct.serialNumber`) and completes
+   *         `Token/_exchange` + `Device/_dcr`
    *     parameters:
    *       - $ref: '#/components/parameters/AppId'
    *       - $ref: '#/components/parameters/AppVersion'
