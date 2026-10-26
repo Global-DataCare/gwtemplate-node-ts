@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+- Restore the deployment-authorized legacy `Organization/_activate`
+  bootstrap-controller proof path without weakening modern DCR authorization.
+  Tenant-scoped verification may resolve only the stored
+  `host-bootstrap-controller` key, requires the configured compatibility
+  switch, and accepts an issuer only when it is the stored operational DID or
+  one exact stored `did:web` alias. Caller-supplied JWK material never grants
+  tenant authority.
+
 - Define the shared separation between isolated public statistics,
   study-specific Digital Twins, private tenant research imports and verified
   clinical provenance in the repository skill. Both canonical `00`
