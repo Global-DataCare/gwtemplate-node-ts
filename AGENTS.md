@@ -15,6 +15,10 @@ Primary references:
 - `docs-v1/06-AUDIT-AND-EVIDENCE/06.A-SEDIA-CAPABILITY-EVIDENCE-MATRIX.md`
 - `docs-v1/06-AUDIT-AND-EVIDENCE/06.D-TESTING-GUIDE.md` / `docs-v1/06-AUDIT-AND-EVIDENCE/06.E-END-TO-END-TESTING.md`
 
+All Node/npm gates follow the repository
+[`preserve-workspace-node-runtime` skill](.codex/skills/preserve-workspace-node-runtime/SKILL.md),
+which is compatible with the canonical workspace Node.js 26.13.0 contract.
+
 ## Scope Governance
 1. Keep core GW scope explicit and testable.
 2. Features outside current core narrative must be documented as extension scope, not mixed into core acceptance criteria.
