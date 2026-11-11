@@ -1,0 +1,69 @@
+{
+  "repository": "gdc-sdk-node-ts",
+  "label": "final-full-cycle",
+  "command": [
+    "env",
+    "GDC_WORKSPACE_DIR=${WORKSPACE}",
+    "GW_DIR_OVERRIDE=${WORKSPACE}/.codex-worktrees/e9-repair-gwtemplate-node-ts",
+    "ICA_DIR_OVERRIDE=${WORKSPACE}/.codex-worktrees/e9-repair-dataspace-ica-ts",
+    "KMS_PROVIDER=memory",
+    "SECTOR=health-care",
+    "EMPLOYEE_ROLE=ISCO-08|2211",
+    "GW_ENV_FILE=${WORKSPACE}/.codex-worktrees/e9-repair-gwtemplate-node-ts/env.local-demo.example",
+    "LIVE_GW_HOST_VERIFICATION_PDF_PATH=<PRIVATE_PDF_SHA256:efadf7e245c8ea4ec0bb5d011848c0d9eb5e9e72bed986812053f7cf2cda15ce>",
+    "LIVE_GW_LOG_FILE=${WORKSPACE}/.codex-evidence/e9-20261111/final-full-cycle-gw.log",
+    "LIVE_ICA_LOG_FILE=${WORKSPACE}/.codex-evidence/e9-20261111/final-full-cycle-ica.log",
+    "bash",
+    "scripts/run-live-101-full-cycle-clean.sh"
+  ],
+  "started_at": "2026-11-11T12:46:46.124101+00:00",
+  "node": "v26.13.0",
+  "npm": "11.20.0",
+  "commit": "4b726b5cac458fcc94b543fbde6aeb649aaf80c6",
+  "working_tree": "",
+  "version": "2.9.34",
+  "related_sources": {
+    "gdc-common-utils-ts": {
+      "commit": "7f2caba88bd5ac8cc0e9a1fd90efce76110ea551",
+      "version": "2.9.30",
+      "working_tree": ""
+    },
+    "gdc-sdk-core-ts": {
+      "commit": "e795e5b74f11e8e8c100b76fef4fed5ab39b8f2d",
+      "version": "2.9.12",
+      "working_tree": ""
+    },
+    "gdc-sdk-front-ts": {
+      "commit": "7fe121d21490be5d8cd882cfcac6bc4435868863",
+      "version": "2.9.0",
+      "working_tree": ""
+    },
+    "gdc-sdk-node-ts": {
+      "commit": "4b726b5cac458fcc94b543fbde6aeb649aaf80c6",
+      "version": "2.9.34",
+      "working_tree": ""
+    },
+    "dataspace-ica-ts": {
+      "commit": "67333c8e4ee9177f5e7b0379f8193dd60930cd6b",
+      "version": "1.3.4",
+      "working_tree": ""
+    },
+    "ica-client-sdk-ts": {
+      "commit": "fdf97b553bfa4c130d8648c2a521abe8a8781e60",
+      "version": "2.0.15",
+      "working_tree": ""
+    },
+    "gwtemplate-node-ts": {
+      "commit": "ea8abae0f8c13e817d9241881f169e9400833d9a",
+      "version": "1.25.33",
+      "working_tree": "",
+      "recordedVersion": "1.25.34"
+    }
+  },
+  "package.json_sha256": "d97192cc1ba6ec4e19c98bcfcc041538aef4cba9076143747079e5637496a3d8",
+  "package-lock.json_sha256": "bc65f87e0208175e6d09eb3057e73708fe96f3e7a45d7e8a963f8931d09db15d",
+  "exit_code": 0,
+  "elapsed_seconds": 52.37,
+  "finished_at": "2026-11-11T12:47:39.127599+00:00",
+  "log_sha256": "3ad660729ded509adcadd1d884a6dd649c62b629f7af34c417dbbad0baa95f6b"
+}

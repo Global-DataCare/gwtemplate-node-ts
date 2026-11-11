@@ -1,0 +1,9 @@
+
+> gdc-sdk-front-ts@2.9.0 verify:package-chain
+> npm run build && node scripts/verify-package-chain.mjs
+
+
+> gdc-sdk-front-ts@2.9.0 build
+> tsc -p tsconfig.json
+
+Verified isolated SDK chain: {"gdc-common-utils-ts":"2.9.25","gdc-sdk-core-ts":"2.9.11","gdc-sdk-node-ts":"2.9.27","gdc-sdk-front-ts":"2.9.0"}

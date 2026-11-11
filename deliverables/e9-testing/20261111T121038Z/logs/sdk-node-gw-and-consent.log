@@ -1,0 +1,59 @@
+[local:close] no process is listening on port 3000
+[local:close] done
+
+> gdc-sdk-node-ts@2.9.34 test:e2e:live-gw
+> npm run build && RUN_LIVE_GW_E2E=1 node --test tests/live-gw-node-runtime.e2e.test.mjs
+
+
+> gdc-sdk-node-ts@2.9.34 build
+> tsc -p tsconfig.json
+
+✔ LIVE professional lifecycle on GW (29096.981055ms)
+✔ LIVE didcomm-plain communication conversation indexes DocumentReference and MedicationStatement projections (1306.676114ms)
+✔ LIVE legacy-fhir communication conversation indexes DocumentReference and MedicationStatement projections (1077.750977ms)
+✔ LIVE backend profile runtime individual-controller flow on GW (11318.547043ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 43794.365151
+
+> gdc-sdk-node-ts@2.9.34 test:e2e:live-dialogue:consent-professional
+> npm run build && RUN_LIVE_DIALOGUE_CONSENT_PROFESSIONAL_E2E=1 node --test tests/live-dialogue-consent-professional-access.e2e.test.mjs
+
+
+> gdc-sdk-node-ts@2.9.34 build
+> tsc -p tsconfig.json
+
+✔ LIVE controller-to-professional consent dialogue on existing tenant (8667.748531ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 9635.797799
+[local:close] no process is listening on port 3000
+[local:close] done
+
+> gdc-sdk-node-ts@2.9.34 test:e2e:live-gw
+> npm run build && RUN_LIVE_GW_E2E=1 node --test tests/live-gw-node-runtime.e2e.test.mjs
+
+
+> gdc-sdk-node-ts@2.9.34 build
+> tsc -p tsconfig.json
+
+✔ LIVE individual lifecycle on GW (10821.917447ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 11813.577794
+OK: secure local SDK E2E passed on v26.13.0 with zero skipped journeys.

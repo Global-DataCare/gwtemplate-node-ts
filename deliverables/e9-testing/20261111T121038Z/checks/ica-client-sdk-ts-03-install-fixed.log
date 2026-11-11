@@ -1,0 +1,23 @@
+
+> ica-client-sdk-ts@2.0.15 prepare
+> npm run build
+
+
+> ica-client-sdk-ts@2.0.15 build
+> tsc
+
+
+added 551 packages, and audited 552 packages in 18s
+
+81 packages are looking for funding
+  run `npm fund` for details
+
+28 vulnerabilities (8 low, 3 moderate, 15 high, 2 critical)
+
+To address issues that do not require attention, run:
+  npm audit fix
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.

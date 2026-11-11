@@ -1,0 +1,15 @@
+
+> gdc-sdk-node-ts@2.9.34 prepare
+> npm run build
+
+
+> gdc-sdk-node-ts@2.9.34 build
+> tsc -p tsconfig.json
+
+
+added 14 packages, and audited 15 packages in 8s
+
+4 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities

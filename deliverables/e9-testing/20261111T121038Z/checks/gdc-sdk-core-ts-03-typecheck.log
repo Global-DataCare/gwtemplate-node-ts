@@ -1,0 +1,4 @@
+
+> gdc-sdk-core-ts@2.9.12 type-check
+> tsc -p tsconfig.json --noEmit
+

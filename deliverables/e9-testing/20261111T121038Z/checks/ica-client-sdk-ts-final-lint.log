@@ -1,0 +1,4 @@
+
+> ica-client-sdk-ts@2.0.15 lint
+> eslint src/**/*.ts
+

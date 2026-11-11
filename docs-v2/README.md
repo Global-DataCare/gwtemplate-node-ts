@@ -41,6 +41,12 @@ any individual flow file.
 26. [25-clinical-employee-ledger-schema.md](./25-clinical-employee-ledger-schema.md)
 27. [26-tutorial-reading-order.md](./26-tutorial-reading-order.md)
 
+## Deliverables
+
+- [E9 — Pruebas unitarias y testeo (ES)](../deliverables/E9_PRUEBAS_UNITARIAS_Y_TESTEO_SEDIA_ES.md):
+  unit and integration test results, versions, commits and execution logs.
+- [SEDIA local-network report (ES)](../deliverables/INFORME_SEDIA_LOCAL_NETWORK.md).
+
 ## Research / Digital Twin Map
 
 [22-digital-twin-search.md](./22-digital-twin-search.md)

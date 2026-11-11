@@ -1,0 +1,4 @@
+
+> gdc-common-utils-ts@2.9.30 typecheck
+> tsc -p tsconfig.json --noEmit
+

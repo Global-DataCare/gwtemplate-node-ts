@@ -72,6 +72,7 @@ rules are defined in [DOCS_GOVERNANCE.md](DOCS_GOVERNANCE.md).
 - [06.F Test contract layout](06-AUDIT-AND-EVIDENCE/06.F-TEST-CONTRACT-LAYOUT.md)
 - [06.G CORE test evidence](06-AUDIT-AND-EVIDENCE/06.G-CORE-TEST-EVIDENCE.md)
 - [06.H Test matrix](06-AUDIT-AND-EVIDENCE/06.H-TEST-MATRIX.md)
+- [E9: pruebas unitarias y testeo (ES)](../deliverables/E9_PRUEBAS_UNITARIAS_Y_TESTEO_SEDIA_ES.md)
 
 Generated OpenAPI artifacts remain under `docs-v1/openapi-profiles/`; generated
 flow examples remain under `docs-v1/openapi-examples/`. The public HTTP route

@@ -1,0 +1,885 @@
+{
+  "schemaVersion": "gdc.e9.testing/v1",
+  "expediente": "E9-20261111T121038Z",
+  "scope": "complete local test/demo matrix",
+  "status": "SUPERADO_MATRIZ_LOCAL",
+  "executionDate": "2026-11-11",
+  "platform": "macOS (Darwin)",
+  "node": "v26.13.0",
+  "npm": "11.20.0",
+  "sources": {
+    "gdc-common-utils-ts": {
+      "repository": "gdc-common-utils-ts",
+      "version": "2.9.30",
+      "commit": "7f2caba88bd5ac8cc0e9a1fd90efce76110ea551"
+    },
+    "gdc-sdk-core-ts": {
+      "repository": "gdc-sdk-core-ts",
+      "version": "2.9.12",
+      "commit": "e795e5b74f11e8e8c100b76fef4fed5ab39b8f2d"
+    },
+    "gdc-sdk-front-ts": {
+      "repository": "gdc-sdk-front-ts",
+      "version": "2.9.0",
+      "commit": "7fe121d21490be5d8cd882cfcac6bc4435868863"
+    },
+    "gdc-sdk-node-ts": {
+      "repository": "gdc-sdk-node-ts",
+      "version": "2.9.34",
+      "commit": "4b726b5cac458fcc94b543fbde6aeb649aaf80c6"
+    },
+    "dataspace-ica-ts": {
+      "repository": "dataspace-ica-ts",
+      "version": "1.3.4",
+      "commit": "67333c8e4ee9177f5e7b0379f8193dd60930cd6b"
+    },
+    "ica-client-sdk-ts": {
+      "repository": "ica-client-sdk-ts",
+      "version": "2.0.15",
+      "commit": "fdf97b553bfa4c130d8648c2a521abe8a8781e60"
+    },
+    "gwtemplate-node-ts": {
+      "repository": "gwtemplate-node-ts",
+      "version": "1.25.33",
+      "commit": "ea8abae0f8c13e817d9241881f169e9400833d9a",
+      "recordedVersion": "1.25.34"
+    }
+  },
+  "suites": [
+    {
+      "id": "common-coverage",
+      "source": {
+        "repository": "gdc-common-utils-ts",
+        "version": "2.9.30",
+        "commit": "7f2caba88bd5ac8cc0e9a1fd90efce76110ea551"
+      },
+      "node": "v26.13.0",
+      "npm": "11.20.0",
+      "command": [
+        "npm",
+        "run",
+        "test:coverage",
+        "--",
+        "--runInBand",
+        "--watchman=false",
+        "--detectOpenHandles"
+      ],
+      "exitCode": 0,
+      "startedAt": "2026-11-11T12:11:08.528170+00:00",
+      "finishedAt": "2026-11-11T12:13:28.154007+00:00",
+      "elapsedSeconds": 139.316,
+      "tests": {
+        "total": 935,
+        "passed": 935,
+        "failed": 0,
+        "skipped": 0,
+        "cancelled": 0,
+        "pending": 0
+      },
+      "log": {
+        "path": "logs/common-coverage.log",
+        "originalSha256": "fe5b9210b23a90cb5c56f487a0cb7932c2e142fbf2a47c67bf05d67220bab442",
+        "sha256": "4e57c08a7b250e866c8e0677835344e9d49c253a2da0436d47c12ee1b06e12f7"
+      },
+      "provenance": "provenance/common-coverage.json"
+    },
+    {
+      "id": "sdk-core",
+      "source": {
+        "repository": "gdc-sdk-core-ts",
+        "version": "2.9.12",
+        "commit": "e795e5b74f11e8e8c100b76fef4fed5ab39b8f2d"
+      },
+      "node": "v26.13.0",
+      "npm": "11.20.0",
+      "command": [
+        "npm",
+        "test"
+      ],
+      "exitCode": 0,
+      "startedAt": "2026-11-11T12:19:22.331936+00:00",
+      "finishedAt": "2026-11-11T12:19:29.651648+00:00",
+      "elapsedSeconds": 7.033,
+      "tests": {
+        "total": 134,
+        "passed": 134,
+        "failed": 0,
+        "skipped": 0,
+        "cancelled": 0,
+        "pending": 0
+      },
+      "log": {
+        "path": "logs/sdk-core.log",
+        "originalSha256": "12fecfc877dadd7cf3a41a39290bec99f962fafe63c4d95cc71e5397d8b8c617",
+        "sha256": "12fecfc877dadd7cf3a41a39290bec99f962fafe63c4d95cc71e5397d8b8c617"
+      },
+      "provenance": "provenance/sdk-core.json"
+    },
+    {
+      "id": "sdk-front",
+      "source": {
+        "repository": "gdc-sdk-front-ts",
+        "version": "2.9.0",
+        "commit": "7fe121d21490be5d8cd882cfcac6bc4435868863"
+      },
+      "node": "v26.13.0",
+      "npm": "11.20.0",
+      "command": [
+        "npm",
+        "test"
+      ],
+      "exitCode": 0,
+      "startedAt": "2026-11-11T12:19:58.054626+00:00",
+      "finishedAt": "2026-11-11T12:20:05.078919+00:00",
+      "elapsedSeconds": 6.722,
+      "tests": {
+        "total": 69,
+        "passed": 69,
+        "failed": 0,
+        "skipped": 0,
+        "cancelled": 0,
+        "pending": 0
+      },
+      "log": {
+        "path": "logs/sdk-front.log",
+        "originalSha256": "21a88dd4c0f7535750f4d413293cc2d545a22ffe550ab7eaca2b05831a5f145f",
+        "sha256": "21a88dd4c0f7535750f4d413293cc2d545a22ffe550ab7eaca2b05831a5f145f"
+      },
+      "provenance": "provenance/sdk-front.json"
+    },
+    {
+      "id": "sdk-node-unit",
+      "source": {
+        "repository": "gdc-sdk-node-ts",
+        "version": "2.9.34",
+        "commit": "4b726b5cac458fcc94b543fbde6aeb649aaf80c6"
+      },
+      "node": "v26.13.0",
+      "npm": "11.20.0",
+      "command": [
+        "node",
+        "--test",
+        "tests/101-backend-profile-runtime.test.mjs",
+        "tests/101-clinical-profile-summary-guide.test.mjs",
+        "tests/101-clinical-provenance-boundaries-guide.test.mjs",
+        "tests/101-clinical-resource-authoring.test.mjs",
+        "tests/101-dataspace-resolver.test.mjs",
+        "tests/101-default-first-dataspace-discovery.test.mjs",
+        "tests/101-digital-twin-sdk.test.mjs",
+        "tests/101-fhir-coding-token-editors.test.mjs",
+        "tests/101-individual-bundle-communication.test.mjs",
+        "tests/101-individual-controller-backend-runtime.test.mjs",
+        "tests/101-individual-summary-communication.test.mjs",
+        "tests/101-local-terminology-bff.test.mjs",
+        "tests/101-organization-controller-lifecycle.test.mjs",
+        "tests/101-professional-access-request-lifecycle.test.mjs",
+        "tests/101-professional-consent-smart.test.mjs",
+        "tests/101-profile-workspace-runtime.test.mjs",
+        "tests/101-sdk-end-to-end-doc.test.mjs",
+        "tests/101-wallet-backed-job-manager.test.mjs",
+        "tests/102-terminology-service-client.test.mjs",
+        "tests/async-polling.test.mjs",
+        "tests/authorized-subject-directory.test.mjs",
+        "tests/canonical-resource-meta-claims-writers.test.mjs",
+        "tests/clinical-document-demo-clone-export.test.mjs",
+        "tests/clinical-editor-public-exports.test.mjs",
+        "tests/clinical-outbox-transport.test.mjs",
+        "tests/controller-lifecycle-wrapper.test.mjs",
+        "tests/dataspace-resolver-advanced.test.mjs",
+        "tests/dataspace-resolver.test.mjs",
+        "tests/deprecated-composition-import-contract.test.mjs",
+        "tests/device-activation.test.mjs",
+        "tests/did-web-recipient.test.mjs",
+        "tests/digital-twin.test.mjs",
+        "tests/employee-transport.test.mjs",
+        "tests/fhir-r5-subscription-runtime.test.mjs",
+        "tests/gateway-active-consent-provider.test.mjs",
+        "tests/gdc-session-bridge.test.mjs",
+        "tests/host-onboarding.test.mjs",
+        "tests/individual-controller-backend-runtime-writes.test.mjs",
+        "tests/individual-onboarding.test.mjs",
+        "tests/individual-start.test.mjs",
+        "tests/live-product-stack-script.test.mjs",
+        "tests/node-managed-wallet.test.mjs",
+        "tests/node-runtime-client.test.mjs",
+        "tests/orchestration.test.mjs",
+        "tests/order-offer-summary.test.mjs",
+        "tests/organization-controller-recovery.test.mjs",
+        "tests/organization-employee-lifecycle.test.mjs",
+        "tests/organization-test-network-credential.test.mjs",
+        "tests/owned-family-directory.test.mjs",
+        "tests/pdqm-patient-match.test.mjs",
+        "tests/poll-options.test.mjs",
+        "tests/profile-recovery-envelope.test.mjs",
+        "tests/profile-storage-neutrality.test.mjs",
+        "tests/public-declaration-boundary.test.mjs",
+        "tests/release-discipline.test.mjs",
+        "tests/release-gate.test.mjs",
+        "tests/release-skill-continuity.test.mjs",
+        "tests/resource-operations.test.mjs",
+        "tests/runtime-contracts.test.mjs",
+        "tests/sdk-core-version-contract.test.mjs",
+        "tests/self-probe-cleanup-snippet.test.mjs",
+        "tests/server-profile-session.test.mjs",
+        "tests/smart-token-clinical-bearer.test.mjs",
+        "tests/smart-token.test.mjs",
+        "tests/terminal-bundle-assertions.test.mjs",
+        "tests/user-profile-index-store.test.mjs"
+      ],
+      "exitCode": 0,
+      "startedAt": "2026-11-11T12:44:13.766688+00:00",
+      "finishedAt": "2026-11-11T12:44:24.154405+00:00",
+      "elapsedSeconds": 9.799,
+      "tests": {
+        "total": 345,
+        "passed": 345,
+        "failed": 0,
+        "skipped": 0,
+        "cancelled": 0,
+        "pending": 0
+      },
+      "log": {
+        "path": "logs/sdk-node-unit.log",
+        "originalSha256": "49c3306beec9f5029bafd7ab69759d8c2326a9a6fa89eeda4b18403da9016885",
+        "sha256": "49c3306beec9f5029bafd7ab69759d8c2326a9a6fa89eeda4b18403da9016885"
+      },
+      "provenance": "provenance/sdk-node-unit.json"
+    },
+    {
+      "id": "sdk-node-gw-and-consent",
+      "source": {
+        "repository": "gwtemplate-node-ts",
+        "version": "1.25.33",
+        "commit": "ea8abae0f8c13e817d9241881f169e9400833d9a",
+        "recordedVersion": "1.25.34"
+      },
+      "node": "v26.13.0",
+      "npm": "11.20.0",
+      "command": [
+        "env",
+        "PORTS=3000",
+        "KMS_PROVIDER=memory",
+        "GDC_SDK_NODE_ROOT=${WORKSPACE}/.codex-worktrees/e9-repair-gdc-sdk-node-ts",
+        "DATASPACE_ICA_ROOT=${WORKSPACE}/.codex-worktrees/e9-repair-dataspace-ica-ts",
+        "ICA_KNOWN_CERTS_AUTO_DOWNLOAD=true",
+        "DID_WEB_DOMAIN=localhost:3310",
+        "LIVE_GW_RESULTS_DIR=${WORKSPACE}/.codex-evidence/e9-20261111/final-secure-local",
+        "bash",
+        "scripts/run-secure-e2e-google-user.sh"
+      ],
+      "exitCode": 0,
+      "startedAt": "2026-11-11T12:44:49.418856+00:00",
+      "finishedAt": "2026-11-11T12:46:45.969853+00:00",
+      "elapsedSeconds": 115.928,
+      "tests": {
+        "total": 6,
+        "passed": 6,
+        "failed": 0,
+        "skipped": 0,
+        "cancelled": 0,
+        "pending": 0
+      },
+      "log": {
+        "path": "logs/sdk-node-gw-and-consent.log",
+        "originalSha256": "3f15cd218140b25b2faac7bb832b6c811419b2af8bee51b0ccb545c22cfbb1fd",
+        "sha256": "3f15cd218140b25b2faac7bb832b6c811419b2af8bee51b0ccb545c22cfbb1fd"
+      },
+      "provenance": "provenance/sdk-node-gw-and-consent.json"
+    },
+    {
+      "id": "sdk-node-full-cycle",
+      "source": {
+        "repository": "gdc-sdk-node-ts",
+        "version": "2.9.34",
+        "commit": "4b726b5cac458fcc94b543fbde6aeb649aaf80c6"
+      },
+      "node": "v26.13.0",
+      "npm": "11.20.0",
+      "command": [
+        "env",
+        "GDC_WORKSPACE_DIR=${WORKSPACE}",
+        "GW_DIR_OVERRIDE=${WORKSPACE}/.codex-worktrees/e9-repair-gwtemplate-node-ts",
+        "ICA_DIR_OVERRIDE=${WORKSPACE}/.codex-worktrees/e9-repair-dataspace-ica-ts",
+        "KMS_PROVIDER=memory",
+        "SECTOR=health-care",
+        "EMPLOYEE_ROLE=ISCO-08|2211",
+        "GW_ENV_FILE=${WORKSPACE}/.codex-worktrees/e9-repair-gwtemplate-node-ts/env.local-demo.example",
+        "LIVE_GW_HOST_VERIFICATION_PDF_PATH=<PRIVATE_PDF_SHA256:efadf7e245c8ea4ec0bb5d011848c0d9eb5e9e72bed986812053f7cf2cda15ce>",
+        "LIVE_GW_LOG_FILE=${WORKSPACE}/.codex-evidence/e9-20261111/final-full-cycle-gw.log",
+        "LIVE_ICA_LOG_FILE=${WORKSPACE}/.codex-evidence/e9-20261111/final-full-cycle-ica.log",
+        "bash",
+        "scripts/run-live-101-full-cycle-clean.sh"
+      ],
+      "exitCode": 0,
+      "startedAt": "2026-11-11T12:46:46.124101+00:00",
+      "finishedAt": "2026-11-11T12:47:39.127599+00:00",
+      "elapsedSeconds": 52.37,
+      "tests": {
+        "total": 1,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "cancelled": 0,
+        "pending": 0
+      },
+      "log": {
+        "path": "logs/sdk-node-full-cycle.log",
+        "originalSha256": "3ad660729ded509adcadd1d884a6dd649c62b629f7af34c417dbbad0baa95f6b",
+        "sha256": "1156a7868baffbae1d9239e1120b242c8744ed6dd2e6576234a93383839757ad"
+      },
+      "provenance": "provenance/sdk-node-full-cycle.json"
+    },
+    {
+      "id": "sdk-node-controller",
+      "source": {
+        "repository": "gdc-sdk-node-ts",
+        "version": "2.9.34",
+        "commit": "4b726b5cac458fcc94b543fbde6aeb649aaf80c6"
+      },
+      "node": "v26.13.0",
+      "npm": "11.20.0",
+      "command": [
+        "env",
+        "GDC_WORKSPACE_DIR=${WORKSPACE}",
+        "GW_DIR_OVERRIDE=${WORKSPACE}/.codex-worktrees/e9-repair-gwtemplate-node-ts",
+        "ICA_DIR_OVERRIDE=${WORKSPACE}/.codex-worktrees/e9-repair-dataspace-ica-ts",
+        "KMS_PROVIDER=memory",
+        "ICA_KNOWN_CERTS_AUTO_DOWNLOAD=true",
+        "DID_WEB_DOMAIN=localhost:3310",
+        "LIVE_GW_LOG_FILE=${WORKSPACE}/.codex-evidence/e9-20261111/final-controller-gw.log",
+        "LIVE_ICA_LOG_FILE=${WORKSPACE}/.codex-evidence/e9-20261111/final-controller-ica.log",
+        "bash",
+        "scripts/run-live-controller-lifecycle.sh"
+      ],
+      "exitCode": 0,
+      "startedAt": "2026-11-11T12:48:21.120874+00:00",
+      "finishedAt": "2026-11-11T12:48:54.313729+00:00",
+      "elapsedSeconds": 32.611,
+      "tests": {
+        "total": 1,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "cancelled": 0,
+        "pending": 0
+      },
+      "log": {
+        "path": "logs/sdk-node-controller.log",
+        "originalSha256": "18d07440af812cdb8392b80fb191a24b70046b03f652f17c320f115b30333129",
+        "sha256": "b580ac9d25f63b8e4287d99ac23de39d6ad4b15b9241e847a9ddf49862d5fdb5"
+      },
+      "provenance": "provenance/sdk-node-controller.json"
+    },
+    {
+      "id": "sdk-node-profile-individual",
+      "source": {
+        "repository": "gdc-sdk-node-ts",
+        "version": "2.9.34",
+        "commit": "4b726b5cac458fcc94b543fbde6aeb649aaf80c6"
+      },
+      "node": "v26.13.0",
+      "npm": "11.20.0",
+      "command": [
+        "env",
+        "BASE_URL=http://127.0.0.1:33300",
+        "TENANT_ID=e9-20261111t124739",
+        "TENANT_ROUTE_ID=e9-20261111t124739",
+        "HOST_ID_VALUE=e9-20261111t124739-host",
+        "HOST_JURISDICTION=EU",
+        "JURISDICTION=ES",
+        "SECTOR=health-care",
+        "SUBJECT_DID=did:web:host.example.com:health-care:organization:taxid:ES-B00112233:individual:multibase:zMomQqDS8U8M8MxEbzn7gjG",
+        "PROFESSIONAL_SMART_SUBJECT_DID=did:web:host.example.com:health-care:organization:taxid:ES-B00112233:individual:multibase:zMomQqDS8U8M8MxEbzn7gjG",
+        "SMART_SUBJECT_DID=did:web:api.acme.org:employee:zW1pca8dQVVz2apBk8A1CWJ8VSHgheXpRZoZtqwhnkHjFkV:ISCO-08|2211",
+        "PROFESSIONAL_ACTOR_DID=did:web:api.acme.org:employee:zW1pca8dQVVz2apBk8A1CWJ8VSHgheXpRZoZtqwhnkHjFkV:ISCO-08|2211",
+        "SMART_CLIENT_ID=did:web:device-001",
+        "PROFESSIONAL_CLIENT_ID=did:web:device-001",
+        "PROFESSIONAL_EMAIL=doctor.oncall@example.org",
+        "PROFESSIONAL_ROLE=ISCO-08|2211",
+        "SMART_SUBJECT_OCCUPATION=ISCO-08|2211",
+        "PROFESSIONAL_SUBJECT_OCCUPATION=ISCO-08|2211",
+        "RUN_LIVE_GW_E2E=1",
+        "RUN_LIVE_GW_E2E_ACTOR_CHAIN=1",
+        "RUN_LIVE_GW_E2E_HOST_VERIFICATION_TRANSACTION=0",
+        "RUN_LIVE_GW_E2E_PROFILE_RUNTIME=0",
+        "RUN_LIVE_GW_E2E_IPS_INGESTION=0",
+        "RUN_LIVE_GW_E2E_INDIVIDUAL_LIFECYCLE=0",
+        "LIVE_GW_ALLOW_HOST_TEARDOWN=0",
+        "LIVE_GW_E2E_SUITE=professional",
+        "RUN_LIVE_PROFILE_RUNTIME_E2E=1",
+        "RUN_LIVE_PROFILE_RUNTIME_PROFESSIONAL_E2E=1",
+        "node",
+        "--test",
+        "tests/live-profile-runtime-individual.e2e.test.mjs"
+      ],
+      "exitCode": 0,
+      "startedAt": "2026-11-11T12:48:08.653323+00:00",
+      "finishedAt": "2026-11-11T12:48:16.976624+00:00",
+      "elapsedSeconds": 7.657,
+      "tests": {
+        "total": 1,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "cancelled": 0,
+        "pending": 0
+      },
+      "log": {
+        "path": "logs/sdk-node-profile-individual.log",
+        "originalSha256": "2a2daa0432166d1cf3c0a3d106e2b518173956bab425f1cc1e4e3a7a36f90b65",
+        "sha256": "2a2daa0432166d1cf3c0a3d106e2b518173956bab425f1cc1e4e3a7a36f90b65"
+      },
+      "provenance": "provenance/sdk-node-profile-individual.json"
+    },
+    {
+      "id": "sdk-node-profile-professional",
+      "source": {
+        "repository": "gdc-sdk-node-ts",
+        "version": "2.9.34",
+        "commit": "4b726b5cac458fcc94b543fbde6aeb649aaf80c6"
+      },
+      "node": "v26.13.0",
+      "npm": "11.20.0",
+      "command": [
+        "env",
+        "BASE_URL=http://127.0.0.1:33300",
+        "TENANT_ID=e9-20261111t124739",
+        "TENANT_ROUTE_ID=e9-20261111t124739",
+        "HOST_ID_VALUE=e9-20261111t124739-host",
+        "HOST_JURISDICTION=EU",
+        "JURISDICTION=ES",
+        "SECTOR=health-care",
+        "SUBJECT_DID=did:web:host.example.com:health-care:organization:taxid:ES-B00112233:individual:multibase:zMomQqDS8U8M8MxEbzn7gjG",
+        "PROFESSIONAL_SMART_SUBJECT_DID=did:web:host.example.com:health-care:organization:taxid:ES-B00112233:individual:multibase:zMomQqDS8U8M8MxEbzn7gjG",
+        "SMART_SUBJECT_DID=did:web:api.acme.org:employee:zW1pca8dQVVz2apBk8A1CWJ8VSHgheXpRZoZtqwhnkHjFkV:ISCO-08|2211",
+        "PROFESSIONAL_ACTOR_DID=did:web:api.acme.org:employee:zW1pca8dQVVz2apBk8A1CWJ8VSHgheXpRZoZtqwhnkHjFkV:ISCO-08|2211",
+        "SMART_CLIENT_ID=did:web:device-001",
+        "PROFESSIONAL_CLIENT_ID=did:web:device-001",
+        "PROFESSIONAL_EMAIL=doctor.oncall@example.org",
+        "PROFESSIONAL_ROLE=ISCO-08|2211",
+        "SMART_SUBJECT_OCCUPATION=ISCO-08|2211",
+        "PROFESSIONAL_SUBJECT_OCCUPATION=ISCO-08|2211",
+        "RUN_LIVE_GW_E2E=1",
+        "RUN_LIVE_GW_E2E_ACTOR_CHAIN=1",
+        "RUN_LIVE_GW_E2E_HOST_VERIFICATION_TRANSACTION=0",
+        "RUN_LIVE_GW_E2E_PROFILE_RUNTIME=0",
+        "RUN_LIVE_GW_E2E_IPS_INGESTION=0",
+        "RUN_LIVE_GW_E2E_INDIVIDUAL_LIFECYCLE=0",
+        "LIVE_GW_ALLOW_HOST_TEARDOWN=0",
+        "LIVE_GW_E2E_SUITE=professional",
+        "RUN_LIVE_PROFILE_RUNTIME_E2E=1",
+        "RUN_LIVE_PROFILE_RUNTIME_PROFESSIONAL_E2E=1",
+        "node",
+        "--test",
+        "tests/live-profile-runtime-professional.e2e.test.mjs"
+      ],
+      "exitCode": 0,
+      "startedAt": "2026-11-11T12:48:17.127093+00:00",
+      "finishedAt": "2026-11-11T12:48:20.908254+00:00",
+      "elapsedSeconds": 3.176,
+      "tests": {
+        "total": 1,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "cancelled": 0,
+        "pending": 0
+      },
+      "log": {
+        "path": "logs/sdk-node-profile-professional.log",
+        "originalSha256": "33643902768c29921be5cb4272033700deabc834c503835e906ca1a8d7828ba2",
+        "sha256": "33643902768c29921be5cb4272033700deabc834c503835e906ca1a8d7828ba2"
+      },
+      "provenance": "provenance/sdk-node-profile-professional.json"
+    },
+    {
+      "id": "ica-api",
+      "source": {
+        "repository": "dataspace-ica-ts",
+        "version": "1.3.4",
+        "commit": "67333c8e4ee9177f5e7b0379f8193dd60930cd6b"
+      },
+      "node": "v26.13.0",
+      "npm": "11.20.0",
+      "command": [
+        "env",
+        "ICA_REAL_TERMS_PDF_FIXTURE=<PRIVATE_PDF_SHA256:8f441297624d7e991067af819d3a631bd5435c99bd191cfc6eca2f39279cca0f>",
+        "node",
+        "--test",
+        "--test-concurrency=1",
+        "./test/api*.test.ts"
+      ],
+      "exitCode": 0,
+      "startedAt": "2026-11-11T12:43:26.245112+00:00",
+      "finishedAt": "2026-11-11T12:44:06.224955+00:00",
+      "elapsedSeconds": 39.402,
+      "tests": {
+        "total": 309,
+        "passed": 309,
+        "failed": 0,
+        "skipped": 0,
+        "cancelled": 0,
+        "pending": 0
+      },
+      "log": {
+        "path": "logs/ica-api.log",
+        "originalSha256": "6cf7d3c66fd7608dad87c1f71aea121b0bd174d472f77944b4746ba38bb425b4",
+        "sha256": "3e6bd8f012d39fb223964323fb225f58ddf0c45d0ba1b4fc4a0a8c693e12168e"
+      },
+      "provenance": "provenance/ica-api.json"
+    },
+    {
+      "id": "ica-client-isolated",
+      "source": {
+        "repository": "ica-client-sdk-ts",
+        "version": "2.0.15",
+        "commit": "fdf97b553bfa4c130d8648c2a521abe8a8781e60"
+      },
+      "node": "v26.13.0",
+      "npm": "11.20.0",
+      "command": [
+        "npm",
+        "test",
+        "--",
+        "--runInBand"
+      ],
+      "exitCode": 0,
+      "startedAt": "2026-11-11T12:43:11.753565+00:00",
+      "finishedAt": "2026-11-11T12:43:15.873019+00:00",
+      "elapsedSeconds": 3.513,
+      "tests": {
+        "total": 52,
+        "passed": 52,
+        "failed": 0,
+        "skipped": 0,
+        "cancelled": 0,
+        "pending": 0
+      },
+      "log": {
+        "path": "logs/ica-client-isolated.log",
+        "originalSha256": "5d64c39981d4015c90cef037c3cb85f35245486c89d56830ac432c495caea03e",
+        "sha256": "5d64c39981d4015c90cef037c3cb85f35245486c89d56830ac432c495caea03e"
+      },
+      "provenance": "provenance/ica-client-isolated.json"
+    },
+    {
+      "id": "ica-client-live",
+      "source": {
+        "repository": "ica-client-sdk-ts",
+        "version": "2.0.15",
+        "commit": "fdf97b553bfa4c130d8648c2a521abe8a8781e60"
+      },
+      "node": "v26.13.0",
+      "npm": "11.20.0",
+      "command": [
+        "env",
+        "ICA_LIVE_E2E=1",
+        "ICA_BASE_URL=http://127.0.0.1:33310",
+        "ICA_LIVE_E2E_PDF_PATH=<PRIVATE_PDF_SHA256:cd34eba11a8b73c20eefc4fa7de7d3ba99bc588d3c015aa98b830bd5116c66f4>",
+        "node",
+        "--experimental-vm-modules",
+        "node_modules/jest/bin/jest.js",
+        "--config",
+        "./jest.live.config.js",
+        "--runInBand",
+        "--runTestsByPath",
+        "src/__tests__/IcaClient.live.test.ts"
+      ],
+      "exitCode": 0,
+      "startedAt": "2026-11-11T12:44:36.450424+00:00",
+      "finishedAt": "2026-11-11T12:44:49.237105+00:00",
+      "elapsedSeconds": 12.202,
+      "tests": {
+        "total": 2,
+        "passed": 2,
+        "failed": 0,
+        "skipped": 0,
+        "cancelled": 0,
+        "pending": 0
+      },
+      "log": {
+        "path": "logs/ica-client-live.log",
+        "originalSha256": "b3545860d613c71b0fc9e3ede861729b4b24c866c0b03466e13c5445a98cf197",
+        "sha256": "b3545860d613c71b0fc9e3ede861729b4b24c866c0b03466e13c5445a98cf197"
+      },
+      "provenance": "provenance/ica-client-live.json"
+    },
+    {
+      "id": "gw-runtime",
+      "source": {
+        "repository": "gwtemplate-node-ts",
+        "version": "1.25.33",
+        "commit": "ea8abae0f8c13e817d9241881f169e9400833d9a",
+        "recordedVersion": "1.25.34"
+      },
+      "node": "v26.13.0",
+      "npm": "11.20.0",
+      "command": [
+        "npm",
+        "run",
+        "test:e9-evidence"
+      ],
+      "exitCode": 0,
+      "startedAt": "2026-11-11T12:44:31.254728+00:00",
+      "finishedAt": "2026-11-11T12:44:34.280629+00:00",
+      "elapsedSeconds": 2.395,
+      "tests": {
+        "total": 13,
+        "passed": 13,
+        "failed": 0,
+        "skipped": 0,
+        "cancelled": 0,
+        "pending": 0
+      },
+      "log": {
+        "path": "logs/gw-runtime.log",
+        "originalSha256": "d3625c1faec64be4ccd121e7897b8df8d05d7a3da280091b7bd2e2f5f7c8379e",
+        "sha256": "d3625c1faec64be4ccd121e7897b8df8d05d7a3da280091b7bd2e2f5f7c8379e"
+      },
+      "provenance": "provenance/gw-runtime.json"
+    }
+  ],
+  "checks": [
+    {
+      "repository": "gdc-common-utils-ts",
+      "label": "01-install",
+      "exitCode": 0,
+      "log": {
+        "path": "checks/gdc-common-utils-ts-01-install.log",
+        "sha256": "bb02f3d0dd36d6d969aed661262504f5df74b73d6fc63851e3db10944c689677"
+      }
+    },
+    {
+      "repository": "gdc-common-utils-ts",
+      "label": "03-typecheck",
+      "exitCode": 0,
+      "log": {
+        "path": "checks/gdc-common-utils-ts-03-typecheck.log",
+        "sha256": "365ed646ab57c71bfc3421ce1901d979edb4c03497c4653b03a20b8e84f34e61"
+      }
+    },
+    {
+      "repository": "gdc-common-utils-ts",
+      "label": "final-dependencies",
+      "exitCode": 0,
+      "log": {
+        "path": "checks/gdc-common-utils-ts-final-dependencies.log",
+        "sha256": "640cf4fd2568484b8ff89d33545b9ebb9785c75dd39bdef3e17d0a27e0dea610"
+      }
+    },
+    {
+      "repository": "gdc-sdk-core-ts",
+      "label": "01-install",
+      "exitCode": 0,
+      "log": {
+        "path": "checks/gdc-sdk-core-ts-01-install.log",
+        "sha256": "3e37983579472dc7444ce34f3bc7b160ead21431a8a80a85bc31941631312f1e"
+      }
+    },
+    {
+      "repository": "gdc-sdk-core-ts",
+      "label": "03-typecheck",
+      "exitCode": 0,
+      "log": {
+        "path": "checks/gdc-sdk-core-ts-03-typecheck.log",
+        "sha256": "759d8f2d9ecb1f3cb528fb8dd1fbdc5898fc1ff193131a6dd4246020e8698f66"
+      }
+    },
+    {
+      "repository": "gdc-sdk-core-ts",
+      "label": "final-dependencies",
+      "exitCode": 0,
+      "log": {
+        "path": "checks/gdc-sdk-core-ts-final-dependencies.log",
+        "sha256": "b37c589553be222627f1b06631f7528fb4ebbd43bceb92949c7df2e12321c95b"
+      }
+    },
+    {
+      "repository": "gdc-sdk-front-ts",
+      "label": "01-install",
+      "exitCode": 0,
+      "log": {
+        "path": "checks/gdc-sdk-front-ts-01-install.log",
+        "sha256": "31fbbfb028d68472f0ca652087937cebbf23fa970f60b0b0acac6fb86273faa6"
+      }
+    },
+    {
+      "repository": "gdc-sdk-front-ts",
+      "label": "03-typecheck",
+      "exitCode": 0,
+      "log": {
+        "path": "checks/gdc-sdk-front-ts-03-typecheck.log",
+        "sha256": "c6c3ea8b4bdd4050dff3b3cd674efcf5af3bff0a5b36bfe4a97a5c58fbbb4a1f"
+      }
+    },
+    {
+      "repository": "gdc-sdk-front-ts",
+      "label": "04-package-chain",
+      "exitCode": 0,
+      "log": {
+        "path": "checks/gdc-sdk-front-ts-04-package-chain.log",
+        "sha256": "a4089df15fdfd8139da5d3fd375598ee5c0c520c7e1becda57e6d050d8780d51"
+      }
+    },
+    {
+      "repository": "gdc-sdk-front-ts",
+      "label": "final-dependencies",
+      "exitCode": 0,
+      "log": {
+        "path": "checks/gdc-sdk-front-ts-final-dependencies.log",
+        "sha256": "c46db66a93fbb2f5a5322d65a6fdb8e28c7d2be9f63b7471dcb59e5bf8856658"
+      }
+    },
+    {
+      "repository": "gdc-sdk-node-ts",
+      "label": "22-install-reserved-version",
+      "exitCode": 0,
+      "log": {
+        "path": "checks/gdc-sdk-node-ts-22-install-reserved-version.log",
+        "sha256": "d0dca493fb9be079720b88a1d6aab475a46eea75f31aa2add029e369c164aae4"
+      }
+    },
+    {
+      "repository": "gdc-sdk-node-ts",
+      "label": "final-types",
+      "exitCode": 0,
+      "log": {
+        "path": "checks/gdc-sdk-node-ts-final-types.log",
+        "sha256": "dc7513c5bd54329d607492f56ba05001846e48e5a8291f44b3ff0f555c491a29"
+      }
+    },
+    {
+      "repository": "gdc-sdk-node-ts",
+      "label": "final-profiles-prerequisite",
+      "exitCode": 0,
+      "log": {
+        "path": "checks/gdc-sdk-node-ts-final-profiles-prerequisite.log",
+        "sha256": "51e51cb50b105e96230e79811134fe5ef1eab970a6d09a01195a1446e1bbe4ed"
+      }
+    },
+    {
+      "repository": "gdc-sdk-node-ts",
+      "label": "final-dependencies",
+      "exitCode": 0,
+      "log": {
+        "path": "checks/gdc-sdk-node-ts-final-dependencies.log",
+        "sha256": "eff87fa11cd7b14f277a8767e96e246f662a39bea312ba72ba289ca32a55b2f9"
+      }
+    },
+    {
+      "repository": "dataspace-ica-ts",
+      "label": "12-install-final",
+      "exitCode": 0,
+      "log": {
+        "path": "checks/dataspace-ica-ts-12-install-final.log",
+        "sha256": "08f0125f96c133cac7e147dc686f9a0660a09c491d9b8cb78c2a5598d53bb30f"
+      }
+    },
+    {
+      "repository": "dataspace-ica-ts",
+      "label": "final-check",
+      "exitCode": 0,
+      "log": {
+        "path": "checks/dataspace-ica-ts-final-check.log",
+        "sha256": "3b8d5bcd3b29cf4b45d0c53ec2d7d7fa0b14cff3fa46bb1365d318be4e992135"
+      }
+    },
+    {
+      "repository": "dataspace-ica-ts",
+      "label": "final-dependencies",
+      "exitCode": 0,
+      "log": {
+        "path": "checks/dataspace-ica-ts-final-dependencies.log",
+        "sha256": "212d947450d69153ec8e91ac34f1205cd21dd2ff2e4f3378021949ace2d8c8c2"
+      }
+    },
+    {
+      "repository": "ica-client-sdk-ts",
+      "label": "03-install-fixed",
+      "exitCode": 0,
+      "log": {
+        "path": "checks/ica-client-sdk-ts-03-install-fixed.log",
+        "sha256": "68f39e13f5b5040882533bfe4e1433cef26ffa434218fe25ff10dce299d5a24d"
+      }
+    },
+    {
+      "repository": "ica-client-sdk-ts",
+      "label": "final-esm",
+      "exitCode": 0,
+      "log": {
+        "path": "checks/ica-client-sdk-ts-final-esm.log",
+        "sha256": "b033afcc92b5ceeeeefe4980d887ad01789c411ca1c56c37f4701065636b4feb"
+      }
+    },
+    {
+      "repository": "ica-client-sdk-ts",
+      "label": "final-lint",
+      "exitCode": 0,
+      "log": {
+        "path": "checks/ica-client-sdk-ts-final-lint.log",
+        "sha256": "e6f87aafe5ea7ff59976d6a885af5666cd6691b2a6c6e100e68565e88ce267fe"
+      }
+    },
+    {
+      "repository": "ica-client-sdk-ts",
+      "label": "final-dependencies",
+      "exitCode": 0,
+      "log": {
+        "path": "checks/ica-client-sdk-ts-final-dependencies.log",
+        "sha256": "6dde3f174323be0ca0da132dbb1ee5ed735baa24e9870bdd5f57f32dd481baeb"
+      }
+    },
+    {
+      "repository": "gwtemplate-node-ts",
+      "label": "07-install-final",
+      "exitCode": 0,
+      "log": {
+        "path": "checks/gwtemplate-node-ts-07-install-final.log",
+        "sha256": "6aef2730c76fc04f54acd7dfe4210f0454fcd3ed8f23aeaa4fd0b7512e431603"
+      }
+    },
+    {
+      "repository": "gwtemplate-node-ts",
+      "label": "final-shell",
+      "exitCode": 0,
+      "log": {
+        "path": "checks/gwtemplate-node-ts-final-shell.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "repository": "gwtemplate-node-ts",
+      "label": "final-dependencies",
+      "exitCode": 0,
+      "log": {
+        "path": "checks/gwtemplate-node-ts-final-dependencies.log",
+        "sha256": "9cf1142f6b9d6324ebcaae56f3f6ea8afb54e1f11965928d6eb2c8a7ac6a6f7a"
+      }
+    }
+  ],
+  "privateInputSha256": {
+    "signed-fnmt-multisign": "cd34eba11a8b73c20eefc4fa7de7d3ba99bc588d3c015aa98b830bd5116c66f4",
+    "signed-fnmt-three-signatures": "2a0d6b8009f2d2a7415a63594cc520794448cb1a23bea7b7b71e8f622d6facd8",
+    "signed-structured-annex": "8f441297624d7e991067af819d3a631bd5435c99bd191cfc6eca2f39279cca0f",
+    "signed-organization-lifecycle": "efadf7e245c8ea4ec0bb5d011848c0d9eb5e9e72bed986812053f7cf2cda15ce"
+  },
+  "sanitization": [
+    "local workspace and home paths normalized",
+    "private signed PDF paths replaced by content hashes",
+    "private organization identifiers replaced by hashes",
+    "compact local tokens and private PEMs redacted if present",
+    "test names, outcomes, counters and commands otherwise preserved",
+    "console line endings normalized to LF"
+  ],
+  "publication": {
+    "gitBranch": "main",
+    "npmPublish": "not performed",
+    "imagesOrDeployment": "not performed"
+  },
+  "versionCorrection": {
+    "repository": "gwtemplate-node-ts",
+    "version": "1.25.33",
+    "recordedVersion": "1.25.34",
+    "reason": "Correction of package version metadata only; original execution logs, dates, commits and package hashes preserved."
+  }
+}

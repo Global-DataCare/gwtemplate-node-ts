@@ -1003,3 +1003,7 @@ Notes:
 - In production, `SECURITY_MODE=demo` is blocked.
 
 > **Note:** If you are unsure which modes are active, check the startup log: it will show the enabled capabilities (`didcomm-encrypted`, `didcomm-plain`, etc).
+
+## Entregable E9 — pruebas unitarias y testeo
+
+El [Entregable E9: pruebas unitarias y testeo](deliverables/E9_PRUEBAS_UNITARIAS_Y_TESTEO_SEDIA_ES.md) recoge la validación local completa del 11 de noviembre. Su [expediente de evidencia](deliverables/e9-testing/20261111T121038Z/README.md) contiene la matriz superada y los registros.

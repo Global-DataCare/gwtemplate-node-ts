@@ -1,0 +1,18 @@
+gdc-common-utils-ts@2.9.30 ${WORKSPACE}/.codex-worktrees/e9-repair-gdc-common-utils-ts
+├── @babel/preset-env@7.28.6
+├── @noble/hashes@2.0.1
+├── @noble/post-quantum@0.5.4
+├── @stablelib/base64@1.0.1
+├── @stablelib/utf8@1.0.2
+├── @types/jest@29.5.14
+├── @types/node@20.19.30
+├── @types/pako@2.0.4
+├── babel-jest@29.7.0
+├── base-x@4.0.1
+├── jest@29.7.0
+├── jose@4.15.9
+├── pako@2.1.0
+├── ts-jest@29.4.6
+├── ts-node@10.9.2
+└── typescript@5.9.3
+

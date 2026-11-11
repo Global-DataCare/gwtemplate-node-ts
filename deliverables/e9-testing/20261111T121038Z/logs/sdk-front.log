@@ -1,0 +1,85 @@
+
+> gdc-sdk-front-ts@2.9.0 test
+> npm run build && node --test tests/*.test.mjs
+
+
+> gdc-sdk-front-ts@2.9.0 build
+> tsc -p tsconfig.json
+
+✔ 101: browser keeps the Bundle in memory and delegates persistence to its BFF (5.795212ms)
+✔ 101: import, optimistic render, BFF readback, then allergy and medication section updates (127.897415ms)
+✔ 101: frontend waits for the application BFF job and reconciles authoritative readback (13.806567ms)
+✔ 101: BFF rejection rolls back, while an unconfirmed job remains pending (9.685648ms)
+✔ frontend SDK exposes mixed POST and DELETE clinical batch entries (7.354942ms)
+✔ frontend SDK exposes the canonical coded clinical authoring/display surface (0.49914ms)
+✔ own UI components receive every Composition section and resolved card from the public frontend barrel (5.142712ms)
+✔ 101: frontend profile runtime stays generic across frontend consumers (14.666866ms)
+✔ 101: frontend individual-controller runtime wraps the current frontend baseline (9.899235ms)
+✔ controller invitation becomes a member SMART read only through active Consent (20.484767ms)
+✔ 101: an offline frontend translates and searches its loaded terminology (7.366152ms)
+✔ an offline frontend leaves an unknown code unresolved for FHIR fallback (0.425091ms)
+✔ 101: partial GW failure removes only the erroneous optimistic resource and emits a notice (9.216632ms)
+✔ 101: ambiguous entries remain pending until the relevant _search replaces local state (1.595241ms)
+✔ 101: definitive transport rejection removes the whole optimistic submission (0.617722ms)
+✔ 101: a rejected modification removes the erroneous local resource instead of pretending the edit persisted (0.655029ms)
+✔ 101: each screen refreshes from its own aggregate _search result (2.843434ms)
+✔ frontend actor facades implement the complete runtime-neutral Core surface (4.486046ms)
+✔ frontend exposes the complete browser-safe digital-twin facade (0.539908ms)
+✔ frontend facades retain the browser-safe Node business surface (0.824999ms)
+✔ new browser-safe facade methods delegate through the configured runtime adapter (1.956382ms)
+✔ professional access request lists add the canonical notification filter (0.705032ms)
+✔ digital-twin facade binds research SMART requests to the loaded actor (5.512502ms)
+✔ gdc-sdk-front-ts reuses core facade expansion for Family sessions (3.922151ms)
+✔ gdc-sdk-front-ts reuses core capability filtering (0.578742ms)
+✔ client installation id is generated once and reused from the shared storage key (2.320283ms)
+✔ client installation id exposes a typed stable error for an empty generator result (1.422123ms)
+✔ ClientSDK resolves app identity and defaults appVersion to v1.0 (5.070199ms)
+✔ ClientSDK.initializeSession creates the current session and persists the profile (12.482471ms)
+✔ ClientSDK.initializeSession rejects missing profileId and keeps the session cleared (1.98743ms)
+✔ ClientSDK.initializeProfileRegistry initializes the vault once and stores the registry (0.673776ms)
+✔ ClientSDK sends AppId and AppVersion headers in provider discovery requests (1.436364ms)
+✔ ClientSDK.resolveAuthority derives one hosted tenant DID from one base URL without requiring caller-side did:web knowledge (1.591208ms)
+✔ frontend discovery maps hosting operators into UI cards (2.644449ms)
+✔ frontend discovery maps published providers into UI cards (0.53214ms)
+✔ frontend discovery maps backend match DTOs into UI cards (0.58747ms)
+✔ frontend discovery filters provider cards by capability (0.498054ms)
+✔ HttpDataspaceDiscoveryClient maps backend discovery DTOs into UI cards (5.681815ms)
+✔ HttpDataspaceDiscoveryClient sends app identity and custom headers to the BFF (3.34468ms)
+✔ HttpDataspaceDiscoveryClient derives hosting operators from provider matches when the BFF omits them (1.106002ms)
+✔ direct Front runtime sends the canonical outbox through an injected carrier (12.125439ms)
+✔ direct Front runtime keeps section and summary updates as distinct contracts (2.546614ms)
+✔ direct Front runtime preserves independent success and failure results from one clinical batch (2.145179ms)
+✔ offline or Bluetooth carrier receives the unchanged protected JWE form body (2.129926ms)
+✔ direct Front runtime never substitutes the login ID token for SMART authorization (4.437785ms)
+✔ direct Front runtime reads $summary and returns section/type/date facades (10.285082ms)
+✔ IndividualService.sendCommunication returns a thread id for canonical input (2.422204ms)
+✔ IndividualService.sendCommunication rejects missing required subject (3.28444ms)
+✔ IndividualService.searchClinicalBundle returns a thread id for canonical input (0.642894ms)
+✔ IndividualService.searchClinicalBundle rejects missing required subject (1.302186ms)
+✔ frontend individual facade accepts the same canonical clinical outbox as the Node facade (5.460844ms)
+✔ frontend individual controller forwards a temporary professional grant expiry (0.514771ms)
+✔ frontend actor facade exposes separate section and summary update methods (1.438968ms)
+✔ frontend controller facade exposes the same member invitation seat lifecycle as Node (0.781272ms)
+✔ frontend individual-member facade exposes the same consent-scoped clinical operations (0.926889ms)
+✔ organization controller session materializes host and organization facades (4.857842ms)
+✔ family controller session materializes individual and personal facades (3.423505ms)
+✔ professional session materializes the professional facade without employee helpers (0.572912ms)
+✔ ProfessionalSdk exposes canonical identity VC and VP helpers through the shared common-utils layer (2.745975ms)
+✔ OrganizationControllerSdk delegates organization DID binding to the frontend runtime client (0.525995ms)
+✔ published frontend SDK pins one coherent shared dependency chain (7.554954ms)
+✔ exports the explicit organization license purchase route (1.586822ms)
+✔ ProfileRegistry delegates create/update/search/deactivate/not-found lifecycle calls to vault (3.031668ms)
+✔ gdc-sdk-front-ts exposes its migration target status (2.49286ms)
+✔ describeFrontActorSession builds a composite Family descriptor from actor flags (2.478003ms)
+✔ describeFrontActorFacades splits Family descriptor into scoped facades (0.730209ms)
+✔ describeFrontActorSession keeps optional fields undefined when they are omitted (0.41394ms)
+✔ describeFrontActorFacades returns no facades when actor flags are missing (0.246505ms)
+✔ UserProfileIndexStore persists and resolves hashed profile-index records (4.249775ms)
+ℹ tests 69
+ℹ suites 0
+ℹ pass 69
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2747.139501

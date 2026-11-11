@@ -1,0 +1,27 @@
+
+> ica-client-sdk-ts@2.0.15 pretest
+> node --test test/isolated-discovery.test.mjs
+
+✔ default Jest discovery includes every isolated suite and separates the real HTTP journey (856.424246ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1005.811235
+
+> ica-client-sdk-ts@2.0.15 test
+> NODE_OPTIONS=--experimental-vm-modules ICA_BASE_URL=http://localhost:3310 jest --runInBand
+
+(node:96670) ExperimentalWarning: VM Modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+PASS src/__tests__/controllerBinding.test.ts
+PASS src/__tests__/IcaClient.test.ts
+
+Test Suites: 2 passed, 2 total
+Tests:       52 passed, 52 total
+Snapshots:   0 total
+Time:        1.45 s
+Ran all test suites.

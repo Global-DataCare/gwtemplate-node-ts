@@ -1,0 +1,12 @@
+(node:99423) ExperimentalWarning: VM Modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+PASS src/__tests__/IcaClient.live.test.ts (11.081 s)
+  IcaClient live E2E against local ICA demo
+    ✓ projects demo representative email into sameAs and controller binding JWK into hasCredential.material (5278 ms)
+    ✓ reuses the caller-owned keys submitted to verify when creating the organization DID document (5047 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       2 passed, 2 total
+Snapshots:   0 total
+Time:        11.528 s, estimated 12 s
+Ran all test suites within paths "src/__tests__/IcaClient.live.test.ts".

@@ -1,0 +1,59 @@
+{
+  "repository": "ica-client-sdk-ts",
+  "label": "final-esm",
+  "command": [
+    "npm",
+    "run",
+    "test:pack:esm"
+  ],
+  "started_at": "2026-11-11T12:43:16.020924+00:00",
+  "node": "v26.13.0",
+  "npm": "11.20.0",
+  "commit": "fdf97b553bfa4c130d8648c2a521abe8a8781e60",
+  "working_tree": "",
+  "version": "2.0.15",
+  "related_sources": {
+    "gdc-common-utils-ts": {
+      "commit": "7f2caba88bd5ac8cc0e9a1fd90efce76110ea551",
+      "version": "2.9.30",
+      "working_tree": ""
+    },
+    "gdc-sdk-core-ts": {
+      "commit": "e795e5b74f11e8e8c100b76fef4fed5ab39b8f2d",
+      "version": "2.9.12",
+      "working_tree": ""
+    },
+    "gdc-sdk-front-ts": {
+      "commit": "7fe121d21490be5d8cd882cfcac6bc4435868863",
+      "version": "2.9.0",
+      "working_tree": ""
+    },
+    "gdc-sdk-node-ts": {
+      "commit": "4b726b5cac458fcc94b543fbde6aeb649aaf80c6",
+      "version": "2.9.34",
+      "working_tree": ""
+    },
+    "dataspace-ica-ts": {
+      "commit": "67333c8e4ee9177f5e7b0379f8193dd60930cd6b",
+      "version": "1.3.4",
+      "working_tree": ""
+    },
+    "ica-client-sdk-ts": {
+      "commit": "fdf97b553bfa4c130d8648c2a521abe8a8781e60",
+      "version": "2.0.15",
+      "working_tree": ""
+    },
+    "gwtemplate-node-ts": {
+      "commit": "ea8abae0f8c13e817d9241881f169e9400833d9a",
+      "version": "1.25.33",
+      "working_tree": "",
+      "recordedVersion": "1.25.34"
+    }
+  },
+  "package.json_sha256": "27c51174e8798526254e07bd35d7ea6178b770da459e1234eb15de82f7780252",
+  "package-lock.json_sha256": "acd55333ee7be8c4df65ac75485f094e839bb0ff32680f4c49abfcd2d1e98671",
+  "exit_code": 0,
+  "elapsed_seconds": 6.338,
+  "finished_at": "2026-11-11T12:43:22.941371+00:00",
+  "log_sha256": "b033afcc92b5ceeeeefe4980d887ad01789c411ca1c56c37f4701065636b4feb"
+}

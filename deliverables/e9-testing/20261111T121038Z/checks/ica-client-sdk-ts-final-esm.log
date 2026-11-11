@@ -1,0 +1,8 @@
+
+> ica-client-sdk-ts@2.0.15 test:pack:esm
+> npm run build && node ./scripts/smoke-esm-consumer.mjs
+
+
+> ica-client-sdk-ts@2.0.15 build
+> tsc
+

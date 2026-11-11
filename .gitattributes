@@ -1,0 +1,2 @@
+*.sh text eol=lf
+deliverables/e9-testing/** -text

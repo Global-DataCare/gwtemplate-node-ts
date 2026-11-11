@@ -1,0 +1,20 @@
+{
+  "repository": "gdc-sdk-front-ts",
+  "label": "04-package-chain",
+  "command": [
+    "npm",
+    "run",
+    "verify:package-chain"
+  ],
+  "started_at": "2026-11-11T12:20:08.266220+00:00",
+  "node": "v26.13.0",
+  "npm": "11.20.0",
+  "commit": "7fe121d21490be5d8cd882cfcac6bc4435868863",
+  "working_tree": "",
+  "package.json_sha256": "3e629ebba5ebc4d50ff7b80aa95385b93877733547f4267d6b9c9ab3f3c1504e",
+  "package-lock.json_sha256": "b5a1af664d601947e8919e3c925eed126474c6b55c64f8da195ddcdf7923151b",
+  "exit_code": 0,
+  "elapsed_seconds": 13.677,
+  "finished_at": "2026-11-11T12:20:22.234175+00:00",
+  "log_sha256": "a4089df15fdfd8139da5d3fd375598ee5c0c520c7e1becda57e6d050d8780d51"
+}

@@ -23,6 +23,9 @@ dominios, direcciones, credenciales ni inventarios de un despliegue concreto.
 - `INFORME_SEDIA_LOCAL_NETWORK.md`: informe consolidado de la ejecución
   `local-network`, con resultados, cobertura, servicios, puertos y referencias.
 - `INFORME_SEDIA_LOCAL_NETWORK.docx`: versión Word del mismo informe.
+- [`E9_PRUEBAS_UNITARIAS_Y_TESTEO_SEDIA_ES.md`](./E9_PRUEBAS_UNITARIAS_Y_TESTEO_SEDIA_ES.md):
+  pruebas unitarias e integración de los componentes, con resultados,
+  versiones, commits y logs.
 - `open-source-production-readiness/20260921T191100Z/`: paquete completo de
   evidencia sintética de la ejecución, con resumen, manifiesto, estados y logs.
 

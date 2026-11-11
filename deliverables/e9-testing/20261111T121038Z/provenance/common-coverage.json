@@ -1,0 +1,24 @@
+{
+  "repository": "gdc-common-utils-ts",
+  "label": "02-coverage",
+  "command": [
+    "npm",
+    "run",
+    "test:coverage",
+    "--",
+    "--runInBand",
+    "--watchman=false",
+    "--detectOpenHandles"
+  ],
+  "started_at": "2026-11-11T12:11:08.528170+00:00",
+  "node": "v26.13.0",
+  "npm": "11.20.0",
+  "commit": "7f2caba88bd5ac8cc0e9a1fd90efce76110ea551",
+  "working_tree": "",
+  "package.json_sha256": "3c0b72c32ab14b3a5b48b342b211351654060099b91bc27841842e9730dc204d",
+  "package-lock.json_sha256": "e0002ae9b71bb3bac9251b08b319746c5c5a30687f0df344bdcaf507a53f213a",
+  "exit_code": 0,
+  "elapsed_seconds": 139.316,
+  "finished_at": "2026-11-11T12:13:28.154007+00:00",
+  "log_sha256": "fe5b9210b23a90cb5c56f487a0cb7932c2e142fbf2a47c67bf05d67220bab442"
+}

@@ -1,0 +1,19 @@
+{
+  "repository": "gdc-sdk-node-ts",
+  "label": "22-install-reserved-version",
+  "command": [
+    "npm",
+    "ci"
+  ],
+  "started_at": "2026-11-11T12:40:26.067448+00:00",
+  "node": "v26.13.0",
+  "npm": "11.20.0",
+  "commit": "b9c516905e1216ec64186d7764d947c5677fcc85",
+  "working_tree": " M package-lock.json\n M package.json\n M tests/sdk-core-version-contract.test.mjs\n",
+  "package.json_sha256": "d97192cc1ba6ec4e19c98bcfcc041538aef4cba9076143747079e5637496a3d8",
+  "package-lock.json_sha256": "bc65f87e0208175e6d09eb3057e73708fe96f3e7a45d7e8a963f8931d09db15d",
+  "exit_code": 0,
+  "elapsed_seconds": 8.379,
+  "finished_at": "2026-11-11T12:40:34.844347+00:00",
+  "log_sha256": "d0dca493fb9be079720b88a1d6aab475a46eea75f31aa2add029e369c164aae4"
+}

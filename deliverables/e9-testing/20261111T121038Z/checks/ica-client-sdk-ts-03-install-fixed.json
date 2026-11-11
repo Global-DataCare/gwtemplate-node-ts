@@ -1,0 +1,19 @@
+{
+  "repository": "ica-client-sdk-ts",
+  "label": "03-install-fixed",
+  "command": [
+    "npm",
+    "ci"
+  ],
+  "started_at": "2026-11-11T12:16:22.941148+00:00",
+  "node": "v26.13.0",
+  "npm": "11.20.0",
+  "commit": "c9662324db7b9763b30cbb2f2eed7b173db97dde",
+  "working_tree": " M CHANGELOG.md\n M jest.config.js\n M package-lock.json\n M package.json\n?? test/\n",
+  "package.json_sha256": "27c51174e8798526254e07bd35d7ea6178b770da459e1234eb15de82f7780252",
+  "package-lock.json_sha256": "acd55333ee7be8c4df65ac75485f094e839bb0ff32680f4c49abfcd2d1e98671",
+  "exit_code": 0,
+  "elapsed_seconds": 18.432,
+  "finished_at": "2026-11-11T12:16:41.696151+00:00",
+  "log_sha256": "68f39e13f5b5040882533bfe4e1433cef26ffa434218fe25ff10dce299d5a24d"
+}

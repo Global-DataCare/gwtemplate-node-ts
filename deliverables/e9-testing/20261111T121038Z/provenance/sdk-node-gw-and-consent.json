@@ -1,0 +1,67 @@
+{
+  "repository": "gwtemplate-node-ts",
+  "label": "final-secure-local",
+  "command": [
+    "env",
+    "PORTS=3000",
+    "KMS_PROVIDER=memory",
+    "GDC_SDK_NODE_ROOT=${WORKSPACE}/.codex-worktrees/e9-repair-gdc-sdk-node-ts",
+    "DATASPACE_ICA_ROOT=${WORKSPACE}/.codex-worktrees/e9-repair-dataspace-ica-ts",
+    "ICA_KNOWN_CERTS_AUTO_DOWNLOAD=true",
+    "DID_WEB_DOMAIN=localhost:3310",
+    "LIVE_GW_RESULTS_DIR=${WORKSPACE}/.codex-evidence/e9-20261111/final-secure-local",
+    "bash",
+    "scripts/run-secure-e2e-google-user.sh"
+  ],
+  "started_at": "2026-11-11T12:44:49.418856+00:00",
+  "node": "v26.13.0",
+  "npm": "11.20.0",
+  "commit": "ea8abae0f8c13e817d9241881f169e9400833d9a",
+  "working_tree": "",
+  "version": "1.25.33",
+  "related_sources": {
+    "gdc-common-utils-ts": {
+      "commit": "7f2caba88bd5ac8cc0e9a1fd90efce76110ea551",
+      "version": "2.9.30",
+      "working_tree": ""
+    },
+    "gdc-sdk-core-ts": {
+      "commit": "e795e5b74f11e8e8c100b76fef4fed5ab39b8f2d",
+      "version": "2.9.12",
+      "working_tree": ""
+    },
+    "gdc-sdk-front-ts": {
+      "commit": "7fe121d21490be5d8cd882cfcac6bc4435868863",
+      "version": "2.9.0",
+      "working_tree": ""
+    },
+    "gdc-sdk-node-ts": {
+      "commit": "4b726b5cac458fcc94b543fbde6aeb649aaf80c6",
+      "version": "2.9.34",
+      "working_tree": ""
+    },
+    "dataspace-ica-ts": {
+      "commit": "67333c8e4ee9177f5e7b0379f8193dd60930cd6b",
+      "version": "1.3.4",
+      "working_tree": ""
+    },
+    "ica-client-sdk-ts": {
+      "commit": "fdf97b553bfa4c130d8648c2a521abe8a8781e60",
+      "version": "2.0.15",
+      "working_tree": ""
+    },
+    "gwtemplate-node-ts": {
+      "commit": "ea8abae0f8c13e817d9241881f169e9400833d9a",
+      "version": "1.25.33",
+      "working_tree": "",
+      "recordedVersion": "1.25.34"
+    }
+  },
+  "package.json_sha256": "78ba4094d5cd71c7e576b1ec0ebc0e4c90aa966ed4d97a2185f72526c95e5e5b",
+  "package-lock.json_sha256": "4428300213fea2dd342da64fabebd55956b6a15f903c3178399d4ed79af15aad",
+  "exit_code": 0,
+  "elapsed_seconds": 115.928,
+  "finished_at": "2026-11-11T12:46:45.969853+00:00",
+  "log_sha256": "3f15cd218140b25b2faac7bb832b6c811419b2af8bee51b0ccb545c22cfbb1fd",
+  "recordedVersion": "1.25.34"
+}

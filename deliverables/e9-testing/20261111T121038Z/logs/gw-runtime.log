@@ -1,0 +1,25 @@
+
+> gwtemplate-node-ts@1.25.34 test:e9-evidence
+> node --test ./scripts/tests/e9-evidence.test.mjs ./scripts/tests/secure-e2e-node-runtime.test.mjs
+
+✔ accepts the complete successful matrix (14.398528ms)
+✔ rejects an unsuccessful command even when counters claim success (8.108617ms)
+✔ rejects failed tests (6.931147ms)
+✔ rejects skipped tests (6.457993ms)
+✔ rejects cancelled tests (6.349969ms)
+✔ rejects pending tests (7.984634ms)
+✔ rejects a missing suite instead of reducing the matrix (10.568508ms)
+✔ rejects log modification (9.165921ms)
+✔ rejects invented counters even if the log hash is genuine (7.649006ms)
+✔ rejects a different runtime (6.763099ms)
+✔ secure E2E runtime guard accepts v26.13.0 (568.889847ms)
+✔ secure E2E runtime guard rejects v24.0.0 (559.977561ms)
+✔ secure E2E runtime guard rejects v26.12.0 (559.422167ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1846.763312

@@ -1,0 +1,28 @@
+[live-101-clean] run_id=20261111t124646
+[live-101-clean] host_id=live101-20261111t124646-host
+[live-101-clean] tenant_id=live101-20261111t124646
+[live-101-clean] ica_log=${WORKSPACE}/.codex-evidence/e9-20261111/final-full-cycle-ica.log
+[live-101-clean] gw_log=${WORKSPACE}/.codex-evidence/e9-20261111/final-full-cycle-gw.log
+[local:close] no process is listening on port 3000
+[local:close] done
+[live-101-clean] ica_pid=3085
+[live-101-clean] gw_pid=3152
+[live-101-clean] ICA is ready at http://127.0.0.1:3310
+[live-101-clean] selected GW is ready at http://127.0.0.1:3000
+
+> gdc-sdk-node-ts@2.9.34 test:e2e:live-full-cycle:direct
+> npm run build && RUN_LIVE_101_FULL_CYCLE_E2E=1 node --test tests/101-live-full-cycle-bff-runtime.e2e.test.mjs
+
+
+> gdc-sdk-node-ts@2.9.34 build
+> tsc -p tsconfig.json
+
+✔ 101: LIVE full-cycle backend/BFF runtime flow (32826.063536ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 33841.882524

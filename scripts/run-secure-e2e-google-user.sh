@@ -4,11 +4,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 GW_PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 NODE_VERSION="$(node --version)"
-NODE_MAJOR="${NODE_VERSION#v}"
-NODE_MAJOR="${NODE_MAJOR%%.*}"
-
-if [[ "$NODE_MAJOR" != '24' ]]; then
-  echo "ERROR: secure local E2E requires Node 24; active runtime is ${NODE_VERSION}." >&2
+if [[ "$NODE_VERSION" != 'v26.13.0' ]]; then
+  echo "ERROR: secure local E2E requires Node 26.13.0; active runtime is ${NODE_VERSION}." >&2
   exit 2
 fi
 

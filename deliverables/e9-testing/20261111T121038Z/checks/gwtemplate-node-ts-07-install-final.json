@@ -1,0 +1,19 @@
+{
+  "repository": "gwtemplate-node-ts",
+  "label": "07-install-final",
+  "command": [
+    "npm",
+    "ci"
+  ],
+  "started_at": "2026-11-11T12:35:19.077832+00:00",
+  "node": "v26.13.0",
+  "npm": "11.20.0",
+  "commit": "1e6bb9b60fbb986655288965cedd24a941636688",
+  "working_tree": " M CHANGELOG.md\n M package-lock.json\n M package.json\n M scripts/run-secure-e2e-google-user.sh\n?? scripts/tests/e9-evidence.test.mjs\n?? scripts/tests/secure-e2e-node-runtime.test.mjs\n?? scripts/verify-e9-evidence.mjs\n",
+  "package.json_sha256": "78ba4094d5cd71c7e576b1ec0ebc0e4c90aa966ed4d97a2185f72526c95e5e5b",
+  "package-lock.json_sha256": "4428300213fea2dd342da64fabebd55956b6a15f903c3178399d4ed79af15aad",
+  "exit_code": 0,
+  "elapsed_seconds": 30.443,
+  "finished_at": "2026-11-11T12:35:49.865052+00:00",
+  "log_sha256": "6aef2730c76fc04f54acd7dfe4210f0454fcd3ed8f23aeaa4fd0b7512e431603"
+}

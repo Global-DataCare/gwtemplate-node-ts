@@ -1,0 +1,19 @@
+{
+  "repository": "gdc-sdk-core-ts",
+  "label": "01-install",
+  "command": [
+    "npm",
+    "ci"
+  ],
+  "started_at": "2026-11-11T12:19:20.105460+00:00",
+  "node": "v26.13.0",
+  "npm": "11.20.0",
+  "commit": "e795e5b74f11e8e8c100b76fef4fed5ab39b8f2d",
+  "working_tree": "",
+  "package.json_sha256": "b037d2d5d94d20199f3f11fc0773bd87bb7fe0d4649d4db40538d1a665af9ec8",
+  "package-lock.json_sha256": "24ffda186728d71eafab20fea80278862595beeb28fbd722b7a51c6382c44f6a",
+  "exit_code": 0,
+  "elapsed_seconds": 1.676,
+  "finished_at": "2026-11-11T12:19:22.141718+00:00",
+  "log_sha256": "3e37983579472dc7444ce34f3bc7b160ead21431a8a80a85bc31941631312f1e"
+}

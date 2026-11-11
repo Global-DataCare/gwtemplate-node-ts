@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Align the secure local E2E launcher with Node 26.13.0 and verify E9 acceptance against the complete declared matrix, exit statuses, log hashes and completed test counters.
+
 - Restore the deployment-authorized legacy `Organization/_activate`
   bootstrap-controller proof path without weakening modern DCR authorization.
   Tenant-scoped verification may resolve only the stored

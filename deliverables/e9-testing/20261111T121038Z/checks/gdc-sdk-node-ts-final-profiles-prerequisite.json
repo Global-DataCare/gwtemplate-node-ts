@@ -1,0 +1,87 @@
+{
+  "repository": "gdc-sdk-node-ts",
+  "label": "final-profiles-prerequisite",
+  "command": [
+    "env",
+    "BASE_URL=http://127.0.0.1:33300",
+    "TENANT_ID=e9-20261111t124739",
+    "TENANT_ROUTE_ID=e9-20261111t124739",
+    "HOST_ID_VALUE=e9-20261111t124739-host",
+    "HOST_JURISDICTION=EU",
+    "JURISDICTION=ES",
+    "SECTOR=health-care",
+    "SUBJECT_DID=did:web:host.example.com:health-care:organization:taxid:ES-B00112233:individual:multibase:zMomQqDS8U8M8MxEbzn7gjG",
+    "PROFESSIONAL_SMART_SUBJECT_DID=did:web:host.example.com:health-care:organization:taxid:ES-B00112233:individual:multibase:zMomQqDS8U8M8MxEbzn7gjG",
+    "SMART_SUBJECT_DID=did:web:api.acme.org:employee:zW1pca8dQVVz2apBk8A1CWJ8VSHgheXpRZoZtqwhnkHjFkV:ISCO-08|2211",
+    "PROFESSIONAL_ACTOR_DID=did:web:api.acme.org:employee:zW1pca8dQVVz2apBk8A1CWJ8VSHgheXpRZoZtqwhnkHjFkV:ISCO-08|2211",
+    "SMART_CLIENT_ID=did:web:device-001",
+    "PROFESSIONAL_CLIENT_ID=did:web:device-001",
+    "PROFESSIONAL_EMAIL=doctor.oncall@example.org",
+    "PROFESSIONAL_ROLE=ISCO-08|2211",
+    "SMART_SUBJECT_OCCUPATION=ISCO-08|2211",
+    "PROFESSIONAL_SUBJECT_OCCUPATION=ISCO-08|2211",
+    "RUN_LIVE_GW_E2E=1",
+    "RUN_LIVE_GW_E2E_ACTOR_CHAIN=1",
+    "RUN_LIVE_GW_E2E_HOST_VERIFICATION_TRANSACTION=0",
+    "RUN_LIVE_GW_E2E_PROFILE_RUNTIME=0",
+    "RUN_LIVE_GW_E2E_IPS_INGESTION=0",
+    "RUN_LIVE_GW_E2E_INDIVIDUAL_LIFECYCLE=0",
+    "LIVE_GW_ALLOW_HOST_TEARDOWN=0",
+    "LIVE_GW_E2E_SUITE=professional",
+    "RUN_LIVE_PROFILE_RUNTIME_E2E=1",
+    "RUN_LIVE_PROFILE_RUNTIME_PROFESSIONAL_E2E=1",
+    "node",
+    "--test",
+    "tests/live-gw-node-runtime.e2e.test.mjs"
+  ],
+  "started_at": "2026-11-11T12:47:47.395803+00:00",
+  "node": "v26.13.0",
+  "npm": "11.20.0",
+  "commit": "4b726b5cac458fcc94b543fbde6aeb649aaf80c6",
+  "working_tree": "",
+  "version": "2.9.34",
+  "related_sources": {
+    "gdc-common-utils-ts": {
+      "commit": "7f2caba88bd5ac8cc0e9a1fd90efce76110ea551",
+      "version": "2.9.30",
+      "working_tree": ""
+    },
+    "gdc-sdk-core-ts": {
+      "commit": "e795e5b74f11e8e8c100b76fef4fed5ab39b8f2d",
+      "version": "2.9.12",
+      "working_tree": ""
+    },
+    "gdc-sdk-front-ts": {
+      "commit": "7fe121d21490be5d8cd882cfcac6bc4435868863",
+      "version": "2.9.0",
+      "working_tree": ""
+    },
+    "gdc-sdk-node-ts": {
+      "commit": "4b726b5cac458fcc94b543fbde6aeb649aaf80c6",
+      "version": "2.9.34",
+      "working_tree": ""
+    },
+    "dataspace-ica-ts": {
+      "commit": "67333c8e4ee9177f5e7b0379f8193dd60930cd6b",
+      "version": "1.3.4",
+      "working_tree": ""
+    },
+    "ica-client-sdk-ts": {
+      "commit": "fdf97b553bfa4c130d8648c2a521abe8a8781e60",
+      "version": "2.0.15",
+      "working_tree": ""
+    },
+    "gwtemplate-node-ts": {
+      "commit": "ea8abae0f8c13e817d9241881f169e9400833d9a",
+      "version": "1.25.33",
+      "working_tree": "",
+      "recordedVersion": "1.25.34"
+    }
+  },
+  "package.json_sha256": "d97192cc1ba6ec4e19c98bcfcc041538aef4cba9076143747079e5637496a3d8",
+  "package-lock.json_sha256": "bc65f87e0208175e6d09eb3057e73708fe96f3e7a45d7e8a963f8931d09db15d",
+  "exit_code": 0,
+  "elapsed_seconds": 20.432,
+  "finished_at": "2026-11-11T12:48:08.442930+00:00",
+  "log_sha256": "51e51cb50b105e96230e79811134fe5ef1eab970a6d09a01195a1446e1bbe4ed"
+}

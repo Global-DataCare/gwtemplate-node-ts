@@ -1,0 +1,20 @@
+{
+  "repository": "gdc-sdk-core-ts",
+  "label": "03-typecheck",
+  "command": [
+    "npm",
+    "run",
+    "type-check"
+  ],
+  "started_at": "2026-11-11T12:19:29.803234+00:00",
+  "node": "v26.13.0",
+  "npm": "11.20.0",
+  "commit": "e795e5b74f11e8e8c100b76fef4fed5ab39b8f2d",
+  "working_tree": "",
+  "package.json_sha256": "b037d2d5d94d20199f3f11fc0773bd87bb7fe0d4649d4db40538d1a665af9ec8",
+  "package-lock.json_sha256": "24ffda186728d71eafab20fea80278862595beeb28fbd722b7a51c6382c44f6a",
+  "exit_code": 0,
+  "elapsed_seconds": 2.437,
+  "finished_at": "2026-11-11T12:19:32.547333+00:00",
+  "log_sha256": "759d8f2d9ecb1f3cb528fb8dd1fbdc5898fc1ff193131a6dd4246020e8698f66"
+}

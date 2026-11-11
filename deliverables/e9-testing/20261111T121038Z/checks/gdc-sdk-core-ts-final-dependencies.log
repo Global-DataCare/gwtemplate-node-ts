@@ -1,0 +1,5 @@
+gdc-sdk-core-ts@2.9.12 ${WORKSPACE}/.codex-worktrees/e9-repair-gdc-sdk-core-ts
+├── @types/node@20.19.41
+├── gdc-common-utils-ts@2.9.26
+└── typescript@5.9.3
+

@@ -1,0 +1,27 @@
+[live-controller] run_id=20261111t124821
+[live-controller] host_id=live-controller-20261111t124821-host
+[live-controller] tenant_id=live-controller-20261111t124821
+[live-controller] pdf_path=<PRIVATE_PDF_SHA256:efadf7e245c8ea4ec0bb5d011848c0d9eb5e9e72bed986812053f7cf2cda15ce>
+[live-controller] ica_log=${WORKSPACE}/.codex-evidence/e9-20261111/final-controller-ica.log
+[live-controller] gw_log=${WORKSPACE}/.codex-evidence/e9-20261111/final-controller-gw.log
+[local:close] no process is listening on port 3000
+[local:close] done
+[live-controller] ICA is ready at http://127.0.0.1:3310
+[live-controller] selected GW is ready at http://127.0.0.1:3000
+
+> gdc-sdk-node-ts@2.9.34 test:e2e:live-controller-lifecycle:direct
+> npm run build && RUN_LIVE_101_ORGANIZATION_CONTROLLER_LIFECYCLE_E2E=1 node --test tests/101-organization-controller-lifecycle.live.test.mjs
+
+
+> gdc-sdk-node-ts@2.9.34 build
+> tsc -p tsconfig.json
+
+✔ 101: LIVE organization controller lifecycle with controller proof bearer (13535.410846ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 14514.670122
