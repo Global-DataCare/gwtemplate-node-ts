@@ -23,7 +23,7 @@ done
 grep -Fq 'oci://ghcr.io/global-datacare/gdc-host' "${INDEX}"
 grep -Fq 'helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.4.0' "${GUIDE}"
 grep -Fq 'tar -xzf gdc-host-0.4.0.tgz' "${GUIDE}"
-grep -Fq 'ghcr.io/global-datacare/gw-core@sha256:915069bc437e625e2444971191dec48e9c7b4cd65e04900612d8333af1daefa8' "${GUIDE}"
+grep -Fq 'ghcr.io/global-datacare/gw-core@sha256:4befce5fda069c7279579fb01c48f631f8237934217fd8cd85e853fe369e78f1' "${GUIDE}"
 grep -Fq 'peer.channels' "${GUIDE}"
 grep -Fq 'fabric-ca-client getcainfo' "${GUIDE}"
 grep -Fq 'enroll-host-msp.sh' "${GUIDE}"

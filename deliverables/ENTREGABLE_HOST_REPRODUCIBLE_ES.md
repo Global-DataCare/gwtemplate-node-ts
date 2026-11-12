@@ -29,9 +29,9 @@ Las dos imágenes `linux/amd64` verificadas están disponibles públicamente en
 GitHub Container Registry:
 
 - [GW CORE](https://github.com/orgs/Global-DataCare/packages/container/package/gw-core):
-  `ghcr.io/global-datacare/gw-core@sha256:915069bc437e625e2444971191dec48e9c7b4cd65e04900612d8333af1daefa8`.
+  `ghcr.io/global-datacare/gw-core@sha256:4befce5fda069c7279579fb01c48f631f8237934217fd8cd85e853fe369e78f1`.
 - [Runtime CCAAS](https://github.com/orgs/Global-DataCare/packages/container/package/host-runtime):
-  `ghcr.io/global-datacare/host-runtime@sha256:f5d45cebaa5e7443ebf70aac85f33794d3d366dcb5370ab7921e9bc56336c0fa`.
+  `ghcr.io/global-datacare/host-runtime@sha256:b61f80bc405fc15a02890a269e6f051c0b3161a173d680fc8b610df681e11603`.
 
 La primera ejecuta GW CORE. La segunda contiene los diez servidores de
 chaincode y selecciona cada contrato mediante `CHAINCODE_NAME`. No sustituye
@@ -171,8 +171,8 @@ GCS pendiente y que coincidan los digests de origen transformado y destino.
 Para verificar o reutilizar los artefactos ya publicados sin reconstruirlos:
 
 ```bash
-export GW_PUBLIC_IMAGE="ghcr.io/global-datacare/gw-core@sha256:915069bc437e625e2444971191dec48e9c7b4cd65e04900612d8333af1daefa8"
-export CCAAS_PUBLIC_IMAGE="ghcr.io/global-datacare/host-runtime@sha256:f5d45cebaa5e7443ebf70aac85f33794d3d366dcb5370ab7921e9bc56336c0fa"
+export GW_PUBLIC_IMAGE="ghcr.io/global-datacare/gw-core@sha256:4befce5fda069c7279579fb01c48f631f8237934217fd8cd85e853fe369e78f1"
+export CCAAS_PUBLIC_IMAGE="ghcr.io/global-datacare/host-runtime@sha256:b61f80bc405fc15a02890a269e6f051c0b3161a173d680fc8b610df681e11603"
 docker buildx imagetools inspect "${GW_PUBLIC_IMAGE}"
 docker buildx imagetools inspect "${CCAAS_PUBLIC_IMAGE}"
 docker pull "${GW_PUBLIC_IMAGE}"

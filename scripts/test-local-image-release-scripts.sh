@@ -363,12 +363,12 @@ if [[ "$(grep -Ec '^RUN npm ci($| )' ./Dockerfile)" -ne 2 ]]; then
   echo 'ERROR: both Docker stages must install the exact lockfile with npm ci.' >&2
   exit 1
 fi
-if [[ "$(grep -Ec '^FROM node:24-alpine($| AS )' ./Dockerfile)" -ne 2 ]]; then
-  echo 'ERROR: builder and runtime Docker stages must use the workspace Node.js 24 line.' >&2
+if [[ "$(grep -Ec '^FROM node:26\.13\.0-alpine($| AS )' ./Dockerfile)" -ne 2 ]]; then
+  echo 'ERROR: builder and runtime Docker stages must pin Node.js 26.13.0.' >&2
   exit 1
 fi
-if [[ "$(grep -Ec '^FROM node:24-alpine$' ./chaincode/Dockerfile.ccaas)" -ne 1 ]]; then
-  echo 'ERROR: the shared CCAAS host runtime must use the workspace Node.js 24 line.' >&2
+if [[ "$(grep -Ec '^FROM node:26\.13\.0-alpine$' ./chaincode/Dockerfile.ccaas)" -ne 1 ]]; then
+  echo 'ERROR: the shared CCAAS host runtime must pin Node.js 26.13.0.' >&2
   exit 1
 fi
 

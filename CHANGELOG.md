@@ -3,6 +3,57 @@
 ## [Unreleased]
 
 - Align the secure local E2E launcher with Node 26.13.0 and verify E9 acceptance against the complete declared matrix, exit statuses, log hashes and completed test counters.
+- Prepare GW CORE `1.26.0` as the October 2026 security, correctness and
+  portability patch.
+- Pin both GW CORE image stages and the independently versioned CCAAS
+  `host-runtime` to Node.js `26.13.0`; the October release must rebuild that
+  shared ten-contract runtime because `artifact-sc` transaction
+  `UpsertResearchVersions` was added after the currently documented runtime
+  digest.
+- Align the standalone consent-access CCAAS builder/runtime stages with exact
+  Node.js `26.13.0` as well, so local Fabric validation exercises the same
+  runtime line as the coordinated production artifact set.
+- Correct the stale deterministic CCAAS package fixture to the byte-identical
+  package emitted by the versioned generator across Node.js 24.9.0, 24.21.0,
+  24.22.3 and 26.13.0; this prepares artifacts only and performs no Fabric
+  lifecycle operation.
+- Refresh the shared CCAAS runtime lock with `@grpc/grpc-js@1.14.7` and
+  `protobufjs@7.6.6`, clearing the production advisories reported while
+  rebuilding `host-runtime` under Node.js `26.13.0`.
+- Remove the Firebase rules test harness from production dependencies and align
+  Firebase Admin, Google Cloud Storage/Auth and their governed transitive
+  overrides, including `fast-xml-parser@5.12.0` for
+  `GHSA-474x-hrwr-fgx4`. The installed production dependency tree now reports
+  zero known npm vulnerabilities without changing
+  `gdc-common-utils-ts@2.9.26`.
+- Zeroize cached private signing/encryption keys, DEKs, HMAC keys and the
+  process-owned runtime KEK on expiry, replacement, eviction, invalidation and
+  graceful shutdown.
+- Repair stale tenant `didConfig.service` catalogs even when the public DID
+  service projection is already canonical.
+- Resolve exact governed employee DID documents for existing professionals
+  without granting controller authority.
+- Isolate unreadable historical licence seats so one invalid encrypted record
+  cannot suppress valid search results or grant access.
+- Return conversion failures in both `OperationOutcome.issue.diagnostics` and
+  the compatibility `details.text` field.
+- Bind local-Fabric ICA verification to the configured host jurisdiction and
+  replace POSIX-only cleanup/OpenAPI build commands with portable Node entry
+  points.
+- Harden the Windows local-Fabric gate for this release: select
+  Git Bash explicitly, preserve LF shell scripts, disable MSYS path rewriting,
+  invoke npm/npx through the active Node runtime, verify the Docker daemon,
+  remove POSIX-only package metadata commands and serialize PEM values as
+  exact single-line `\\n`-escaped environment assignments.
+- Make local-demo/local-Fabric API startup and shutdown portable Node
+  entrypoints, and normalize Windows `jq.exe` carriage returns before querying
+  generated consent rule IDs in the local Fabric smoke.
+- Replace product-specific maps in the shared documentation entrypoints with
+  neutral client, study-operator and professional-tenant responsibilities.
+- Publish the coordinated GW CORE and ten-contract CCAAS images with immutable
+  GHCR digests, regenerate the ten deterministic Fabric packages against the
+  CCAAS digest, and prefer `sha256sum` with a macOS `shasum` fallback so the
+  release manifest is reproducible on Windows, Linux and macOS.
 
 - Restore the deployment-authorized legacy `Organization/_activate`
   bootstrap-controller proof path without weakening modern DCR authorization.

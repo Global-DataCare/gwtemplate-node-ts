@@ -887,7 +887,7 @@ export function createDiscoveryRouter(
    *         description: Controller DID is not registered for this tenant
    */
   router.get(`${tenantControllerDidPrefix}/did.json`, resolveTenant, async (req, res) => {
-    const controllerDidDocument = await tenantStatusService.resolveControllerDidDocument(
+    const controllerDidDocument = await tenantStatusService.resolveEmployeeDidDocument(
       res.locals.vaultId,
       req.params.memberId,
       req.params.role,

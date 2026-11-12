@@ -21,7 +21,7 @@ HOST2_MSP="${HLF_MSP_ID_HOST2:-Host2MSP}"
 
 function to_env_one_line_pem() {
   # Convert newlines to \n to keep dotenv compatible.
-  perl -0pe 's/\n/\\n/g' "$1"
+  perl -0pe 's/\r?\n/chr(92) . "n"/ge' "$1"
 }
 
 HOST1_ADMIN_CERT="organizations/peerOrganizations/${HOST1_DOMAIN}/users/Admin@${HOST1_DOMAIN}/msp/signcerts/cert.pem"

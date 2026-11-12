@@ -13,7 +13,7 @@
     "build": "",
     "build:watch": "",
     "prepublishOnly": "npm run build",
-    "metadata": "set -x && fabric-chaincode-node metadata generate --file metadata.json",
+    "metadata": "fabric-chaincode-node metadata generate --file metadata.json",
     "docker": "docker build -f ./Dockerfile -t consentaccess-sc .",
     "package:caas": "npm run build && weft chaincode package caas --path . --label consentaccess-sc --address ${CHAINCODE_SERVER_ADDRESS} --archive consentaccess-sc-caas.tgz --quiet",
     "package:k8s": "npm run build && weft chaincode package caas --path . --label consentaccess-sc --address ${CHAINCODE_SERVER_ADDRESS} --archive consentaccess-sc-caas.tgz --quiet",
@@ -25,6 +25,10 @@
   "dependencies": {
     "fabric-contract-api": "^2.5.4",
     "fabric-shim": "^2.5.4"
+  },
+  "overrides": {
+    "@grpc/grpc-js": "1.14.7",
+    "protobufjs": "7.6.6"
   },
   "devDependencies": {
     "chai": "^4.5.0",

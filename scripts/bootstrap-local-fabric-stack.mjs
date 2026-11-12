@@ -27,6 +27,16 @@ if (args.help) {
   process.exit(0);
 }
 
+const bashCommand = resolveBashCommand();
+const npmCommand = process.platform === 'win32' ? process.execPath : 'npm';
+const npmArgsPrefix = process.platform === 'win32'
+  ? [resolve(dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js')]
+  : [];
+const npxCommand = process.platform === 'win32' ? process.execPath : 'npx';
+const npxArgsPrefix = process.platform === 'win32'
+  ? [resolve(dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npx-cli.js')]
+  : [];
+
 const defaultDataChannel = args.dataChannel || 'health-care-local';
 const config = {
   tenantId: args.tenantId || 'acme-id',
@@ -62,17 +72,15 @@ async function main() {
 
   await runStep('fabric-reset-devnet', {
     cwd: fabricDevnetRoot,
-    command: 'bash',
-    args: [
-      '-lc',
-      [
-        "for container in $(docker ps -a --format '{{.ID}} {{.Names}}' | awk '$2 ~ /^dev-peer0-host/ {print $1}'); do docker rm -f \"$container\" >/dev/null 2>&1 || true; done",
-        'docker compose down -v --remove-orphans || true',
-        'for service in orderer peer0-host1 peer0-host2 fabric-tools fabric-ca-client ica root-ca; do docker rm -f "${GDC_CONTAINER_PREFIX:-gdc}-$service" >/dev/null 2>&1 || true; done; docker rm -f consentaccess-sc >/dev/null 2>&1 || true',
-        'for attempt in $(seq 1 30); do remaining=false; for service in orderer peer0-host1 peer0-host2 fabric-tools fabric-ca-client ica root-ca; do docker container inspect "${GDC_CONTAINER_PREFIX:-gdc}-$service" >/dev/null 2>&1 && remaining=true; done; [ "$remaining" = false ] && break; [ "$attempt" != 30 ] || exit 1; sleep 1; done',
-        'docker volume rm -f "${COMPOSE_PROJECT_NAME:-gdc-fabric-v3-devnet}_root-ca-db" "${COMPOSE_PROJECT_NAME:-gdc-fabric-v3-devnet}_ica-db" "${COMPOSE_PROJECT_NAME:-gdc-fabric-v3-devnet}_orderer-data" "${COMPOSE_PROJECT_NAME:-gdc-fabric-v3-devnet}_peer0-host1-data" "${COMPOSE_PROJECT_NAME:-gdc-fabric-v3-devnet}_peer0-host2-data" >/dev/null 2>&1 || true',
-      ].join('; '),
-    ],
+    command: bashCommand,
+    args: ['-s'],
+    input: [
+      "for container in $(docker ps -a --format '{{.ID}} {{.Names}}' | awk '$2 ~ /^dev-peer0-host/ {print $1}'); do docker rm -f \"$container\" >/dev/null 2>&1 || true; done",
+      'docker compose down -v --remove-orphans || true',
+      'for service in orderer peer0-host1 peer0-host2 fabric-tools fabric-ca-client ica root-ca; do docker rm -f "${GDC_CONTAINER_PREFIX:-gdc}-$service" >/dev/null 2>&1 || true; done; docker rm -f consentaccess-sc >/dev/null 2>&1 || true',
+      'for attempt in $(seq 1 30); do remaining=false; for service in orderer peer0-host1 peer0-host2 fabric-tools fabric-ca-client ica root-ca; do docker container inspect "${GDC_CONTAINER_PREFIX:-gdc}-$service" >/dev/null 2>&1 && remaining=true; done; [ "$remaining" = false ] && break; [ "$attempt" != 30 ] || exit 1; sleep 1; done',
+      'docker volume rm -f "${COMPOSE_PROJECT_NAME:-gdc-fabric-v3-devnet}_root-ca-db" "${COMPOSE_PROJECT_NAME:-gdc-fabric-v3-devnet}_ica-db" "${COMPOSE_PROJECT_NAME:-gdc-fabric-v3-devnet}_orderer-data" "${COMPOSE_PROJECT_NAME:-gdc-fabric-v3-devnet}_peer0-host1-data" "${COMPOSE_PROJECT_NAME:-gdc-fabric-v3-devnet}_peer0-host2-data" >/dev/null 2>&1 || true',
+    ].join('\n'),
   });
 
   if (config.fabricCaSource === 'dataspace-ca') {
@@ -85,7 +93,7 @@ async function main() {
     requirePath(resolve(config.dataspaceCaIssuerDir), 'Missing dataspace CA issuer directory');
     await runStep('fabric-copy-dataspace-cas', {
       cwd: fabricDevnetRoot,
-      command: 'bash',
+      command: bashCommand,
       args: [
         './scripts/00-copy-dataspace-ca.sh',
         resolve(config.dataspaceCaRootDir),
@@ -95,18 +103,18 @@ async function main() {
   } else {
     await runStep('fabric-copy-dev-cas', {
       cwd: fabricDevnetRoot,
-      command: 'bash',
+      command: bashCommand,
       args: ['./scripts/00-copy-dev-cas.sh'],
     });
   }
   await runStep('fabric-up-cas', {
     cwd: fabricDevnetRoot,
-    command: 'bash',
+    command: bashCommand,
     args: ['./scripts/01-up-cas.sh'],
   });
   await runStep('fabric-bootstrap-network', {
     cwd: fabricDevnetRoot,
-    command: 'bash',
+    command: bashCommand,
     args: ['./scripts/02-bootstrap-network.sh'],
     env: {
       HLF_DATA_CHANNEL_NAME: config.dataChannel,
@@ -116,7 +124,7 @@ async function main() {
   });
   await runStep('fabric-generate-backend-env', {
     cwd: fabricDevnetRoot,
-    command: 'bash',
+    command: bashCommand,
     args: ['./scripts/04-generate-backend-env.sh'],
     env: {
       HLF_DATA_CHANNEL_NAME: config.dataChannel,
@@ -127,8 +135,8 @@ async function main() {
 
   await runStep('gw-prepare-local-fabric-env', {
     cwd: repoRoot,
-    command: 'npm',
-    args: ['run', 'prepare:local-fabric-env'],
+    command: bashCommand,
+    args: ['./scripts/prepare-consentaccess-local-fabric-env.sh'],
     env: {
       CHANNEL_NAME: config.dataChannel,
       IDENTITY_CHANNEL_NAME: config.identityChannel,
@@ -139,7 +147,7 @@ async function main() {
   if (config.deployChaincode) {
     await runStep('fabric-deploy-identity-chaincodes', {
       cwd: fabricDevnetRoot,
-      command: 'bash',
+      command: bashCommand,
       args: ['./scripts/05-deploy-identity-chaincodes.sh'],
       env: {
         GWTEMPLATE_DIR: repoRoot,
@@ -151,7 +159,7 @@ async function main() {
 
     await runStep('fabric-deploy-consentaccess-chaincode', {
       cwd: repoRoot,
-      command: 'bash',
+      command: bashCommand,
       args: ['./chaincode/scripts/consentaccess-local-devnet.sh'],
       env: {
         CHANNEL_NAME: config.dataChannel,
@@ -174,8 +182,8 @@ async function main() {
   if (config.restartGw) {
     await runStep('gw-stop-existing', {
       cwd: repoRoot,
-      command: 'npm',
-      args: ['run', 'local:close'],
+      command: npmCommand,
+      args: [...npmArgsPrefix, 'run', 'local:close'],
     });
   }
 
@@ -190,8 +198,9 @@ async function main() {
   if (config.bootstrapTenant) {
     await runStep('gw-bootstrap-tenant', {
       cwd: repoRoot,
-      command: 'npx',
+      command: npxCommand,
       args: [
+        ...npxArgsPrefix,
         'dotenv',
         '-e',
         config.envFile,
@@ -207,7 +216,7 @@ async function main() {
   if (config.bootstrapIndividual) {
     await runStep('gw-bootstrap-individual', {
       cwd: repoRoot,
-      command: 'bash',
+      command: bashCommand,
       args: [
         '-lc',
         `npx dotenv -e ${shellQuote(config.envFile)} -- bash ./scripts/demo-create-individual-organization.sh`,
@@ -308,6 +317,19 @@ function parseSimpleEnv(text) {
   return entries;
 }
 
+function resolveBashCommand() {
+  if (process.platform !== 'win32') return 'bash';
+
+  const candidates = [
+    process.env.GIT_BASH_PATH,
+    process.env.ProgramFiles && join(process.env.ProgramFiles, 'Git', 'bin', 'bash.exe'),
+    process.env.LOCALAPPDATA && join(process.env.LOCALAPPDATA, 'Programs', 'Git', 'bin', 'bash.exe'),
+  ].filter(Boolean);
+  const selected = candidates.find((candidate) => existsSync(candidate));
+  if (selected) return selected;
+  throw new Error('Git Bash is required on Windows. Set GIT_BASH_PATH to bash.exe.');
+}
+
 async function runStep(label, options) {
   const logPath = join(runLogDir, `${label}.log`);
   const logStream = createWriteStream(logPath, { flags: 'a' });
@@ -320,6 +342,12 @@ async function runStep(label, options) {
         COMPOSE_PROJECT_NAME: process.env.COMPOSE_PROJECT_NAME || 'gdc-public-local-network',
       }
     : {};
+  const gitBashEnv = process.platform === 'win32' && options.command === bashCommand
+    ? {
+        MSYS_NO_PATHCONV: '1',
+        MSYS2_ARG_CONV_EXCL: '*',
+      }
+    : {};
 
   await new Promise((resolvePromise, rejectPromise) => {
     const child = spawn(options.command, options.args, {
@@ -327,10 +355,13 @@ async function runStep(label, options) {
       env: {
         ...process.env,
         ...composeEnv,
+        ...gitBashEnv,
         ...(options.env || {}),
       },
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: [options.input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'],
     });
+
+    if (options.input !== undefined) child.stdin.end(options.input);
 
     child.stdout.on('data', (chunk) => {
       process.stdout.write(chunk);
@@ -360,13 +391,14 @@ async function startGatewayInBackground(envFile) {
 
   await runStep('gw-build-swagger', {
     cwd: repoRoot,
-    command: 'npm',
-    args: ['run', 'build:swagger'],
+    command: npmCommand,
+    args: [...npmArgsPrefix, 'run', 'build:swagger'],
   });
 
   const child = spawn(
-    'npx',
+    npxCommand,
     [
+      ...npxArgsPrefix,
       'dotenv',
       '-e',
       envFile,

@@ -30,7 +30,7 @@ function fail() {
 }
 
 function to_env_one_line_pem() {
-  perl -0pe 's/\n/\\n/g' "$1"
+  perl -0pe 's/\r?\n/chr(92) . "n"/ge' "$1"
 }
 
 # Docker accepts duplicate --env-file assignments and silently keeps the last
@@ -112,6 +112,7 @@ HLF_CERTIFICATE=$(to_env_one_line_pem "${HOST1_ADMIN_CERT}")
 HLF_PRIVATE_KEY=$(to_env_one_line_pem "${HOST1_ADMIN_KEY}")
 HLF_CHANNEL_NAME=${CHANNEL_NAME}
 HOST_JURISDICTION=${HOST_JURISDICTION_VALUE}
+ICA_JURISDICTION=${HOST_JURISDICTION_VALUE}
 JURISDICTION=${TENANT_JURISDICTION_VALUE}
 DEFAULT_SECTOR=${SECTOR_VALUE}
 HOST_LEGACY_REPRESENTATIVE_CONTROLLER=${LEGACY_REPRESENTATIVE_CONTROLLER_VALUE}

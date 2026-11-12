@@ -1,7 +1,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 #
-FROM node:18.16 AS builder
+FROM node:26.13.0 AS builder
 
 WORKDIR /usr/src/app
 
@@ -12,7 +12,7 @@ RUN npm install
 RUN npm run build && npm shrinkwrap
 
 
-FROM node:18.16 AS prod-builder
+FROM node:26.13.0 AS prod-builder
 WORKDIR /usr/src/app
 
 COPY --chown=node:node --from=builder /usr/src/app/index.js ./index.js
@@ -24,7 +24,7 @@ RUN npm ci --omit=dev && npm cache clean --force
 
 # ------------------------------------------------------------------------------
 # Builds the Chaincode as a Service docker version.
-FROM node:18.16 AS ccaas
+FROM node:26.13.0 AS ccaas
 WORKDIR /usr/src/app
 
 ARG TARGETARCH
@@ -50,7 +50,7 @@ ENTRYPOINT ["/tini", "--", "/usr/src/app/docker-entrypoint.sh"]
 
 # ------------------------------------------------------------------------------
 # Builds the chaincode for the k8s builder.
-FROM node:18.16 AS k8s
+FROM node:26.13.0 AS k8s
 WORKDIR /usr/src/app
 
 ARG TARGETARCH

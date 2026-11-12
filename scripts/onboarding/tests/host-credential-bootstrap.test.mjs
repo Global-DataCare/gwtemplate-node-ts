@@ -19,6 +19,14 @@ import {
   requestHostCredential,
 } from '../request-host-credential.mjs';
 
+async function assertPrivatePosixMode(path) {
+  // Windows reports a synthetic 0666 mode even after chmod(0600); NTFS access
+  // is governed by ACLs rather than POSIX permission bits.
+  if (process.platform !== 'win32') {
+    assert.equal((await stat(path)).mode & 0o777, 0o600);
+  }
+}
+
 test('uses one activation and a locally generated request key to obtain a governed Host VC without a PDF', async (t) => {
   const root = await mkdtemp(join(tmpdir(), 'host-credential-bootstrap-'));
   const privateJwkFile = join(root, 'host-signing.private.jwk.json');
@@ -79,7 +87,7 @@ test('uses one activation and a locally generated request key to obtain a govern
     activationCode: 'ica_host_test_activation_code',
   }), { mode: 0o600 });
   await initializeHostRequestKey({ hostDomain, privateJwkFile });
-  assert.equal((await stat(privateJwkFile)).mode & 0o777, 0o600);
+  await assertPrivatePosixMode(privateJwkFile);
 
   await assert.rejects(
     requestHostCredential({
@@ -120,6 +128,7 @@ test('uses one activation and a locally generated request key to obtain a govern
   assert.equal(received.length, 1);
   assert.deepEqual(receivedAuthorization, ['HostActivation ica_host_test_activation_code']);
   assert.equal(received[0].iss, `did:web:${hostDomain}`);
+  assert.equal(received[0].body.data[0].resource.organization.publicKeyJwk.d, undefined);
   assert.equal(received[0].body.data[0].resource.meta.claims['org.schema.Service.owner.email'], controllerEmail);
   assert.equal(received[0].body.data[0].resource.meta.claims['org.schema.Organization.taxID'], organizationTaxId);
   const compact = received[0].body.hostAuthorizationProof.jws.split('.');
@@ -131,5 +140,5 @@ test('uses one activation and a locally generated request key to obtain a govern
   const result = JSON.parse(await readFile(credentialOutputFile, 'utf8'));
   assert.equal(result.credential.type.includes('HostingServiceCredential'), true);
   assert.equal(result.vcJwt, 'header.payload.signature');
-  assert.equal((await stat(credentialOutputFile)).mode & 0o777, 0o600);
+  await assertPrivatePosixMode(credentialOutputFile);
 });

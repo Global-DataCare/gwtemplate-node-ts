@@ -9,6 +9,7 @@ const TENANT_VAULT_ID = 'health-research_VATES-B00000000';
 const TENANT_COLLECTION = 'tenant-collection-example';
 const TENANT_DID = 'did:web:gateway.example:VATES-B00000000:cds-ES:v1:health-research';
 const CONTROLLER_DID = `${TENANT_DID}:employee:zExample:RESPRSN`;
+const PROFESSIONAL_DID = `${TENANT_DID}:employee:zProfessional:2211`;
 const CONTROLLER_KID = 'urn:jwk:sha-256:example-controller-key';
 const ACTOR_IDENTIFIER = 'urn:multibase:zExampleActor';
 
@@ -119,6 +120,32 @@ describe('TenantStatusService', () => {
     const resolved = await new TenantStatusService(tenants, vaultRepository, kmsService)
       .resolveControllerDidDocument(TENANT_VAULT_ID, 'zExample', 'RESPRSN');
     expect(resolved?.id).toBe(CONTROLLER_DID);
+  });
+
+  it('resolves an existing professional DID without requiring controller membership', async () => {
+    tenants.getTenant.mockResolvedValue({
+      status: 'active',
+      didDocument: { id: TENANT_DID, controller: [CONTROLLER_DID] },
+    });
+    const professionalDocument = {
+      id: 'governed-professional-record',
+      status: 'active',
+      sequence: 0,
+      content: {
+        didDocument: {
+          id: PROFESSIONAL_DID,
+          verificationMethod: [],
+        },
+      },
+    };
+    (vaultRepository.getContainersInSection as any).mockImplementation(async (_scope: string, section: string) => (
+      String(section).endsWith('employees') ? [professionalDocument] : []
+    ));
+
+    const resolved = await new TenantStatusService(tenants, vaultRepository, kmsService)
+      .resolveEmployeeDidDocument(TENANT_VAULT_ID, 'zProfessional', '2211');
+
+    expect(resolved).toEqual(professionalDocument.content.didDocument);
   });
 
   it('reports dcr_active only for an active device binding owned by the controller actor', async () => {
