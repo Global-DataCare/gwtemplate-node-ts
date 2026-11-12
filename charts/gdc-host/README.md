@@ -21,7 +21,7 @@ values privado de cada release.
 ## Imágenes públicas de referencia
 
 - [GW CORE](https://github.com/orgs/Global-DataCare/packages/container/package/gw-core):
-  `ghcr.io/global-datacare/gw-core@sha256:4befce5fda069c7279579fb01c48f631f8237934217fd8cd85e853fe369e78f1`
+  `ghcr.io/global-datacare/gw-core@sha256:a19ba9f712642da6a715e0039352204fc21d7546a6dfcd86cd8f17f26158c2f8`
 - [Runtime CCAAS](https://github.com/orgs/Global-DataCare/packages/container/package/host-runtime):
   `ghcr.io/global-datacare/host-runtime@sha256:b61f80bc405fc15a02890a269e6f051c0b3161a173d680fc8b610df681e11603`
 
@@ -69,7 +69,7 @@ imágenes deben expresarse siempre por digest OCI:
 
 ```yaml
 gw:
-  image: ghcr.io/global-datacare/gw-core@sha256:4befce5fda069c7279579fb01c48f631f8237934217fd8cd85e853fe369e78f1
+  image: ghcr.io/global-datacare/gw-core@sha256:a19ba9f712642da6a715e0039352204fc21d7546a6dfcd86cd8f17f26158c2f8
 ```
 
 La sección `host` identifica al operador y al controller técnico inicial del

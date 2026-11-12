@@ -360,7 +360,7 @@ El runtime común de los diez chaincodes está disponible en la
 GW CORE y CCAAS son artefactos OCI distintos. Use siempre sus digests:
 
 ```bash
-export GW_PUBLIC_IMAGE="ghcr.io/global-datacare/gw-core@sha256:4befce5fda069c7279579fb01c48f631f8237934217fd8cd85e853fe369e78f1"
+export GW_PUBLIC_IMAGE="ghcr.io/global-datacare/gw-core@sha256:a19ba9f712642da6a715e0039352204fc21d7546a6dfcd86cd8f17f26158c2f8"
 export CCAAS_PUBLIC_IMAGE="ghcr.io/global-datacare/host-runtime@sha256:b61f80bc405fc15a02890a269e6f051c0b3161a173d680fc8b610df681e11603"
 docker buildx imagetools inspect "${GW_PUBLIC_IMAGE}"
 docker buildx imagetools inspect "${CCAAS_PUBLIC_IMAGE}"
