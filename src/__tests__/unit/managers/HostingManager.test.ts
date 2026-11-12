@@ -39,7 +39,8 @@ import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { TenantsCacheManager } from '../../../managers/TenantsCacheManager';
 import { IStorageAdapter } from '../../../database/storage/IStorageAdapter';
 import { JwkSet } from 'gdc-common-utils-ts/models/jwk';
-import { initializeHostServicesConfig } from '../../../utils/services';
+import { initializeHostServicesConfig, initializeTenantServicesConfig } from '../../../utils/services';
+import { populateDidDocumentServices } from '../../../utils/did-document';
 
 import { ILogger } from '../../../loggers/ILogger';
 import { testTenant1LegalName } from '../../data/organization.data';
@@ -394,6 +395,56 @@ describe('HostingManager', () => {
     expect(services.some(service =>
       service.id.endsWith('#digitaltwin:org.hl7.fhir.r4:composition:_search'))).toBe(false);
     expect(services).toContainEqual(customService);
+  });
+
+  it('[1.2b TENANT] repairs a stale operational catalog when the public DID catalog is already canonical', async () => {
+    const tenantId = 'VATES-G02793481';
+    const sector = Sector.HEALTH_CARE;
+    const tenantVaultId = tenantUtils.getTenantVaultId(sector, tenantId);
+    const hostCollectionName = await mockTenantsCacheManager.getCollectionName('host') as string;
+    const claims: ClaimsRecord = {
+      [ClaimsOrganizationSchemaorg.alternateName]: tenantId,
+      [ClaimsOrganizationSchemaorg.addressCountry]: 'ES',
+      [ClaimsOrganizationSchemaorg.identifierType]: 'VAT',
+      [ClaimsOrganizationSchemaorg.identifierValue]: tenantId,
+      [ClaimsOrganizationSchemaorg.url]: `https://${EXAMPLE_HOST_PUBLIC_HOSTNAME}`,
+      [ClaimsServiceSchemaorg.category]: sector,
+    };
+    const did = `${composeHostDidWebId('', EXAMPLE_HOST_PUBLIC_HOSTNAME)}:${tenantId}:cds-ES:v1:${sector}`;
+    const canonicalConfig = initializeTenantServicesConfig(sector, []);
+    const canonicalPublicServices = populateDidDocumentServices(
+      did,
+      `https://${EXAMPLE_HOST_PUBLIC_HOSTNAME}`,
+      canonicalConfig,
+      true,
+      { alternateName: tenantId, jurisdiction: 'ES', version: 'v1', sector },
+      `https://${EXAMPLE_HOST_PUBLIC_HOSTNAME}`,
+    );
+    const stored = await mockKmsService.protectConfidentialData({
+      id: tenantVaultId,
+      status: 'active',
+      sequence: 0,
+      content: {
+        status: 'active',
+        claims,
+        didConfig: { service: [] },
+        didDocument: {
+          '@context': 'https://www.w3.org/ns/did/v1',
+          id: did,
+          service: canonicalPublicServices,
+        },
+      },
+    } as ConfidentialStorageDoc, 'host');
+    await vaultRepository.put(hostCollectionName, [stored], getEnvSectionId('tenants'));
+
+    expect(await hostingManager.reconcileTenantServiceRoutes()).toBe(1);
+
+    const refreshed = await vaultRepository.get(
+      hostCollectionName,
+      tenantVaultId,
+      getEnvSectionId('tenants'),
+    ) as ConfidentialStorageDoc;
+    expect((refreshed.content as any).didConfig.service).toEqual(canonicalConfig);
   });
 
   it('[1.3 TENANT] republishes recoverable tenant keys without changing identity, controllers or services', async () => {

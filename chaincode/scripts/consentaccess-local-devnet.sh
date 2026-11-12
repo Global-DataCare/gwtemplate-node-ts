@@ -90,7 +90,7 @@ function ensure_devnet_ready() {
   require_command cp
   require_file "${ENSURE_DEVNET_ENV_SCRIPT}"
 
-  [[ -S /var/run/docker.sock ]] || fail "Docker socket not available"
+  docker info >/dev/null 2>&1 || fail "Docker daemon not available"
   docker ps --format '{{.Names}}' | grep -qx "${FABRIC_TOOLS_CONTAINER}" \
     || fail "Fabric tools container is not running: ${FABRIC_TOOLS_CONTAINER}"
   require_file "${DEVNET_ROOT}/channel-artifacts/${CHANNEL_NAME}.block"

@@ -53,8 +53,15 @@ HOST_RUNTIME_OUTPUT_DIR="${WORK}/runtime" \
 for artifact in msp.tgz tls.tgz authorization.json manifest.sha256; do
   [[ -s "${WORK}/runtime/${artifact}" ]]
 done
-[[ "$(stat -f '%Lp' "${WORK}/runtime" 2>/dev/null || stat -c '%a' "${WORK}/runtime")" == "700" ]]
-[[ "$(stat -f '%Lp' "${WORK}/runtime/msp.tgz" 2>/dev/null || stat -c '%a' "${WORK}/runtime/msp.tgz")" == "600" ]]
+case "$(uname -s)" in
+  MINGW*|MSYS*)
+    # NTFS permissions are ACL-backed; Git Bash reports synthetic POSIX modes.
+    ;;
+  *)
+    [[ "$(stat -f '%Lp' "${WORK}/runtime" 2>/dev/null || stat -c '%a' "${WORK}/runtime")" == "700" ]]
+    [[ "$(stat -f '%Lp' "${WORK}/runtime/msp.tgz" 2>/dev/null || stat -c '%a' "${WORK}/runtime/msp.tgz")" == "600" ]]
+    ;;
+esac
 (cd "${WORK}/runtime" && shasum -a 256 -c manifest.sha256)
 ! rg -n 'must-not-leak|enrollmentSecret|hostCredentialJwt' "${WORK}/runtime"
 jq -e '.authorized and .mspId == "Host2MSP" and .networkKind == "test-network"' \

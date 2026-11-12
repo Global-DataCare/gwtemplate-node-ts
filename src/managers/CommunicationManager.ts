@@ -424,6 +424,7 @@ export class CommunicationManager implements IJobProcessor {
                 severity: 'error',
                 code: 'processing',
                 details: { text: error instanceof Error ? error.message : 'Unknown error during conversion.' },
+                diagnostics: error instanceof Error ? error.message : 'Unknown error during conversion.',
               }],
             }
           },

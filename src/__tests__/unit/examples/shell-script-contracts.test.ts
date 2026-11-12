@@ -59,10 +59,11 @@ describe('shell script payload contracts', () => {
     expect(bootstrapScript).toContain('.body.data[0].response.outcome.issue[0].diagnostics');
   });
 
-  it('exposes the mandatory Node 24 live-E2E runner and rejects skipped journeys', () => {
+  it('exposes the mandatory Node 26.13.0 live-E2E runner and rejects skipped journeys', () => {
     const liveRunner = readScript('scripts/run-secure-e2e-google-user.sh');
 
-    expect(liveRunner).toContain('NODE_MAJOR');
+    expect(liveRunner).toContain("NODE_VERSION=\"$(node --version)\"");
+    expect(liveRunner).toContain("if [[ \"$NODE_VERSION\" != 'v26.13.0' ]]");
     expect(liveRunner).toContain('LIVE_GW_API_SCRIPT:-api:local-demo');
     expect(liveRunner).toContain('npm run "$GW_API_SCRIPT"');
     expect(liveRunner).toContain('test:e2e:live-gw');

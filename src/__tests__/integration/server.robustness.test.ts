@@ -185,4 +185,15 @@ describe('Server Robustness', () => {
       }
     });
   });
+
+  describe('graceful shutdown', () => {
+    it('destroys process-resident KMS material when the server runtime stops', async () => {
+      const runtime = await startServer({ listen: false });
+      const destroy = jest.spyOn(runtime.kmsService as any, 'destroy');
+
+      await runtime.shutdown();
+
+      expect(destroy).toHaveBeenCalledTimes(1);
+    });
+  });
 });

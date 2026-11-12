@@ -4,6 +4,19 @@
 # public Service address; they never contain credentials.
 set -euo pipefail
 
+if command -v sha256sum >/dev/null 2>&1; then
+  SHA256_COMMAND=(sha256sum)
+elif command -v shasum >/dev/null 2>&1; then
+  SHA256_COMMAND=(shasum -a 256)
+else
+  echo 'Missing SHA-256 executable: install shasum or sha256sum' >&2
+  exit 1
+fi
+
+sha256_file() {
+  "${SHA256_COMMAND[@]}" "$@"
+}
+
 for variable in CCAAS_IMAGE CCAAS_OUTPUT_DIR; do
   [[ -n "${!variable:-}" ]] || {
     echo "Missing ${variable}" >&2
@@ -55,7 +68,7 @@ for spec in "${specs[@]}"; do
     > "${package_root}/metadata.json"
   node "$(dirname "${BASH_SOURCE[0]}")/build-deterministic-ccaas-package.mjs" \
     "${package_root}/code/connection.json" "${package_root}/metadata.json" "${archive}"
-  digest="$(shasum -a 256 "${archive}" | awk '{print $1}')"
+  digest="$(sha256_file "${archive}" | awk '{print $1}')"
   package_id="${label}:${digest}"
   printf '  - name: %s\n    image: %s\n    packageId: %s\n' \
     "${name}" "${CCAAS_IMAGE}" "${package_id}" >> "${CCAAS_OUTPUT_DIR}/chaincodes.values.yaml"
@@ -66,8 +79,10 @@ done
 
 (
   cd "${CCAAS_OUTPUT_DIR}"
-  find packages -type f -name '*.tgz' -print | LC_ALL=C sort | xargs shasum -a 256 \
+  while IFS= read -r archive; do
+    sha256_file "${archive}"
+  done < <(find packages -type f -name '*.tgz' -print | LC_ALL=C sort) \
     > manifest.sha256
-  shasum -a 256 chaincodes.values.yaml manifest.tsv >> manifest.sha256
+  sha256_file chaincodes.values.yaml manifest.tsv >> manifest.sha256
 )
 echo "Ten deterministic CCAAS packages written to ${CCAAS_OUTPUT_DIR}." >&2

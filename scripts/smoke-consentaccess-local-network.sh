@@ -132,14 +132,18 @@ function render_duplicate_consentaccess_payload() {
   )
 }
 
+function strip_carriage_returns() {
+  tr -d '\r'
+}
+
 echo "[smoke-consentaccess] rendering canonical consent bundle from common-utils fixtures"
 request_payload="$(render_consentaccess_payload CONSENT_BATCH_REQUEST)"
-rule_ids_json="$(render_consentaccess_payload RULE_ID_LIST)"
+rule_ids_json="$(render_consentaccess_payload RULE_ID_LIST | strip_carriage_returns)"
 expected_rule_count="$(jq 'length' <<<"${rule_ids_json}")"
 duplicate_request_payload="$(render_duplicate_consentaccess_payload CONSENT_BATCH_REQUEST_DUPLICATE)"
-duplicate_rule_ids_json="$(render_duplicate_consentaccess_payload RULE_ID_LIST_DUPLICATE)"
+duplicate_rule_ids_json="$(render_duplicate_consentaccess_payload RULE_ID_LIST_DUPLICATE | strip_carriage_returns)"
 duplicate_rule_count="$(jq 'length' <<<"${duplicate_rule_ids_json}")"
-repeated_rule_id="$(jq -r '.[0]' <<<"${duplicate_rule_ids_json}")"
+repeated_rule_id="$(jq -r '.[0]' <<<"${duplicate_rule_ids_json}" | strip_carriage_returns)"
 
 echo "[smoke-consentaccess] POST ${CONSENT_ENDPOINT}"
 curl -sS -X POST "${CONSENT_ENDPOINT}" \
@@ -169,7 +173,7 @@ if [[ "${actual_status_count}" != "${expected_rule_count}" ]]; then
 fi
 
 echo "[smoke-consentaccess] verifying ${expected_rule_count} independent rule assets on ${CHANNEL_NAME}"
-for rule_id in $(jq -r '.[]' <<<"${rule_ids_json}"); do
+for rule_id in $(jq -r '.[]' <<<"${rule_ids_json}" | strip_carriage_returns); do
   asset_json="$(wait_for_rule_asset "${rule_id}")"
   jq -e --arg rule_id "${rule_id}" \
     '.id == $rule_id and (.data | length) == 1 and .data[0].id == $rule_id' \
@@ -202,7 +206,7 @@ if [[ "${duplicate_status_count}" != "${duplicate_rule_count}" ]]; then
 fi
 
 echo "[smoke-consentaccess] verifying second batch assets and duplicate no-op behavior"
-for rule_id in $(jq -r '.[]' <<<"${duplicate_rule_ids_json}"); do
+for rule_id in $(jq -r '.[]' <<<"${duplicate_rule_ids_json}" | strip_carriage_returns); do
   asset_json="$(wait_for_rule_asset "${rule_id}")"
   jq -e --arg rule_id "${rule_id}" \
     '.id == $rule_id and (.data | length) == 1 and .data[0].id == $rule_id' \
