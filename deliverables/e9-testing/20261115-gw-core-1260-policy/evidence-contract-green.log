@@ -1,0 +1,23 @@
+✔ accepts exact completed results and keeps classification separate from totals (6.594462ms)
+✔ rejects relabelled historical gateway version (3.762192ms)
+✔ rejects a mutable image tag (1.830963ms)
+✔ rejects failed processes even with passing JSON (1.501126ms)
+✔ rejects changed evidence (2.132516ms)
+✔ rejects invented case names (2.015958ms)
+✔ rejects absent invalid-identity coverage (1.800801ms)
+✔ rejects omitted tests in a completed suite (2.239672ms)
+✔ rejects a different release commit even with the correct version label (1.889233ms)
+✔ rejects a different immutable image (2.002802ms)
+✔ rejects counting a case twice (1.692364ms)
+✔ rejects invented totals even with genuine passing results (1.914018ms)
+✔ accepts separately recorded published-image journeys (3.33612ms)
+✔ rejects a different running image version (2.670174ms)
+✔ rejects image journey counts that disagree with the completed log (2.684809ms)
+ℹ tests 15
+ℹ suites 0
+ℹ pass 15
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 268.928603

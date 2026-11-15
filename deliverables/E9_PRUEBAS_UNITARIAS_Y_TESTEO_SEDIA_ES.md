@@ -12,6 +12,7 @@ El Entregable E9 documenta las pruebas de los paquetes de utilidades, los SDK, e
 | npm | `11.20.0` |
 | Entorno de pruebas | Local, con perfiles test/demo |
 | Integración | Procesos reales de GW e ICA mediante HTTP |
+| Ampliación específica de la pasarela | 15 de noviembre de 2026; GW CORE 1.26.0; apartado 10 |
 
 La ejecución finaliza con todas las baterías superadas y cero casos fallidos, omitidos, cancelados o pendientes.
 
@@ -26,6 +27,7 @@ La ejecución finaliza con todas las baterías superadas y cero casos fallidos, 
 | dataspace-ica-ts | 1.3.4 | [`67333c8e4ee9`](https://github.com/Global-DataCare/dataspace-ica-ts/commit/67333c8e4ee9177f5e7b0379f8193dd60930cd6b) |
 | ica-client-sdk-ts | 2.0.15 | [`fdf97b553bfa`](https://github.com/Global-DataCare/ica-client-sdk-ts/commit/fdf97b553bfa4c130d8648c2a521abe8a8781e60) |
 | gwtemplate-node-ts | 1.25.33 | [`ea8abae0f8c1`](https://github.com/Global-DataCare/gwtemplate-node-ts/commit/ea8abae0f8c13e817d9241881f169e9400833d9a) |
+| gwtemplate-node-ts, ampliación de políticas | 1.26.0 | [`01f36c02877f`](https://github.com/Global-DataCare/gwtemplate-node-ts/commit/01f36c02877fb2da7a55538320ab69d0dc2e84b9) |
 
 Cada componente se instala con `npm ci` a partir de su archivo de dependencias fijadas. Los registros de `npm ls` identifican las versiones cargadas durante la ejecución. Los commits de la tabla permiten localizar el código empleado en cada batería.
 
@@ -42,6 +44,9 @@ Cada componente se instala con `npm ci` a partir de su archivo de dependencias f
 | Cliente ICA, baterías aisladas | 52/52 | 2 ficheros |
 | Cliente ICA, integración HTTP | 2/2 | Verificación y creación del documento DID |
 | Comprobación de runtime e integridad E9 | 13/13 | Requisitos de ejecución y validación del expediente |
+| GW CORE 1.26.0, autorización y controles de transporte | 90/90 | 7 ficheros; dependencias aisladas y servicios en memoria según cada prueba |
+| GW CORE 1.26.0, verificación criptográfica de identidad | 10/10 | Servidor HTTP local de descubrimiento y claves; firmas ES384 reales |
+| GW CORE 1.26.0, imagen publicada con Fabric local | 8/8 | Cinco recorridos autorizados y tres denegados |
 
 Todas las baterías registran cero fallidos, omitidos, cancelados y pendientes. El cliente ICA ejecuta también una comprobación de descubrimiento que verifica la inclusión de los dos ficheros de pruebas aisladas.
 
@@ -134,3 +139,103 @@ shasum -a 256 -c SHA256SUMS.txt
 El [expediente consolidado de pruebas E9](https://github.com/Global-DataCare/gwtemplate-node-ts/tree/main/deliverables/e9-testing/20261111T121038Z) contiene la matriz superada, sus logs, manifiestos e instrucciones de reproducción.
 
 Los siete repositorios incluyen la evidencia correspondiente en `deliverables/e9-testing/20261111T121038Z`.
+
+## 10. Ampliación: políticas de uso y pruebas negativas de GW CORE 1.26.0
+
+La pasarela se incluye expresamente con una ejecución nueva, vinculada al código
+de la versión **1.26.0**, commit `01f36c02877fb2da7a55538320ab69d0dc2e84b9`,
+y Node.js **26.13.0**. Los resultados del 11 de noviembre y sus versiones
+permanecen intactos. El expediente de esta ampliación está en
+[`e9-testing/20261115-gw-core-1260-policy`](e9-testing/20261115-gw-core-1260-policy).
+
+### 10.1 Identidad y autorización: 100 casos superados
+
+Se ejecutaron dos baterías sin casos fallidos, omitidos o pendientes:
+
+| Batería | Resultado | Qué comprueba |
+| --- | --- | --- |
+| Autorización, transporte y reglas de acceso | 90/90 | Consentimientos, roles, identidad del solicitante, contrato entre organizaciones, alcance SMART y restricciones de emergencia |
+| Identidad con firmas reales y claves obtenidas por HTTP | 10/10 | Un caso válido y nueve rechazos de identidad o configuración de confianza no válidas |
+
+Entre los casos identificados en la matriz hay **14 negativos de identidad** y
+**13 negativos de autorización o política**. Nueve de los negativos de identidad
+realizan verificación criptográfica real, sin sustituir el verificador ni las
+peticiones HTTP por mocks. Las otras pruebas indican sus dependencias aisladas
+en el código; no se presentan como un recorrido completo de un proveedor externo.
+
+Los nueve casos criptográficos rechazan:
+
+1. El contenido de un token modificado después de firmarlo.
+2. Una identidad firmada cuyo periodo de validez ha terminado.
+3. Una identidad que todavía no ha entrado en vigor.
+4. Un token dirigido a otro destinatario.
+5. Un token cuyo emisor no coincide con el esperado.
+6. Una firma cuya clave no figura en el conjunto publicado al comenzar la verificación.
+7. Un documento de descubrimiento que declara otro emisor.
+8. Un emisor fuera de los proveedores expresamente admitidos.
+9. Un token mal formado.
+
+Las pruebas de política incluyen el rechazo por ausencia de consentimiento,
+consentimiento vencido o mal formado, denegación expresa prevalente, rol o correo
+no admitido, empleado sin vinculación activa, ausencia del contrato entre
+organizaciones y alcance de acceso no permitido. Una identidad válida sin
+permiso se diferencia de una identidad no válida.
+
+### 10.2 Imagen publicada y políticas con Fabric real: ocho recorridos
+
+Se ejecutó la imagen pública inmutable
+`ghcr.io/global-datacare/gw-core@sha256:a19ba9f712642da6a715e0039352204fc21d7546a6dfcd86cd8f17f26158c2f8`.
+El proceso confirmó versión **1.26.0** y Node.js **26.13.0**. Se utilizaron
+un orderer, un peer y contratos reales de Fabric en una red local aislada,
+con los perfiles y datos sintéticos canónicos del repositorio.
+
+| Recorrido | Resultado esperado y observado |
+| --- | --- |
+| Consentimiento individual y resumen clínico limitado a las secciones autorizadas | Acceso permitido y resumen leído |
+| Consentimiento individual y búsqueda de datos | Acceso permitido y búsqueda completada |
+| Profesional de secretaría médica con consentimiento | Acceso permitido y búsqueda completada |
+| Profesional de secretaría médica sin consentimiento | Solicitud de token denegada |
+| Investigación con contrato, consentimiento y rol admitido | Acceso permitido y búsqueda de gemelos completada |
+| Investigación con rol no admitido | Solicitud de token denegada |
+| Investigación con permiso dirigido al correo del solicitante | Acceso permitido y búsqueda de gemelos completada |
+| Investigación con permiso dirigido a otro correo | Solicitud de token denegada |
+
+Las reglas de consentimiento se registraron y releyeron en Fabric. Se comprobó
+también la repetición de lotes y sus identificadores, sin contar cada activo o
+petición HTTP como otro caso. El canal de investigación terminó con altura 5.
+El log conserva los ocho identificadores de recorrido y el digest probado.
+
+Estos recorridos prueban el comportamiento de la imagen publicada con Fabric
+local. El perfil utiliza las fixtures de verificación del repositorio; no
+acredita una instancia externa de Clearing House ni un recorrido autenticado
+del portal GDC. Los contenedores, volúmenes y la red creados para la ejecución
+se retiraron al terminar, conservando los recursos preexistentes.
+
+### 10.3 Recuento y trazabilidad
+
+Los 90 y 10 casos pertenecen a conjuntos distintos y suman **100**. Los 15 casos
+del nuevo verificador del expediente comprueban integridad y contabilización;
+no se suman como pruebas de políticas de la pasarela. Los 13 controles del
+expediente histórico tampoco se reclasifican como pruebas de políticas.
+Los ocho recorridos de la imagen se informan como una capa E2E separada; no se
+mezclan con los casos Jest para producir un total único.
+
+Como diagnóstico adicional se ejecutó la batería general del repositorio:
+**1.181 superados, cero fallidos y tres omitidos**, sobre 1.184 casos. Las tres
+omisiones preexistentes corresponden a un recorrido Firestore, validación XSD
+de factura UBL y conexión a una ICA externa. Se identifican por nombre en
+`full-suite-diagnostic.json`; no se cuentan como aprobadas. Esta ejecución
+repite casos de la ampliación y no se añade a su total de 100.
+
+El manifiesto enlaza cada caso con el fichero y resultado de ejecución, conserva
+los comandos y las huellas de los logs y fija el digest de la imagen publicada.
+El verificador rechaza otra versión o imagen, resultados inventados, logs
+modificados, procesos fallidos, omisiones y duplicación de casos:
+
+```bash
+node scripts/verify-e9-gw-policy-evidence.mjs deliverables/e9-testing/20261115-gw-core-1260-policy/manifest.json
+```
+
+La retirada de una clave de firma no equivale a revocar una credencial de negocio.
+Esta ampliación no atribuye a esos casos una prueba completa de propagación de
+revocación de credencial y posterior denegación de acceso.

@@ -1,0 +1,45 @@
+✔ accepts exact completed results and keeps classification separate from totals (7.842313ms)
+✔ rejects relabelled historical gateway version (2.160827ms)
+✔ rejects a mutable image tag (2.855718ms)
+✔ rejects failed processes even with passing JSON (1.535574ms)
+✔ rejects changed evidence (1.840418ms)
+✔ rejects invented case names (1.674509ms)
+✔ rejects absent invalid-identity coverage (1.992788ms)
+✔ rejects omitted tests in a completed suite (2.282244ms)
+✔ rejects a different release commit even with the correct version label (1.893046ms)
+✔ rejects a different immutable image (1.824823ms)
+✔ rejects counting a case twice (1.640601ms)
+✖ rejects invented totals even with genuine passing results (2.555456ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 11
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 239.190867
+
+✖ failing tests:
+
+test at scripts/tests/e9-gw-policy-evidence.test.mjs:42:1
+✖ rejects invented totals even with genuine passing results (2.555456ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /counter/. Input:
+
+  ''
+
+      at file://${GW_ROOT}/scripts/tests/e9-gw-policy-evidence.test.mjs:42:150
+      at fixture (file://${GW_ROOT}/scripts/tests/e9-gw-policy-evidence.test.mjs:28:7)
+      at TestContext.<anonymous> (file://${GW_ROOT}/scripts/tests/e9-gw-policy-evidence.test.mjs:42:70)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '',
+    expected: /counter/,
+    operator: 'match',
+    diff: 'simple'
+  }

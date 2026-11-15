@@ -1,0 +1,24 @@
+{
+  "total": 1184,
+  "passed": 1181,
+  "failed": 0,
+  "skipped": 3,
+  "skippedCases": [
+    {
+      "source": "src/__tests__/integration/vault-blood-pressure-day-batch.e2e.spec.ts",
+      "name": "FirestoreVaultRepository blood-pressure day batches (E2E) keeps a 3-reading daily batch pending until its blockchain tx id is written",
+      "status": "pending"
+    },
+    {
+      "source": "src/__tests__/unit/utils/ubl-invoice.test.ts",
+      "name": "UBL Invoice (EN 16931) validation + hash validates against EN 16931 XSD schema",
+      "status": "pending"
+    },
+    {
+      "source": "src/__tests__/integration/icaOnline.test.ts",
+      "name": "ICA online integration should reach the ICA Fabric-CA endpoint (fails if offline)",
+      "status": "pending"
+    }
+  ],
+  "includedInPolicyTotals": false
+}

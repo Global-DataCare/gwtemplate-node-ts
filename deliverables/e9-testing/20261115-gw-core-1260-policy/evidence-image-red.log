@@ -1,0 +1,71 @@
+✔ accepts exact completed results and keeps classification separate from totals (6.328ms)
+✔ rejects relabelled historical gateway version (2.241013ms)
+✔ rejects a mutable image tag (3.070179ms)
+✔ rejects failed processes even with passing JSON (1.527279ms)
+✔ rejects changed evidence (1.934675ms)
+✔ rejects invented case names (1.777625ms)
+✔ rejects absent invalid-identity coverage (1.709116ms)
+✔ rejects omitted tests in a completed suite (1.939366ms)
+✔ rejects a different release commit even with the correct version label (1.706104ms)
+✔ rejects a different immutable image (1.827788ms)
+✔ rejects counting a case twice (1.655ms)
+✔ rejects invented totals even with genuine passing results (1.603435ms)
+✔ accepts separately recorded published-image journeys (1.999829ms)
+✖ rejects a different running image version (2.887045ms)
+✖ rejects image journey counts that disagree with the completed log (2.213463ms)
+ℹ tests 15
+ℹ suites 0
+ℹ pass 13
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 200.749908
+
+✖ failing tests:
+
+test at scripts/tests/e9-gw-policy-evidence.test.mjs:51:1
+✖ rejects a different running image version (2.887045ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /runtime/. Input:
+
+  ''
+
+      at file://${GW_ROOT}/scripts/tests/e9-gw-policy-evidence.test.mjs:51:123
+      at fixture (file://${GW_ROOT}/scripts/tests/e9-gw-policy-evidence.test.mjs:28:7)
+      at TestContext.<anonymous> (file://${GW_ROOT}/scripts/tests/e9-gw-policy-evidence.test.mjs:51:54)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '',
+    expected: /runtime/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/tests/e9-gw-policy-evidence.test.mjs:52:1
+✖ rejects image journey counts that disagree with the completed log (2.213463ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /flow.*counter/. Input:
+
+  ''
+
+      at file://${GW_ROOT}/scripts/tests/e9-gw-policy-evidence.test.mjs:52:134
+      at fixture (file://${GW_ROOT}/scripts/tests/e9-gw-policy-evidence.test.mjs:28:7)
+      at TestContext.<anonymous> (file://${GW_ROOT}/scripts/tests/e9-gw-policy-evidence.test.mjs:52:78)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '',
+    expected: /flow.*counter/,
+    operator: 'match',
+    diff: 'simple'
+  }
