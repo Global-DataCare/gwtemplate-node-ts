@@ -1,0 +1,90 @@
+✔ accepts exact completed results and keeps classification separate from totals (7.059691ms)
+✔ rejects relabelled historical gateway version (2.250117ms)
+✔ rejects a mutable image tag (3.490185ms)
+✔ rejects failed processes even with passing JSON (2.441952ms)
+✔ rejects changed evidence (2.558855ms)
+✔ rejects invented case names (2.769003ms)
+✔ rejects absent invalid-identity coverage (2.549882ms)
+✔ rejects omitted tests in a completed suite (10.586539ms)
+✖ rejects a different release commit even with the correct version label (3.98091ms)
+✖ rejects a different immutable image (3.301508ms)
+✖ rejects counting a case twice (2.341095ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 8
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 284.145648
+
+✖ failing tests:
+
+test at scripts/tests/e9-gw-policy-evidence.test.mjs:39:1
+✖ rejects a different release commit even with the correct version label (3.98091ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /release commit/. Input:
+
+  ''
+
+      at file://${GW_ROOT}/scripts/tests/e9-gw-policy-evidence.test.mjs:39:148
+      at fixture (file://${GW_ROOT}/scripts/tests/e9-gw-policy-evidence.test.mjs:28:7)
+      at TestContext.<anonymous> (file://${GW_ROOT}/scripts/tests/e9-gw-policy-evidence.test.mjs:39:83)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '',
+    expected: /release commit/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/tests/e9-gw-policy-evidence.test.mjs:40:1
+✖ rejects a different immutable image (3.301508ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /release image/. Input:
+
+  ''
+
+      at file://${GW_ROOT}/scripts/tests/e9-gw-policy-evidence.test.mjs:40:148
+      at fixture (file://${GW_ROOT}/scripts/tests/e9-gw-policy-evidence.test.mjs:28:7)
+      at TestContext.<anonymous> (file://${GW_ROOT}/scripts/tests/e9-gw-policy-evidence.test.mjs:40:48)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '',
+    expected: /release image/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts/tests/e9-gw-policy-evidence.test.mjs:41:1
+✖ rejects counting a case twice (2.341095ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /duplicate case/. Input:
+
+  ''
+
+      at file://${GW_ROOT}/scripts/tests/e9-gw-policy-evidence.test.mjs:41:115
+      at fixture (file://${GW_ROOT}/scripts/tests/e9-gw-policy-evidence.test.mjs:28:7)
+      at TestContext.<anonymous> (file://${GW_ROOT}/scripts/tests/e9-gw-policy-evidence.test.mjs:41:42)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '',
+    expected: /duplicate case/,
+    operator: 'match',
+    diff: 'simple'
+  }

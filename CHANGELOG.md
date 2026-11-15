@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Extend E9 with version-bound GW CORE 1.26.0 evidence: 100 source-policy and
+  real-signature identity checks plus eight published-image journeys against
+  isolated local Fabric. Preserve historical counts, disclose three unrelated
+  general-suite omissions, and verify exact digests, logs and case provenance.
 - Align the secure local E2E launcher with Node 26.13.0 and verify E9 acceptance against the complete declared matrix, exit statuses, log hashes and completed test counters.
 - Prepare GW CORE `1.26.0` as the October 2026 security, correctness and
   portability patch.

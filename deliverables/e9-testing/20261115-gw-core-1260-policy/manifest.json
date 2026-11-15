@@ -1,0 +1,685 @@
+{
+  "specVersion": "gdc.e9.gateway-policy-evidence/v1",
+  "generatedAt": "2026-11-15T20:12:53.639573+00:00",
+  "gateway": {
+    "version": "1.26.0",
+    "sourceCommit": "01f36c02877fb2da7a55538320ab69d0dc2e84b9",
+    "image": "ghcr.io/global-datacare/gw-core@sha256:a19ba9f712642da6a715e0039352204fc21d7546a6dfcd86cd8f17f26158c2f8"
+  },
+  "runs": [
+    {
+      "id": "focused",
+      "layer": "source",
+      "node": "v26.13.0",
+      "command": [
+        "node",
+        "scripts/run-jest.mjs",
+        "--runInBand",
+        "--no-coverage",
+        "--json",
+        "--outputFile=${EVIDENCE_DIR}/focused-results.json",
+        "--runTestsByPath",
+        "src/__tests__/managers/AuthorizationManager.test.ts",
+        "src/__tests__/managers/OpenIdAuthManager.test.ts",
+        "src/__tests__/unit/adapters/activation-trust.adapter.test.ts",
+        "src/__tests__/integration/security-mode-gates.test.ts",
+        "src/__tests__/integration/identity/smart-token.test.ts",
+        "src/__tests__/unit/managers/OpenIdAuthManager.break-glass.test.ts",
+        "src/__tests__/unit/security/break-glass.test.ts"
+      ],
+      "exitCode": 0,
+      "tests": {
+        "total": 90,
+        "passed": 90,
+        "failed": 0,
+        "skipped": 0
+      },
+      "log": {
+        "path": "focused.log",
+        "sha256": "38ab0b0d10d48af9d841a146732ea5c6389ac3f298e60f4938f6e097be2ab0f1"
+      },
+      "results": {
+        "path": "focused-results.json",
+        "sha256": "7d619012b76c262ed91193fcd750c501e7d2989671b39f1f481d065855d4d91a"
+      },
+      "cases": [
+        {
+          "name": "OpenIdAuthManager fails closed when a consent expiry is malformed or has reached its boundary",
+          "category": "policy-negative",
+          "source": "src/__tests__/managers/OpenIdAuthManager.test.ts"
+        },
+        {
+          "name": "OpenIdAuthManager issues only consented sections to an accepted individual member VP",
+          "category": "policy-positive",
+          "source": "src/__tests__/managers/OpenIdAuthManager.test.ts"
+        },
+        {
+          "name": "OpenIdAuthManager should issue a signed access_token for a tenant (org did rule)",
+          "category": "policy-positive",
+          "source": "src/__tests__/managers/OpenIdAuthManager.test.ts"
+        },
+        {
+          "name": "OpenIdAuthManager should match a provider-neutral member DID and normalized section token",
+          "category": "policy-positive",
+          "source": "src/__tests__/managers/OpenIdAuthManager.test.ts"
+        },
+        {
+          "name": "OpenIdAuthManager should permit one canonical stored Composition action without organization prefix",
+          "category": "policy-positive",
+          "source": "src/__tests__/managers/OpenIdAuthManager.test.ts"
+        },
+        {
+          "name": "OpenIdAuthManager should reject patient/Composition root scopes",
+          "category": "policy-negative",
+          "source": "src/__tests__/managers/OpenIdAuthManager.test.ts"
+        },
+        {
+          "name": "OpenIdAuthManager should reject patient/ResearchSubject root scopes",
+          "category": "policy-negative",
+          "source": "src/__tests__/managers/OpenIdAuthManager.test.ts"
+        },
+        {
+          "name": "OpenIdAuthManager should permit when rule is jurisdiction urn (ES)",
+          "category": "policy-positive",
+          "source": "src/__tests__/managers/OpenIdAuthManager.test.ts"
+        },
+        {
+          "name": "OpenIdAuthManager should permit when rule is email with wildcard role",
+          "category": "policy-positive",
+          "source": "src/__tests__/managers/OpenIdAuthManager.test.ts"
+        },
+        {
+          "name": "OpenIdAuthManager should permit when rule actor-role is a comma-separated list and one role matches",
+          "category": "policy-positive",
+          "source": "src/__tests__/managers/OpenIdAuthManager.test.ts"
+        },
+        {
+          "name": "OpenIdAuthManager should reject when vp_token is missing",
+          "category": "policy-negative",
+          "source": "src/__tests__/managers/OpenIdAuthManager.test.ts"
+        },
+        {
+          "name": "OpenIdAuthManager should deny when a direct physician deny overrides a broader organization allow",
+          "category": "policy-negative",
+          "source": "src/__tests__/managers/OpenIdAuthManager.test.ts"
+        },
+        {
+          "name": "OpenIdAuthManager should permit a related person targeted directly by email",
+          "category": "policy-positive",
+          "source": "src/__tests__/managers/OpenIdAuthManager.test.ts"
+        },
+        {
+          "name": "OpenIdAuthManager should require and accept a matching inter-tenant contract for a foreign organization actor",
+          "category": "supporting-contract",
+          "source": "src/__tests__/managers/OpenIdAuthManager.test.ts"
+        },
+        {
+          "name": "OpenIdAuthManager issues DigitalTwinReader to a verified same-tenant employee DID without a research contract",
+          "category": "supporting-contract",
+          "source": "src/__tests__/managers/OpenIdAuthManager.test.ts"
+        },
+        {
+          "name": "OpenIdAuthManager issues DigitalTwinReader to a verified same-tenant member DID without a research contract",
+          "category": "supporting-contract",
+          "source": "src/__tests__/managers/OpenIdAuthManager.test.ts"
+        },
+        {
+          "name": "OpenIdAuthManager extracts the same VAT tenant from a public organization DID without comparing host aliases",
+          "category": "supporting-contract",
+          "source": "src/__tests__/managers/OpenIdAuthManager.test.ts"
+        },
+        {
+          "name": "OpenIdAuthManager denies same-tenant DigitalTwinReader when the extracted employee does not exist as active in the tenant",
+          "category": "policy-negative",
+          "source": "src/__tests__/managers/OpenIdAuthManager.test.ts"
+        },
+        {
+          "name": "OpenIdAuthManager denies same-tenant DigitalTwinReader when the employee DID hash is not a credential sameAs alias",
+          "category": "policy-negative",
+          "source": "src/__tests__/managers/OpenIdAuthManager.test.ts"
+        },
+        {
+          "name": "OpenIdAuthManager denies same-tenant DigitalTwinReader when the verified VP does not identify the requesting employee",
+          "category": "policy-negative",
+          "source": "src/__tests__/managers/OpenIdAuthManager.test.ts"
+        },
+        {
+          "name": "OpenIdAuthManager should issue an individual self-read token without requiring an inter-tenant research contract",
+          "category": "supporting-contract",
+          "source": "src/__tests__/managers/OpenIdAuthManager.test.ts"
+        },
+        {
+          "name": "OpenIdAuthManager should accept a trusted verified binding between two individual portal DIDs",
+          "category": "policy-positive",
+          "source": "src/__tests__/managers/OpenIdAuthManager.test.ts"
+        },
+        {
+          "name": "OpenIdAuthManager should reject an individual DID binding whose issuer is not configured as trusted",
+          "category": "identity-negative",
+          "source": "src/__tests__/managers/OpenIdAuthManager.test.ts"
+        },
+        {
+          "name": "OpenIdAuthManager should deny a foreign organization actor when no matching inter-tenant contract is presented",
+          "category": "policy-negative",
+          "source": "src/__tests__/managers/OpenIdAuthManager.test.ts"
+        },
+        {
+          "name": "OpenIdAuthManager should accept one trusted external research bearer instead of vp_token for inter-tenant research access",
+          "category": "supporting-contract",
+          "source": "src/__tests__/managers/OpenIdAuthManager.test.ts"
+        },
+        {
+          "name": "OpenIdAuthManager should accept one trusted external research bearer for ResearchSubject scope when the stored action is canonical",
+          "category": "supporting-contract",
+          "source": "src/__tests__/managers/OpenIdAuthManager.test.ts"
+        },
+        {
+          "name": "OpenIdAuthManager should accept one research employee when the permit is role-specific and matches the requester role",
+          "category": "supporting-contract",
+          "source": "src/__tests__/managers/OpenIdAuthManager.test.ts"
+        },
+        {
+          "name": "OpenIdAuthManager should reject one research employee when the permit role does not match the requester role",
+          "category": "policy-negative",
+          "source": "src/__tests__/managers/OpenIdAuthManager.test.ts"
+        },
+        {
+          "name": "OpenIdAuthManager should accept one research employee when the permit targets the requester email directly",
+          "category": "supporting-contract",
+          "source": "src/__tests__/managers/OpenIdAuthManager.test.ts"
+        },
+        {
+          "name": "OpenIdAuthManager should reject one research employee when a direct-email permit targets another employee",
+          "category": "policy-negative",
+          "source": "src/__tests__/managers/OpenIdAuthManager.test.ts"
+        },
+        {
+          "name": "OpenIdAuthManager should accept one professional SMART request with vp_token plus client_assertion",
+          "category": "supporting-contract",
+          "source": "src/__tests__/managers/OpenIdAuthManager.test.ts"
+        },
+        {
+          "name": "OpenIdAuthManager accepts an operational actor DID issuer with its distinct DCR client assertion identity",
+          "category": "supporting-contract",
+          "source": "src/__tests__/managers/OpenIdAuthManager.test.ts"
+        },
+        {
+          "name": "SECURITY_MODE content-type gates rejects application/json in strict mode",
+          "category": "supporting-contract",
+          "source": "src/__tests__/integration/security-mode-gates.test.ts"
+        },
+        {
+          "name": "SECURITY_MODE content-type gates accepts application/json in compat mode when JSON_LEGACY=true",
+          "category": "supporting-contract",
+          "source": "src/__tests__/integration/security-mode-gates.test.ts"
+        },
+        {
+          "name": "SECURITY_MODE content-type gates rejects application/fhir+json in compat mode when FHIR_LEGACY=false",
+          "category": "supporting-contract",
+          "source": "src/__tests__/integration/security-mode-gates.test.ts"
+        },
+        {
+          "name": "SECURITY_MODE content-type gates accepts didcomm-plaintext in demo mode",
+          "category": "supporting-contract",
+          "source": "src/__tests__/integration/security-mode-gates.test.ts"
+        },
+        {
+          "name": "SECURITY_MODE content-type gates preserves an insecure demo bearer subject for a FHIR transport job",
+          "category": "supporting-contract",
+          "source": "src/__tests__/integration/security-mode-gates.test.ts"
+        },
+        {
+          "name": "SECURITY_MODE content-type gates queues Token/_exchange with the validated route tenant when Firebase has no tenant_id",
+          "category": "supporting-contract",
+          "source": "src/__tests__/integration/security-mode-gates.test.ts"
+        },
+        {
+          "name": "SECURITY_MODE content-type gates queues OTP wallet recovery for the exact routed tenant and installation",
+          "category": "supporting-contract",
+          "source": "src/__tests__/integration/security-mode-gates.test.ts"
+        },
+        {
+          "name": "SECURITY_MODE content-type gates resolves encrypted host Order sender keys despite a historical host catalog",
+          "category": "supporting-contract",
+          "source": "src/__tests__/integration/security-mode-gates.test.ts"
+        },
+        {
+          "name": "SECURITY_MODE content-type gates authorizes a pre-DCR Order only with the controller keys protected in its pending Offer",
+          "category": "supporting-contract",
+          "source": "src/__tests__/integration/security-mode-gates.test.ts"
+        },
+        {
+          "name": "SECURITY_MODE content-type gates authorizes an organization transaction only with its explicit reviewed controller binding",
+          "category": "supporting-contract",
+          "source": "src/__tests__/integration/security-mode-gates.test.ts"
+        },
+        {
+          "name": "SECURITY_MODE content-type gates normalizes an encrypted SDK token exchange payload into the manager body contract",
+          "category": "supporting-contract",
+          "source": "src/__tests__/integration/security-mode-gates.test.ts"
+        },
+        {
+          "name": "SECURITY_MODE content-type gates verifies the embedded wallet key during encrypted pre-DCR token exchange",
+          "category": "supporting-contract",
+          "source": "src/__tests__/integration/security-mode-gates.test.ts"
+        },
+        {
+          "name": "SECURITY_MODE content-type gates resolves encrypted tenant traffic with historical stale DCR kid indexes",
+          "category": "supporting-contract",
+          "source": "src/__tests__/integration/security-mode-gates.test.ts"
+        },
+        {
+          "name": "SECURITY_MODE content-type gates allows host organization _activate without bearer in demo mode",
+          "category": "supporting-contract",
+          "source": "src/__tests__/integration/security-mode-gates.test.ts"
+        },
+        {
+          "name": "SECURITY_MODE content-type gates requires bearer in strict mode when insecure bearer is disabled",
+          "category": "supporting-contract",
+          "source": "src/__tests__/integration/security-mode-gates.test.ts"
+        },
+        {
+          "name": "SECURITY_MODE content-type gates rejects invalid bearer in strict mode when validation is enforced",
+          "category": "identity-negative",
+          "source": "src/__tests__/integration/security-mode-gates.test.ts"
+        },
+        {
+          "name": "SECURITY_MODE content-type gates calls verifyIdToken for valid bearer in strict mode and continues request flow",
+          "category": "supporting-contract",
+          "source": "src/__tests__/integration/security-mode-gates.test.ts"
+        },
+        {
+          "name": "SECURITY_MODE content-type gates propagates verified bearer payload into Organization/_issue jobs in strict mode",
+          "category": "supporting-contract",
+          "source": "src/__tests__/integration/security-mode-gates.test.ts"
+        },
+        {
+          "name": "SECURITY_MODE content-type gates accepts a deterministically signed id_token from one virtual BFF issuer in strict mode",
+          "category": "supporting-contract",
+          "source": "src/__tests__/integration/security-mode-gates.test.ts"
+        },
+        {
+          "name": "SECURITY_MODE content-type gates accepts one deterministically signed controller proof bearer on host lifecycle routes in strict mode",
+          "category": "supporting-contract",
+          "source": "src/__tests__/integration/security-mode-gates.test.ts"
+        },
+        {
+          "name": "SECURITY_MODE content-type gates passes the plain-DIDComm meta JWK into controller bearer verification",
+          "category": "supporting-contract",
+          "source": "src/__tests__/integration/security-mode-gates.test.ts"
+        },
+        {
+          "name": "SECURITY_MODE content-type gates binds tenant plain-DIDComm verification to the post-DCR storage scope",
+          "category": "supporting-contract",
+          "source": "src/__tests__/integration/security-mode-gates.test.ts"
+        },
+        {
+          "name": "SECURITY_MODE content-type gates opts an individual FHIR data route into tenant-signed SMART bearer verification",
+          "category": "supporting-contract",
+          "source": "src/__tests__/integration/security-mode-gates.test.ts"
+        },
+        {
+          "name": "SMART token issuance (integration) should issue individual self-read through a trusted cross-portal DID binding",
+          "category": "supporting-contract",
+          "source": "src/__tests__/integration/identity/smart-token.test.ts"
+        },
+        {
+          "name": "SMART token issuance (integration) should issue token for a foreign tenant actor only when a matching inter-tenant contract VC is presented",
+          "category": "supporting-contract",
+          "source": "src/__tests__/integration/identity/smart-token.test.ts"
+        },
+        {
+          "name": "SMART token issuance (integration) should issue token for research access with one trusted external bearer instead of vp_token",
+          "category": "supporting-contract",
+          "source": "src/__tests__/integration/identity/smart-token.test.ts"
+        },
+        {
+          "name": "SMART token issuance (integration) should issue token for research access with one trusted external bearer and canonical ResearchSubject action",
+          "category": "supporting-contract",
+          "source": "src/__tests__/integration/identity/smart-token.test.ts"
+        },
+        {
+          "name": "AppAuthorizationManager verifyIdToken should return a valid result for a correct id_token",
+          "category": "supporting-contract",
+          "source": "src/__tests__/managers/AuthorizationManager.test.ts"
+        },
+        {
+          "name": "AppAuthorizationManager verifyIdToken should throw a ManagerError for an invalid id_token",
+          "category": "identity-negative",
+          "source": "src/__tests__/managers/AuthorizationManager.test.ts"
+        },
+        {
+          "name": "AppAuthorizationManager verifyIdToken should validate one deterministically signed id_token through a local virtual BFF verifier",
+          "category": "supporting-contract",
+          "source": "src/__tests__/managers/AuthorizationManager.test.ts"
+        },
+        {
+          "name": "AppAuthorizationManager verifyBearerToken accepts a tenant-signed SMART access token only when a data route opts in",
+          "category": "supporting-contract",
+          "source": "src/__tests__/managers/AuthorizationManager.test.ts"
+        },
+        {
+          "name": "AppAuthorizationManager verifyBearerToken should fall back to one signed controller proof bearer when id_token verification fails",
+          "category": "supporting-contract",
+          "source": "src/__tests__/managers/AuthorizationManager.test.ts"
+        },
+        {
+          "name": "AppAuthorizationManager verifyBearerToken keeps projected public JWK verification only outside tenant DCR scope",
+          "category": "supporting-contract",
+          "source": "src/__tests__/managers/AuthorizationManager.test.ts"
+        },
+        {
+          "name": "AppAuthorizationManager verifyBearerToken verifies a post-DCR controller proof with the registered key",
+          "category": "supporting-contract",
+          "source": "src/__tests__/managers/AuthorizationManager.test.ts"
+        },
+        {
+          "name": "AppAuthorizationManager verifyBearerToken verifies the stored legacy _activate bootstrap key when the proof issuer is its DID alias",
+          "category": "supporting-contract",
+          "source": "src/__tests__/managers/AuthorizationManager.test.ts"
+        },
+        {
+          "name": "AppAuthorizationManager verifyBearerToken rejects a tenant-scoped proof when its kid is not registered by DCR",
+          "category": "identity-negative",
+          "source": "src/__tests__/managers/AuthorizationManager.test.ts"
+        },
+        {
+          "name": "AppAuthorizationManager verifyAndConsumeActivationCode should return a valid license and mark it as active",
+          "category": "supporting-contract",
+          "source": "src/__tests__/managers/AuthorizationManager.test.ts"
+        },
+        {
+          "name": "AppAuthorizationManager verifyAndConsumeActivationCode should throw an error if activation code is not found",
+          "category": "supporting-contract",
+          "source": "src/__tests__/managers/AuthorizationManager.test.ts"
+        },
+        {
+          "name": "AppAuthorizationManager verifyAndConsumeActivationCode should reuse an active seat for a second installation of the same authenticated user",
+          "category": "supporting-contract",
+          "source": "src/__tests__/managers/AuthorizationManager.test.ts"
+        },
+        {
+          "name": "AppAuthorizationManager verifyAndConsumeActivationCode decrypts an indexed protected seat before reusing its activation credential",
+          "category": "supporting-contract",
+          "source": "src/__tests__/managers/AuthorizationManager.test.ts"
+        },
+        {
+          "name": "AppAuthorizationManager verifyAndConsumeActivationCode should bind a legacy active seat to its first authenticated reuse",
+          "category": "supporting-contract",
+          "source": "src/__tests__/managers/AuthorizationManager.test.ts"
+        },
+        {
+          "name": "AppAuthorizationManager rotateEmployeeActivationCodeForOwnedDevice rotates only the active seat bound to the OTP-authenticated email and installation",
+          "category": "supporting-contract",
+          "source": "src/__tests__/managers/AuthorizationManager.test.ts"
+        },
+        {
+          "name": "AppAuthorizationManager rotateEmployeeActivationCodeForOwnedDevice rejects a different email even when it knows the installation id",
+          "category": "identity-negative",
+          "source": "src/__tests__/managers/AuthorizationManager.test.ts"
+        },
+        {
+          "name": "break-glass sector and profession policy allows a verified physician to request read-only human emergency access through health-care",
+          "category": "supporting-contract",
+          "source": "src/__tests__/unit/security/break-glass.test.ts"
+        },
+        {
+          "name": "break-glass sector and profession policy never allows a human break-glass request through health-research",
+          "category": "supporting-contract",
+          "source": "src/__tests__/unit/security/break-glass.test.ts"
+        },
+        {
+          "name": "break-glass sector and profession policy never allows a human break-glass request through onehealth-research",
+          "category": "supporting-contract",
+          "source": "src/__tests__/unit/security/break-glass.test.ts"
+        },
+        {
+          "name": "break-glass sector and profession policy never allows a human break-glass request through animal-care",
+          "category": "supporting-contract",
+          "source": "src/__tests__/unit/security/break-glass.test.ts"
+        },
+        {
+          "name": "break-glass sector and profession policy never allows a human break-glass request through animal-research",
+          "category": "supporting-contract",
+          "source": "src/__tests__/unit/security/break-glass.test.ts"
+        },
+        {
+          "name": "break-glass sector and profession policy does not infer emergency authority from nursing or employment alone",
+          "category": "supporting-contract",
+          "source": "src/__tests__/unit/security/break-glass.test.ts"
+        },
+        {
+          "name": "break-glass sector and profession policy allows veterinarians only for animal subjects through animal-care",
+          "category": "supporting-contract",
+          "source": "src/__tests__/unit/security/break-glass.test.ts"
+        },
+        {
+          "name": "break-glass sector and profession policy rejects write scopes even for an otherwise authorized physician",
+          "category": "policy-negative",
+          "source": "src/__tests__/unit/security/break-glass.test.ts"
+        },
+        {
+          "name": "break-glass audit and controller notice persists one 24-hour emergency Consent and issues renewable 15-minute token authorizations",
+          "category": "supporting-contract",
+          "source": "src/__tests__/unit/security/break-glass.test.ts"
+        },
+        {
+          "name": "break-glass audit and controller notice rejects a declared animal kind for a human DID before writing audit data",
+          "category": "policy-negative",
+          "source": "src/__tests__/unit/security/break-glass.test.ts"
+        },
+        {
+          "name": "DefaultActivationTrustAdapter marks strict trust checks in test-network/network and delegates VP verification",
+          "category": "supporting-contract",
+          "source": "src/__tests__/unit/adapters/activation-trust.adapter.test.ts"
+        },
+        {
+          "name": "DefaultActivationTrustAdapter allows activation consistency evaluation without representative credential",
+          "category": "supporting-contract",
+          "source": "src/__tests__/unit/adapters/activation-trust.adapter.test.ts"
+        },
+        {
+          "name": "DefaultActivationTrustAdapter accepts only the old combined representative authority as a two-VC compatibility fallback",
+          "category": "supporting-contract",
+          "source": "src/__tests__/unit/adapters/activation-trust.adapter.test.ts"
+        },
+        {
+          "name": "DefaultActivationTrustAdapter verifies one deterministically signed ES384 vp_token in strict mode when the controller JWK is embedded",
+          "category": "supporting-contract",
+          "source": "src/__tests__/unit/adapters/activation-trust.adapter.test.ts"
+        },
+        {
+          "name": "OpenIdAuthManager break-glass SMART integration issues a short emergency token only after the authorizer records the exception",
+          "category": "supporting-contract",
+          "source": "src/__tests__/unit/managers/OpenIdAuthManager.break-glass.test.ts"
+        }
+      ],
+      "startedAt": "2026-11-15T19:58:21.023000+00:00",
+      "endedAt": "2026-11-15T19:58:58.363000+00:00",
+      "workingDirectory": "${GW_ROOT}"
+    },
+    {
+      "id": "real-identity",
+      "layer": "source",
+      "node": "v26.13.0",
+      "command": [
+        "node",
+        "scripts/run-jest.mjs",
+        "--runInBand",
+        "--no-coverage",
+        "--json",
+        "--outputFile=${EVIDENCE_DIR}/real-identity-results.json",
+        "--runTestsByPath",
+        "src/__tests__/integration/identity/e9-oidc-verification.test.ts"
+      ],
+      "exitCode": 0,
+      "tests": {
+        "total": 10,
+        "passed": 10,
+        "failed": 0,
+        "skipped": 0
+      },
+      "log": {
+        "path": "real-identity.log",
+        "sha256": "0707ac9bd0ae04aa53347cba7ea6cd7d140d59fcbd15eb53ee68a3695df2293d"
+      },
+      "results": {
+        "path": "real-identity-results.json",
+        "sha256": "9d3ee16d176f3bb5fd16e403099ba1d59dde35ae71c745c019a4d0157059399b"
+      },
+      "cases": [
+        {
+          "name": "E9 real OIDC identity verification [ID-P01] accepts a correctly signed identity through actual discovery and JWKS HTTP",
+          "category": "identity-positive",
+          "source": "src/__tests__/integration/identity/e9-oidc-verification.test.ts"
+        },
+        {
+          "name": "E9 real OIDC identity verification [ID-N01] rejects a payload modified after signing",
+          "category": "identity-negative",
+          "source": "src/__tests__/integration/identity/e9-oidc-verification.test.ts"
+        },
+        {
+          "name": "E9 real OIDC identity verification [ID-N02] rejects an expired signed identity",
+          "category": "identity-negative",
+          "source": "src/__tests__/integration/identity/e9-oidc-verification.test.ts"
+        },
+        {
+          "name": "E9 real OIDC identity verification [ID-N03] rejects an identity not yet valid",
+          "category": "identity-negative",
+          "source": "src/__tests__/integration/identity/e9-oidc-verification.test.ts"
+        },
+        {
+          "name": "E9 real OIDC identity verification [ID-N04] rejects a signed identity intended for another audience",
+          "category": "identity-negative",
+          "source": "src/__tests__/integration/identity/e9-oidc-verification.test.ts"
+        },
+        {
+          "name": "E9 real OIDC identity verification [ID-N05] rejects a signed identity from another issuer",
+          "category": "identity-negative",
+          "source": "src/__tests__/integration/identity/e9-oidc-verification.test.ts"
+        },
+        {
+          "name": "E9 real OIDC identity verification [ID-N06] rejects a key absent from the current issuer key set",
+          "category": "identity-negative",
+          "source": "src/__tests__/integration/identity/e9-oidc-verification.test.ts"
+        },
+        {
+          "name": "E9 real OIDC identity verification [ID-N07] rejects a discovery document impersonating another issuer",
+          "category": "identity-negative",
+          "source": "src/__tests__/integration/identity/e9-oidc-verification.test.ts"
+        },
+        {
+          "name": "E9 real OIDC identity verification [ID-N08] rejects an issuer outside the explicitly trusted providers",
+          "category": "identity-negative",
+          "source": "src/__tests__/integration/identity/e9-oidc-verification.test.ts"
+        },
+        {
+          "name": "E9 real OIDC identity verification [ID-N09] rejects malformed credentials before trusting any issuer",
+          "category": "identity-negative",
+          "source": "src/__tests__/integration/identity/e9-oidc-verification.test.ts"
+        }
+      ],
+      "startedAt": "2026-11-15T20:01:31.116000+00:00",
+      "endedAt": "2026-11-15T20:01:39.914000+00:00",
+      "workingDirectory": "${GW_ROOT}"
+    }
+  ],
+  "counting": "Focused and real-identity runs are disjoint. Full-suite diagnostic repeats them and is not added to their total. Evidence-validator tests are not gateway policy cases.",
+  "fullSuiteDiagnostic": {
+    "total": 1184,
+    "passed": 1181,
+    "failed": 0,
+    "skipped": 3,
+    "skippedCases": [
+      {
+        "source": "src/__tests__/integration/vault-blood-pressure-day-batch.e2e.spec.ts",
+        "name": "FirestoreVaultRepository blood-pressure day batches (E2E) keeps a 3-reading daily batch pending until its blockchain tx id is written",
+        "status": "pending"
+      },
+      {
+        "source": "src/__tests__/unit/utils/ubl-invoice.test.ts",
+        "name": "UBL Invoice (EN 16931) validation + hash validates against EN 16931 XSD schema",
+        "status": "pending"
+      },
+      {
+        "source": "src/__tests__/integration/icaOnline.test.ts",
+        "name": "ICA online integration should reach the ICA Fabric-CA endpoint (fails if offline)",
+        "status": "pending"
+      }
+    ],
+    "includedInPolicyTotals": false
+  },
+  "fabric": {
+    "layer": "published-image",
+    "environment": "local-network",
+    "securityProfile": "Repository canonical demo/local-network fixtures; not a live external Clearing House or portal journey",
+    "image": "ghcr.io/global-datacare/gw-core@sha256:a19ba9f712642da6a715e0039352204fc21d7546a6dfcd86cd8f17f26158c2f8",
+    "runtime": {
+      "version": "1.26.0",
+      "node": "v26.13.0"
+    },
+    "exitCode": 0,
+    "flowCount": 8,
+    "allowed": 5,
+    "denied": 3,
+    "verifiedFlows": [
+      "individual-consent-smart-scoped-summary",
+      "individual-consent-smart-bundle-search",
+      "medical-secretary-consent-smart-bundle-search-allow",
+      "medical-secretary-without-consent-smart-token-deny",
+      "research-contract-consent-smart-digitaltwin-search-role-allow",
+      "research-contract-consent-smart-digitaltwin-search-role-deny",
+      "research-contract-consent-smart-digitaltwin-search-email-allow",
+      "research-contract-consent-smart-digitaltwin-search-email-deny"
+    ],
+    "log": {
+      "path": "fabric-10-published-image-policy.log",
+      "sha256": "e5ad202a9ab077c73023f178bf184a47088eb141d11c72bc45f0496121693675"
+    },
+    "runtimeEvidence": {
+      "path": "fabric-11-runtime-version.log",
+      "sha256": "4444bfc91878e512982855eb79480104056ebf4adefd1b4506104648c7f08326"
+    },
+    "commands": {
+      "path": "fabric-commands.json",
+      "sha256": "9603b6ad73db51d404d60ab0215494cde5d8be6709c5a92ecbd363dc3fe820ee"
+    },
+    "preflight": {
+      "path": "fabric-preflight.json",
+      "sha256": "a165b4ae74d8c741f1b2184c1e6da32beac834480811341a9a04a45e48139089"
+    },
+    "cleanup": {
+      "path": "fabric-cleanup.json",
+      "sha256": "e930d5ceccf5391bdf8da091bb30706b83830920ca40e9b821b50c96cc260a80"
+    },
+    "counting": "Eight complete journeys; consent-rule assets and HTTP steps are not additional cases.",
+    "observedTransactionIds": [
+      "b03ca039eeb49e137f109b8319baae73e17551e0d9b41cf5eda2d7f3294e68c7",
+      "ca947b326256884326466ab59b8908a9da6f708aa4b6ea36ae831ebd074603f6"
+    ]
+  },
+  "testHarness": [
+    {
+      "path": "scripts/verify-e9-gw-policy-evidence.mjs",
+      "sha256": "a1b36f577af2b0b32d1fa8d14263cdc17d86be93510f0fa24836fcd8c198453e"
+    },
+    {
+      "path": "scripts/tests/e9-gw-policy-evidence.test.mjs",
+      "sha256": "e52450b811d1183081d624eea2b0250175253f61c94e084e79c9908057605d21"
+    },
+    {
+      "path": "src/__tests__/integration/identity/e9-oidc-verification.test.ts",
+      "sha256": "3f9a0c4629ed63bd16d1bcdd885df0849c4af584f4d77b151cb0d4c087c85885"
+    }
+  ],
+  "logHandling": "User paths, disposable JWT values and any private-key PEM are redacted. Complete originals remain in private operator custody. Trailing whitespace in expected-red contract logs is normalized.",
+  "knownLimitations": [
+    "No end-to-end claim about a revoked business credential being refused by an external verifier.",
+    "No cross-cloud staging or authenticated GDC portal claim.",
+    "Three pre-existing general-suite omissions are disclosed separately and excluded from accepted policy counts."
+  ],
+  "finalCleanup": {
+    "path": "final-local-cleanup.json",
+    "sha256": "e58e5da47d45bf479b5fded09f3fe9ea438f9e23933554b41c46a369c4348486"
+  }
+}

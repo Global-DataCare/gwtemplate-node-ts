@@ -1,0 +1,11 @@
+{
+  "removedOwnedEphemeralKeyAndEnvironmentPaths": [
+    "infra/fabric/local-network/organizations",
+    "infra/fabric/local-network/crypto/ca",
+    ".env.local-demo",
+    ".env.local-fabric",
+    ".env.local-fabric-devnet",
+    "infra/fabric/local-network/.env.fabric-devnet"
+  ],
+  "ownedPortsStillBusy": []
+}

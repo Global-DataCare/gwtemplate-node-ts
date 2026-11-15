@@ -1,0 +1,168 @@
+[
+  {
+    "id": "fabric-01-disposable-root",
+    "command": [
+      "node",
+      "${WORKSPACE_ROOT}/dataspace-ca-ts/bin/dataspace-ca-cli.js",
+      "root:bootstrap",
+      "--domain",
+      "ca.local.example.test",
+      "--profile",
+      "staging",
+      "--passphrase-env",
+      "ROOT_PASSPHRASE",
+      "--scrypt",
+      "10:1:1:48",
+      "--out-dir",
+      "${GW_ROOT}/artifacts/e9-private-runtime/root"
+    ],
+    "cwd": "${GW_ROOT}",
+    "startedAt": "2026-11-15T20:10:14.763301+00:00",
+    "endedAt": "2026-11-15T20:10:15.020530+00:00",
+    "exitCode": 0,
+    "log": "${HOME}/Recuperacion-GDC-2026-11-14/e9-gw-core-1260/fabric-01-disposable-root.log"
+  },
+  {
+    "id": "fabric-02-disposable-issuer",
+    "command": [
+      "node",
+      "${WORKSPACE_ROOT}/dataspace-ca-ts/bin/dataspace-ca-cli.js",
+      "issuer:bootstrap",
+      "--domain",
+      "ca.local.example.test",
+      "--root-dir",
+      "${GW_ROOT}/artifacts/e9-private-runtime/root",
+      "--profile",
+      "staging",
+      "--passphrase-env",
+      "ISSUER_PASSPHRASE",
+      "--scrypt",
+      "10:1:1:48",
+      "--jurisdiction",
+      "EU",
+      "--sector",
+      "health-care",
+      "--out-dir",
+      "${GW_ROOT}/artifacts/e9-private-runtime/issuer"
+    ],
+    "cwd": "${GW_ROOT}",
+    "startedAt": "2026-11-15T20:10:15.021414+00:00",
+    "endedAt": "2026-11-15T20:10:15.267528+00:00",
+    "exitCode": 0,
+    "log": "${HOME}/Recuperacion-GDC-2026-11-14/e9-gw-core-1260/fabric-02-disposable-issuer.log"
+  },
+  {
+    "id": "fabric-03-copy-ca",
+    "command": [
+      "bash",
+      "scripts/00-copy-dataspace-ca.sh",
+      "${GW_ROOT}/artifacts/e9-private-runtime/root",
+      "${GW_ROOT}/artifacts/e9-private-runtime/issuer"
+    ],
+    "cwd": "${GW_ROOT}/infra/fabric/local-network",
+    "startedAt": "2026-11-15T20:10:15.268421+00:00",
+    "endedAt": "2026-11-15T20:10:15.337222+00:00",
+    "exitCode": 0,
+    "log": "${HOME}/Recuperacion-GDC-2026-11-14/e9-gw-core-1260/fabric-03-copy-ca.log"
+  },
+  {
+    "id": "fabric-04-start-ca",
+    "command": [
+      "bash",
+      "scripts/01-up-cas.sh"
+    ],
+    "cwd": "${GW_ROOT}/infra/fabric/local-network",
+    "startedAt": "2026-11-15T20:10:15.338073+00:00",
+    "endedAt": "2026-11-15T20:10:18.392626+00:00",
+    "exitCode": 0,
+    "log": "${HOME}/Recuperacion-GDC-2026-11-14/e9-gw-core-1260/fabric-04-start-ca.log"
+  },
+  {
+    "id": "fabric-05-bootstrap-network",
+    "command": [
+      "bash",
+      "scripts/02-bootstrap-network.sh"
+    ],
+    "cwd": "${GW_ROOT}/infra/fabric/local-network",
+    "startedAt": "2026-11-15T20:10:18.394073+00:00",
+    "endedAt": "2026-11-15T20:10:39.091461+00:00",
+    "exitCode": 0,
+    "log": "${HOME}/Recuperacion-GDC-2026-11-14/e9-gw-core-1260/fabric-05-bootstrap-network.log"
+  },
+  {
+    "id": "fabric-06-backend-env",
+    "command": [
+      "bash",
+      "scripts/04-generate-backend-env.sh"
+    ],
+    "cwd": "${GW_ROOT}/infra/fabric/local-network",
+    "startedAt": "2026-11-15T20:10:39.092398+00:00",
+    "endedAt": "2026-11-15T20:10:39.195388+00:00",
+    "exitCode": 0,
+    "log": "${HOME}/Recuperacion-GDC-2026-11-14/e9-gw-core-1260/fabric-06-backend-env.log"
+  },
+  {
+    "id": "fabric-07-gw-env",
+    "command": [
+      "bash",
+      "scripts/prepare-consentaccess-local-fabric-env.sh"
+    ],
+    "cwd": "${GW_ROOT}",
+    "startedAt": "2026-11-15T20:10:39.196296+00:00",
+    "endedAt": "2026-11-15T20:10:39.320805+00:00",
+    "exitCode": 0,
+    "log": "${HOME}/Recuperacion-GDC-2026-11-14/e9-gw-core-1260/fabric-07-gw-env.log"
+  },
+  {
+    "id": "fabric-08-identity-contracts",
+    "command": [
+      "bash",
+      "scripts/05-deploy-identity-chaincodes.sh"
+    ],
+    "cwd": "${GW_ROOT}/infra/fabric/local-network",
+    "startedAt": "2026-11-15T20:10:39.321793+00:00",
+    "endedAt": "2026-11-15T20:13:27.259934+00:00",
+    "exitCode": 0,
+    "log": "${HOME}/Recuperacion-GDC-2026-11-14/e9-gw-core-1260/fabric-08-identity-contracts.log"
+  },
+  {
+    "id": "fabric-09-consent-contract",
+    "command": [
+      "bash",
+      "chaincode/scripts/consentaccess-local-devnet.sh"
+    ],
+    "cwd": "${GW_ROOT}",
+    "startedAt": "2026-11-15T20:13:27.261521+00:00",
+    "endedAt": "2026-11-15T20:14:27.333991+00:00",
+    "exitCode": 0,
+    "log": "${HOME}/Recuperacion-GDC-2026-11-14/e9-gw-core-1260/fabric-09-consent-contract.log"
+  },
+  {
+    "id": "fabric-10-published-image-policy",
+    "command": [
+      "bash",
+      "scripts/smoke-docker-local-network.sh"
+    ],
+    "cwd": "${GW_ROOT}",
+    "startedAt": "2026-11-15T20:14:27.335097+00:00",
+    "endedAt": "2026-11-15T20:16:15.781869+00:00",
+    "exitCode": 0,
+    "log": "${HOME}/Recuperacion-GDC-2026-11-14/e9-gw-core-1260/fabric-10-published-image-policy.log"
+  },
+  {
+    "id": "fabric-11-runtime-version",
+    "command": [
+      "docker",
+      "exec",
+      "e9-1260-20261115-gw",
+      "node",
+      "-e",
+      "console.log(JSON.stringify({version:require(\"./package.json\").version,node:process.version}))"
+    ],
+    "cwd": "${GW_ROOT}",
+    "startedAt": "2026-11-15T20:16:15.783019+00:00",
+    "endedAt": "2026-11-15T20:16:16.022847+00:00",
+    "exitCode": 0,
+    "log": "${HOME}/Recuperacion-GDC-2026-11-14/e9-gw-core-1260/fabric-11-runtime-version.log"
+  }
+]

@@ -1,0 +1,15 @@
+
+> gwtemplate-node-ts@1.26.0 check:environment-template
+> node scripts/validate-environment-template.mjs && node --test scripts/tests/environment-template-policy.test.mjs
+
+✔ accepts the one versioned template and ignored runtime environment contract (7.754112ms)
+✔ rejects the legacy filename, unignored runtime files and populated secrets (0.890388ms)
+✔ keeps this repository compliant with the environment template contract (43.86084ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 277.491414

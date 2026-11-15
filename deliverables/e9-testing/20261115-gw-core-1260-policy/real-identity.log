@@ -1,0 +1,13 @@
+  console.log
+    [dotenv@17.2.3] injecting env (0) from .env.local-demo -- tip: ⚙️  write to custom object with { processEnv: myObject }
+
+      at _log (node_modules/dotenv/lib/main.js:142:11)
+
+(node:22730) ExperimentalWarning: VM Modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+Test Suites: 1 passed, 1 total
+Tests:       10 passed, 10 total
+Snapshots:   0 total
+Time:        8.803 s
+Ran all test suites within paths "src/__tests__/integration/identity/e9-oidc-verification.test.ts".
+Test results written to: ../../../../Recuperacion-GDC-2026-11-14/e9-gw-core-1260/real-identity-results.json

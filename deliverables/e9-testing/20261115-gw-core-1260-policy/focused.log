@@ -1,0 +1,403 @@
+  console.log
+    [dotenv@17.2.3] injecting env (0) from .env.local-demo -- tip: ⚙️  override existing env vars with { override: true }
+
+      at _log (node_modules/dotenv/lib/main.js:142:11)
+
+(node:21157) ExperimentalWarning: VM Modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+  console.log
+    [dotenv@17.2.3] injecting env (0) from .env.local-demo -- tip: 👥 sync secrets across teammates & machines: https://dotenvx.com/ops
+
+      at _log (node_modules/dotenv/lib/main.js:142:11)
+
+  console.warn
+    [API] Legacy host onboarding endpoint used (Organization/_batch or alias _verify). Prefer Organization/_transaction for canonical ICA-backed onboarding. Organization/_activate remains legacy compatibility for ICA-proof-first callers.
+
+      3579 |       && (normalizedAction === '_batch' || normalizedAction === '_verify');
+      3580 |     if (isLegacyHostOrganizationSubmit) {
+    > 3581 |       console.warn(
+           |               ^
+      3582 |         '[API] Legacy host onboarding endpoint used (Organization/_batch or alias _verify). '
+      3583 |         + 'Prefer Organization/_transaction for canonical ICA-backed onboarding. '
+      3584 |         + 'Organization/_activate remains legacy compatibility for ICA-proof-first callers.',
+
+      at src/routes/api.ts:3581:15
+      at Layer.handle [as handle_request] (node_modules/express/lib/router/layer.js:95:5)
+      at next (node_modules/express/lib/router/route.js:149:13)
+      at Route.dispatch (node_modules/express/lib/router/route.js:119:3)
+      at Layer.handle [as handle_request] (node_modules/express/lib/router/layer.js:95:5)
+      at node_modules/express/lib/router/index.js:284:15
+      at param (node_modules/express/lib/router/index.js:365:14)
+      at param (node_modules/express/lib/router/index.js:376:14)
+      at param (node_modules/express/lib/router/index.js:376:14)
+      at param (node_modules/express/lib/router/index.js:376:14)
+      at param (node_modules/express/lib/router/index.js:376:14)
+      at param (node_modules/express/lib/router/index.js:376:14)
+      at param (node_modules/express/lib/router/index.js:376:14)
+      at param (node_modules/express/lib/router/index.js:376:14)
+      at router.process_params (node_modules/express/lib/router/index.js:421:3)
+      at next (node_modules/express/lib/router/index.js:280:10)
+      at next (node_modules/express/lib/router/route.js:141:14)
+      at pollingGate (src/routes/api.ts:807:55)
+      at Layer.handle [as handle_request] (node_modules/express/lib/router/layer.js:95:5)
+      at next (node_modules/express/lib/router/route.js:149:13)
+      at Route.dispatch (node_modules/express/lib/router/route.js:119:3)
+      at Layer.handle [as handle_request] (node_modules/express/lib/router/layer.js:95:5)
+      at node_modules/express/lib/router/index.js:284:15
+      at param (node_modules/express/lib/router/index.js:365:14)
+      at param (node_modules/express/lib/router/index.js:376:14)
+      at param (node_modules/express/lib/router/index.js:376:14)
+      at param (node_modules/express/lib/router/index.js:376:14)
+      at param (node_modules/express/lib/router/index.js:376:14)
+      at param (node_modules/express/lib/router/index.js:376:14)
+      at param (node_modules/express/lib/router/index.js:376:14)
+      at param (node_modules/express/lib/router/index.js:376:14)
+      at router.process_params (node_modules/express/lib/router/index.js:421:3)
+      at next (node_modules/express/lib/router/index.js:280:10)
+      at router.handle (node_modules/express/lib/router/index.js:175:3)
+      at router (node_modules/express/lib/router/index.js:47:12)
+      at Layer.handle [as handle_request] (node_modules/express/lib/router/layer.js:95:5)
+      at trim_prefix (node_modules/express/lib/router/index.js:328:13)
+      at node_modules/express/lib/router/index.js:286:9
+      at router.process_params (node_modules/express/lib/router/index.js:346:12)
+      at next (node_modules/express/lib/router/index.js:280:10)
+      at urlencodedParser (node_modules/body-parser/lib/types/urlencoded.js:86:7)
+      at Layer.handle [as handle_request] (node_modules/express/lib/router/layer.js:95:5)
+      at trim_prefix (node_modules/express/lib/router/index.js:328:13)
+      at node_modules/express/lib/router/index.js:286:9
+      at router.process_params (node_modules/express/lib/router/index.js:346:12)
+      at next (node_modules/express/lib/router/index.js:280:10)
+      at node_modules/body-parser/lib/read.js:155:5
+      at invokeCallback (node_modules/raw-body/index.js:238:16)
+      at done (node_modules/raw-body/index.js:227:7)
+      at IncomingMessage.onEnd (node_modules/raw-body/index.js:287:7)
+
+  console.log
+    [dotenv@17.2.3] injecting env (0) from .env.local-demo -- tip: ⚙️  write to custom object with { processEnv: myObject }
+
+      at _log (node_modules/dotenv/lib/main.js:142:11)
+
+  console.warn
+    WARN: Could not load swagger-spec.json. Did you run `npm run build`? Error: Error: ENOENT: no such file or directory, open '${GW_ROOT}/swagger-spec.json'
+
+      91 |     return JSON.parse(fs.readFileSync(swaggerSpecPath, 'utf8'));
+      92 |   } catch (error) {
+    > 93 |     console.warn(`WARN: Could not load swagger-spec.json. Did you run \`npm run build\`? Error: ${error}`);
+         |             ^
+      94 |     return {
+      95 |       openapi: '3.0.0',
+      96 |       info: { title: 'Swagger Spec Not Found', version: '0.0.0' },
+
+      at loadSwaggerSpecFromDisk (src/server.ts:93:13)
+      at src/server.ts:103:24
+
+  console.warn
+    [Config] SECTORS_ALLOWED is deprecated. Use ALLOWED_SECTORS.
+
+      283 |   const legacyCsv = String(env.SECTORS_ALLOWED || '').trim();
+      284 |   if (legacyCsv) {
+    > 285 |     console.warn('[Config] SECTORS_ALLOWED is deprecated. Use ALLOWED_SECTORS.');
+          |             ^
+      286 |     return applyDefaultAllowedSectors(parseAndValidateSectors(legacyCsv), env);
+      287 |   }
+      288 |
+
+      at resolveAllowedSectorsFromEnv (src/config/server-config.ts:285:13)
+      at getConfig (src/config/server-config.ts:392:23)
+      at startServer (src/server.ts:154:18)
+      at Object.<anonymous> (src/__tests__/integration/identity/smart-token.test.ts:88:85)
+
+  console.log
+    [GW-API] Security mode=demo network-mode=test capabilities: didcomm-encrypted=true, didcomm-plain=true, didcomm-plaintext-legacy=false, json-legacy=true, fhir-legacy=true, insecure-bearer=true
+
+      at logSecurityModeCapabilities (src/server.ts:134:11)
+
+  console.log
+    [GW-API] Using In-Memory Storage Adapter.
+
+      at buildInfrastructure (src/bootstrap/build-infrastructure.ts:80:13)
+
+  console.log
+    [GW-API] Using In-Memory Vault Repository (cleared).
+
+      at buildInfrastructure (src/bootstrap/build-infrastructure.ts:98:13)
+
+  console.warn
+    [GW-API] Envelope provider is memory. Use this only for dev/test.
+
+      107 |   const { adapter: envelopeAdapter, provider: envelopeProvider } = await createEnvelopeAdapter(config);
+      108 |   if (envelopeProvider === 'memory') {
+    > 109 |     console.warn('[GW-API] Envelope provider is memory. Use this only for dev/test.');
+          |             ^
+      110 |   }
+      111 |   console.log(`[GW-API] Using envelope provider: ${envelopeProvider}`);
+      112 |   if (config.nodeEnv === 'demo') {
+
+      at buildInfrastructure (src/bootstrap/build-infrastructure.ts:109:13)
+      at startServer (src/server.ts:203:7)
+      at Object.<anonymous> (src/__tests__/integration/identity/smart-token.test.ts:88:79)
+
+  console.log
+    [GW-API] Using envelope provider: memory
+
+      at buildInfrastructure (src/bootstrap/build-infrastructure.ts:111:11)
+
+  console.log
+    [GW-API] Using KmsService.
+
+      at buildInfrastructure (src/bootstrap/build-infrastructure.ts:124:13)
+
+  console.log
+    [GW-API] Host tenant not found. Bootstrapping...
+
+      at startServer (src/server.ts:267:15)
+
+  console.log
+    [GW-API] Warming up host cache after bootstrap...
+
+      at startServer (src/server.ts:271:15)
+
+  console.log
+    [Webhooks] Optional payment webhook adapter is disabled.
+
+      at createWebhooksRouter (src/routes/webhooks.ts:21:13)
+
+  console.warn
+    [Config] SECTORS_ALLOWED is deprecated. Use ALLOWED_SECTORS.
+
+      283 |   const legacyCsv = String(env.SECTORS_ALLOWED || '').trim();
+      284 |   if (legacyCsv) {
+    > 285 |     console.warn('[Config] SECTORS_ALLOWED is deprecated. Use ALLOWED_SECTORS.');
+          |             ^
+      286 |     return applyDefaultAllowedSectors(parseAndValidateSectors(legacyCsv), env);
+      287 |   }
+      288 |
+
+      at resolveAllowedSectorsFromEnv (src/config/server-config.ts:285:13)
+      at getConfig (src/config/server-config.ts:392:23)
+      at startServer (src/server.ts:154:18)
+      at Object.<anonymous> (src/__tests__/integration/identity/smart-token.test.ts:220:85)
+
+  console.log
+    [GW-API] Security mode=demo network-mode=test capabilities: didcomm-encrypted=true, didcomm-plain=true, didcomm-plaintext-legacy=false, json-legacy=true, fhir-legacy=true, insecure-bearer=true
+
+      at logSecurityModeCapabilities (src/server.ts:134:11)
+
+  console.log
+    [GW-API] Using In-Memory Storage Adapter.
+
+      at buildInfrastructure (src/bootstrap/build-infrastructure.ts:80:13)
+
+  console.log
+    [GW-API] Using In-Memory Vault Repository (cleared).
+
+      at buildInfrastructure (src/bootstrap/build-infrastructure.ts:98:13)
+
+  console.warn
+    [GW-API] Envelope provider is memory. Use this only for dev/test.
+
+      107 |   const { adapter: envelopeAdapter, provider: envelopeProvider } = await createEnvelopeAdapter(config);
+      108 |   if (envelopeProvider === 'memory') {
+    > 109 |     console.warn('[GW-API] Envelope provider is memory. Use this only for dev/test.');
+          |             ^
+      110 |   }
+      111 |   console.log(`[GW-API] Using envelope provider: ${envelopeProvider}`);
+      112 |   if (config.nodeEnv === 'demo') {
+
+      at buildInfrastructure (src/bootstrap/build-infrastructure.ts:109:13)
+      at startServer (src/server.ts:203:7)
+      at Object.<anonymous> (src/__tests__/integration/identity/smart-token.test.ts:220:79)
+
+  console.log
+    [GW-API] Using envelope provider: memory
+
+      at buildInfrastructure (src/bootstrap/build-infrastructure.ts:111:11)
+
+  console.log
+    [GW-API] Using KmsService.
+
+      at buildInfrastructure (src/bootstrap/build-infrastructure.ts:124:13)
+
+  console.log
+    [GW-API] Host tenant not found. Bootstrapping...
+
+      at startServer (src/server.ts:267:15)
+
+  console.log
+    [GW-API] Warming up host cache after bootstrap...
+
+      at startServer (src/server.ts:271:15)
+
+  console.log
+    [Webhooks] Optional payment webhook adapter is disabled.
+
+      at createWebhooksRouter (src/routes/webhooks.ts:21:13)
+
+  console.warn
+    [Config] SECTORS_ALLOWED is deprecated. Use ALLOWED_SECTORS.
+
+      283 |   const legacyCsv = String(env.SECTORS_ALLOWED || '').trim();
+      284 |   if (legacyCsv) {
+    > 285 |     console.warn('[Config] SECTORS_ALLOWED is deprecated. Use ALLOWED_SECTORS.');
+          |             ^
+      286 |     return applyDefaultAllowedSectors(parseAndValidateSectors(legacyCsv), env);
+      287 |   }
+      288 |
+
+      at resolveAllowedSectorsFromEnv (src/config/server-config.ts:285:13)
+      at getConfig (src/config/server-config.ts:392:23)
+      at startServer (src/server.ts:154:18)
+      at Object.<anonymous> (src/__tests__/integration/identity/smart-token.test.ts:342:85)
+
+  console.log
+    [GW-API] Security mode=demo network-mode=test capabilities: didcomm-encrypted=true, didcomm-plain=true, didcomm-plaintext-legacy=false, json-legacy=true, fhir-legacy=true, insecure-bearer=false
+
+      at logSecurityModeCapabilities (src/server.ts:134:11)
+
+  console.log
+    [GW-API] Using In-Memory Storage Adapter.
+
+      at buildInfrastructure (src/bootstrap/build-infrastructure.ts:80:13)
+
+  console.log
+    [GW-API] Using In-Memory Vault Repository (cleared).
+
+      at buildInfrastructure (src/bootstrap/build-infrastructure.ts:98:13)
+
+  console.warn
+    [GW-API] Envelope provider is memory. Use this only for dev/test.
+
+      107 |   const { adapter: envelopeAdapter, provider: envelopeProvider } = await createEnvelopeAdapter(config);
+      108 |   if (envelopeProvider === 'memory') {
+    > 109 |     console.warn('[GW-API] Envelope provider is memory. Use this only for dev/test.');
+          |             ^
+      110 |   }
+      111 |   console.log(`[GW-API] Using envelope provider: ${envelopeProvider}`);
+      112 |   if (config.nodeEnv === 'demo') {
+
+      at buildInfrastructure (src/bootstrap/build-infrastructure.ts:109:13)
+      at startServer (src/server.ts:203:7)
+      at Object.<anonymous> (src/__tests__/integration/identity/smart-token.test.ts:342:79)
+
+  console.log
+    [GW-API] Using envelope provider: memory
+
+      at buildInfrastructure (src/bootstrap/build-infrastructure.ts:111:11)
+
+  console.log
+    [GW-API] Using KmsService.
+
+      at buildInfrastructure (src/bootstrap/build-infrastructure.ts:124:13)
+
+  console.log
+    [GW-API] Host tenant not found. Bootstrapping...
+
+      at startServer (src/server.ts:267:15)
+
+  console.log
+    [GW-API] Warming up host cache after bootstrap...
+
+      at startServer (src/server.ts:271:15)
+
+  console.log
+    [Webhooks] Optional payment webhook adapter is disabled.
+
+      at createWebhooksRouter (src/routes/webhooks.ts:21:13)
+
+  console.warn
+    [Config] SECTORS_ALLOWED is deprecated. Use ALLOWED_SECTORS.
+
+      283 |   const legacyCsv = String(env.SECTORS_ALLOWED || '').trim();
+      284 |   if (legacyCsv) {
+    > 285 |     console.warn('[Config] SECTORS_ALLOWED is deprecated. Use ALLOWED_SECTORS.');
+          |             ^
+      286 |     return applyDefaultAllowedSectors(parseAndValidateSectors(legacyCsv), env);
+      287 |   }
+      288 |
+
+      at resolveAllowedSectorsFromEnv (src/config/server-config.ts:285:13)
+      at getConfig (src/config/server-config.ts:392:23)
+      at startServer (src/server.ts:154:18)
+      at Object.<anonymous> (src/__tests__/integration/identity/smart-token.test.ts:469:85)
+
+  console.log
+    [GW-API] Security mode=demo network-mode=test capabilities: didcomm-encrypted=true, didcomm-plain=true, didcomm-plaintext-legacy=false, json-legacy=true, fhir-legacy=true, insecure-bearer=false
+
+      at logSecurityModeCapabilities (src/server.ts:134:11)
+
+  console.log
+    [GW-API] Using In-Memory Storage Adapter.
+
+      at buildInfrastructure (src/bootstrap/build-infrastructure.ts:80:13)
+
+  console.log
+    [GW-API] Using In-Memory Vault Repository (cleared).
+
+      at buildInfrastructure (src/bootstrap/build-infrastructure.ts:98:13)
+
+  console.warn
+    [GW-API] Envelope provider is memory. Use this only for dev/test.
+
+      107 |   const { adapter: envelopeAdapter, provider: envelopeProvider } = await createEnvelopeAdapter(config);
+      108 |   if (envelopeProvider === 'memory') {
+    > 109 |     console.warn('[GW-API] Envelope provider is memory. Use this only for dev/test.');
+          |             ^
+      110 |   }
+      111 |   console.log(`[GW-API] Using envelope provider: ${envelopeProvider}`);
+      112 |   if (config.nodeEnv === 'demo') {
+
+      at buildInfrastructure (src/bootstrap/build-infrastructure.ts:109:13)
+      at startServer (src/server.ts:203:7)
+      at Object.<anonymous> (src/__tests__/integration/identity/smart-token.test.ts:469:79)
+
+  console.log
+    [GW-API] Using envelope provider: memory
+
+      at buildInfrastructure (src/bootstrap/build-infrastructure.ts:111:11)
+
+  console.log
+    [GW-API] Using KmsService.
+
+      at buildInfrastructure (src/bootstrap/build-infrastructure.ts:124:13)
+
+  console.log
+    [GW-API] Host tenant not found. Bootstrapping...
+
+      at startServer (src/server.ts:267:15)
+
+  console.log
+    [GW-API] Warming up host cache after bootstrap...
+
+      at startServer (src/server.ts:271:15)
+
+  console.log
+    [Webhooks] Optional payment webhook adapter is disabled.
+
+      at createWebhooksRouter (src/routes/webhooks.ts:21:13)
+
+  console.log
+    [dotenv@17.2.3] injecting env (0) from .env.local-demo -- tip: ⚙️  load multiple .env files with { path: ['.env.local', '.env'] }
+
+      at _log (node_modules/dotenv/lib/main.js:142:11)
+
+  console.log
+    [dotenv@17.2.3] injecting env (0) from .env.local-demo -- tip: 🔄 add secrets lifecycle management: https://dotenvx.com/ops
+
+      at _log (node_modules/dotenv/lib/main.js:142:11)
+
+  console.log
+    [dotenv@17.2.3] injecting env (0) from .env.local-demo -- tip: ⚙️  enable debug logging with { debug: true }
+
+      at _log (node_modules/dotenv/lib/main.js:142:11)
+
+  console.log
+    [dotenv@17.2.3] injecting env (0) from .env.local-demo -- tip: ⚙️  load multiple .env files with { path: ['.env.local', '.env'] }
+
+      at _log (node_modules/dotenv/lib/main.js:142:11)
+
+Test Suites: 7 passed, 7 total
+Tests:       90 passed, 90 total
+Snapshots:   0 total
+Time:        37.344 s
+Ran all test suites within paths "src/__tests__/managers/AuthorizationManager.test.ts", "src/__tests__/managers/OpenIdAuthManager.test.ts", "src/__tests__/unit/adapters/activation-trust.adapter.test.ts", "src/__tests__/integration/security-mode-gates.test.ts", "src/__tests__/integration/identity/smart-token.test.ts", "src/__tests__/unit/managers/OpenIdAuthManager.break-glass.test.ts", "src/__tests__/unit/security/break-glass.test.ts".
+Test results written to: ../../../../Recuperacion-GDC-2026-11-14/e9-gw-core-1260/focused-results.json
