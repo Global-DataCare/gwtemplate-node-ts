@@ -10,6 +10,43 @@ Para una operación real, siga primero la guía corta
 después [`PUESTA_EN_MARCHA_HOST_ES.md`](./PUESTA_EN_MARCHA_HOST_ES.md). Este
 documento conserva el detalle técnico de referencia y no sustituye ese orden.
 
+## Configuración de red y verificación
+
+`NETWORK_MODE` selecciona el uso de blockchain. `CLEARING_HOUSE_MODE=local`
+selecciona la verificación dentro del propio gateway, también en Kubernetes o
+producción: comprueba firmas, identidad y autorizaciones vigentes.
+
+- **Probar la interfaz sin Fabric:** despliegue solo el gateway con
+  `NETWORK_MODE=test`, `CLEARING_HOUSE_MODE=local` y `SECURITY_MODE=strict`
+  (o conserve el perfil `compat` existente). La autenticación y las firmas
+  siguen siendo reales. Aísle los datos de pruebas: los proveedores de base de
+  datos y almacenamiento configurados pueden recibir escrituras.
+- **Staging con Fabric:** configure `DEPLOYMENT_ENV=staging`,
+  `NODE_ENV=staging` y `NETWORK_MODE=test-network`.
+- **Producción:** configure `DEPLOYMENT_ENV=production`,
+  `NODE_ENV=production`, `NETWORK_MODE=network` y `SECURITY_MODE=strict`.
+- **Demostración local:** seleccione expresamente `DEPLOYMENT_ENV=local`,
+  `NETWORK_MODE=test`, `SECURITY_MODE=demo` y `CLEARING_HOUSE_MODE=stub`.
+
+Staging y producción requieren autenticación y verificaciones reales. Para
+`local`, configure `CREDENTIAL_TRUSTED_ISSUERS_JSON` con el emisor exacto de cada
+ICA autorizada, su estado activo, sus claves públicas de firma y su endpoint
+HTTPS de consulta del estado de las credenciales. Las claves privadas permanecen
+en Secrets. El modo `remote` requiere además configurar el verificador de
+confianza de cada tenant y los solicitantes backend autorizados.
+
+El chart de host incorpora Fabric y admite `local-network`, `test-network` y
+`network`; el perfil de interfaz `test` utiliza un despliegue de gateway sin ese
+perfil Fabric. En los values privados de Helm, las opciones de verificación
+indicadas en `gw.extraEnv` se trasladan a referencias explícitas del ConfigMap
+en el contenedor y prevalecen sobre entradas antiguas del Secret. Revise la
+configuración efectiva tras el despliegue, preserve identidades y datos, y
+pruebe un acceso autorizado y rechazos por firma o permiso no válidos.
+
+La [configuración completa de perfiles y confianza](../docs-v1/03-IDENTITY-AND-TRUST/03.F-CLEARING-HOUSE-OIDC.md#deployment-profiles)
+y los [ejemplos de values del chart](../charts/gdc-host/README.md)
+detallan los campos y los contratos de verificación.
+
 ## 1. Resultado y roles
 
 Una ejecución correcta deja una `HostingServiceCredential` VC-JWT, una
@@ -360,7 +397,7 @@ El runtime común de los diez chaincodes está disponible en la
 GW CORE y CCAAS son artefactos OCI distintos. Use siempre sus digests:
 
 ```bash
-export GW_PUBLIC_IMAGE="ghcr.io/global-datacare/gw-core@sha256:a19ba9f712642da6a715e0039352204fc21d7546a6dfcd86cd8f17f26158c2f8"
+export GW_PUBLIC_IMAGE="ghcr.io/global-datacare/gw-core@sha256:069de1bee22ab43d24b7dcb2123ebf160d983a70ef15228e7cf95c4ca25313dd"
 export CCAAS_PUBLIC_IMAGE="ghcr.io/global-datacare/host-runtime@sha256:b61f80bc405fc15a02890a269e6f051c0b3161a173d680fc8b610df681e11603"
 docker buildx imagetools inspect "${GW_PUBLIC_IMAGE}"
 docker buildx imagetools inspect "${CCAAS_PUBLIC_IMAGE}"
@@ -451,8 +488,8 @@ helm template "${HELM_RELEASE}" charts/gdc-host \
   --namespace "${KUBE_NAMESPACE}" \
   --values /secure/inventory/host.values.yaml > /secure/onboarding/rendered.yaml
 
-helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.4.0
-tar -xzf gdc-host-0.4.0.tgz -C /secure/onboarding
+helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.4.4
+tar -xzf gdc-host-0.4.4.tgz -C /secure/onboarding
 
 helm upgrade --install "${HELM_RELEASE}" /secure/onboarding/gdc-host \
   --kube-context "${KUBE_CONTEXT}" --namespace "${KUBE_NAMESPACE}" \

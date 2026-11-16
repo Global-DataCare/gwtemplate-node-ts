@@ -44,6 +44,16 @@ spec:
                 configMapKeyRef:
                   name: {{ include "gdc-host.fullname" . }}-gw
                   key: {{ printf "HLF_CONNECTION_PEER_%s" .Values.peer.mspId }}
+            {{- $root := . }}
+            {{- range $key := list "CLEARING_HOUSE_MODE" "CREDENTIAL_TRUSTED_ISSUERS_JSON" "CLEARING_HOUSE_TENANTS_JSON" "CLEARING_HOUSE_REQUESTERS_JSON" "GXDCH_TENANTS_JSON" }}
+            {{- if hasKey $root.Values.gw.extraEnv $key }}
+            - name: {{ $key }}
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "gdc-host.fullname" $root }}-gw
+                  key: {{ $key }}
+            {{- end }}
+            {{- end }}
             {{- if eq .Values.gw.awsCredentials.mode "roles-anywhere" }}
             - name: AWS_EC2_METADATA_SERVICE_ENDPOINT
               value: {{ printf "http://127.0.0.1:%v" .Values.gw.awsCredentials.rolesAnywhere.port | quote }}

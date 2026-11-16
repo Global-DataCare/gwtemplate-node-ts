@@ -9,7 +9,7 @@ metadata:
 data:
   HOST_INTERNAL_IP: "0.0.0.0"
   PORT: "3000"
-  NODE_ENV: {{ ternary "production" "demo" (eq .Values.environment "production") | quote }}
+  NODE_ENV: {{ ternary "development" .Values.environment (eq .Values.environment "local") | quote }}
   DEPLOYMENT_ENV: {{ .Values.environment | quote }}
   NETWORK_MODE: {{ .Values.networkMode | quote }}
   STORAGE_LAYOUT: "scoped-v2"

@@ -20,7 +20,7 @@ gw:
   service: { type: ClusterIP, port: 80 }
   ingress: { enabled: false, className: "", annotations: {}, tlsSecretName: "" }
   providers: { queue: mem, database: mem, storage: mem, kms: local, replayProtection: mem }
-  authTokenVerifier: demo
+  authTokenVerifier: firebase
   securityMode: compat
   didcommPlain: "true"
 images:

@@ -62,8 +62,8 @@ migrada o desplegada.
 El mismo chart validado en `local-network` se distribuye como OCI:
 
 ```bash
-helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.4.0
-helm show chart oci://ghcr.io/global-datacare/gdc-host --version 0.4.0
+helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.4.4
+helm show chart oci://ghcr.io/global-datacare/gdc-host --version 0.4.4
 ```
 
 Paquete: [gdc-host en GHCR](https://github.com/orgs/Global-DataCare/packages/container/package/gdc-host).
@@ -79,7 +79,7 @@ hosts que usan los Services estándar.
 ## Imágenes OCI públicas verificadas
 
 - [GW CORE](https://github.com/orgs/Global-DataCare/packages/container/package/gw-core):
-  `ghcr.io/global-datacare/gw-core@sha256:a19ba9f712642da6a715e0039352204fc21d7546a6dfcd86cd8f17f26158c2f8`
+  `ghcr.io/global-datacare/gw-core@sha256:069de1bee22ab43d24b7dcb2123ebf160d983a70ef15228e7cf95c4ca25313dd`
 - [Runtime CCAAS](https://github.com/orgs/Global-DataCare/packages/container/package/host-runtime):
   `ghcr.io/global-datacare/host-runtime@sha256:b61f80bc405fc15a02890a269e6f051c0b3161a173d680fc8b610df681e11603`
 

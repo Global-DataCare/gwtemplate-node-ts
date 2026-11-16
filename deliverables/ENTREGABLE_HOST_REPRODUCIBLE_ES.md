@@ -29,7 +29,7 @@ Las dos imágenes `linux/amd64` verificadas están disponibles públicamente en
 GitHub Container Registry:
 
 - [GW CORE](https://github.com/orgs/Global-DataCare/packages/container/package/gw-core):
-  `ghcr.io/global-datacare/gw-core@sha256:a19ba9f712642da6a715e0039352204fc21d7546a6dfcd86cd8f17f26158c2f8`.
+  `ghcr.io/global-datacare/gw-core@sha256:069de1bee22ab43d24b7dcb2123ebf160d983a70ef15228e7cf95c4ca25313dd`.
 - [Runtime CCAAS](https://github.com/orgs/Global-DataCare/packages/container/package/host-runtime):
   `ghcr.io/global-datacare/host-runtime@sha256:b61f80bc405fc15a02890a269e6f051c0b3161a173d680fc8b610df681e11603`.
 
@@ -171,7 +171,7 @@ GCS pendiente y que coincidan los digests de origen transformado y destino.
 Para verificar o reutilizar los artefactos ya publicados sin reconstruirlos:
 
 ```bash
-export GW_PUBLIC_IMAGE="ghcr.io/global-datacare/gw-core@sha256:a19ba9f712642da6a715e0039352204fc21d7546a6dfcd86cd8f17f26158c2f8"
+export GW_PUBLIC_IMAGE="ghcr.io/global-datacare/gw-core@sha256:069de1bee22ab43d24b7dcb2123ebf160d983a70ef15228e7cf95c4ca25313dd"
 export CCAAS_PUBLIC_IMAGE="ghcr.io/global-datacare/host-runtime@sha256:b61f80bc405fc15a02890a269e6f051c0b3161a173d680fc8b610df681e11603"
 docker buildx imagetools inspect "${GW_PUBLIC_IMAGE}"
 docker buildx imagetools inspect "${CCAAS_PUBLIC_IMAGE}"
