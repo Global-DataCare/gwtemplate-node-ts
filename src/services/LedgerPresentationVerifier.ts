@@ -17,7 +17,7 @@ export type VerifiedPresentationIdentity = {
   email?: string; phone?: string; sameAs?: readonly string[];
 };
 
-/** Current-state verifier. No network label, missing status or decodable token is a positive verification. */
+/** Verifies signatures, current key/credential state and authorization through the configured provider. */
 export class LedgerPresentationVerifier implements IClearingHouseService {
   constructor(private readonly options: {
     network: string;

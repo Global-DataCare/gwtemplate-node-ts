@@ -1,4 +1,4 @@
-// Flow contract: local test and network labels cannot manufacture trust checks; only explicit demo may relax checks, and real environments require authenticated current evidence.
+// Flow contract: require authenticated current trust evidence in non-demo profiles; preserve the separately selected local demo contract.
 import { DefaultTrustRegistryAdapter } from '../../../adapters/trust-registry.adapter';
 
 describe('DefaultTrustRegistryAdapter', () => {

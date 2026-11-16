@@ -15,20 +15,14 @@ import { MlkemPublicJwk, PublicJwk } from 'gdc-common-utils-ts/interfaces/Crypto
 import { ParameterData } from 'gdc-common-utils-ts/models/params';
 
 /**
- * A development-focused implementation of the Key Management Service that uses a real
- * KMS instance internally to generate real, deterministic keys, but simulates the
- * encryption/decryption of the communication layer.
- *
- * This provides the best of both worlds for development:
- * - Real, cryptographically valid `did.json` documents and Verifiable Credentials.
- * - Simple, plaintext-equivalent API communication without needing to build real JWEs.
- *
- * WARNING: DO NOT USE IN PRODUCTION.
+ * Explicit local demo decorator with real key generation and signing delegated
+ * to the process-owned KMS. Uses local demo transport and storage formats.
+ * Runtime profile validation controls where this decorator is enabled.
  */
 export class DemoKmsService implements IKmsService {
   private _realKmsService: IKmsService;
 
-  // The Demo service now wraps a real KMS instance to handle key generation and signing.
+  // The wrapped KMS owns signing keys and their lifecycle.
   constructor(realKmsService: IKmsService) {
     if (!isLocalDemoSecurityMode()) throw new Error('Demo key custody requires explicit local demo.');
     this._realKmsService = realKmsService;
@@ -103,10 +97,9 @@ export class DemoKmsService implements IKmsService {
     return this._realKmsService.createCompactJws(payload, signerKid, signerVaultId, purpose, protectedHeader);
   }
 
-  // --- SIMULATED METHODS (Communication Bypass) ---
+  // --- LOCAL DEMO TRANSPORT ---
 
-  // These methods override the real KMS behavior to allow for simple, unencrypted
-  // communication flows during development.
+  // These methods provide the transport format selected for explicit local demos.
   
   async decodeRequest(message: string): Promise<JobRequest> {
     console.warn(`[DemoKmsService] Bypassing decryption for JWE-like message.`);

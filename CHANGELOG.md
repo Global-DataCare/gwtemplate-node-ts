@@ -22,8 +22,9 @@
   activation evidence separate from Fabric checks and enrolled-device proof.
 - Delegate demo KMS shutdown to the real key owner and preserve protected
   presentation headers when signing through the demo decorator.
-- Restrict simulated authentication, Clearing House results and demo KMS
-  custody to explicit local demo; local `test` no longer implies demo.
+- Define the explicit local demo profile separately from cryptographic `test`,
+  Test Network and production verification. Apply current-state signature and
+  authorization checks to non-demo verification.
 - Add authenticated tenant presentation verification and federated SMART
   introspection with registered-client keys, replay protection, current-state
   evidence, ES384/ML-DSA verification and tenant-signed EHR presentations.
