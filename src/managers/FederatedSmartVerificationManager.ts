@@ -2,7 +2,6 @@
 
 import { createHash, randomUUID } from 'node:crypto';
 import {
-  calculateJwkThumbprint,
   decodeJwt,
   decodeProtectedHeader,
   type JWK,
@@ -16,10 +15,12 @@ import type { IKmsService } from '../gdc-backend-utils-node/models/IKmsService';
 import type { IVaultRepository } from '../database/repositories/vault/vault.repository';
 import type { ITenantsManager } from './ITenantsManager';
 import { verifyPinnedJwt, type IClearingHouseService } from '../services/ClearingHouseService';
+import type { PublicJwk } from 'gdc-common-utils-ts/interfaces/Cryptography.types';
 import type { ICryptography } from 'gdc-common-utils-ts/interfaces/ICryptography';
 import type { IReplayProtectionStore } from '../adapters/replay-protection-store';
 import { getEnvSectionId } from '../utils/section-env';
 import { getTenantVaultId } from '../utils/tenant';
+import { tryGetJwkThumbprint } from '../utils/ledger-organization-registration-helpers';
 
 const JWT_BEARER_ASSERTION_TYPE = 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer';
 const TOKEN_INTROSPECTION_JWT_TYPE = 'token-introspection+jwt';
@@ -147,10 +148,12 @@ export class FederatedSmartVerificationManager {
       tenantDid,
       tenantVaultId,
     });
+    // The assertion has already passed signature, bounded-time and replay checks.
+    const requestNonce = String(decodeJwt(input.clientAssertion).jti);
 
     try {
       const verifiedToken = await this.verifyIndexToken(input.token);
-      await this.verifyProfessionalEvidence(verifiedToken, tenantDid, tenantVaultId);
+      await this.verifyAccessEvidence(verifiedToken, tenantDid, tenantVaultId);
       const verifiedPresentation = await this.signVerifiedPresentation(verifiedToken, tenantVaultId, tenantDid, ehrClientId, input.token);
       const tokenIntrospection = {
         active: true,
@@ -171,6 +174,7 @@ export class FederatedSmartVerificationManager {
         tenantVaultId,
         tenantDid,
         ehrClientId,
+        requestNonce,
         expiresAt: verifiedToken.expiresAt,
         tokenIntrospection,
       });
@@ -180,6 +184,7 @@ export class FederatedSmartVerificationManager {
         tenantVaultId,
         tenantDid,
         ehrClientId,
+        requestNonce,
         expiresAt: this.now() + 60,
         tokenIntrospection: { active: false },
       });
@@ -241,8 +246,10 @@ export class FederatedSmartVerificationManager {
     let verifiedPayload: JWTPayload | undefined;
     for (const candidate of candidates) {
       try {
-        if (header.jwk && await calculateJwkThumbprint(header.jwk as JWK) !== await calculateJwkThumbprint(candidate)) {
-          continue;
+        if (header.jwk) {
+          const presentedThumbprint = tryGetJwkThumbprint(header.jwk as PublicJwk);
+          const registeredThumbprint = tryGetJwkThumbprint(candidate as PublicJwk);
+          if (!presentedThumbprint || !registeredThumbprint || presentedThumbprint !== registeredThumbprint) continue;
         }
         const payload = await verifyPinnedJwt(input.compact, { keys: [candidate] }, clientId, this.now(), {
           audience: input.requestUrl, cryptography: this.dependencies.cryptography, allowMissingKid: true,
@@ -319,7 +326,7 @@ export class FederatedSmartVerificationManager {
     if (!Number.isFinite(expiresAt) || expiresAt <= this.now()) {
       throw new ManagerError('Federated SMART token is expired.', IssueType.Forbidden);
     }
-    if (payload.ledger_verified !== true || consentIdentifiers.length === 0) {
+    if (payload.ledger_verified !== true || (consentIdentifiers.length === 0 && payload.acr !== 'urn:antifraud:acr:openid4vp:individual')) {
       throw new ManagerError('Federated SMART token lacks verified consent evidence.', IssueType.Forbidden);
     }
     if (sha256Hex(presentation) !== presentationHash) {
@@ -340,7 +347,7 @@ export class FederatedSmartVerificationManager {
     };
   }
 
-  private async verifyProfessionalEvidence(token: VerifiedIndexToken, tenantDid: string, tenantVaultId: string): Promise<void> {
+  private async verifyAccessEvidence(token: VerifiedIndexToken, tenantDid: string, tenantVaultId: string): Promise<void> {
     const acr = String(token.payload.acr || '').trim();
     const result = await this.dependencies.clearingHouseService.verifyVpToken({
       tenantDid,
@@ -355,7 +362,7 @@ export class FederatedSmartVerificationManager {
       consentIdentifiers: token.consentIdentifiers,
     });
     if (result.ledgerVerified !== true || result.vpHash !== token.presentationHash) {
-      throw new ManagerError('Clearing House could not verify current professional and consent evidence.', IssueType.Forbidden);
+      throw new ManagerError('Clearing House could not verify current requester and consent evidence.', IssueType.Forbidden);
     }
     if (acr && result.acr !== acr) {
       throw new ManagerError('Clearing House returned a different assurance context.', IssueType.Forbidden);
@@ -365,7 +372,7 @@ export class FederatedSmartVerificationManager {
   private async signVerifiedPresentation(token: VerifiedIndexToken, vaultId: string, tenantDid: string, ehrClientId: string, compactToken: string): Promise<string> {
     const decoded = decodeJwt(token.presentation);
     const original = (decoded.vp || decoded) as Record<string, any>;
-    if (!Array.isArray(original.verifiableCredential) || original.verifiableCredential.length === 0) throw new ManagerError('Professional presentation contains no original credential.', IssueType.Security);
+    if (!Array.isArray(original.verifiableCredential) || original.verifiableCredential.length === 0) throw new ManagerError('Requester presentation contains no original credential.', IssueType.Security);
     const key = await this.dependencies.kmsService.getPublicVerificationKey(vaultId, undefined, 'comm_sig');
     if (!key?.kid || token.expiresAt <= this.now()) throw new ManagerError('Tenant verification evidence cannot be signed.', IssueType.Security);
     return this.dependencies.kmsService.createCompactJws({ iss: tenantDid, aud: ehrClientId, sub: token.subject,
@@ -380,6 +387,7 @@ export class FederatedSmartVerificationManager {
     tenantVaultId: string;
     tenantDid: string;
     ehrClientId: string;
+    requestNonce: string;
     expiresAt: number;
     tokenIntrospection: Record<string, unknown>;
   }): Promise<string> {
@@ -397,6 +405,8 @@ export class FederatedSmartVerificationManager {
       aud: input.ehrClientId,
       iat: now,
       nbf: now,
+      jti: randomUUID(),
+      nonce: input.requestNonce,
       exp: input.expiresAt,
       token_introspection: input.tokenIntrospection,
     }, signingKey.kid, input.tenantVaultId, 'comm_sig', { typ: TOKEN_INTROSPECTION_JWT_TYPE });

@@ -1,5 +1,7 @@
 import { resolveProfessionalHomeVault } from './resolve-professional-home-vault';
 import { verifyRegisteredProfessionalIdentity } from './verify-registered-presentation-identity';
+import { verifyRegisteredIndividualMemberIdentity } from '../services/registered-individual-member-authority';
+import { summarizeIndividualMemberIdentityCredential } from 'gdc-common-utils-ts/utils/individual-smart';
 import { normalizeCodeSystemAndValue } from '../utils/normalize-codeAndSystem';
 import { ManageAssetSubjectKeyBinding } from '../blockchain/fabric/v3/manageAssetSubjectKeyBinding';
 import { ManageAssetProfessionalAssignment } from '../blockchain/fabric/v3/manageAssetProfessionalAssignment';
@@ -9,7 +11,7 @@ import type { JSONWebKeySet, JWK } from 'jose';
 import type { IVaultRepository } from '../database/repositories/vault/vault.repository';
 import type { IKmsService } from '../gdc-backend-utils-node/models/IKmsService';
 import type { ICredentialLedgerAdapter } from '../adapters/ICredentialLedgerAdapter';
-import { LedgerPresentationVerifier } from '../services/LedgerPresentationVerifier';
+import { LedgerPresentationVerifier, type VerifiedPresentationIdentity } from '../services/LedgerPresentationVerifier';
 import type { ClearingHouseVerificationRequest } from '../services/ClearingHouseService';
 import { getTenantVaultIdFromIss } from '../utils/tenant';
 import { getEnvSectionId } from '../utils/section-env';
@@ -27,7 +29,7 @@ export function buildLocalClearingHouseVerifier(options: {
   vaultRepository: IVaultRepository;
   kmsService: IKmsService;
   cryptography: ICryptography;
-  authorize: (request: ClearingHouseVerificationRequest) => Promise<void>;
+  authorize: (request: ClearingHouseVerificationRequest, identity?: VerifiedPresentationIdentity) => Promise<void>;
 }): LedgerPresentationVerifier {
   const trustedIssuer = (issuer: string): { jwks: JSONWebKeySet; channelName?: string; status?: string } => {
     const entries = JSON.parse(process.env.CREDENTIAL_TRUSTED_ISSUERS_JSON || '{}');
@@ -85,6 +87,16 @@ export function buildLocalClearingHouseVerifier(options: {
     },
     verifyRegisteredIdentity: async (credential, holder, key, request) => {
       const vaultId = await holderVault(request);
+      if (summarizeIndividualMemberIdentityCredential(credential)) {
+        const identity = await verifyRegisteredIndividualMemberIdentity({ credential, holder, vaultId,
+          kmsService: options.kmsService, vaultRepository: options.vaultRepository });
+        for (const scope of request.tokenScope?.split(/\s+/) || []) {
+          const queryOffset = scope.indexOf('?');
+          const subject = queryOffset < 0 ? null : new URLSearchParams(scope.slice(queryOffset + 1)).get('subject');
+          if (subject && subject !== identity.subjectDid) throw new Error('Personal access scope targets another individual.');
+        }
+        return identity;
+      }
       const employeeCollection = await options.tenants.getCollectionName(vaultId);
       if (!employeeCollection) throw new Error('Authoritative employee collection is unavailable.');
       const identity = await verifyRegisteredProfessionalIdentity({ credential, holder, vaultId, employeeCollection,

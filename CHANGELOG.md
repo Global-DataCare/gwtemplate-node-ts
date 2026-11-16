@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+- Verify personal SMART access using current encrypted individual-member
+  licences and registered wallet keys: preserve the individual controller's
+  default access, restrict family members to current consent, and recheck
+  both at the custodian tenant's Clearing House.
+- Allow licensed family-member DCR without granting controller or clinical
+  creator authority; reject role substitution and revoked device authority.
+- Bind signed SMART verification responses to each EHR request and accept
+  embedded ML-DSA public keys only when they match the registered client key.
+
 - Link tenant DIDs to OpenID/SMART discovery metadata and publish the
   registered-client SMART verification endpoint as `introspection_endpoint`.
 - Verify ICA-backed first-controller activation without Fabric in `test`:

@@ -27,11 +27,15 @@ import { getMatchingSubjectIdentityBindingFromVpToken } from 'gdc-common-utils-t
 import { calculateJwkThumbprint, compactVerify, decodeProtectedHeader, importJWK, type JWK } from 'jose';
 import { getEnvSectionId } from '../utils/section-env';
 import { ServiceCapability } from 'gdc-common-utils-ts/constants/service-capabilities';
-import { HealthcareConsentPurposes } from 'gdc-common-utils-ts/constants/healthcare';
+import { HealthcareActorRoles, HealthcareConsentPurposes } from 'gdc-common-utils-ts/constants/healthcare';
 import { deriveGrantedSmartScopes } from 'gdc-common-utils-ts/utils/smart-scope';
 import { ClaimConsent, ConsentStatuses, type ConsentRule } from 'gdc-common-utils-ts/models/consent-rule';
 import { getMatchingIndividualMemberCredentialFromVpToken } from 'gdc-common-utils-ts/utils/individual-smart';
 import type { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
+import { openDeviceLicenseDocument } from '../utils/device-license-storage';
+import { LICENSE_USER_CLASS_INDIVIDUAL } from '../constants/domain';
+import type { VerifiedPresentationIdentity } from '../services/LedgerPresentationVerifier';
+import { loadRegisteredIndividualMemberAuthority } from '../services/registered-individual-member-authority';
 import { getOrCreateDigitalTwinSubjectId } from '../utils/digital-twin-research-projection';
 import { getMatchingProfessionalCredentialFromVpToken } from 'gdc-common-utils-ts/utils/professional-smart';
 import { getOrganizationDidFromIndividualDid } from 'gdc-common-utils-ts/utils/did-resolution';
@@ -246,11 +250,19 @@ export class OpenIdAuthManager implements IJobProcessor {
         );
       }
       if (memberCredential) {
+        // The canonical member DID serializes its role value, not the whole
+        // coded role or private user identifier. Use the verified presentation
+        // and authenticated DCR registration to recover that context.
+        actor.role = actor.role || memberCredential.relationship;
+        actor.identifier = actor.identifier || String(registeredDeviceProfile?.authenticatedSubject || '').trim() || undefined;
+        actor.memberKind = 'individual';
         memberLicense = await this.getActiveMemberLicense({
           tenantVaultId,
           subject,
           actorIdentifier: actor.identifier,
           actorRole: actor.role,
+          licenseId: registeredDeviceProfile?.licenseId,
+          deviceClientId: registeredDeviceProfile?.clientId,
         });
         if (!memberLicense) {
           throw new ManagerError('No active individual-member license binds this actor to the requested subject.', IssueType.Forbidden);
@@ -299,7 +311,12 @@ export class OpenIdAuthManager implements IJobProcessor {
         ? { ...rule, [ClaimConsent.actorIdentifier]: normalizedActors.join(',') }
         : rule;
     });
-    const sharedProjection = compositionReadOnlyRequest
+    const hasVerifiedIndividualControllerAuthority = accessProof.mode === 'registered_individual_controller'
+      || Boolean(registeredDeviceProfile && registeredDeviceProfile.licenseId && memberLicense
+        && registeredDeviceProfile.licenseId === memberLicense.id
+        && registeredDeviceProfile.actorDid === actor.sub && registeredDeviceProfile.authorizedSubjectDid === subject
+        && normalizeConsentActorRole(String(memberLicense.issuedToRole || ''), 'family') === normalizeConsentActorRole(HealthcareActorRoles.Controller, 'family'));
+    const sharedProjection = compositionReadOnlyRequest && !hasVerifiedIndividualControllerAuthority
       ? deriveGrantedSmartScopes(sharedEvaluatorRules as ConsentRule[], {
           requestedScopes: requestedScopeTokens,
           actor: {
@@ -323,7 +340,7 @@ export class OpenIdAuthManager implements IJobProcessor {
             .map((match) => match.rule)
           : [])
       : [];
-    const evaluation = sameTenantEmployeeResearchAccess || accessProof.mode === 'registered_individual_controller'
+    const evaluation = sameTenantEmployeeResearchAccess || hasVerifiedIndividualControllerAuthority
       ? {
           allowed: true,
           missingSections: [] as string[],
@@ -501,18 +518,36 @@ export class OpenIdAuthManager implements IJobProcessor {
   }
 
   /** Re-evaluates current local consent; a previously issued token is never the current decision. */
-  public async verifyCurrentConsentContext(request: ClearingHouseVerificationRequest): Promise<void> {
-    if (!request.tokenIssuer || !request.tokenSubject || !request.tokenScope || !request.consentIdentifiers?.length) {
+  public async verifyCurrentConsentContext(request: ClearingHouseVerificationRequest, identity?: VerifiedPresentationIdentity): Promise<void> {
+    if (!request.tokenIssuer || !request.tokenSubject || !request.tokenScope) {
       throw new ManagerError('Current authorization requires issuer, professional, scope and consent identifiers.', IssueType.Required);
     }
-    const vaultId = getTenantVaultIdFromIss(request.tokenIssuer);
+    const vaultId = await this.tenantsCacheManager.findTenantVaultIdByDid?.(request.tokenIssuer) || getTenantVaultIdFromIss(request.tokenIssuer);
     if (!await this.tenantsCacheManager.tenantExists(vaultId) || !await this.tenantsCacheManager.isTenantOperational(vaultId)) throw new ManagerError('Authoritative consent tenant is unavailable.', IssueType.Forbidden);
     const did = await this.tenantsCacheManager.getDidDocument(vaultId);
     if (did?.id !== request.tokenIssuer) throw new ManagerError('Consent issuer mismatch.', IssueType.Forbidden);
     const { subject } = this.extractPinnedSubjectAndSections(request.tokenScope);
+    if (identity && identity.actorDid !== request.tokenSubject) throw new ManagerError('Verified actor does not match the requested authorization subject.', IssueType.Forbidden);
+    if (identity?.acr === 'urn:antifraud:acr:openid4vp:individual') {
+      if (identity.subjectDid !== subject) throw new ManagerError('Verified personal authority targets another individual.', IssueType.Forbidden);
+      if (normalizeConsentActorRole(String(identity.role || ''), 'family') === normalizeConsentActorRole(HealthcareActorRoles.Controller, 'family')) return;
+    }
+    if (!request.consentIdentifiers?.length) throw new ManagerError('Current authorization requires consent identifiers.', IssueType.Required);
     const actor = parseActorFromSub(request.tokenSubject);
     const rules = await this.vaultRepository.getContainersInSection<any>(vaultId, getIndividualSectionId(subject, 'rules'));
     const activeRules = rules.filter(rule => getClaimValue(rule, ClaimConsent.status) === ConsentStatuses.Active && this.isRuleTimeActive(rule));
+    if (identity) {
+      const projection = deriveGrantedSmartScopes(activeRules as ConsentRule[], { requestedScopes: request.tokenScope,
+        actor: { actorKind: identity.acr === 'urn:antifraud:acr:openid4vp:individual' ? 'related-person' : 'professional',
+          did: identity.actorDid, aliases: Array.from(identity.sameAs || []), email: identity.email, phone: identity.phone,
+          organizationDid: getOrganizationDidFromIndividualDid(identity.actorDid),
+          jurisdiction: request.tokenIssuer.split(':').find(value => value.startsWith('cds-'))?.slice(4) || '' },
+        actorRole: identity.role || actor.role, purpose: request.tokenPurpose });
+      const ids = new Set(projection.evaluations.flatMap(evaluation => evaluation.winningRules
+        .filter(match => match.decision === 'permit').map(match => String(getClaimValue(match.rule, ClaimConsent.identifier) || ''))).filter(Boolean));
+      if (projection.decision !== 'granted' || !request.consentIdentifiers.every(id => ids.has(id))) throw new ManagerError('Current consent does not authorize the complete token scope.', IssueType.Forbidden);
+      return;
+    }
     const evaluation = this.evaluateRequestedConsent({ rules: activeRules, subject, actor: { ...actor, organization: getOrganizationDidFromIndividualDid(actor.sub) },
       purpose: request.tokenPurpose, requestedPermissions: this.parseRequestedScopePermissions(request.tokenScope),
       jurisdiction: request.tokenIssuer.split(':').find(value => value.startsWith('cds-'))?.slice(4) || '', actorSubjectAliases: new Set([actor.sub]) });
@@ -568,6 +603,13 @@ export class OpenIdAuthManager implements IJobProcessor {
       && String(profile.authorizedSubjectDid || '') === params.subjectDid
       && String(profile.authenticatedSubject || '')
       && String(profile.licenseId || '')) {
+      const memberVault = profile.registeredAtVaultId || params.tenantVaultId;
+      if (!params.tenantVaultId || !memberVault || !await this.tenantsCacheManager.isTenantOperational(params.tenantVaultId)
+        || !await this.tenantsCacheManager.isTenantOperational(memberVault)) throw new ManagerError('Individual authority tenant is inactive.', IssueType.Forbidden);
+      const authority = await loadRegisteredIndividualMemberAuthority({ holder: profile.clientId, vaultId: memberVault,
+        kmsService: this.kmsService, vaultRepository: this.vaultRepository });
+      if (authority.profile.actorDid !== params.actorDid || authority.profile.authorizedSubjectDid !== params.subjectDid
+        || authority.role !== normalizeConsentActorRole(HealthcareActorRoles.Controller, 'family')) throw new ManagerError('An individual controller authority is required without vp_token.', IssueType.Forbidden);
       return {
         mode: 'registered_individual_controller',
         acr: individualAcr,
@@ -589,6 +631,8 @@ export class OpenIdAuthManager implements IJobProcessor {
     subject: string;
     actorIdentifier?: string;
     actorRole?: string;
+    licenseId?: string;
+    deviceClientId?: string;
   }): Promise<DeviceLicense | undefined> {
     const actorIdentifier = String(input.actorIdentifier || '').trim();
     const actorRole = String(input.actorRole || '').trim().toLowerCase();
@@ -597,14 +641,22 @@ export class OpenIdAuthManager implements IJobProcessor {
       input.tenantVaultId,
       getEnvSectionId('device-licenses'),
     );
-    return (documents || []).map((document: any) =>
-      document?.content as DeviceLicense & Record<string, unknown> | undefined
-    ).find((license) => {
-      return license?.status === 'active'
+    for (const document of documents || []) {
+      if (input.licenseId && document.id !== input.licenseId) continue;
+      let license: DeviceLicense;
+      try { ({ license } = await openDeviceLicenseDocument(document, input.tenantVaultId, this.kmsService)); }
+      catch { continue; }
+      const currentAuthority = isLocalDemoSecurityMode() || (license.userClass === LICENSE_USER_CLASS_INDIVIDUAL
+        && Number.isFinite(license.exp) && license.exp > Date.now() / 1000 && document.status === 'active');
+      const deviceActive = !input.deviceClientId || (Array.isArray(license.deviceBindings)
+        ? license.deviceBindings.some(binding => binding.clientId === input.deviceClientId && binding.status === DeviceBindingStatuses.Active)
+        : license.deviceId === input.deviceClientId);
+      if (currentAuthority && deviceActive && license?.status === 'active'
         && String(license.subjectId || '').replace(/^firebase:/, '') === actorIdentifier.replace(/^firebase:/, '')
         && String(license.authorizedSubjectDid || '').trim() === input.subject
-        && String(license.issuedToRole || '').trim().toLowerCase() === actorRole;
-    });
+        && String(license.issuedToRole || '').trim().toLowerCase() === actorRole) return license;
+    }
+    return undefined;
   }
 
   /**

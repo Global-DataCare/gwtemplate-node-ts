@@ -11,6 +11,12 @@ import type { ICryptography } from 'gdc-common-utils-ts/interfaces/ICryptography
 import type { ICredentialLedgerAdapter } from '../adapters/ICredentialLedgerAdapter';
 import { verifyPinnedDetachedJws, verifyPinnedJwt, type IClearingHouseService, type ClearingHouseVerificationRequest, type ClearingHouseVerificationResult } from './ClearingHouseService';
 
+/** In-process facts established by signature and current-state checks; never accepted from a request body. */
+export type VerifiedPresentationIdentity = {
+  actorDid: string; acr: string; subjectDid?: string; role?: string;
+  email?: string; phone?: string; sameAs?: readonly string[];
+};
+
 /** Current-state verifier. No network label, missing status or decodable token is a positive verification. */
 export class LedgerPresentationVerifier implements IClearingHouseService {
   constructor(private readonly options: {
@@ -23,8 +29,8 @@ export class LedgerPresentationVerifier implements IClearingHouseService {
     resolveHolderKeys: (holder: string, tenantDid: string, request: ClearingHouseVerificationRequest) => Promise<JSONWebKeySet>;
     resolveIssuerKeys: (issuer: string) => Promise<JSONWebKeySet>;
     assertActiveKey: (owner: string, key: JWK, request: ClearingHouseVerificationRequest) => Promise<void>;
-    verifyRegisteredIdentity?: (credential: Record<string, any>, holder: string, key: JWK, request: ClearingHouseVerificationRequest) => Promise<{ actorDid: string; acr: string }>;
-    authorize: (request: ClearingHouseVerificationRequest) => Promise<void>;
+    verifyRegisteredIdentity?: (credential: Record<string, any>, holder: string, key: JWK, request: ClearingHouseVerificationRequest) => Promise<VerifiedPresentationIdentity>;
+    authorize: (request: ClearingHouseVerificationRequest, identity?: VerifiedPresentationIdentity) => Promise<void>;
   }) {}
 
   async verifyVpToken(request: ClearingHouseVerificationRequest): Promise<ClearingHouseVerificationResult> {
@@ -53,6 +59,12 @@ export class LedgerPresentationVerifier implements IClearingHouseService {
     let issuerKeysChecked = true;
     const subjects = new Set<string>();
     const provedAssurance = new Set<string>();
+    const verifiedIdentities = new Map<string, VerifiedPresentationIdentity>();
+    const rememberIdentity = (identity: VerifiedPresentationIdentity) => {
+      const previous = verifiedIdentities.get(identity.acr);
+      if (previous && (previous.actorDid !== identity.actorDid || previous.subjectDid !== identity.subjectDid || previous.role !== identity.role)) throw new Error('Presentation contains ambiguous actor authority.');
+      verifiedIdentities.set(identity.acr, identity);
+    };
     for (const input of vp.verifiableCredential) {
       let credential: Record<string, any>;
       let compact: string | undefined;
@@ -65,6 +77,7 @@ export class LedgerPresentationVerifier implements IClearingHouseService {
         const identity = await this.options.verifyRegisteredIdentity(credential, holder, holderKey, request);
         if (request.tokenSubject && identity.actorDid !== request.tokenSubject) throw new Error('Registered identity does not match the professional subject.');
         subjects.add(identity.actorDid); provedAssurance.add(identity.acr); issuerKeysChecked = false;
+        rememberIdentity(identity);
         continue;
       }
       const keys = await this.options.resolveIssuerKeys(issuer);
@@ -103,8 +116,14 @@ export class LedgerPresentationVerifier implements IClearingHouseService {
           || extractRepresentativeCredentialBinding(credential);
         if (material !== toJwkThumbprintSha256Urn(holderKey as any)) throw new Error('Credential holder key binding does not match the presentation signer.');
       }
-      if (professional && (!request.tokenSubject || professional.actorDid === request.tokenSubject)) provedAssurance.add('urn:antifraud:acr:openid4vp:employee');
-      if (individual && (!request.tokenSubject || individual.actorDid === request.tokenSubject)) provedAssurance.add('urn:antifraud:acr:openid4vp:individual');
+      if (professional && (!request.tokenSubject || professional.actorDid === request.tokenSubject)) {
+        const acr = 'urn:antifraud:acr:openid4vp:employee'; provedAssurance.add(acr);
+        rememberIdentity({ actorDid: professional.actorDid, acr, role: professional.role, sameAs: professional.sameAs });
+      }
+      if (individual && (!request.tokenSubject || individual.actorDid === request.tokenSubject)) {
+        const acr = 'urn:antifraud:acr:openid4vp:individual'; provedAssurance.add(acr);
+        rememberIdentity({ actorDid: individual.actorDid, acr, subjectDid: individual.subjectDid, role: individual.relationship, sameAs: individual.sameAs });
+      }
       for (const subject of Array.isArray(credential.credentialSubject) ? credential.credentialSubject : [credential.credentialSubject]) {
         if (subject?.id) subjects.add(subject.id);
         for (const alias of Array.isArray(subject?.sameAs) ? subject.sameAs : [subject?.sameAs]) if (typeof alias === 'string') subjects.add(alias);
@@ -114,7 +133,7 @@ export class LedgerPresentationVerifier implements IClearingHouseService {
     if (!acr || !request.acrValues.includes(acr)) throw new Error('Presentation does not prove the requested assurance context.');
     if (!provedAssurance.has(acr)) throw new Error('Issuer-signed credentials do not prove the requested professional assurance.');
     if (request.tokenSubject && !subjects.has(request.tokenSubject)) throw new Error('Credential subject does not match the professional.');
-    if (request.tokenScope) await this.options.authorize(request);
+    if (request.tokenScope) await this.options.authorize(request, verifiedIdentities.get(acr));
     return { acr, amr: ['openid4vp', 'vc'], vpHash: createHash('sha256').update(request.vpToken).digest('hex'), ledgerVerified: true,
       trustChecks: { revocationChecked: true, issuerKeyStatusChecked: issuerKeysChecked, subjectKeyStatusChecked: true, onChainChecked: this.options.ledgerKind === 'fabric' } };
   }

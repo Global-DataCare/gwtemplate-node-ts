@@ -3,6 +3,8 @@
 // src/__tests__/managers/OpenIdAuthManager.test.ts
 
 import { createHash, randomUUID } from 'node:crypto';
+import { EXAMPLE_HOSTED_INDIVIDUAL_CONTROLLER_DID, EXAMPLE_RELATED_PERSON_ROLE } from 'gdc-common-utils-ts/examples/shared';
+import { parseIndividualMemberDidWeb } from 'gdc-common-utils-ts/utils/did';
 import { decodeProtectedHeader } from 'jose';
 import { OpenIdAuthManager } from '../../managers/OpenIdAuthManager';
 import { IKmsService } from '../../gdc-backend-utils-node/models/IKmsService';
@@ -287,8 +289,8 @@ describe('OpenIdAuthManager', () => {
     });
     const vault = {
       getContainersInSection: jest.fn()
-        .mockResolvedValueOnce([{ content: {
-          status: 'active', subjectId: actorId, authorizedSubjectDid: subjectDid,
+        .mockResolvedValueOnce([{ status: 'active', content: {
+          status: 'active', userClass: 'individual', exp: Math.floor(Date.now() / 1000) + 300, subjectId: actorId, authorizedSubjectDid: subjectDid,
           issuedToRole: role, issuedToPhone: memberPhone,
         } }])
         .mockResolvedValueOnce([{
@@ -2596,8 +2598,8 @@ describe('OpenIdAuthManager', () => {
 
   it('accepts an operational actor DID issuer with its distinct DCR client assertion identity', async () => {
     const issuerDid = EXAMPLE_HOSTING_OPERATOR_DID;
-    const subjectDid = EXAMPLE_SUBJECT_DID;
-    const actorDid = EXAMPLE_CONTROLLER_DID;
+    const actorDid = EXAMPLE_HOSTED_INDIVIDUAL_CONTROLLER_DID;
+    const subjectDid = parseIndividualMemberDidWeb(actorDid).individualDidWeb;
     const clientId = EXAMPLE_DEVICE_CLIENT_ID;
     const fixture = await buildClientAssertionFixture({ clientId, audience: issuerDid, additionalClaims: { jti: randomUUID() } });
     const deviceProfile = {
@@ -2610,8 +2612,12 @@ describe('OpenIdAuthManager', () => {
       licenseId: EXAMPLE_LICENSE_SUBJECT_ID_ACTIVE,
       jwks: { keys: [fixture.publicJwk] },
     };
+    const currentLicence = { id: deviceProfile.licenseId, status: 'active', userClass: 'individual', subjectId: deviceProfile.authenticatedSubject,
+      authorizedSubjectDid: subjectDid, issuedToRole: EXAMPLE_RELATED_PERSON_ROLE, exp: Math.floor(Date.now() / 1000) + 300,
+      deviceBindings: [{ clientId, status: DeviceBindingStatuses.Active }] };
     const vault = {
-      get: jest.fn().mockResolvedValue({
+      get: jest.fn(async (_vault: string, id: string) => id === currentLicence.id
+        ? { id, status: 'active', content: currentLicence } : {
         id: clientId,
         status: DeviceBindingStatuses.Active,
         content: deviceProfile,
@@ -2634,6 +2640,7 @@ describe('OpenIdAuthManager', () => {
       {
         getDidDocument: jest.fn().mockResolvedValue({ id: issuerDid }),
         tenantExists: jest.fn().mockResolvedValue(true),
+        isTenantOperational: jest.fn().mockResolvedValue(true),
       } as unknown as jest.Mocked<TenantsCacheManager>,
       vault,
       { verifyVpToken: jest.fn() } as unknown as jest.Mocked<IClearingHouseService>,

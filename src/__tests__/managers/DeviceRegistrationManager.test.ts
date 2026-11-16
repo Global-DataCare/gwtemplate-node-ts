@@ -1,4 +1,4 @@
-// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
+// Flow contract: bind each device to its licensed actor, contact, individual and role; an authorized family member can register without acquiring controller or clinical-creator authority. Reuse shared fixtures and canonical types.
 // src/__tests__/managers/DeviceRegistrationManager.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
@@ -29,6 +29,7 @@ import {
 } from 'gdc-common-utils-ts/constants/identity-auth';
 import {
   EXAMPLE_CONTROLLER_DID,
+  EXAMPLE_RELATED_PERSON_INACTIVE_RELATIONSHIP,
   EXAMPLE_EMAIL_PROFESSIONAL,
   EXAMPLE_EMAIL_CONTROLLER_INDIVIDUAL,
   EXAMPLE_EMPLOYEE_DEVICE_CLIENT_ID_PRIMARY,
@@ -411,10 +412,57 @@ describe('DeviceRegistrationManager', () => {
       }));
     });
 
+    it('registers an authorized family member without assigning controller or clinical-creator authority', async () => {
+      const job = cloneDeep(DCR_REGISTRATION_JOB);
+      const activationCode = String((job.content?.body as any)?.[IdentityAuthRequestFields.Code]);
+      const role = EXAMPLE_RELATED_PERSON_INACTIVE_RELATIONSHIP;
+      const [roleType, roleValue] = role.split('|');
+      const actorDid = buildIndividualMemberDidWeb({
+        individualDidWeb: testIndividualControllerDcrIdentity.subjectDid,
+        memberId: buildSecureIdValueMember({ secureIdTypeMember: SecureIdTypesIndividual.Email, privateIdValueMember: EXAMPLE_EMAIL_CONTROLLER_INDIVIDUAL }),
+        roleType, roleValue,
+      });
+      Object.assign(job.content!.body as any, {
+        [IdentityDcrMetadataFields.ActorDid]: actorDid,
+        [IdentityDcrMetadataFields.ProfileDid]: actorDid,
+      });
+      delete (job.content!.body as any)[IdentityDcrMetadataFields.ClinicalCreatorBinding];
+      job.content!.meta = { bearer: { jwt: { payload: {
+        sub: testIndividualControllerDcrIdentity.authenticatedSubject, act_code: activationCode,
+        scope: testIndividualControllerDcrIdentity.scope,
+      } } } } as any;
+      const vaultId = getTenantVaultId(job.sector as any, job.tenantId as string);
+      const license = { ...EXAMPLE_LICENSE_ACTIVE_RECORD, tenantId: job.tenantId,
+        activationCode, userClass: DeviceUserClasses.Individual, type: DeviceAppTypes.Mobile,
+        status: LicenseStatuses.Active, subjectId: testIndividualControllerDcrIdentity.authenticatedSubject,
+        issuedToEmail: EXAMPLE_EMAIL_CONTROLLER_INDIVIDUAL, issuedToRole: role,
+        authorizedSubjectDid: testIndividualControllerDcrIdentity.subjectDid,
+      };
+      await vaultRepository.put(vaultId, [{ id: license.id, status: license.status, sequence: 0, content: license }], getEnvSectionId('device-licenses'));
+      const result = await manager.process(job);
+      const entry = (result.body as BundleJsonApi).data[0] as BundleEntryResponse;
+      expect(entry.response.status).toBe(String(HttpStatusCodes.Created));
+      const clientId = String((entry.resource as any).client_id);
+      const stored = await vaultRepository.get<ConfidentialStorageDoc>(vaultId, clientId, getEnvSectionId('device-profiles'));
+      const profile = await mockKmsService.unprotectConfidentialData<any>(stored!, vaultId);
+      expect(profile).toMatchObject({ actorDid, profileDid: actorDid, authorizedSubjectDid: license.authorizedSubjectDid, licenseId: license.id });
+      expect(await vaultRepository.get(vaultId, `urn:uuid:${EXAMPLE_KYC_CONTROLLER_UUID}`, getClinicalCreatorBindingsSectionId())).toBeUndefined();
+      (job.content!.body as any)[IdentityDcrMetadataFields.ClinicalCreatorBinding] = {
+        kind: FhirIpsCreatorKinds.IndividualMember,
+        actorIdentifier: `urn:uuid:${EXAMPLE_KYC_CONTROLLER_USER_UUID}`,
+        authorIdentifier: `urn:uuid:${EXAMPLE_KYC_CONTROLLER_UUID}`,
+        ownerIdentifier: `urn:uuid:${EXAMPLE_PRIVATE_INDIVIDUAL_UUID}`,
+        role: testIndividualControllerDcrIdentity.role,
+      };
+      const elevated = (await manager.process(job)).body as BundleJsonApi;
+      expect((elevated.data[0] as ErrorEntry).response.status).toBe(String(HttpStatusCodes.Forbidden));
+
+    });
+
     it('does not promote a non-controller individual role into DCR controller authority', async () => {
       const job = cloneDeep(DCR_REGISTRATION_JOB);
-      // CHILD is deliberately the non-controller role whose rejection is the contract under test.
-      const actorDid = testIndividualControllerDcrIdentity.actorDid.replace(/:[^:]+$/, ':CHILD');
+      // A family licence must never authorize the controller DID.
+      const actorDid = testIndividualControllerDcrIdentity.actorDid;
       const activationCode = String((job.content?.body as any)?.[IdentityAuthRequestFields.Code]);
       Object.assign(job.content!.body as any, {
         [IdentityDcrMetadataFields.ActorDid]: actorDid,
@@ -437,7 +485,7 @@ describe('DeviceRegistrationManager', () => {
         type: DeviceAppTypes.Mobile,
         status: LicenseStatuses.Active,
         issuedToEmail: EXAMPLE_EMAIL_CONTROLLER_INDIVIDUAL,
-        issuedToRole: 'v3-RoleCode|CHILD',
+        issuedToRole: EXAMPLE_RELATED_PERSON_INACTIVE_RELATIONSHIP,
         authorizedSubjectDid: testIndividualControllerDcrIdentity.subjectDid,
       } as unknown as DeviceLicense & Record<string, any>;
       await vaultRepository.put(vaultId, [{
@@ -451,7 +499,7 @@ describe('DeviceRegistrationManager', () => {
       const entry = (result.body as BundleJsonApi).data[0] as ErrorEntry;
 
       expect(entry.response.status).toBe(String(HttpStatusCodes.Forbidden));
-      expect(entry.response.outcome?.issue[0]?.diagnostics).toContain('controller role');
+      expect(entry.response.outcome?.issue[0]?.diagnostics).toContain('licensed role');
     });
 
     it('rejects DCR instead of persisting a phantom client when the licensed controller entity is missing', async () => {

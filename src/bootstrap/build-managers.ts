@@ -119,7 +119,7 @@ export function buildManagers(options: {
   const verifierUsesFabric = config.networkMode !== 'test' && ['fabric', 'multi'].includes(verifierProvider);
   const localClearingHouseVerifier = buildLocalClearingHouseVerifier({ network: config.networkMode, ledgerKind: verifierUsesFabric ? 'fabric' : 'memory',
     tenants: tenantManager, ledger: verifierUsesFabric ? credentialLedgerFabric : credentialLedgerMem,
-    vaultRepository, kmsService, cryptography: cryptographyService, authorize: request => openIdAuthManager.verifyCurrentConsentContext(request) });
+    vaultRepository, kmsService, cryptography: cryptographyService, authorize: (request, identity) => openIdAuthManager.verifyCurrentConsentContext(request, identity) });
   const clearingHouseService = new ClearingHouseService({ cryptography: cryptographyService, localVerifier: localClearingHouseVerifier,
     signClientAssertion: async ({ tenantDid, tenantVaultId, audience, requestHash }) => {
       const vaultId = tenantVaultId || (tenantDid === hostRuntime.hostDid ? 'host' : getTenantVaultIdFromIss(tenantDid));
