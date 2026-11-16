@@ -34,6 +34,10 @@ export class DemoKmsService implements IKmsService {
     this._realKmsService = realKmsService;
   }
 
+  destroy(): void {
+    this._realKmsService.destroy?.();
+  }
+
   async init(): Promise<void> {
     // It's crucial to initialize the wrapped service to provision the host keys.
     await this._realKmsService.init();
@@ -94,9 +98,9 @@ export class DemoKmsService implements IKmsService {
     return this._realKmsService.createDetachedJws(payload, signerKid, signerVaultId, purpose);
   }
 
-  async createCompactJws(payload: object, signerKid: string, signerVaultId: string, purpose?: SigningPurpose): Promise<string> {
+  async createCompactJws(payload: object, signerKid: string, signerVaultId: string, purpose?: SigningPurpose, protectedHeader?: Readonly<Record<string, string>>): Promise<string> {
     console.warn(`[DemoKmsService] Delegating real compact JWS creation for: ${signerVaultId}`);
-    return this._realKmsService.createCompactJws(payload, signerKid, signerVaultId, purpose);
+    return this._realKmsService.createCompactJws(payload, signerKid, signerVaultId, purpose, protectedHeader);
   }
 
   // --- SIMULATED METHODS (Communication Bypass) ---

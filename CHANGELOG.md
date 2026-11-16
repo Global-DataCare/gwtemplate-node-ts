@@ -20,6 +20,8 @@
   controller key and submitted credentials to the signed presentation, and
   preserve the receiving host as verification audience. Keep native ICA
   activation evidence separate from Fabric checks and enrolled-device proof.
+- Delegate demo KMS shutdown to the real key owner and preserve protected
+  presentation headers when signing through the demo decorator.
 - Restrict simulated authentication, Clearing House results and demo KMS
   custody to explicit local demo; local `test` no longer implies demo.
 - Add authenticated tenant presentation verification and federated SMART
@@ -31,6 +33,7 @@
 - Reject inactive SMART client registrations and Clearing House receipts
   for a different presentation; keep DCR initial access tokens on their own
   verifier path.
+
 ## [1.26.0] - 2026-11-15
 
 - Extend E9 with version-bound GW CORE 1.26.0 evidence: 100 source-policy and
