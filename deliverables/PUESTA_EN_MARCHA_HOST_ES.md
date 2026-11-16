@@ -4,6 +4,15 @@ Esta guía comienza cuando la ICA del espacio de datos ya está operativa. No
 migra staging a producción: crea identidades, certificados, Secrets y PVC
 nuevos para cada red.
 
+Para actualizar un host existente a GW CORE 1.26.1, conserve sus identidades,
+claves, Secrets, PVC y datos. No repita el alta descrita en esta guía.
+Use el chart 0.4.4 y la imagen inmutable indicada en la
+[guía operativa](GUIA_OPERATIVA_HOST_ES.md#configuración-de-red-y-verificación).
+Configure expresamente el verificador y la confianza en los emisores según ese
+apartado. Staging y producción mantienen verificaciones reales. El perfil de
+interfaz sin Fabric usa un despliegue solo de gateway con `NETWORK_MODE=test`;
+`CLEARING_HOUSE_MODE=local` verifica firmas dentro del proceso y no selecciona demo.
+
 ## 1. Responsables
 
 Cada fase corresponde a uno de estos responsables:
@@ -510,13 +519,13 @@ valida e inyecta la lista, mientras que el equipo DevOps de Fabric realiza y
 verifica la unión efectiva.
 
 ```bash
-helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.4.0
+helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.4.4
 
 bash scripts/validate-host-helm-values.sh \
   /secure/inventory/host.values.yaml '<namespace>' '<release>'
 
 helm upgrade --install '<release>' oci://ghcr.io/global-datacare/gdc-host \
-  --version 0.3.5 --namespace '<namespace>' --create-namespace \
+  --version 0.4.4 --namespace '<namespace>' --create-namespace \
   --values /secure/inventory/host.values.yaml \
   --atomic --wait --timeout 15m
 ```

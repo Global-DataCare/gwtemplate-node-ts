@@ -2,6 +2,15 @@
 
 This guide starts after the data-space ICA is operational. It does not migrate staging identities into production: each network receives new identities, certificates, Secrets and PVCs.
 
+When updating an existing host to GW CORE 1.26.1, retain its identities, keys,
+Secrets, PVCs and data. Do not repeat the onboarding procedure below.
+Use chart 0.4.4 and the immutable image identified in the
+[operations guide](GUIDE_HOST_OPERATIONS_EN.md#network-and-verification-configuration).
+Explicitly configure the verifier and trusted issuers as described there.
+Staging and production retain real verification. UI development without Fabric
+uses a GW-only deployment with `NETWORK_MODE=test`;
+`CLEARING_HOUSE_MODE=local` verifies signatures in the process and does not select demo.
+
 ## 1. Responsibilities
 
 Each phase is assigned to one of these roles:
@@ -361,13 +370,13 @@ Upon boot, GW automatically creates the reserved technical record `host`, genera
 `peer.channels` contains Fabric channels, not GW sectors. It should list all channels already approved for the MSP that the new peer should join. Helm validates and injects the list, while Fabric DevOps team performs and verifies the effective join.
 
 ```bash
-helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.4.0
+helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.4.4
 
 bash scripts/validate-host-helm-values.sh \
   /secure/inventory/host.values.yaml '<namespace>' '<release>'
 
 helm upgrade --install '<release>' oci://ghcr.io/global-datacare/gdc-host \
-  --version 0.3.5 --namespace '<namespace>' --create-namespace \
+  --version 0.4.4 --namespace '<namespace>' --create-namespace \
   --values /secure/inventory/host.values.yaml \
   --atomic --wait --timeout 15m
 ```

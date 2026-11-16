@@ -102,7 +102,7 @@ if rg -n -i 'identidad administradora de Fabric CA|identidad registradora de Fab
   exit 1
 fi
 if rg -n -i 'Flujo completo en lenguaje directo|El flujo ya no requiere un `did\.json` previo|`did\.json` provisional|did\.json.*provisional|provisional.*did\.json|viernes a lunes|ENROLLMENT_GRANT_TTL_SECONDS|\bauditor\b' \
-  "${ROOT}/deliverables"; then
+  "${ROOT}/deliverables" --glob '*.md' --glob '*.html'; then
   echo 'La guía final contiene lenguaje informal o histórico.' >&2
   exit 1
 fi

@@ -33,7 +33,7 @@ Staging y producción requieren autenticación y verificaciones reales. Para
 ICA autorizada, su estado activo, sus claves públicas de firma y su endpoint
 HTTPS de consulta del estado de las credenciales. Las claves privadas permanecen
 en Secrets. El modo `remote` requiere además configurar el verificador de
-confianza de cada tenant y los solicitantes backend autorizados.
+confianza de cada organización alojada y los solicitantes backend autorizados.
 
 El chart de host incorpora Fabric y admite `local-network`, `test-network` y
 `network`; el perfil de interfaz `test` utiliza un despliegue de gateway sin ese
