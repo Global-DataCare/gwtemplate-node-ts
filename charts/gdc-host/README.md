@@ -3,7 +3,7 @@
 Distribución pública OCI:
 
 ```bash
-helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.4.0
+helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.4.4
 ```
 
 `gdc-host` empaqueta un límite de host reutilizable en cualquier Kubernetes:
@@ -21,7 +21,7 @@ values privado de cada release.
 ## Imágenes públicas de referencia
 
 - [GW CORE](https://github.com/orgs/Global-DataCare/packages/container/package/gw-core):
-  `ghcr.io/global-datacare/gw-core@sha256:a19ba9f712642da6a715e0039352204fc21d7546a6dfcd86cd8f17f26158c2f8`
+  `ghcr.io/global-datacare/gw-core@sha256:069de1bee22ab43d24b7dcb2123ebf160d983a70ef15228e7cf95c4ca25313dd`
 - [Runtime CCAAS](https://github.com/orgs/Global-DataCare/packages/container/package/host-runtime):
   `ghcr.io/global-datacare/host-runtime@sha256:b61f80bc405fc15a02890a269e6f051c0b3161a173d680fc8b610df681e11603`
 
@@ -29,6 +29,70 @@ El runtime CCAAS contiene los diez contratos públicos. Todos los hosts usan los
 mismos Services `gdc-cc-<contrato>:9999` dentro de su namespace aislado y, por
 tanto, los mismos paquetes y package IDs. No configure la imagen de GW CORE
 como runtime CCAAS.
+
+## Verificación de identidad y perfiles de despliegue
+
+`NETWORK_MODE` selecciona la red; `CLEARING_HOUSE_MODE` selecciona dónde se
+verifican las credenciales y presentaciones. Son decisiones independientes:
+
+- **Producción:** `environment: production`, `networkMode: network`,
+  `gw.securityMode: strict` y `CLEARING_HOUSE_MODE: local` (o un verificador
+  remoto configurado). Usa Fabric de producción y comprobaciones reales.
+- **Staging con Fabric:** `environment: staging`, `networkMode: test-network`,
+  los mismos controles de identidad y una red Fabric de pruebas.
+- **Integración Fabric local:** `environment: local`,
+  `networkMode: local-network` y comprobaciones reales.
+- **Pruebas de interfaz sin Fabric:** un despliegue solo de GW con
+  `NETWORK_MODE=test`, `SECURITY_MODE=strict` o el `compat` existente y
+  `CLEARING_HOUSE_MODE=local`. Conserva las firmas y autorizaciones reales;
+  las operaciones del ledger usan memoria. Este chart empaqueta un host Fabric
+  y no admite `networkMode: test`.
+
+`local` significa que el propio proceso de GW realiza la verificación. Es
+válido en Kubernetes y en producción. `stub` corresponde exclusivamente a la
+demostración local explícita (`DEPLOYMENT_ENV=local`, `NETWORK_MODE=test`,
+`SECURITY_MODE=demo`). Staging y producción no seleccionan demo.
+
+Para usar el verificador local, añada a sus values privados:
+
+```yaml
+gw:
+  extraEnv:
+    CLEARING_HOUSE_MODE: local
+    CREDENTIAL_TRUSTED_ISSUERS_JSON: |-
+      {
+        "<emisor exacto de la credencial ICA>": {
+          "status": "active",
+          "jwks": {"keys": ["<sustituir por objetos JWK públicos aprobados>"]},
+          "statusEndpointTemplate": "<endpoint HTTPS aprobado con {credentialType}>"
+        }
+      }
+```
+
+El bloque anterior muestra la estructura: sustituya los marcadores y use objetos
+JWK públicos completos, no cadenas. Obtenga el emisor, las claves de firma y el
+endpoint de estado de la ICA autorizada. El valor de la variable debe ser una
+cadena JSON válida (por eso se usa `|-`), no un objeto YAML. Las claves privadas
+y los secretos de autenticación permanecen en Secrets.
+
+El chart introduce las variables de verificación configuradas explícitamente
+en `gw.extraEnv` mediante referencias al ConfigMap del contenedor. Así prevalecen
+sobre una entrada antigua con el mismo nombre en `gw.existingSecret`. Las
+variables de confianza no configuradas en `extraEnv` conservan su fuente
+anterior. Revise también las variables efectivas del pod después del rollout.
+
+Configure además el proveedor de autenticación con su emisor, destinatario y
+claves de confianza. Un login válido no sustituye el registro del dispositivo,
+la identidad profesional o personal autorizada, los permisos ni el
+consentimiento aplicable. Para delegación remota, configure
+`CLEARING_HOUSE_TENANTS_JSON` y los solicitantes autorizados en el verificador
+receptor; la configuración del adaptador Gaia-X es independiente.
+
+Antes de aceptar el despliegue, pruebe una solicitud firmada autorizada y los
+rechazos por firma inválida y permiso denegado. En los perfiles Fabric,
+compruebe también la transacción y su lectura posterior. Conserve las claves,
+identificadores y datos existentes al actualizar el host. Consulte el
+[contrato completo de perfiles y confianza](../../docs-v1/03-IDENTITY-AND-TRUST/03.F-CLEARING-HOUSE-OIDC.md#deployment-profiles).
 
 ## Límite de responsabilidad
 
@@ -69,7 +133,7 @@ imágenes deben expresarse siempre por digest OCI:
 
 ```yaml
 gw:
-  image: ghcr.io/global-datacare/gw-core@sha256:a19ba9f712642da6a715e0039352204fc21d7546a6dfcd86cd8f17f26158c2f8
+  image: ghcr.io/global-datacare/gw-core@sha256:069de1bee22ab43d24b7dcb2123ebf160d983a70ef15228e7cf95c4ca25313dd
 ```
 
 La sección `host` identifica al operador y al controller técnico inicial del

@@ -18,10 +18,45 @@
   <h1>Guía reproducible para el alta y despliegue de un host</h1>
   <p><strong>Documento público en español para memoria, consultoría e integración.</strong></p>
 
+  <h2>Configuración de red y verificación</h2>
+  <p><code>NETWORK_MODE</code> selecciona el uso de blockchain.
+  <code>CLEARING_HOUSE_MODE=local</code> verifica las firmas, la identidad y las
+  autorizaciones dentro del gateway, también en Kubernetes o producción.</p>
+  <ul>
+    <li><strong>Interfaz sin Fabric:</strong> despliegue solo el gateway con
+    <code>NETWORK_MODE=test</code>, <code>CLEARING_HOUSE_MODE=local</code> y
+    <code>SECURITY_MODE=strict</code> (o el perfil <code>compat</code> existente).
+    Se mantienen la autenticación y las firmas reales. Aísle los datos de
+    pruebas; la base de datos y el almacenamiento configurados pueden recibir escrituras.</li>
+    <li><strong>Staging con Fabric:</strong> <code>DEPLOYMENT_ENV=staging</code>,
+    <code>NODE_ENV=staging</code> y <code>NETWORK_MODE=test-network</code>.</li>
+    <li><strong>Producción:</strong> <code>DEPLOYMENT_ENV=production</code>,
+    <code>NODE_ENV=production</code>, <code>NETWORK_MODE=network</code> y
+    <code>SECURITY_MODE=strict</code>.</li>
+    <li><strong>Demostración local:</strong> seleccione expresamente
+    <code>DEPLOYMENT_ENV=local</code>, <code>NETWORK_MODE=test</code>,
+    <code>SECURITY_MODE=demo</code> y <code>CLEARING_HOUSE_MODE=stub</code>.</li>
+  </ul>
+  <p>Staging y producción requieren autenticación y verificaciones reales.
+  Configure <code>CREDENTIAL_TRUSTED_ISSUERS_JSON</code> con el emisor exacto,
+  estado activo, claves públicas de firma y endpoint HTTPS de estado de las
+  credenciales de cada ICA autorizada. Las claves privadas permanecen en Secrets.
+  El modo <code>remote</code> requiere además configurar el verificador de cada
+  tenant y sus solicitantes backend autorizados.</p>
+  <p>El chart incorpora Fabric y admite <code>local-network</code>,
+  <code>test-network</code> y <code>network</code>. El perfil de interfaz
+  <code>test</code> utiliza un despliegue solo del gateway. Las opciones de
+  verificación suministradas en los values privados mediante <code>gw.extraEnv</code>
+  se trasladan al contenedor mediante referencias explícitas al ConfigMap y
+  prevalecen sobre entradas antiguas del Secret. Preserve identidades y datos,
+  compruebe la configuración efectiva y pruebe accesos permitidos y denegados.</p>
+  <p>Consulte la <a href="../docs-v1/03-IDENTITY-AND-TRUST/03.F-CLEARING-HOUSE-OIDC.md#deployment-profiles">configuración completa de perfiles y confianza</a>
+  y los <a href="../charts/gdc-host/README.md">ejemplos de values del chart</a>.</p>
+
   <h2>Imágenes OCI públicas verificadas</h2>
   <ul>
     <li>GW CORE: <a href="https://github.com/orgs/Global-DataCare/packages/container/package/gw-core">https://github.com/orgs/Global-DataCare/packages/container/package/gw-core</a>:
-      <code>ghcr.io/global-datacare/gw-core@sha256:a19ba9f712642da6a715e0039352204fc21d7546a6dfcd86cd8f17f26158c2f8</code>.</li>
+      <code>ghcr.io/global-datacare/gw-core@sha256:069de1bee22ab43d24b7dcb2123ebf160d983a70ef15228e7cf95c4ca25313dd</code>.</li>
     <li>Runtime CCAAS: <a href="https://github.com/orgs/Global-DataCare/packages/container/package/host-runtime">https://github.com/orgs/Global-DataCare/packages/container/package/host-runtime</a>:
       <code>ghcr.io/global-datacare/host-runtime@sha256:b61f80bc405fc15a02890a269e6f051c0b3161a173d680fc8b610df681e11603</code>.</li>
   </ul>
@@ -242,12 +277,12 @@ CA_TLS_CERT=/secure/trust/fabric-ica-ca-chain.pem \
   <code>manifest.sha256</code>.</p>
 
   <h2>11. Imagen OCI, values y package IDs</h2>
-  <pre>helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.4.0
-helm show chart oci://ghcr.io/global-datacare/gdc-host --version 0.4.0</pre>
+  <pre>helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.4.4
+helm show chart oci://ghcr.io/global-datacare/gdc-host --version 0.4.4</pre>
   <p>El chart OCI es el mismo artefacto validado en local-network. Los values,
   Secrets, grants y MSP/TLS se generan de nuevo para cada entorno; los package
   IDs CCAAS deterministas son compartidos.</p>
-  <pre>export GW_PUBLIC_IMAGE="ghcr.io/global-datacare/gw-core@sha256:a19ba9f712642da6a715e0039352204fc21d7546a6dfcd86cd8f17f26158c2f8"
+  <pre>export GW_PUBLIC_IMAGE="ghcr.io/global-datacare/gw-core@sha256:069de1bee22ab43d24b7dcb2123ebf160d983a70ef15228e7cf95c4ca25313dd"
 export CCAAS_PUBLIC_IMAGE="ghcr.io/global-datacare/host-runtime@sha256:b61f80bc405fc15a02890a269e6f051c0b3161a173d680fc8b610df681e11603"
 docker buildx imagetools inspect "${GW_PUBLIC_IMAGE}"
 docker buildx imagetools inspect "${CCAAS_PUBLIC_IMAGE}"
@@ -279,8 +314,8 @@ REDIS_SECRET_ENV_FILE=/secure/host/redis.env \
   bash scripts/onboarding/materialize-kubernetes-secrets.sh
 bash scripts/validate-host-helm-values.sh \
   /secure/inventory/host.values.yaml "${KUBE_NAMESPACE}" "${HELM_RELEASE}"
-helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.4.0
-tar -xzf gdc-host-0.4.0.tgz -C /secure/onboarding
+helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.4.4
+tar -xzf gdc-host-0.4.4.tgz -C /secure/onboarding
 helm upgrade --install "${HELM_RELEASE}" /secure/onboarding/gdc-host \
   --kube-context "${KUBE_CONTEXT}" --namespace "${KUBE_NAMESPACE}" \
   --values /secure/inventory/host.values.yaml \

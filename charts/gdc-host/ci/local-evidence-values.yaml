@@ -24,9 +24,9 @@ gw:
   service: { type: ClusterIP, port: 80 }
   ingress: { enabled: false, className: "", annotations: {}, tlsSecretName: "" }
   providers: { queue: mem, database: postgres, storage: ipfs, kms: local, replayProtection: mem }
-  authTokenVerifier: demo
-  securityMode: demo
-  didcommPlain: "true"
+  authTokenVerifier: firebase
+  securityMode: strict
+  didcommPlain: disabled
 images:
   init: registry.example.invalid/busybox@sha256:2222222222222222222222222222222222222222222222222222222222222222
 peer:

@@ -4,6 +4,42 @@ This guide is public, neutral with respect to Node Operator and valid for `local
 
 For real operation, follow the short guide first [`MIGRATION_AND_DEPLOYMENT_ICA_EN.md`](./MIGRATION_AND_DEPLOYMENT_ICA_EN.md) and then [`PROCEDURE_HOST_ONBOARDING_EN.md`](./PROCEDURE_HOST_ONBOARDING_EN.md). This document preserves the technical reference detail and does not replace that order.
 
+## Network and verification configuration
+
+`NETWORK_MODE` selects blockchain use. `CLEARING_HOUSE_MODE=local` selects
+verification inside the gateway process, including in Kubernetes or production:
+it checks signatures, identity and current authority.
+
+- **UI testing without Fabric:** deploy the gateway alone with
+  `NETWORK_MODE=test`, `CLEARING_HOUSE_MODE=local` and `SECURITY_MODE=strict`
+  (or retain an existing `compat` profile). Authentication and signatures remain
+  real. Isolate test data: the configured database and storage providers can
+  still receive writes.
+- **Staging with Fabric:** set `DEPLOYMENT_ENV=staging`, `NODE_ENV=staging`
+  and `NETWORK_MODE=test-network`.
+- **Production:** set `DEPLOYMENT_ENV=production`, `NODE_ENV=production`,
+  `NETWORK_MODE=network` and `SECURITY_MODE=strict`.
+- **Local demonstration:** explicitly select `DEPLOYMENT_ENV=local`,
+  `NETWORK_MODE=test`, `SECURITY_MODE=demo` and `CLEARING_HOUSE_MODE=stub`.
+
+Staging and production require real authentication and verification. For
+`local`, configure `CREDENTIAL_TRUSTED_ISSUERS_JSON` with each approved ICA's exact
+issuer, active status, public signing keys and HTTPS credential-status endpoint.
+Private keys remain in Secrets. The `remote` mode additionally requires each
+tenant's trusted verifier and authorized backend requesters.
+
+The host chart includes Fabric and accepts `local-network`, `test-network` and
+`network`; the UI-only `test` profile uses a gateway deployment without that
+Fabric profile. Verification settings explicitly supplied in the private Helm
+values under `gw.extraEnv` become container ConfigMap references, taking
+precedence over older Secret entries. Check the effective configuration after
+rollout, preserve identities and data, and test an authorized request plus
+invalid-signature and denied-permission cases.
+
+The [complete profile and trust configuration](../docs-v1/03-IDENTITY-AND-TRUST/03.F-CLEARING-HOUSE-OIDC.md#deployment-profiles)
+and [chart values examples](../charts/gdc-host/README.md)
+describe the fields and verification contracts.
+
 ## 1. Result and roles
 
 Successful execution produces a `HostingServiceCredential` VC-JWT, an authorization linked to the URL/MSP/network/channels, an MSP administrator safeguarded by the entity authorized to administer Fabric, MSP and TLS certificates with host-generated private keys, the MSP admitted to the channels, the runtime installed through Helm, and evidence of write, read, denial and persistence.
@@ -238,7 +274,7 @@ GW CORE is not published on npm. The verified version is available on the [GW CO
 GW CORE and CCAAS are different OCI artifacts. Always use the approved digests:
 
 ```bash
-export GW_PUBLIC_IMAGE="ghcr.io/global-datacare/gw-core@sha256:a19ba9f712642da6a715e0039352204fc21d7546a6dfcd86cd8f17f26158c2f8"
+export GW_PUBLIC_IMAGE="ghcr.io/global-datacare/gw-core@sha256:069de1bee22ab43d24b7dcb2123ebf160d983a70ef15228e7cf95c4ca25313dd"
 export CCAAS_PUBLIC_IMAGE="ghcr.io/global-datacare/host-runtime@sha256:b61f80bc405fc15a02890a269e6f051c0b3161a173d680fc8b610df681e11603"
 docker buildx imagetools inspect "${GW_PUBLIC_IMAGE}"
 docker buildx imagetools inspect "${CCAAS_PUBLIC_IMAGE}"
@@ -310,8 +346,8 @@ helm template "${HELM_RELEASE}" charts/gdc-host \
   --namespace "${KUBE_NAMESPACE}" \
   --values /secure/inventory/host.values.yaml > /secure/onboarding/rendered.yaml
 
-helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.4.0
-tar -xzf gdc-host-0.4.0.tgz -C /secure/onboarding
+helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.4.4
+tar -xzf gdc-host-0.4.4.tgz -C /secure/onboarding
 
 helm upgrade --install "${HELM_RELEASE}" /secure/onboarding/gdc-host \
   --kube-context "${KUBE_CONTEXT}" --namespace "${KUBE_NAMESPACE}" \

@@ -18,10 +18,44 @@
   <h1>Reproducible guide for registering and deploying a host</h1>
   <p><strong>Public document for project reporting, consulting and integration.</strong></p>
 
+  <h2>Network and verification configuration</h2>
+  <p><code>NETWORK_MODE</code> selects blockchain use.
+  <code>CLEARING_HOUSE_MODE=local</code> verifies signatures, identity and current
+  authority inside the gateway, including in Kubernetes or production.</p>
+  <ul>
+    <li><strong>UI without Fabric:</strong> deploy the gateway alone with
+    <code>NETWORK_MODE=test</code>, <code>CLEARING_HOUSE_MODE=local</code> and
+    <code>SECURITY_MODE=strict</code> (or the existing <code>compat</code> profile).
+    Authentication and signatures remain real. Isolate test data; the configured
+    database and storage providers can still receive writes.</li>
+    <li><strong>Staging with Fabric:</strong> <code>DEPLOYMENT_ENV=staging</code>,
+    <code>NODE_ENV=staging</code> and <code>NETWORK_MODE=test-network</code>.</li>
+    <li><strong>Production:</strong> <code>DEPLOYMENT_ENV=production</code>,
+    <code>NODE_ENV=production</code>, <code>NETWORK_MODE=network</code> and
+    <code>SECURITY_MODE=strict</code>.</li>
+    <li><strong>Local demonstration:</strong> explicitly select
+    <code>DEPLOYMENT_ENV=local</code>, <code>NETWORK_MODE=test</code>,
+    <code>SECURITY_MODE=demo</code> and <code>CLEARING_HOUSE_MODE=stub</code>.</li>
+  </ul>
+  <p>Staging and production require real authentication and verification.
+  Configure <code>CREDENTIAL_TRUSTED_ISSUERS_JSON</code> with each approved ICA's
+  exact issuer, active status, public signing keys and HTTPS credential-status
+  endpoint. Private keys remain in Secrets. The <code>remote</code> mode also
+  requires each tenant's trusted verifier and authorized backend requesters.</p>
+  <p>The chart includes Fabric and accepts <code>local-network</code>,
+  <code>test-network</code> and <code>network</code>. The UI-only
+  <code>test</code> profile uses a gateway-only deployment. Verification settings
+  supplied in private Helm values through <code>gw.extraEnv</code> become explicit
+  container ConfigMap references and take precedence over older Secret entries.
+  Preserve identities and data, check the effective configuration, and test
+  permitted and denied requests.</p>
+  <p>See the <a href="../docs-v1/03-IDENTITY-AND-TRUST/03.F-CLEARING-HOUSE-OIDC.md#deployment-profiles">complete profile and trust configuration</a>
+  and <a href="../charts/gdc-host/README.md">chart values examples</a>.</p>
+
  <h2>Verified public OCI images</h2>
   <ul>
     <li>GW CORE: <a href="https://github.com/orgs/Global-DataCare/packages/container/package/gw-core">https://github.com/orgs/Global-DataCare/packages/container/package/gw-core</a>:
-      <code>ghcr.io/global-datacare/gw-core@sha256:a19ba9f712642da6a715e0039352204fc21d7546a6dfcd86cd8f17f26158c2f8</code>.</li>
+      <code>ghcr.io/global-datacare/gw-core@sha256:069de1bee22ab43d24b7dcb2123ebf160d983a70ef15228e7cf95c4ca25313dd</code>.</li>
     <li>CCAAS Runtime: <a href="https://github.com/orgs/Global-DataCare/packages/container/package/host-runtime">https://github.com/orgs/Global-DataCare/packages/container/package/host-runtime</a>:
       <code>ghcr.io/global-datacare/host-runtime@sha256:b61f80bc405fc15a02890a269e6f051c0b3161a173d680fc8b610df681e11603</code>.</li>
   </ul>
@@ -244,12 +278,12 @@ CA_TLS_CERT=/secure/trust/fabric-ica-ca-chain.pem \
   <code>manifest.sha256</code>.</p>
 
 <h2>11. OCI image, values and package IDs</h2>
-  <pre>helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.4.0
-helm show chart oci://ghcr.io/global-datacare/gdc-host --version 0.4.0</pre>
+  <pre>helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.4.4
+helm show chart oci://ghcr.io/global-datacare/gdc-host --version 0.4.4</pre>
   <p>The OCI chart is the same artifact validated in local-network. Values,
   Secrets, enrollment grants and MSP/TLS material are generated again for each
   environment; the deterministic CCAAS package IDs are shared.</p>
-  <pre>export GW_PUBLIC_IMAGE="ghcr.io/global-datacare/gw-core@sha256:a19ba9f712642da6a715e0039352204fc21d7546a6dfcd86cd8f17f26158c2f8"
+  <pre>export GW_PUBLIC_IMAGE="ghcr.io/global-datacare/gw-core@sha256:069de1bee22ab43d24b7dcb2123ebf160d983a70ef15228e7cf95c4ca25313dd"
 export CCAAS_PUBLIC_IMAGE="ghcr.io/global-datacare/host-runtime@sha256:b61f80bc405fc15a02890a269e6f051c0b3161a173d680fc8b610df681e11603"
 docker buildx imagetools inspect "${GW_PUBLIC_IMAGE}"
 docker buildx imagetools inspect "${CCAAS_PUBLIC_IMAGE}"
@@ -281,8 +315,8 @@ REDIS_SECRET_ENV_FILE=/secure/host/redis.env \
   bash scripts/onboarding/materialize-kubernetes-secrets.sh
 bash scripts/validate-host-helm-values.sh \
   /secure/inventory/host.values.yaml "${KUBE_NAMESPACE}" "${HELM_RELEASE}"
-helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.4.0
-tar -xzf gdc-host-0.4.0.tgz -C /secure/onboarding
+helm pull oci://ghcr.io/global-datacare/gdc-host --version 0.4.4
+tar -xzf gdc-host-0.4.4.tgz -C /secure/onboarding
 helm upgrade --install "${HELM_RELEASE}" /secure/onboarding/gdc-host \
   --kube-context "${KUBE_CONTEXT}" --namespace "${KUBE_NAMESPACE}" \
   --values /secure/inventory/host.values.yaml \

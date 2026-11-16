@@ -61,6 +61,20 @@ grep -q 'host-st.example.invalid' "${TMP_DIR}/staging.yaml"
 grep -q 'host.example.invalid' "${TMP_DIR}/production.yaml"
 grep -q 'NETWORK_MODE: "test-network"' "${TMP_DIR}/staging.yaml"
 grep -q 'NETWORK_MODE: "network"' "${TMP_DIR}/production.yaml"
+grep -q 'NODE_ENV: "staging"' "${TMP_DIR}/staging.yaml"
+grep -q 'NODE_ENV: "production"' "${TMP_DIR}/production.yaml"
+grep -q 'NODE_ENV: "development"' "${TMP_DIR}/local-host1.yaml"
+cat > "${TMP_DIR}/verification-values.yaml" <<'EOF'
+gw:
+  extraEnv:
+    CLEARING_HOUSE_MODE: local
+    CREDENTIAL_TRUSTED_ISSUERS_JSON: '{}'
+EOF
+helm template host-verification "${CHART}" --namespace host-st \
+  -f "${CHART}/ci/staging-values.yaml" -f "${TMP_DIR}/verification-values.yaml" > "${TMP_DIR}/verification.yaml"
+grep -A6 'name: CLEARING_HOUSE_MODE' "${TMP_DIR}/verification.yaml" | grep -q 'configMapKeyRef:'
+grep -A6 'name: CREDENTIAL_TRUSTED_ISSUERS_JSON' "${TMP_DIR}/verification.yaml" | grep -q 'configMapKeyRef:'
+
 grep -q 'STORAGE_LAYOUT: "scoped-v2"' "${TMP_DIR}/production.yaml"
 grep -q 'RESEARCH_TERMINOLOGY_BASE_URL: ""' "${TMP_DIR}/production.yaml"
 grep -q 'RESEARCH_TERMINOLOGY_LABELS_ENABLED: "false"' "${TMP_DIR}/production.yaml"
@@ -106,7 +120,15 @@ grep -A4 'name: chaincode' "${TMP_DIR}/local-evidence.yaml" | grep -q 'imagePull
 grep -A5 'name: CHAINCODE_ID' "${TMP_DIR}/local-evidence.yaml" | grep -q 'name: CHAINCODE_NAME'
 grep -q 'HOST_INTERNAL_IP: "0.0.0.0"' "${TMP_DIR}/local-evidence.yaml"
 grep -q 'PORT: "3000"' "${TMP_DIR}/local-evidence.yaml"
-grep -q 'SECURITY_MODE: "demo"' "${TMP_DIR}/local-evidence.yaml"
+grep -q 'SECURITY_MODE: "strict"' "${TMP_DIR}/local-evidence.yaml"
+for profile in local-host1 local-host2 local-evidence; do
+  grep -q 'AUTH_TOKEN_VERIFIER: "firebase"' "${TMP_DIR}/${profile}.yaml"
+done
+# Unspecified trust settings remain available from the existing Secret.
+if grep -q 'name: CLEARING_HOUSE_MODE' "${TMP_DIR}/staging.yaml"; then
+  echo 'chart must only override trust settings explicitly supplied in extraEnv' >&2
+  exit 1
+fi
 grep -q 'LEDGER_PROVIDER_MAP: "test=mem,local-network=fabric,test-network=fabric,network=fabric"' \
   "${TMP_DIR}/local-evidence.yaml"
 
