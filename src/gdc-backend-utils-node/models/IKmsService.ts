@@ -36,6 +36,9 @@ export type SigningPurpose = 'comm_sig' | 'vc_sign';
  */
 export interface IKmsService {
 
+  /** Releases process-owned key material during runtime shutdown. */
+  destroy?(): void;
+
   /**
    * Initializes the service, ensuring essential keys (like for the 'host') are provisioned.
    * MUST be called before any other methods.
