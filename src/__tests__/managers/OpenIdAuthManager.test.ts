@@ -1,6 +1,11 @@
+// Flow contract: isolated consent and SMART policy decisions consume a verifier result bound to the submitted presentation.
 // TDD contract: write this test red first; make it green only with the complete real behavior.
 // src/__tests__/managers/OpenIdAuthManager.test.ts
 
+import { createHash, randomUUID } from 'node:crypto';
+import { EXAMPLE_HOSTED_INDIVIDUAL_CONTROLLER_DID, EXAMPLE_RELATED_PERSON_ROLE } from 'gdc-common-utils-ts/examples/shared';
+import { parseIndividualMemberDidWeb } from 'gdc-common-utils-ts/utils/did';
+import { decodeProtectedHeader } from 'jose';
 import { OpenIdAuthManager } from '../../managers/OpenIdAuthManager';
 import { IKmsService } from '../../gdc-backend-utils-node/models/IKmsService';
 import { TenantsCacheManager } from '../../managers/TenantsCacheManager';
@@ -129,12 +134,12 @@ function buildAliasedIndividualSelfReadManager(): OpenIdAuthManager {
     }]),
   } as unknown as jest.Mocked<IVaultRepository>;
   const clearingHouse = {
-    verifyVpToken: jest.fn().mockResolvedValue({
+    verifyVpToken: jest.fn().mockImplementation(async (request: { vpToken: string }) => ({
       acr: 'urn:antifraud:acr:openid4vp:individual',
       amr: ['openid4vp', 'vc'],
-      vpHash: 'hash',
+      vpHash: createHash('sha256').update(request.vpToken).digest('hex'),
       ledgerVerified: true,
-    }),
+    })),
   } as unknown as jest.Mocked<IClearingHouseService>;
   return new OpenIdAuthManager(kmsService, tenants, vault, clearingHouse);
 }
@@ -201,12 +206,12 @@ function buildSameTenantDigitalTwinManager(
         : []),
   } as unknown as jest.Mocked<IVaultRepository>;
   const clearingHouse = {
-    verifyVpToken: jest.fn().mockResolvedValue({
+    verifyVpToken: jest.fn().mockImplementation(async (request: { vpToken: string }) => ({
       acr: 'urn:antifraud:acr:openid4vp:employee',
       amr: ['openid4vp', 'vc'],
-      vpHash: 'hash',
+      vpHash: createHash('sha256').update(request.vpToken).digest('hex'),
       ledgerVerified: true,
-    }),
+    })),
   } as unknown as jest.Mocked<IClearingHouseService>;
   return new OpenIdAuthManager(kmsService, tenants, vault, clearingHouse);
 }
@@ -284,8 +289,8 @@ describe('OpenIdAuthManager', () => {
     });
     const vault = {
       getContainersInSection: jest.fn()
-        .mockResolvedValueOnce([{ content: {
-          status: 'active', subjectId: actorId, authorizedSubjectDid: subjectDid,
+        .mockResolvedValueOnce([{ status: 'active', content: {
+          status: 'active', userClass: 'individual', exp: Math.floor(Date.now() / 1000) + 300, subjectId: actorId, authorizedSubjectDid: subjectDid,
           issuedToRole: role, issuedToPhone: memberPhone,
         } }])
         .mockResolvedValueOnce([{
@@ -310,9 +315,9 @@ describe('OpenIdAuthManager', () => {
         tenantExists: jest.fn().mockResolvedValue(true),
       } as unknown as jest.Mocked<TenantsCacheManager>,
       vault,
-      { verifyVpToken: jest.fn().mockResolvedValue({
+      { verifyVpToken: jest.fn().mockImplementation(async (request: { vpToken: string }) => ({
         acr: 'urn:antifraud:acr:openid4vp:individual',
-        amr: ['openid4vp', 'vc'], vpHash: 'hash', ledgerVerified: true,
+        amr: ['openid4vp', 'vc'], vpHash: createHash('sha256').update(request.vpToken).digest('hex'), ledgerVerified: true,
       }) } as unknown as jest.Mocked<IClearingHouseService>,
     );
 
@@ -384,12 +389,12 @@ describe('OpenIdAuthManager', () => {
     };
 
     const mockClearingHouse: jest.Mocked<IClearingHouseService> = {
-      verifyVpToken: jest.fn().mockResolvedValue({
+      verifyVpToken: jest.fn().mockImplementation(async (request: { vpToken: string }) => ({
         acr: 'urn:antifraud:acr:openid4vp:employee',
         amr: ['openid4vp', 'vc'],
-        vpHash: 'hash',
+        vpHash: createHash('sha256').update(request.vpToken).digest('hex'),
         ledgerVerified: true,
-      }),
+    })),
     };
 
     const manager = new OpenIdAuthManager(
@@ -518,12 +523,12 @@ describe('OpenIdAuthManager', () => {
     };
 
     const mockClearingHouse: jest.Mocked<IClearingHouseService> = {
-      verifyVpToken: jest.fn().mockResolvedValue({
+      verifyVpToken: jest.fn().mockImplementation(async (request: { vpToken: string }) => ({
         acr: 'urn:antifraud:acr:openid4vp:employee',
         amr: ['openid4vp', 'vc'],
-        vpHash: 'hash',
+        vpHash: createHash('sha256').update(request.vpToken).digest('hex'),
         ledgerVerified: true,
-      }),
+    })),
     };
 
     const manager = new OpenIdAuthManager(
@@ -612,12 +617,12 @@ describe('OpenIdAuthManager', () => {
     };
 
     const mockClearingHouse: jest.Mocked<IClearingHouseService> = {
-      verifyVpToken: jest.fn().mockResolvedValue({
+      verifyVpToken: jest.fn().mockImplementation(async (request: { vpToken: string }) => ({
         acr: 'urn:antifraud:acr:openid4vp:employee',
         amr: ['openid4vp', 'vc'],
-        vpHash: 'hash',
+        vpHash: createHash('sha256').update(request.vpToken).digest('hex'),
         ledgerVerified: true,
-      }),
+    })),
     };
 
     const manager = new OpenIdAuthManager(
@@ -865,12 +870,12 @@ describe('OpenIdAuthManager', () => {
     };
 
     const mockClearingHouse: jest.Mocked<IClearingHouseService> = {
-      verifyVpToken: jest.fn().mockResolvedValue({
+      verifyVpToken: jest.fn().mockImplementation(async (request: { vpToken: string }) => ({
         acr: 'urn:antifraud:acr:openid4vp:employee',
         amr: ['openid4vp', 'vc'],
-        vpHash: 'hash',
+        vpHash: createHash('sha256').update(request.vpToken).digest('hex'),
         ledgerVerified: true,
-      }),
+    })),
     };
 
     const manager = new OpenIdAuthManager(
@@ -952,12 +957,12 @@ describe('OpenIdAuthManager', () => {
     };
 
     const mockClearingHouse: jest.Mocked<IClearingHouseService> = {
-      verifyVpToken: jest.fn().mockResolvedValue({
+      verifyVpToken: jest.fn().mockImplementation(async (request: { vpToken: string }) => ({
         acr: 'urn:antifraud:acr:openid4vp:employee',
         amr: ['openid4vp', 'vc'],
-        vpHash: 'hash',
+        vpHash: createHash('sha256').update(request.vpToken).digest('hex'),
         ledgerVerified: true,
-      }),
+    })),
     };
 
     const manager = new OpenIdAuthManager(
@@ -1039,12 +1044,12 @@ describe('OpenIdAuthManager', () => {
     };
 
     const mockClearingHouse: jest.Mocked<IClearingHouseService> = {
-      verifyVpToken: jest.fn().mockResolvedValue({
+      verifyVpToken: jest.fn().mockImplementation(async (request: { vpToken: string }) => ({
         acr: 'urn:antifraud:acr:openid4vp:employee',
         amr: ['openid4vp', 'vc'],
-        vpHash: 'hash',
+        vpHash: createHash('sha256').update(request.vpToken).digest('hex'),
         ledgerVerified: true,
-      }),
+    })),
     };
 
     const manager = new OpenIdAuthManager(
@@ -1216,12 +1221,12 @@ describe('OpenIdAuthManager', () => {
     };
 
     const mockClearingHouse: jest.Mocked<IClearingHouseService> = {
-      verifyVpToken: jest.fn().mockResolvedValue({
+      verifyVpToken: jest.fn().mockImplementation(async (request: { vpToken: string }) => ({
         acr: 'urn:antifraud:acr:openid4vp:employee',
         amr: ['openid4vp', 'vc'],
-        vpHash: 'hash',
+        vpHash: createHash('sha256').update(request.vpToken).digest('hex'),
         ledgerVerified: true,
-      }),
+    })),
     };
 
     const manager = new OpenIdAuthManager(
@@ -1309,12 +1314,12 @@ describe('OpenIdAuthManager', () => {
     };
 
     const mockClearingHouse: jest.Mocked<IClearingHouseService> = {
-      verifyVpToken: jest.fn().mockResolvedValue({
+      verifyVpToken: jest.fn().mockImplementation(async (request: { vpToken: string }) => ({
         acr: 'urn:antifraud:acr:openid4vp:employee',
         amr: ['openid4vp', 'vc'],
-        vpHash: 'hash',
+        vpHash: createHash('sha256').update(request.vpToken).digest('hex'),
         ledgerVerified: true,
-      }),
+    })),
     };
 
     const manager = new OpenIdAuthManager(
@@ -1405,12 +1410,12 @@ describe('OpenIdAuthManager', () => {
     };
 
     const mockClearingHouse: jest.Mocked<IClearingHouseService> = {
-      verifyVpToken: jest.fn().mockResolvedValue({
+      verifyVpToken: jest.fn().mockImplementation(async (request: { vpToken: string }) => ({
         acr: 'urn:antifraud:acr:openid4vp:employee',
         amr: ['openid4vp', 'vc'],
-        vpHash: 'hash',
+        vpHash: createHash('sha256').update(request.vpToken).digest('hex'),
         ledgerVerified: true,
-      }),
+    })),
     };
 
     const vpPayload = createVP({
@@ -1589,12 +1594,12 @@ describe('OpenIdAuthManager', () => {
     };
 
     const mockClearingHouse: jest.Mocked<IClearingHouseService> = {
-      verifyVpToken: jest.fn().mockResolvedValue({
+      verifyVpToken: jest.fn().mockImplementation(async (request: { vpToken: string }) => ({
         acr: 'urn:antifraud:acr:openid4vp:individual',
         amr: ['openid4vp', 'vc'],
-        vpHash: 'hash',
+        vpHash: createHash('sha256').update(request.vpToken).digest('hex'),
         ledgerVerified: true,
-      }),
+    })),
     };
 
     const manager = new OpenIdAuthManager(
@@ -1727,12 +1732,12 @@ describe('OpenIdAuthManager', () => {
     };
 
     const mockClearingHouse: jest.Mocked<IClearingHouseService> = {
-      verifyVpToken: jest.fn().mockResolvedValue({
+      verifyVpToken: jest.fn().mockImplementation(async (request: { vpToken: string }) => ({
         acr: 'urn:antifraud:acr:openid4vp:employee',
         amr: ['openid4vp', 'vc'],
-        vpHash: 'hash',
+        vpHash: createHash('sha256').update(request.vpToken).digest('hex'),
         ledgerVerified: true,
-      }),
+    })),
     };
 
     const manager = new OpenIdAuthManager(
@@ -1778,6 +1783,7 @@ describe('OpenIdAuthManager', () => {
     process.env.EXTERNAL_RESEARCH_TOKEN_TRUSTED_ISSUERS = 'https://pontus-x.example';
     const clientId = 'did:web:lab.example:employee:researcher1@lab.org:device:client-002';
     const clientAssertion = await buildClientAssertionJwt({
+      additionalClaims: { jti: randomUUID() },
       clientId,
       audience: 'did:web:api.acme.org',
     });
@@ -1796,7 +1802,7 @@ describe('OpenIdAuthManager', () => {
       createCompactJws: buildMockCompactJws(),
       encodeResponse: jest.fn(),
       protectConfidentialData: jest.fn(),
-      unprotectConfidentialData: jest.fn(),
+      unprotectConfidentialData: jest.fn(async (document: any) => document.content),
       getHmacBase64Url: jest.fn(),
       protectAttributesNameAndValue: jest.fn(),
     };
@@ -1824,7 +1830,7 @@ describe('OpenIdAuthManager', () => {
         },
       ] as any),
       put: jest.fn(),
-      get: jest.fn(),
+      get: jest.fn().mockResolvedValue({ status: 'active', content: { clientId, jwks: { keys: [decodeProtectedHeader(clientAssertion).jwk] } } }),
       getHistory: jest.fn(),
       query: jest.fn(),
       delete: jest.fn(),
@@ -1887,7 +1893,7 @@ describe('OpenIdAuthManager', () => {
     } as JobRequest);
 
     expect(response.body.access_token).toBeDefined();
-    expect(response.body.ledger_verified).toBe(true);
+    expect(response.body.ledger_verified).toBe(false);
     expect(mockClearingHouse.verifyVpToken).not.toHaveBeenCalled();
   });
 
@@ -1896,6 +1902,7 @@ describe('OpenIdAuthManager', () => {
     const researchSubjectScope = `organization/ResearchSubject.rs?subject=${EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.subjectDid}`;
     const clientId = 'did:web:lab.example:employee:researcher1@lab.org:device:client-rs-001';
     const clientAssertion = await buildClientAssertionJwt({
+      additionalClaims: { jti: randomUUID() },
       clientId,
       audience: 'did:web:api.acme.org',
     });
@@ -1914,7 +1921,7 @@ describe('OpenIdAuthManager', () => {
       createCompactJws: buildMockCompactJws(),
       encodeResponse: jest.fn(),
       protectConfidentialData: jest.fn(),
-      unprotectConfidentialData: jest.fn(),
+      unprotectConfidentialData: jest.fn(async (document: any) => document.content),
       getHmacBase64Url: jest.fn(),
       protectAttributesNameAndValue: jest.fn(),
     };
@@ -1943,7 +1950,7 @@ describe('OpenIdAuthManager', () => {
         },
       ] as any),
       put: jest.fn(),
-      get: jest.fn(),
+      get: jest.fn().mockResolvedValue({ status: 'active', content: { clientId, jwks: { keys: [decodeProtectedHeader(clientAssertion).jwk] } } }),
       getHistory: jest.fn(),
       query: jest.fn(),
       delete: jest.fn(),
@@ -2006,7 +2013,7 @@ describe('OpenIdAuthManager', () => {
     } as JobRequest);
 
     expect(response.body.access_token).toBeDefined();
-    expect(response.body.ledger_verified).toBe(true);
+    expect(response.body.ledger_verified).toBe(false);
   });
 
   it('should accept one research employee when the permit is role-specific and matches the requester role', async () => {
@@ -2014,6 +2021,7 @@ describe('OpenIdAuthManager', () => {
     const researchSubjectScope = `organization/ResearchSubject.rs?subject=${EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.subjectDid}`;
     const clientId = 'did:web:lab.example:employee:researcher1@lab.org:device:client-role-allow';
     const clientAssertion = await buildClientAssertionJwt({
+      additionalClaims: { jti: randomUUID() },
       clientId,
       audience: 'did:web:api.acme.org',
     });
@@ -2032,7 +2040,7 @@ describe('OpenIdAuthManager', () => {
       createCompactJws: buildMockCompactJws(),
       encodeResponse: jest.fn(),
       protectConfidentialData: jest.fn(),
-      unprotectConfidentialData: jest.fn(),
+      unprotectConfidentialData: jest.fn(async (document: any) => document.content),
       getHmacBase64Url: jest.fn(),
       protectAttributesNameAndValue: jest.fn(),
     };
@@ -2063,7 +2071,7 @@ describe('OpenIdAuthManager', () => {
         },
       ] as any),
       put: jest.fn(),
-      get: jest.fn(),
+      get: jest.fn().mockResolvedValue({ status: 'active', content: { clientId, jwks: { keys: [decodeProtectedHeader(clientAssertion).jwk] } } }),
       getHistory: jest.fn(),
       query: jest.fn(),
       delete: jest.fn(),
@@ -2133,6 +2141,7 @@ describe('OpenIdAuthManager', () => {
     const researchSubjectScope = `organization/ResearchSubject.rs?subject=${EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.subjectDid}`;
     const clientId = 'did:web:lab.example:employee:researcher2@lab.org:device:client-role-deny';
     const clientAssertion = await buildClientAssertionJwt({
+      additionalClaims: { jti: randomUUID() },
       clientId,
       audience: 'did:web:api.acme.org',
     });
@@ -2151,7 +2160,7 @@ describe('OpenIdAuthManager', () => {
       createCompactJws: buildMockCompactJws(),
       encodeResponse: jest.fn(),
       protectConfidentialData: jest.fn(),
-      unprotectConfidentialData: jest.fn(),
+      unprotectConfidentialData: jest.fn(async (document: any) => document.content),
       getHmacBase64Url: jest.fn(),
       protectAttributesNameAndValue: jest.fn(),
     };
@@ -2182,7 +2191,7 @@ describe('OpenIdAuthManager', () => {
         },
       ] as any),
       put: jest.fn(),
-      get: jest.fn(),
+      get: jest.fn().mockResolvedValue({ status: 'active', content: { clientId, jwks: { keys: [decodeProtectedHeader(clientAssertion).jwk] } } }),
       getHistory: jest.fn(),
       query: jest.fn(),
       delete: jest.fn(),
@@ -2250,6 +2259,7 @@ describe('OpenIdAuthManager', () => {
     const researchSubjectScope = `organization/ResearchSubject.rs?subject=${EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.subjectDid}`;
     const clientId = 'did:web:lab.example:employee:researcher1@lab.org:device:client-email-allow';
     const clientAssertion = await buildClientAssertionJwt({
+      additionalClaims: { jti: randomUUID() },
       clientId,
       audience: 'did:web:api.acme.org',
     });
@@ -2268,7 +2278,7 @@ describe('OpenIdAuthManager', () => {
       createCompactJws: buildMockCompactJws(),
       encodeResponse: jest.fn(),
       protectConfidentialData: jest.fn(),
-      unprotectConfidentialData: jest.fn(),
+      unprotectConfidentialData: jest.fn(async (document: any) => document.content),
       getHmacBase64Url: jest.fn(),
       protectAttributesNameAndValue: jest.fn(),
     };
@@ -2299,7 +2309,7 @@ describe('OpenIdAuthManager', () => {
         },
       ] as any),
       put: jest.fn(),
-      get: jest.fn(),
+      get: jest.fn().mockResolvedValue({ status: 'active', content: { clientId, jwks: { keys: [decodeProtectedHeader(clientAssertion).jwk] } } }),
       getHistory: jest.fn(),
       query: jest.fn(),
       delete: jest.fn(),
@@ -2369,6 +2379,7 @@ describe('OpenIdAuthManager', () => {
     const researchSubjectScope = `organization/ResearchSubject.rs?subject=${EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_CONTEXT.subjectDid}`;
     const clientId = 'did:web:lab.example:employee:researcher2@lab.org:device:client-email-deny';
     const clientAssertion = await buildClientAssertionJwt({
+      additionalClaims: { jti: randomUUID() },
       clientId,
       audience: 'did:web:api.acme.org',
     });
@@ -2387,7 +2398,7 @@ describe('OpenIdAuthManager', () => {
       createCompactJws: buildMockCompactJws(),
       encodeResponse: jest.fn(),
       protectConfidentialData: jest.fn(),
-      unprotectConfidentialData: jest.fn(),
+      unprotectConfidentialData: jest.fn(async (document: any) => document.content),
       getHmacBase64Url: jest.fn(),
       protectAttributesNameAndValue: jest.fn(),
     };
@@ -2418,7 +2429,7 @@ describe('OpenIdAuthManager', () => {
         },
       ] as any),
       put: jest.fn(),
-      get: jest.fn(),
+      get: jest.fn().mockResolvedValue({ status: 'active', content: { clientId, jwks: { keys: [decodeProtectedHeader(clientAssertion).jwk] } } }),
       getHistory: jest.fn(),
       query: jest.fn(),
       delete: jest.fn(),
@@ -2487,6 +2498,7 @@ describe('OpenIdAuthManager', () => {
     // - `vp_token` remains the authorization/holder-proof input for OIDC4VP
     const clientId = 'did:web:api.acme.org:employee:doctor1@acme.org:device:client-001';
     const clientAssertion = await buildClientAssertionJwt({
+      additionalClaims: { jti: randomUUID() },
       clientId,
       audience: 'did:web:api.acme.org',
     });
@@ -2505,7 +2517,7 @@ describe('OpenIdAuthManager', () => {
       createCompactJws: buildMockCompactJws(),
       encodeResponse: jest.fn(),
       protectConfidentialData: jest.fn(),
-      unprotectConfidentialData: jest.fn(),
+      unprotectConfidentialData: jest.fn(async (document: any) => document.content),
       getHmacBase64Url: jest.fn(),
       protectAttributesNameAndValue: jest.fn(),
     };
@@ -2527,7 +2539,7 @@ describe('OpenIdAuthManager', () => {
       listContainersInSection: jest.fn(),
       getContainersInSection: jest.fn().mockResolvedValue([{ ...testConsentRulePermitOrgDid }] as any),
       put: jest.fn(),
-      get: jest.fn().mockResolvedValue(undefined),
+      get: jest.fn().mockResolvedValue({ status: 'active', content: { clientId, jwks: { keys: [decodeProtectedHeader(clientAssertion).jwk] } } }),
       getHistory: jest.fn(),
       query: jest.fn(),
       delete: jest.fn(),
@@ -2535,12 +2547,12 @@ describe('OpenIdAuthManager', () => {
     };
 
     const mockClearingHouse: jest.Mocked<IClearingHouseService> = {
-      verifyVpToken: jest.fn().mockResolvedValue({
+      verifyVpToken: jest.fn().mockImplementation(async (request: { vpToken: string }) => ({
         acr: 'urn:antifraud:acr:openid4vp:employee',
         amr: ['openid4vp', 'vc'],
-        vpHash: 'hash',
+        vpHash: createHash('sha256').update(request.vpToken).digest('hex'),
         ledgerVerified: true,
-      }),
+    })),
     };
 
     const manager = new OpenIdAuthManager(
@@ -2586,10 +2598,10 @@ describe('OpenIdAuthManager', () => {
 
   it('accepts an operational actor DID issuer with its distinct DCR client assertion identity', async () => {
     const issuerDid = EXAMPLE_HOSTING_OPERATOR_DID;
-    const subjectDid = EXAMPLE_SUBJECT_DID;
-    const actorDid = EXAMPLE_CONTROLLER_DID;
+    const actorDid = EXAMPLE_HOSTED_INDIVIDUAL_CONTROLLER_DID;
+    const subjectDid = parseIndividualMemberDidWeb(actorDid).individualDidWeb;
     const clientId = EXAMPLE_DEVICE_CLIENT_ID;
-    const fixture = await buildClientAssertionFixture({ clientId, audience: issuerDid });
+    const fixture = await buildClientAssertionFixture({ clientId, audience: issuerDid, additionalClaims: { jti: randomUUID() } });
     const deviceProfile = {
       clientId,
       status: DeviceBindingStatuses.Active,
@@ -2600,8 +2612,12 @@ describe('OpenIdAuthManager', () => {
       licenseId: EXAMPLE_LICENSE_SUBJECT_ID_ACTIVE,
       jwks: { keys: [fixture.publicJwk] },
     };
+    const currentLicence = { id: deviceProfile.licenseId, status: 'active', userClass: 'individual', subjectId: deviceProfile.authenticatedSubject,
+      authorizedSubjectDid: subjectDid, issuedToRole: EXAMPLE_RELATED_PERSON_ROLE, exp: Math.floor(Date.now() / 1000) + 300,
+      deviceBindings: [{ clientId, status: DeviceBindingStatuses.Active }] };
     const vault = {
-      get: jest.fn().mockResolvedValue({
+      get: jest.fn(async (_vault: string, id: string) => id === currentLicence.id
+        ? { id, status: 'active', content: currentLicence } : {
         id: clientId,
         status: DeviceBindingStatuses.Active,
         content: deviceProfile,
@@ -2624,6 +2640,7 @@ describe('OpenIdAuthManager', () => {
       {
         getDidDocument: jest.fn().mockResolvedValue({ id: issuerDid }),
         tenantExists: jest.fn().mockResolvedValue(true),
+        isTenantOperational: jest.fn().mockResolvedValue(true),
       } as unknown as jest.Mocked<TenantsCacheManager>,
       vault,
       { verifyVpToken: jest.fn() } as unknown as jest.Mocked<IClearingHouseService>,

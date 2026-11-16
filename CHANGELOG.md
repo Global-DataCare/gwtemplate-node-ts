@@ -2,6 +2,41 @@
 
 ## [Unreleased]
 
+## [1.26.1] - 2026-11-16
+
+- Verify personal SMART access using current encrypted individual-member
+  licences and registered wallet keys: preserve the individual controller's
+  default access, restrict family members to current consent, and recheck
+  both at the custodian tenant's Clearing House.
+- Allow licensed family-member DCR without granting controller or clinical
+  creator authority; reject role substitution and revoked device authority.
+- Bind signed SMART verification responses to each EHR request and accept
+  embedded ML-DSA public keys only when they match the registered client key.
+
+- Link tenant DIDs to OpenID/SMART discovery metadata and publish the
+  registered-client SMART verification endpoint as `introspection_endpoint`.
+- Verify ICA-backed first-controller activation in all network profiles:
+  validate issuer signatures and current ICA credential status, bind the
+  controller key and submitted credentials to the signed presentation, and
+  preserve the receiving host as verification audience. Keep native ICA
+  activation evidence separate from Fabric checks and enrolled-device proof.
+- Delegate demo KMS shutdown to the real key owner and preserve protected
+  presentation headers when signing through the demo decorator.
+- Define the explicit local demo profile separately from cryptographic `test`,
+  Test Network and production verification. Apply current-state signature and
+  authorization checks to non-demo verification.
+- Add authenticated tenant presentation verification and federated SMART
+  introspection with registered-client keys, replay protection, current-state
+  evidence, ES384/ML-DSA verification and tenant-signed EHR presentations.
+- Verify GXDCH VC-API responses against tenant-pinned issuers, rules versions
+  and exact credential digests, preserving the provider's original signature.
+  Accept the W3C credential issuer object only in the credential profile.
+- Reject inactive SMART client registrations and Clearing House receipts
+  for a different presentation; keep DCR initial access tokens on their own
+  verifier path.
+
+## [1.26.0] - 2026-11-15
+
 - Extend E9 with version-bound GW CORE 1.26.0 evidence: 100 source-policy and
   real-signature identity checks plus eight published-image journeys against
   isolated local Fabric. Preserve historical counts, disclose three unrelated

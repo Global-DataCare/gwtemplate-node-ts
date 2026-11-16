@@ -88,6 +88,7 @@ export class TenantsCacheManager implements ITenantsManager, IPrivilegedTenantRe
   private vaultRepository: IVaultRepository;
   private kmsServiceResolver: () => IKmsService;
   private hostCollectionName: string; // The physical collection name for the host
+  private tenantDidIndexLoaded = false;
   private tenantRuntimeCacheByVaultId = new Map<string, TenantRuntimeView>();
   private get kmsService(): IKmsService {
     return this.kmsServiceResolver();
@@ -214,6 +215,18 @@ export class TenantsCacheManager implements ITenantsManager, IPrivilegedTenantRe
     return tenantConfig;
   }
 
+  public async findTenantVaultIdByDid(did: string): Promise<string | undefined> {
+    if (!did || !did.startsWith('did:')) return undefined;
+    if (!this.tenantDidIndexLoaded) {
+      await this.listRegisteredTenants();
+      this.tenantDidIndexLoaded = true;
+    }
+    const matches = Array.from(this.tenantRuntimeCacheByVaultId.entries()).filter(([, tenant]) =>
+      tenant.didDocument?.id === did || tenant.didDocument?.alsoKnownAs?.includes(did));
+    if (matches.length > 1) throw new Error('Ambiguous tenant DID registration.');
+    return matches[0]?.[0];
+  }
+
   public async tenantExists(vaultId: string): Promise<boolean> {
     return (await this._ensureTenantIsInCache(vaultId)) !== undefined;
   }
@@ -226,6 +239,7 @@ export class TenantsCacheManager implements ITenantsManager, IPrivilegedTenantRe
    */
   public async refreshTenant(vaultId: string): Promise<any | undefined> {
     this.tenantRuntimeCacheByVaultId.delete(vaultId);
+    this.tenantDidIndexLoaded = false;
     return await this.getTenant(vaultId);
   }
 

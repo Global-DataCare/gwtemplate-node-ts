@@ -78,7 +78,10 @@ describe('SMART token issuance (integration)', () => {
     process.env.ORG_HOST_ADMIN_EMAIL = 'admin@host.com';
     process.env.ORG_HOST_ADMIN_UID = 'host-admin-001';
     process.env.ORG_HOST_ADMIN_ROLE = 'ISCO-08|1111';
+    // Explicit demo exercises consent routing; cryptographic boundary proof is in the real Clearing House suite.
     process.env.SECURITY_MODE = 'demo';
+    process.env.NETWORK_MODE = 'test';
+    process.env.CLEARING_HOUSE_MODE = 'stub';
     process.env.JSON_LEGACY = 'true';
     process.env.DEMO_ALLOW_INSECURE_BEARER = 'true';
     process.env.SUBJECT_IDENTITY_BINDING_TRUSTED_ISSUERS = EXAMPLE_TRUSTED_HEALTH_PORTAL_DID;
@@ -211,7 +214,10 @@ describe('SMART token issuance (integration)', () => {
     process.env.ORG_HOST_ADMIN_EMAIL = 'admin@host.com';
     process.env.ORG_HOST_ADMIN_UID = 'host-admin-001';
     process.env.ORG_HOST_ADMIN_ROLE = 'ISCO-08|1111';
+    // Explicit demo exercises consent routing; cryptographic boundary proof is in the real Clearing House suite.
     process.env.SECURITY_MODE = 'demo';
+    process.env.NETWORK_MODE = 'test';
+    process.env.CLEARING_HOUSE_MODE = 'stub';
     process.env.JSON_LEGACY = 'true';
     process.env.DEMO_ALLOW_INSECURE_BEARER = 'true';
 
@@ -331,7 +337,10 @@ describe('SMART token issuance (integration)', () => {
     process.env.ORG_HOST_ADMIN_EMAIL = 'admin@host.com';
     process.env.ORG_HOST_ADMIN_UID = 'host-admin-001';
     process.env.ORG_HOST_ADMIN_ROLE = 'ISCO-08|1111';
+    // Explicit demo exercises consent routing; cryptographic boundary proof is in the real Clearing House suite.
     process.env.SECURITY_MODE = 'demo';
+    process.env.NETWORK_MODE = 'test';
+    process.env.CLEARING_HOUSE_MODE = 'stub';
     process.env.JSON_LEGACY = 'true';
     process.env.DEMO_ALLOW_INSECURE_BEARER = 'false';
     process.env.AUTH_TOKEN_VERIFIER = 'demo';
@@ -439,7 +448,7 @@ describe('SMART token issuance (integration)', () => {
 
       expect(finalPayload?.access_token).toBeDefined();
       expect(finalPayload?.subject).toBe(subject);
-      expect(finalPayload?.ledger_verified).toBe(true);
+      expect(finalPayload?.ledger_verified).toBe(false);
     } finally {
       queueAdapter.stop();
     }
@@ -458,7 +467,10 @@ describe('SMART token issuance (integration)', () => {
     process.env.ORG_HOST_ADMIN_EMAIL = 'admin@host.com';
     process.env.ORG_HOST_ADMIN_UID = 'host-admin-001';
     process.env.ORG_HOST_ADMIN_ROLE = 'ISCO-08|1111';
+    // Explicit demo exercises consent routing; cryptographic boundary proof is in the real Clearing House suite.
     process.env.SECURITY_MODE = 'demo';
+    process.env.NETWORK_MODE = 'test';
+    process.env.CLEARING_HOUSE_MODE = 'stub';
     process.env.JSON_LEGACY = 'true';
     process.env.DEMO_ALLOW_INSECURE_BEARER = 'false';
     process.env.AUTH_TOKEN_VERIFIER = 'demo';
@@ -566,7 +578,7 @@ describe('SMART token issuance (integration)', () => {
       expect(finalPayload?.access_token).toBeDefined();
       expect(finalPayload?.subject).toMatch(/^urn:uuid:/);
       expect(finalPayload?.subject).not.toBe(subject);
-      expect(finalPayload?.ledger_verified).toBe(true);
+      expect(finalPayload?.ledger_verified).toBe(false);
     } finally {
       queueAdapter.stop();
     }

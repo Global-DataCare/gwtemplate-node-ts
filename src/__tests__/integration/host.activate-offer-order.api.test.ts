@@ -4,12 +4,13 @@ import { GatewayRequestEntryTypes } from 'gdc-common-utils-ts/constants/gateway-
 import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
 process.env.DEV_SEED = 'true';
 process.env.NODE_ENV = 'test';
-process.env.SECURITY_MODE = 'demo';
+process.env.SECURITY_MODE = 'compat';
 process.env.NETWORK_MODE = 'local-network';
+process.env.AUTH_TOKEN_VERIFIER = 'firebase';
 process.env.JSON_LEGACY = 'true';
 process.env.FHIR_LEGACY = 'true';
 process.env.DIDCOMM_PLAIN = 'true';
-process.env.DEMO_ALLOW_INSECURE_BEARER = 'true';
+process.env.DEMO_ALLOW_INSECURE_BEARER = 'false';
 process.env.DB_PROVIDER = 'mem';
 process.env.STORAGE_PROVIDER = 'mem';
 process.env.QUEUE_PROVIDER = 'mem';
@@ -31,6 +32,9 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, jest } from '@jes
 import type * as express from 'express';
 import type { Server } from 'http';
 import type { QueueAdapterMem } from '../../adapters/queue-mem';
+import { randomUUID } from 'node:crypto';
+import { AppAuthorizationManager } from '../../managers/AppAuthorizationManager';
+import { DefaultActivationTrustAdapter, assertActivationCredentialConsistency } from '../../adapters/activation-trust.adapter';
 import { startServer, resetServerConfig } from '../../server';
 import { invokeExpress } from './helpers/invokeExpress';
 import {
@@ -88,8 +92,8 @@ function buildActivationPayload(): Record<string, unknown> {
   ].join('.');
 
   return {
-    thid: 'activation-route-story-thid',
-    jti: 'activation-route-story-jti',
+    thid: randomUUID(),
+    jti: randomUUID(),
     iss: 'did:web:controller.example.com',
     aud: 'did:web:host.example.com',
     type: 'application/json',
@@ -159,6 +163,14 @@ describe('Host activation Offer/Order route story', () => {
 
   beforeAll(async () => {
     resetServerConfig();
+    // This suite isolates Offer/Order routing and mocked ledger writes. Signature,
+    // current-state and issuer trust are proved in the separate verifier suites.
+    jest.spyOn(AppAuthorizationManager.prototype, 'verifyBearerToken').mockResolvedValue({ valid: true, payload: { sub: 'did:web:controller.example.com' } } as any);
+    jest.spyOn(DefaultActivationTrustAdapter.prototype, 'evaluate').mockImplementation(async input => ({
+      ...assertActivationCredentialConsistency(input),
+      clearingHouse: { acr: 'urn:antifraud:acr:openid4vp:employee', ledgerVerified: true },
+      trustPolicy: { networkMode: input.networkMode, revocationChecked: true, issuerKeyStatusChecked: true, subjectKeyStatusChecked: true, onChainChecked: true },
+    }));
     global.fetch = jest.fn(async () => ({
       ok: true,
       status: 200,
@@ -226,7 +238,7 @@ describe('Host activation Offer/Order route story', () => {
     const activationSubmit = await invokeExpress(app, {
       method: HttpRequestMethods.Post,
       url: activationUrl,
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', authorization: 'Bearer isolated-route-test' },
       body: activationPayload,
     });
 
@@ -239,7 +251,7 @@ describe('Host activation Offer/Order route story', () => {
     const activationPoll = await invokeExpress(app, {
       method: HttpRequestMethods.Post,
       url: activationPollPath,
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', authorization: 'Bearer isolated-route-test' },
       body: { thid: activationPayload.thid },
     });
 
@@ -293,7 +305,7 @@ describe('Host activation Offer/Order route story', () => {
     const orderSubmit = await invokeExpress(app, {
       method: HttpRequestMethods.Post,
       url: '/host/cds-es/v1/local-network/registry/org.schema/Order/_batch',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', authorization: 'Bearer isolated-route-test' },
       body: orderPayload,
     });
 
@@ -306,7 +318,7 @@ describe('Host activation Offer/Order route story', () => {
     const orderPoll = await invokeExpress(app, {
       method: HttpRequestMethods.Post,
       url: orderPollPath,
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', authorization: 'Bearer isolated-route-test' },
       body: { thid: orderPayload.thid },
     });
 
@@ -347,7 +359,7 @@ describe('Host activation Offer/Order route story', () => {
     const activationSubmit = await invokeExpress(app, {
       method: HttpRequestMethods.Post,
       url: '/host/cds-es/v1/local-network/registry/org.schema/Organization/_activate',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', authorization: 'Bearer isolated-route-test' },
       body: activationPayload,
     });
 
@@ -358,7 +370,7 @@ describe('Host activation Offer/Order route story', () => {
     const activationPoll = await invokeExpress(app, {
       method: HttpRequestMethods.Post,
       url: activationPollPath,
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', authorization: 'Bearer isolated-route-test' },
       body: { thid: activationPayload.thid },
     });
     const activationResult = JSON.parse(activationPoll.text) as { data: Array<Record<string, any>> };
@@ -391,7 +403,7 @@ describe('Host activation Offer/Order route story', () => {
     const activationSubmit = await invokeExpress(app, {
       method: HttpRequestMethods.Post,
       url: '/host/cds-es/v1/local-network/registry/org.schema/Organization/_activate',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', authorization: 'Bearer isolated-route-test' },
       body: activationPayload,
     });
 
@@ -402,7 +414,7 @@ describe('Host activation Offer/Order route story', () => {
     const activationPoll = await invokeExpress(app, {
       method: HttpRequestMethods.Post,
       url: activationPollPath,
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', authorization: 'Bearer isolated-route-test' },
       body: { thid: activationPayload.thid },
     });
 
@@ -431,7 +443,7 @@ describe('Host activation Offer/Order route story', () => {
     const wrongPathSubmit = await invokeExpress(app, {
       method: HttpRequestMethods.Post,
       url: '/host/cds-es/v1/health-care/registry/org.schema/Order/_batch',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', authorization: 'Bearer isolated-route-test' },
       body: orderPayload,
     });
 

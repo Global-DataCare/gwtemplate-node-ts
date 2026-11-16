@@ -17,6 +17,7 @@ import { IDecodedDidcommPayload } from 'gdc-common-utils-ts/models/confidential-
 import type { IVaultRepository } from '../database/repositories/vault/vault.repository';
 import type { IKmsService } from '../gdc-backend-utils-node/models/IKmsService';
 import { getTenantVaultId } from '../utils/tenant';
+import { normalizeConsentActorRole } from '../utils/consent';
 import { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 import { DeviceLicense, DeviceInfo } from 'gdc-common-utils-ts/models/device-license';
 import { getEnvSectionId } from '../utils/section-env';
@@ -184,7 +185,7 @@ export class DeviceRegistrationManager implements IJobProcessor {
       const licenseDoc = openedLicense?.document;
       const license = openedLicense?.license;
       const individualAuthorization = license?.userClass === LICENSE_USER_CLASS_INDIVIDUAL
-        ? this.validateIndividualControllerRegistration({
+        ? this.validateIndividualMemberRegistration({
           job,
           registrationRequest: registrationRequest as DcrRegistrationRequest & Record<string, any>,
           license,
@@ -515,7 +516,7 @@ export class DeviceRegistrationManager implements IJobProcessor {
   }
 
   /** Converts a verified individual activation into one exact DCR authorization tuple. */
-  private validateIndividualControllerRegistration(params: {
+  private validateIndividualMemberRegistration(params: {
     job: JobRequest;
     registrationRequest: DcrRegistrationRequest & Record<string, any>;
     license: DeviceLicense & Record<string, any>;
@@ -531,7 +532,7 @@ export class DeviceRegistrationManager implements IJobProcessor {
     const bearer = (params.job.content as any)?.meta?.bearer?.jwt?.payload || {};
     const authenticatedSubject = String(bearer.sub || '').trim();
     if (!authenticatedSubject || String(bearer.scope || '').trim() !== DCR_REGISTER_SCOPE) {
-      throw new ManagerError('Individual-controller DCR requires a verified initial access token.', IssueType.Security);
+      throw new ManagerError('Individual-member DCR requires a verified initial access token.', IssueType.Security);
     }
     if (String(bearer.act_code || '').trim() !== params.code) {
       throw new ManagerError('DCR activation code does not match the verified initial access token.', IssueType.Forbidden);
@@ -541,7 +542,7 @@ export class DeviceRegistrationManager implements IJobProcessor {
     let authorizedSubjectDid = String(params.license.authorizedSubjectDid || '').trim();
     if (!actorDid || profileDid !== actorDid) {
       throw new ManagerError(
-        'Individual-controller DCR is missing its exact actor, profile or authorized subject binding.',
+        'Individual-member DCR is missing its exact actor, profile or authorized subject binding.',
         IssueType.Forbidden,
       );
     }
@@ -549,9 +550,10 @@ export class DeviceRegistrationManager implements IJobProcessor {
     try {
       parsedActor = parseIndividualMemberDidWeb(actorDid);
     } catch {
-      throw new ManagerError('Individual-controller actor is not a valid individual member DID.', IssueType.Forbidden);
+      throw new ManagerError('Individual-member actor is not a valid individual member DID.', IssueType.Forbidden);
     }
     if (!authorizedSubjectDid) {
+      if (!hasRoleCode(params.license.issuedToRole)) throw new ManagerError('Individual-member licence requires an explicit authorized individual subject.', IssueType.Forbidden);
       const subjectId = String(params.license.subjectId || params.license.ownerOrganizationId || '').trim();
       let expectedSubjectSuffixes: string[] = [];
       try {
@@ -566,19 +568,19 @@ export class DeviceRegistrationManager implements IJobProcessor {
         ];
       } catch {
         throw new ManagerError(
-          'Individual-controller license is missing a valid subject binding.',
+          'Individual-member license is missing a valid subject binding.',
           IssueType.Forbidden,
         );
       }
       if (!expectedSubjectSuffixes.some((suffix) => parsedActor.individualDidWeb.endsWith(suffix))) {
-        throw new ManagerError('Individual-controller actor does not belong to the licensed subject.', IssueType.Forbidden);
+        throw new ManagerError('Individual-member actor does not belong to the licensed subject.', IssueType.Forbidden);
       }
       authorizedSubjectDid = parsedActor.individualDidWeb;
       params.license.subjectId = subjectId;
       params.license.authorizedSubjectDid = authorizedSubjectDid;
     }
     if (parsedActor.individualDidWeb !== authorizedSubjectDid) {
-      throw new ManagerError('Individual-controller actor does not belong to the licensed subject.', IssueType.Forbidden);
+      throw new ManagerError('Individual-member actor does not belong to the licensed subject.', IssueType.Forbidden);
     }
     const expectedMemberIds = [
       params.license.issuedToEmail
@@ -594,22 +596,13 @@ export class DeviceRegistrationManager implements IJobProcessor {
           })
         : undefined,
     ].filter((value): value is string => Boolean(value));
-    const issuedRoleCode = String(params.license.issuedToRole || '').split(/[|:]/).pop()?.toLowerCase();
-    const actorRoleCode = parsedActor.roleValue.toLowerCase();
+    const licensedRole = normalizeConsentActorRole(params.license.issuedToRole || '', 'family');
+    const actorRole = normalizeConsentActorRole(parsedActor.roleValue, 'family');
     if (expectedMemberIds.length === 0
       || !expectedMemberIds.includes(parsedActor.memberId)
-      || !issuedRoleCode
-      || issuedRoleCode !== actorRoleCode
-      || !hasRoleCode(parsedActor.roleValue)
-      || !hasRoleCode(params.license.issuedToRole)) {
-      if (!hasRoleCode(parsedActor.roleValue) || !hasRoleCode(params.license.issuedToRole)) {
-        throw new ManagerError(
-          'Individual-controller DCR requires the licensed controller role RESPRSN.',
-          IssueType.Forbidden,
-        );
-      }
+      || !licensedRole || !actorRole || licensedRole !== actorRole) {
       throw new ManagerError(
-        'Individual-controller actor does not match the activated contact or licensed role.',
+        'Individual-member actor does not match the activated contact or licensed role.',
         IssueType.Forbidden,
       );
     }

@@ -88,6 +88,19 @@ describe('TenantsCacheManager', () => {
     jest.clearAllMocks();
   });
 
+  it('resolves a professional home tenant from its exact protected DID registration without another DCR', async () => {
+    mockVaultRepository.getContainersInSection.mockResolvedValue([{ id: acmeVaultId, content: acmeConfig }] as any);
+    mockKmsService.unprotectConfidentialData.mockImplementation(async (record: any) => record.content);
+    await expect((tenantsCacheManager as any).findTenantVaultIdByDid(healthTenantDid)).resolves.toBe(acmeVaultId);
+    await expect((tenantsCacheManager as any).findTenantVaultIdByDid(`${healthTenantDid}:employee:unknown`)).resolves.toBeUndefined();
+  });
+
+  it('rejects ambiguous DID ownership across registered tenants', async () => {
+    mockVaultRepository.getContainersInSection.mockResolvedValue([{ id: acmeVaultId, content: acmeConfig }, { id: `${acmeVaultId}-other`, content: acmeConfig }] as any);
+    mockKmsService.unprotectConfidentialData.mockImplementation(async (record: any) => record.content);
+    await expect((tenantsCacheManager as any).findTenantVaultIdByDid(healthTenantDid)).rejects.toThrow(/ambiguous/i);
+  });
+
   describe('getCollectionName (Lazy Loading)', () => {
     it('should fetch, decrypt, cache, and return the collection name for an uncached tenant', async () => {
       // This test validates the core lazy-loading logic.

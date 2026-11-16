@@ -3,12 +3,14 @@
 
 import { DidService, ServiceEndpointSelector } from 'gdc-common-utils-ts/models/did';
 import { generateServiceId } from 'gdc-common-utils-ts/utils/did';
+import { DidServiceIds, DidServiceTypes } from 'gdc-common-utils-ts/constants/did-services';
+import { isFhirSector } from './sector';
 
 /**
  * Creates the standard, public-facing "well-known" service endpoints for a DID Document.
  * These are essential for standard DID resolution and discovery.
  */
-function createWellKnownDidServices(did: string, baseUrl: string): DidService[] {
+function createWellKnownDidServices(did: string, baseUrl: string, publishTenantIdentityMetadata: boolean): DidService[] {
   // The final base URL for well-known services should not have a trailing slash.
   const finalBaseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
   return [
@@ -22,6 +24,16 @@ function createWellKnownDidServices(did: string, baseUrl: string): DidService[] 
       type: 'JsonWebKeyService2020',
       serviceEndpoint: `${finalBaseUrl}/jwks.json`,
     },
+    ...(publishTenantIdentityMetadata ? [{
+      id: `${did}${DidServiceIds.OpenIdConfiguration}`,
+      type: DidServiceTypes.OpenIdProvider,
+      serviceEndpoint: `${finalBaseUrl}/.well-known/openid-configuration`,
+    },
+    {
+      id: `${did}${DidServiceIds.SmartConfiguration}`,
+      type: DidServiceTypes.SmartOnFhirConfiguration,
+      serviceEndpoint: `${finalBaseUrl}/.well-known/smart-configuration`,
+    }] : []),
   ];
 }
 
@@ -91,7 +103,7 @@ export function populateDidDocumentServices(
     : operationalBaseUrlsBySection.default ? defaultRoutedBaseUrl : normalizedPublicBaseUrl;
 
   // 1. Create the standard, W3C-compliant well-known services.
-  const wellKnownServices = createWellKnownDidServices(did, wellKnownBaseUrl);
+  const wellKnownServices = createWellKnownDidServices(did, wellKnownBaseUrl, isFhirSector(tenantContext.sector));
 
   // 2. Multiplex the internal business service templates into discrete, public service endpoints.
   const populatedBusinessServices: DidService[] = businessServicesConfig.flatMap(configService => {

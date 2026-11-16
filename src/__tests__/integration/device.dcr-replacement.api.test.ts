@@ -4,12 +4,12 @@ import { resolveHostPhysicalCollectionName } from '../../config/storage-layout';
 import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
 process.env.DEV_SEED = 'true';
 process.env.NODE_ENV = 'test';
-process.env.SECURITY_MODE = 'demo';
+process.env.SECURITY_MODE = 'compat';
 process.env.NETWORK_MODE = 'local-network';
 process.env.JSON_LEGACY = 'true';
 process.env.FHIR_LEGACY = 'true';
 process.env.DIDCOMM_PLAIN = 'true';
-process.env.DEMO_ALLOW_INSECURE_BEARER = 'true';
+process.env.DEMO_ALLOW_INSECURE_BEARER = 'false';
 process.env.DB_PROVIDER = 'mem';
 process.env.STORAGE_PROVIDER = 'mem';
 process.env.QUEUE_PROVIDER = 'mem';
@@ -128,12 +128,12 @@ describe('Device DCR replacement route story', () => {
     await kmsService.init();
 
     const mockConfig: any = {
-      securityMode: 'demo',
+      securityMode: 'compat',
       networkMode: 'local-network',
       fhirLegacy: true,
       jsonLegacy: true,
       didcommPlainEnabled: true,
-      demoAllowInsecureBearer: true,
+      demoAllowInsecureBearer: false,
       nodeEnv: 'test',
       port: 3000,
       apiHostname: 'host',

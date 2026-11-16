@@ -1,8 +1,10 @@
+// Flow contract: explicit local demo delegates real signatures and keeps its simulated storage isolated from other runtime profiles.
 // TDD contract: write this test red first; make it green only with the complete real behavior.
 // src/__tests__/unit/services/DemoKmsService.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
 import { jest } from '@jest/globals';
+import { decodeProtectedHeader } from 'jose';
 import { DemoKmsService } from '../../../services/DemoKmsService';
 import { KmsService } from '../../../services/KmsService';
 import { CryptographyService } from 'gdc-common-utils-ts/CryptographyService';
@@ -17,7 +19,10 @@ describe('DemoKmsService', () => {
     let devKmsService: DemoKmsService;
     let realKmsService: KmsService;
 
+    const savedEnvironment = { ...process.env };
+    afterEach(() => { realKmsService?.destroy(); process.env = { ...savedEnvironment }; });
     beforeEach(() => {
+        process.env.NODE_ENV = 'demo'; process.env.SECURITY_MODE = 'demo'; process.env.NETWORK_MODE = 'test'; delete process.env.DEPLOYMENT_ENV;
         // To test the DemoKmsService decorator, we need a real KmsService to wrap.
         const cryptoService = new CryptographyService(new AdapterCryptoSdkNode());
         const vaultRepository = new VaultMemRepository();
@@ -27,6 +32,22 @@ describe('DemoKmsService', () => {
         
         devKmsService = new DemoKmsService(realKmsService);
         jest.clearAllMocks();
+    });
+
+    it('closes the wrapped KMS so real signing cannot continue after runtime shutdown', async () => {
+        await devKmsService.init();
+        const key = await devKmsService.getPublicVerificationKey('host', undefined, 'comm_sig');
+        expect(key?.kid).toBeDefined();
+        expect(await devKmsService.createCompactJws({ sub: 'local-demo-lifecycle' }, key!.kid!, 'host', 'comm_sig')).toEqual(expect.any(String));
+        devKmsService.destroy();
+        await expect(devKmsService.createCompactJws({ sub: 'local-demo-lifecycle' }, key!.kid!, 'host', 'comm_sig')).rejects.toThrow(/not been initialized/i);
+    });
+
+    it('preserves the signed presentation media type when delegating real signing', async () => {
+        await devKmsService.init();
+        const key = await devKmsService.getPublicVerificationKey('host', undefined, 'comm_sig');
+        const compact = await devKmsService.createCompactJws({ sub: 'local-demo-lifecycle' }, key!.kid!, 'host', 'comm_sig', { typ: 'vp+jwt', cty: 'vp' });
+        expect(decodeProtectedHeader(compact)).toMatchObject({ typ: 'vp+jwt', cty: 'vp' });
     });
 
     describe('provisionKeys and getPublicJwks', () => {

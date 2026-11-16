@@ -202,6 +202,8 @@ async function processActivationEntry(
     vpToken: activation.vpToken,
     presentationSubmission: activation.presentationSubmission,
     primaryDid: activation.primaryDid,
+    verifierTenantDid: deps.issuerDid,
+    controllerBinding: activation.controllerBinding,
     organizationCredential: activation.organizationCredential,
     representativeCredential: activation.representativeCredential,
     controllerCredential: activation.controllerCredential,
@@ -210,6 +212,9 @@ async function processActivationEntry(
     allowLegacyRepresentativeBootstrap,
   });
   const clearingResult = trustResult.clearingHouse;
+  if (trustResult.controllerSigningKey) {
+    activation.controllerBinding = { ...activation.controllerBinding, publicKeyJwk: trustResult.controllerSigningKey };
+  }
   const { organizationDid } = trustResult;
 
   const normalizedClaims = deps.backfillOrganizationActivationRouteDefaults(

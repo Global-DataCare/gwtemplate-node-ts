@@ -1,3 +1,4 @@
+import { isLocalDemoSecurityMode } from '../security/runtime-security-policy';
 export type ActivationNetworkMode = 'test' | 'local-network' | 'test-network' | 'network';
 
 export type TrustRegistryVerificationInput = {
@@ -10,6 +11,9 @@ export type TrustRegistryVerificationInput = {
   representativeCredential?: any;
   controllerCredential?: any;
   now?: Date;
+  verificationEvidence?: TrustRegistryVerificationResult;
+  /** Supplied by native activation verification, never by the registration body. */
+  activationEvidenceSource?: 'ica';
 };
 
 export type TrustRegistryVerificationResult = {
@@ -23,26 +27,15 @@ export interface ITrustRegistryAdapter {
   verifyActivationTrust(input: TrustRegistryVerificationInput): Promise<TrustRegistryVerificationResult>;
 }
 
-/**
- * Default trust policy evaluator.
- *
- * This adapter is intentionally side-effect free and network-agnostic for now.
- * It exposes explicit policy outputs that can later be backed by:
- * - dataspace network trust registries (issuer/subject key status)
- * - blockchain smart contracts by network/jurisdiction/sector (on-chain checks)
- * - revocation infrastructure (OCSP/CRL/status list) for ICA/tenant credentials.
- */
+/** Accepts only checks carried by an authenticated verifier result; network labels are never evidence. */
 export class DefaultTrustRegistryAdapter implements ITrustRegistryAdapter {
   async verifyActivationTrust(input: TrustRegistryVerificationInput): Promise<TrustRegistryVerificationResult> {
-    const strictNetwork =
-      input.networkMode === 'local-network'
-      || input.networkMode === 'test-network'
-      || input.networkMode === 'network';
-    return {
-      revocationChecked: strictNetwork,
-      issuerKeyStatusChecked: strictNetwork,
-      subjectKeyStatusChecked: strictNetwork,
-      onChainChecked: input.networkMode === 'network',
-    };
+    if (isLocalDemoSecurityMode() && input.networkMode === 'test') return { revocationChecked: false, issuerKeyStatusChecked: false, subjectKeyStatusChecked: false, onChainChecked: false };
+    const evidence = input.verificationEvidence;
+    if (!evidence || evidence.revocationChecked !== true || evidence.issuerKeyStatusChecked !== true
+      || evidence.subjectKeyStatusChecked !== true || (input.networkMode !== 'test' && input.activationEvidenceSource !== 'ica' && evidence.onChainChecked !== true)) {
+      throw new Error('Trust registry verification requires explicit, verified current ICA or ledger evidence.');
+    }
+    return { ...evidence };
   }
 }

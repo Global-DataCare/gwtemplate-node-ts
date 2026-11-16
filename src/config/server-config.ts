@@ -1,3 +1,4 @@
+import { isLocalDemoSecurityMode } from '../security/runtime-security-policy';
 import { IServerConfig, TenantServiceRoutes } from '../config';
 import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 
@@ -317,6 +318,8 @@ export function getConfig(): IServerConfig {
     const nodeEnv = process.env.NODE_ENV || 'development';
     const securityMode = parseSecurityMode(process.env.SECURITY_MODE);
     const networkMode = parseNetworkMode(process.env.NETWORK_MODE, nodeEnv);
+    if (nodeEnv === 'demo' && !isLocalDemoSecurityMode({ ...process.env, SECURITY_MODE: securityMode, NETWORK_MODE: networkMode })) throw new Error('NODE_ENV=demo requires the explicit local demo security profile.');
+    if (securityMode === 'demo' && !isLocalDemoSecurityMode({ ...process.env, NETWORK_MODE: networkMode })) throw new Error('Demo security mode is restricted to the explicit local demo profile.');
     const fhirLegacy = parseBooleanEnv(process.env.FHIR_LEGACY, false);
     const jsonLegacy = parseBooleanEnv(process.env.JSON_LEGACY, false);
     const didcommPlainEnabled = parseBooleanEnv(process.env.DIDCOMM_PLAIN, false);
@@ -325,6 +328,7 @@ export function getConfig(): IServerConfig {
       false,
     );
     const demoAllowInsecureBearer = parseBooleanEnv(process.env.DEMO_ALLOW_INSECURE_BEARER, false);
+    if (demoAllowInsecureBearer && !isLocalDemoSecurityMode()) throw new Error('DEMO_ALLOW_INSECURE_BEARER requires the explicit local demo profile.');
     const researchStoreEnabled = parseBooleanEnv(process.env.RESEARCH_STORE_ENABLED, false);
     const researchStoreSeparateDb = parseBooleanEnv(process.env.RESEARCH_STORE_SEPARATE_DB, true);
     const researchStoreProvider = parseResearchStoreProvider(process.env.RESEARCH_STORE_PROVIDER);

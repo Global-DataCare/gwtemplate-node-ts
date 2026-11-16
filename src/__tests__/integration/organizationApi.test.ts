@@ -210,12 +210,16 @@ describe('Organization Registration API', () => {
 
   let hostingManager: HostingManager;
   const originalSecurityMode = process.env.SECURITY_MODE;
+  const originalNetworkMode = process.env.NETWORK_MODE;
+  const originalClearingHouseMode = process.env.CLEARING_HOUSE_MODE;
   const originalDidcommPlain = process.env.DIDCOMM_PLAIN;
   const originalJsonLegacy = process.env.JSON_LEGACY;
   const originalDemoAllowInsecureBearer = process.env.DEMO_ALLOW_INSECURE_BEARER;
 
   beforeAll(async () => {
     process.env.SECURITY_MODE = 'demo';
+    process.env.NETWORK_MODE = 'test';
+    process.env.CLEARING_HOUSE_MODE = 'stub';
     process.env.DIDCOMM_PLAIN = 'true';
     process.env.JSON_LEGACY = 'true';
     process.env.DEMO_ALLOW_INSECURE_BEARER = 'true';
@@ -281,6 +285,8 @@ describe('Organization Registration API', () => {
     jest.clearAllMocks();
     (asyncResponseStore as AsyncResponseStoreMem).clear();
     (vaultRepository as VaultMemRepository).clear();
+
+    app = setupApp(asyncResponseStore, tenantsCacheManager, vaultRepository);
 
     // Re-bootstrap the host before each test to ensure a clean state
     // Mocks for dependencies used by HostingManager
@@ -420,6 +426,8 @@ describe('Organization Registration API', () => {
 
   afterAll(async () => {
     process.env.SECURITY_MODE = originalSecurityMode;
+    if (originalNetworkMode === undefined) delete process.env.NETWORK_MODE; else process.env.NETWORK_MODE = originalNetworkMode;
+    if (originalClearingHouseMode === undefined) delete process.env.CLEARING_HOUSE_MODE; else process.env.CLEARING_HOUSE_MODE = originalClearingHouseMode;
     process.env.DIDCOMM_PLAIN = originalDidcommPlain;
     process.env.JSON_LEGACY = originalJsonLegacy;
     process.env.DEMO_ALLOW_INSECURE_BEARER = originalDemoAllowInsecureBearer;

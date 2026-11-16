@@ -1,3 +1,4 @@
+import { allowsInsecureDemoBearer } from '../security/runtime-security-policy';
 // src/routes/api.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 import { GatewayInternalResourceTypes } from 'gdc-common-utils-ts/constants/gateway-response';
@@ -27,7 +28,7 @@ import { composeHostDidWebId } from '../utils/did-backend';
 import { buildGaiaXLegalParticipantOptionsFromClaims, createGaiaXLegalParticipantCredential } from '../utils/credential-generators';
 import { AppAuthorizationManager } from '../managers/AppAuthorizationManager';
 import { getEnvSectionId } from '../utils/section-env';
-import { IReplayProtectionStore, ReplayProtectionStoreNoop } from '../adapters/replay-protection-store';
+import { IReplayProtectionStore, ReplayProtectionStoreMem } from '../adapters/replay-protection-store';
 import { sendDidcommEarlyError } from '../utils/didcomm-error-response';
 import {
   ACTION_DISABLE,
@@ -53,6 +54,9 @@ import { decodeJwt } from 'jose';
 import { randomUUID } from 'crypto';
 import type { IndividualManager, PatientMatchSearchset } from '../managers/IndividualManager';
 import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
+import type { FederatedSmartVerificationManager } from '../managers/FederatedSmartVerificationManager';
+import type { TenantPresentationVerificationManager } from '../managers/TenantPresentationVerificationManager';
+import type { GaiaXComplianceManager } from '../managers/GaiaXComplianceManager';
 
 const FORWARDED_HEADER_SEPARATOR = ',';
 type SecurityMode = 'strict' | 'compat' | 'demo';
@@ -230,10 +234,6 @@ function isContentTypeAllowedBySecurityPolicy(contentType: ParsedContentType): b
   return false;
 }
 
-function allowsInsecureBearerBySecurityMode(): boolean {
-  return resolveSecurityModeFromEnv() === 'demo'
-    && parseBooleanEnv(process.env.DEMO_ALLOW_INSECURE_BEARER, false);
-}
 
 /**
  * Decodes local/demo bearer claims without treating them as verified proof.
@@ -567,8 +567,11 @@ export function createApiRouter(
   cryptographyService: ICryptography,
   apiBaseUrl: string,
   appAuthManager?: AppAuthorizationManager,
-  replayProtectionStore: IReplayProtectionStore = new ReplayProtectionStoreNoop(),
+  replayProtectionStore: IReplayProtectionStore = new ReplayProtectionStoreMem(),
   individualManager?: Pick<IndividualManager, 'matchPatient'>,
+  federatedSmartVerificationManager?: FederatedSmartVerificationManager,
+  gaiaXComplianceManager?: GaiaXComplianceManager,
+  tenantPresentationVerificationManager?: TenantPresentationVerificationManager,
 ): express.Router {
   const router = express.Router();
 
@@ -676,6 +679,130 @@ export function createApiRouter(
     }
     return 900;
   };
+
+  /**
+   * @openapi
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/smart/token/_verify:
+   *   post:
+   *     tags:
+   *       - 2.2 SMART Token
+   *     summary: Verify a foreign index-provider SMART token for one registered custodian EHR
+   *     description: |
+   *       The EHR authenticates with its DCR-registered private key. The custodian validates the
+   *       index-provider signature, the original professional presentation and the referenced
+   *       consent evidence. The signed result preserves the original subject, purpose, scope and
+   *       expiration and cannot increase the authorization granted by the index provider.
+   *     parameters:
+   *       - $ref: '#/components/parameters/TenantId'
+   *       - $ref: '#/components/parameters/Jurisdiction'
+   *       - $ref: '#/components/parameters/Sector'
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/x-www-form-urlencoded:
+   *           schema:
+   *             type: object
+   *             required: [token, client_assertion_type, client_assertion]
+   *             properties:
+   *               token: { type: string }
+   *               token_type_hint: { type: string, enum: [access_token] }
+   *               client_assertion_type: { type: string }
+   *               client_assertion: { type: string }
+   *     responses:
+   *       '200':
+   *         description: Signed token-introspection response addressed to the registered EHR.
+   *         content:
+   *           application/token-introspection+jwt:
+   *             schema: { type: string }
+   *       '400': { description: Invalid request. }
+   *       '401': { description: EHR client authentication failed. }
+   */
+  router.post(
+    '/:tenantId/cds-:jurisdiction/v1/:sector/identity/openid/smart/token/_verify',
+    async (req, res, next) => {
+      if (!federatedSmartVerificationManager) return next();
+      if (normalizeContentType(req.headers['content-type']) !== 'application/x-www-form-urlencoded') {
+        return res.status(415).json({
+          error: 'invalid_request',
+          error_description: 'Content-Type must be application/x-www-form-urlencoded.',
+        });
+      }
+      try {
+        const requestUrl = new URL(req.originalUrl, apiBaseUrl).href;
+        const result = await federatedSmartVerificationManager.verify({
+          tenantId: String(req.params.tenantId || ''),
+          jurisdiction: String(req.params.jurisdiction || ''),
+          sector: String(req.params.sector || ''),
+          token: String(req.body?.token || ''),
+          tokenTypeHint: req.body?.token_type_hint ? String(req.body.token_type_hint) : undefined,
+          clientAssertionType: String(req.body?.client_assertion_type || ''),
+          clientAssertion: String(req.body?.client_assertion || ''),
+          requestUrl,
+        });
+        return res.status(200).type('application/token-introspection+jwt').send(result.compactResponse);
+      } catch (error) {
+        const managerError = error instanceof ManagerError ? error : undefined;
+        const status = managerError ? Number(managerError.status) || 400 : 500;
+        return res.status(status).json({
+          error: status === 401 || status === 403 ? 'invalid_client' : 'invalid_request',
+          error_description: managerError?.message || 'Federated SMART verification failed.',
+        });
+      }
+    },
+  );
+  /**
+   * @openapi
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/gaia-x/standard-compliance:
+   *   post:
+   *     summary: Submit a tenant-signed VP to the tenant-configured GXDCH and verify the original signed result
+   *     description: Gateway extension using registered private_key_jwt client authentication. The upstream request uses application/vp+jwt; its result uses application/vc+jwt. The request never selects the GXDCH endpoint, issuer, keys or rules version.
+   *     responses:
+   *       '201': { description: Verified original GXDCH VC-JWT }
+   *       '400': { description: Invalid presentation or compliance result }
+   *       '415': { description: Unsupported request media type }
+   *       '503': { description: Tenant GXDCH integration is not configured }
+   */
+  router.post('/:tenantId/cds-:jurisdiction/v1/:sector/identity/gaia-x/standard-compliance', async (req, res) => {
+    if (!gaiaXComplianceManager) return res.status(503).json({ error: 'temporarily_unavailable' });
+    if (normalizeContentType(req.headers['content-type']) !== 'application/x-www-form-urlencoded') return res.status(415).json({ error: 'invalid_request' });
+    try {
+      const result = await gaiaXComplianceManager.verify({ tenantId: String(req.params.tenantId), jurisdiction: String(req.params.jurisdiction), sector: String(req.params.sector),
+        vpToken: String(req.body?.vp_token || ''), clientAssertion: String(req.body?.client_assertion || ''), clientAssertionType: String(req.body?.client_assertion_type || ''),
+        requestUrl: new URL(req.originalUrl, apiBaseUrl).href });
+      return res.status(201).type('application/vc+jwt').send(result.credentialJwt);
+    } catch {
+      return res.status(400).json({ error: 'invalid_request', error_description: 'GXDCH presentation or signed compliance evidence was rejected.' });
+    }
+  });
+
+  /**
+   * @openapi
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/presentation/_verify:
+   *   post:
+   *     tags: [2.2 SMART Token]
+   *     summary: Verify a presentation for an explicitly trusted tenant backend
+   *     description: Gateway extension. Requires a short-lived backend JWT with exact audience, replay protection and a canonical SHA-256 request hash. Returns a signed current-state result. Requesters and keys are selected by server configuration.
+   *     responses:
+   *       '200': { description: Tenant-signed verification JWT }
+   *       '401': { description: Missing backend assertion }
+   *       '403': { description: Untrusted request or invalid current evidence }
+   *       '415': { description: Expected application/json }
+   *       '503': { description: Verifier unavailable }
+   */
+  router.post('/:tenantId/cds-:jurisdiction/v1/:sector/identity/openid/presentation/_verify', async (req, res) => {
+    if (!tenantPresentationVerificationManager) return res.status(503).json({ error: 'temporarily_unavailable' });
+    if (normalizeContentType(req.headers['content-type']) !== 'application/json') return res.status(415).json({ error: 'invalid_request' });
+    const authorization = String(req.headers.authorization || '');
+    if (!/^Bearer \S+$/i.test(authorization)) return res.status(401).json({ error: 'invalid_client' });
+    try {
+      const compact = await tenantPresentationVerificationManager.verify({ tenantId: String(req.params.tenantId), sector: String(req.params.sector),
+        requestUrl: new URL(req.originalUrl, apiBaseUrl).href, assertion: authorization.slice(7), body: req.body });
+      res.set('Cache-Control', 'no-store');
+      return res.status(200).type('application/jwt').send(compact);
+    } catch {
+      return res.status(403).json({ error: 'access_denied' });
+    }
+  });
 
   const cdsRoutePrefix = '/:tenantId/cds-:jurisdiction/v1/:sector/:section/:format/:resourceType';
 
@@ -868,7 +995,7 @@ export function createApiRouter(
       return sendDidcommEarlyError(req, res, 401, IssueType.Security, 'Missing or invalid Bearer token.');
     }
     const accessToken = authHeader.split(' ')[1];
-    if (!allowsInsecureBearerBySecurityMode()) {
+    if (!allowsInsecureDemoBearer()) {
       if (!appAuthManager) {
         return sendDidcommEarlyError(
           req,
@@ -3434,8 +3561,8 @@ export function createApiRouter(
       }
 
       const authToken = req.headers.authorization;
-      const enforceBearerValidation = !allowsInsecureBearerBySecurityMode();
-      const requireBearerHeader = !allowsInsecureBearerBySecurityMode();
+      const enforceBearerValidation = !allowsInsecureDemoBearer();
+      const requireBearerHeader = !allowsInsecureDemoBearer();
       let verifiedBearerPayload: Record<string, any> = {};
       if (requireBearerHeader && (!authToken || !authToken.startsWith('Bearer '))) {
         return sendDidcommEarlyError(req, res, 401, IssueType.Security, 'Missing or invalid Bearer token.');
@@ -3947,17 +4074,19 @@ export function createApiRouter(
           resourceType,
           action,
         );
-        const enforceBearerValidation = !allowsInsecureBearerBySecurityMode();
+        const usesDcrInitialAccessToken = section === 'identity' && String(req.params.format || '').toLowerCase() === 'openid'
+          && String(resourceType || '').toLowerCase() === 'device' && action === '_dcr';
+        const enforceBearerValidation = !allowsInsecureDemoBearer();
         // The 'ping' endpoint is a public health check and does not require authentication for legacy requests.
         const requireBearerHeader =
           section !== 'ping'
           && !allowNoBearerForActivate
-          && !allowsInsecureBearerBySecurityMode();
+          && !allowsInsecureDemoBearer();
         if (requireBearerHeader && (!authToken || !authToken.startsWith('Bearer '))) {
           return sendDidcommEarlyError(req, res, 401, IssueType.Security, 'Missing or invalid Bearer token.');
         }
 
-        if (section !== 'ping' && !allowNoBearerForActivate && enforceBearerValidation) {
+        if (section !== 'ping' && !allowNoBearerForActivate && enforceBearerValidation && !usesDcrInitialAccessToken) {
           if (!appAuthManager) {
             return sendDidcommEarlyError(
               req,
@@ -3986,10 +4115,12 @@ export function createApiRouter(
             );
           }
         }
-        if (!enforceBearerValidation) {
-          verifiedBearerPayload = decodeInsecureDemoBearerPayload(authToken);
-        }
 
+        if (!enforceBearerValidation) verifiedBearerPayload = decodeInsecureDemoBearerPayload(authToken);
+
+        if (usesDcrInitialAccessToken && enforceBearerValidation && !appAuthManager) {
+          return sendDidcommEarlyError(req, res, 500, IssueType.Exception, 'DCR initial access-token verifier is not configured.');
+        }
         if (
           appAuthManager &&
           section === 'identity' &&

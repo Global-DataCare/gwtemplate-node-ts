@@ -1,4 +1,5 @@
 // Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
+import { createActivationTrustUnitFixture, createClearingHouseUnitFixture } from '../../utils/clearing-house-fixtures';
 import { resolveHostPhysicalCollectionName } from '../../../config/storage-layout';
 import { GatewayResponseEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
 import { GatewayRequestEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
@@ -200,6 +201,8 @@ describe('HostingManager activation flow', () => {
       mockLogger,
       mockConfig,
       hostRuntime,
+      createClearingHouseUnitFixture(),
+      createActivationTrustUnitFixture(),
     );
 
     mockKmsService.getPublicJwks.mockResolvedValue({
@@ -480,7 +483,7 @@ describe('HostingManager activation flow', () => {
     expect(entry.resource.meta.claims[GatewayClaim.OrganizationDid]).toBe(EXAMPLE_API_ORGANIZATION_DID);
     expect(entry.resource.meta.claims[GatewayClaim.ActivationNetworkMode]).toBe(URN_NETWORK);
     expect(entry.resource.meta.claims[GatewayClaim.ActivationRevocationChecked]).toBe('true');
-    expect(entry.resource.meta.claims[GatewayClaim.ActivationOnChainChecked]).toBe('false');
+    expect(entry.resource.meta.claims[GatewayClaim.ActivationOnChainChecked]).toBe('true');
 
     const claims = job.content!.body!.data[0]!.meta!.claims;
     const tenantVaultId = tenantUtils.getTenantVaultId(
@@ -1122,6 +1125,8 @@ describe('HostingManager activation flow', () => {
       mockLogger,
       mockConfig,
       hostRuntime,
+      createClearingHouseUnitFixture(),
+      createActivationTrustUnitFixture(),
     );
     await hostingManager.bootstrapHost(testClaimsHostInitialization);
     await mockTenantsCacheManager.loadHost();
@@ -1237,6 +1242,8 @@ describe('HostingManager activation flow', () => {
       mockLogger,
       mockConfig,
       hostRuntime,
+      createClearingHouseUnitFixture(),
+      createActivationTrustUnitFixture(),
     );
     await hostingManager.bootstrapHost(testClaimsHostInitialization);
     await mockTenantsCacheManager.loadHost();

@@ -10,15 +10,6 @@ export interface IReplayProtectionStore {
 }
 
 /**
- * No-op implementation used when replay protection is disabled.
- */
-export class ReplayProtectionStoreNoop implements IReplayProtectionStore {
-  async reserveIfNotExists(_key: string, _ttlSeconds: number): Promise<boolean> {
-    return true;
-  }
-}
-
-/**
  * In-memory implementation for local development/tests.
  * For distributed deployments, replace with Redis/Firestore-backed implementation.
  */

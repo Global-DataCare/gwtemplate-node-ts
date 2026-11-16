@@ -42,9 +42,9 @@ describe('token-verifier-registry', () => {
     process.env = originalEnv;
   });
 
-  it('defaults to DemoTokenVerifier in test env when AUTH_TOKEN_VERIFIER is not set', () => {
+  it('keeps cryptographic Firebase verification in local test when AUTH_TOKEN_VERIFIER is not set', () => {
     const verifier = resolveTokenVerifierFromEnv(true);
-    expect(verifier).toBeInstanceOf(DemoTokenVerifier);
+    expect(verifier).toBeInstanceOf(FirebaseTokenVerifier);
   });
 
   it('defaults to FirebaseTokenVerifier when not test env and AUTH_TOKEN_VERIFIER is not set', () => {

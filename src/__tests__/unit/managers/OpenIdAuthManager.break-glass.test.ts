@@ -1,4 +1,6 @@
+// Flow contract: emergency SMART policy consumes a receipt bound to the original professional presentation.
 // TDD contract: write this test red first; make it green only with the complete real behavior.
+import { createHash } from 'node:crypto';
 import { buildUnsignedProfessionalIdentityVpJwt } from 'gdc-common-utils-ts/utils/professional-smart';
 import { OpenIdAuthManager } from '../../../managers/OpenIdAuthManager';
 
@@ -37,7 +39,7 @@ describe('OpenIdAuthManager break-glass SMART integration', () => {
           verifyVpToken: jest.fn().mockResolvedValue({
             acr: 'urn:antifraud:acr:openid4vp:employee',
             amr: ['openid4vp', 'vc'],
-            vpHash: 'hash',
+            vpHash: createHash('sha256').update(vpToken).digest('hex'),
             ledgerVerified: true,
           }),
         } as any,

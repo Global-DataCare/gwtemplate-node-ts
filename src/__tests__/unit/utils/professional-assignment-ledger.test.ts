@@ -1,6 +1,6 @@
 // Flow contract: professional onboarding projects the exact FHIR assignment,
 // employee and legal-organization references into joinable opaque ledger links.
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it, jest } from '@jest/globals';
 import { buildOrganizationAuthorizationUrnCds } from 'gdc-common-utils-ts';
 import { HealthcareActorRoles } from 'gdc-common-utils-ts/constants/healthcare';
 import { CompositionClaim } from 'gdc-common-utils-ts/models/interoperable-claims/composition-claims';
@@ -47,6 +47,14 @@ describe('professional assignment ledger projection', () => {
     });
     expect(artifactProvenance.relationships.author).toEqual([projection.organizationLink]);
     expect(artifactProvenance.relationships.attester).toEqual([projection.assignmentLink]);
+  });
+
+  it('reads professional assignments using the transaction exposed by employee-sc', async () => {
+    const manager = new ManageAssetProfessionalAssignment({ channelName: 'identity-local' });
+    const evaluateTransaction = jest.fn(async () => Buffer.from(JSON.stringify({ status: 'active' })));
+    jest.spyOn(manager as any, 'withContract').mockImplementation(async (_msp: unknown, operation: any) => operation({ contract: { evaluateTransaction } }));
+    await expect(manager.read('TestMSP', 'assignment-link')).resolves.toMatchObject({ status: 'active' });
+    expect(evaluateTransaction).toHaveBeenCalledWith('getProfessionalAssignment', 'assignment-link');
   });
 
   it('fixes employee-sc inside the manager instead of accepting a deployment override', () => {

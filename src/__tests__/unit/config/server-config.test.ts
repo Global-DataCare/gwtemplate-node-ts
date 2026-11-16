@@ -1,3 +1,4 @@
+// Flow contract: deployed network profiles reject demo authentication and insecure bearer overrides.
 // TDD contract: write this test red first; make it green only with the complete real behavior.
 /**
  * Flow contract: deployment configuration accepts canonical sectors plus
@@ -211,7 +212,7 @@ describe('server-config sector resolution', () => {
       FHIR_LEGACY: 'true',
       JSON_LEGACY: '1',
       DIDCOMM_PLAIN: 'enabled',
-      DEMO_ALLOW_INSECURE_BEARER: 'yes',
+      DEMO_ALLOW_INSECURE_BEARER: 'false',
     };
 
     resetServerConfig();
@@ -222,7 +223,7 @@ describe('server-config sector resolution', () => {
     expect(config.fhirLegacy).toBe(true);
     expect(config.jsonLegacy).toBe(true);
     expect(config.didcommPlainEnabled).toBe(true);
-    expect(config.demoAllowInsecureBearer).toBe(true);
+    expect(config.demoAllowInsecureBearer).toBe(false);
 
     process.env = previousEnv;
     resetServerConfig();
@@ -492,7 +493,16 @@ describe('server-config sector resolution', () => {
     resetServerConfig();
   });
 
-  it('should accept every SECURITY_MODE x NETWORK_MODE pair independently', () => {
+  it('rejects a demo runtime on a deployed network even when SECURITY_MODE is compat', () => {
+    const previous = { ...process.env };
+    try {
+      process.env.NODE_ENV = 'demo'; process.env.SECURITY_MODE = 'compat'; process.env.NETWORK_MODE = 'test-network';
+      process.env.DEMO_ALLOW_INSECURE_BEARER = 'false'; resetServerConfig();
+      expect(() => getConfig()).toThrow(/demo/i);
+    } finally { process.env = previous; resetServerConfig(); }
+  });
+
+  it('keeps demo local while allowing cryptographic strict and compat profiles on every network', () => {
     const previousEnv = process.env;
     const securityModes = ['strict', 'compat', 'demo'] as const;
     const networkModes = ['test', 'test-network', 'network'] as const;
@@ -505,6 +515,10 @@ describe('server-config sector resolution', () => {
           NETWORK_MODE: networkMode,
         };
         resetServerConfig();
+        if (securityMode === 'demo' && networkMode !== 'test') {
+          expect(() => getConfig()).toThrow(/Demo security mode/);
+          continue;
+        }
         const config = getConfig();
         expect(config.securityMode).toBe(securityMode);
         expect(config.networkMode).toBe(networkMode);

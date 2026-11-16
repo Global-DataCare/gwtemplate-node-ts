@@ -1,3 +1,8 @@
+import { resolveProfessionalHomeVault } from './resolve-professional-home-vault';
+import { buildActivationClearingHouse } from './build-activation-clearing-house';
+import { IcaCredentialStatusClient } from '../services/IcaCredentialStatusClient';
+import { randomUUID } from 'node:crypto';
+import { getTenantVaultIdFromIss } from '../utils/tenant';
 import type { IServerConfig } from '../config';
 import type { IVaultRepository } from '../database/repositories/vault/vault.repository';
 import type { IKmsService } from '../gdc-backend-utils-node/models/IKmsService';
@@ -41,6 +46,7 @@ import { RelatedPersonManager } from '../managers/RelatedPersonManager';
 import { ConsentManager } from '../managers/ConsentManager';
 import { DiscoveryService } from '../services/DiscoveryService';
 import { ClearingHouseService } from '../services/ClearingHouseService';
+import { buildLocalClearingHouseVerifier } from './build-clearing-house-verifier';
 import type { CryptographyService } from 'gdc-common-utils-ts/CryptographyService';
 import { composeHostDidWebId } from '../utils/did-backend';
 import type { ITenantsManager } from '../managers/ITenantsManager';
@@ -95,7 +101,45 @@ export function buildManagers(options: {
     hostDid: composeHostDidWebId(config.apiBaseUrl, config.hostExternalDomain),
   };
 
-  const clearingHouseService = new ClearingHouseService();
+  const credentialLedgerMem = new CredentialLedgerAdapterMem();
+  const credentialLedgerFabric = new CredentialLedgerAdapterFabric();
+  const ledgerProviderMap = parseLedgerProviderMap(process.env.LEDGER_PROVIDER_MAP);
+  const ledgerDefaultProvider = process.env.LEDGER_PROVIDER_DEFAULT || 'mem';
+  const ledgerProviders: Record<string, ICredentialLedgerAdapter> = {
+    mem: credentialLedgerMem,
+    fabric: credentialLedgerFabric,
+    multi: new CredentialLedgerAdapterMulti([credentialLedgerMem, credentialLedgerFabric]),
+  };
+  const credentialLedgerAdapter = new CredentialLedgerResolver({
+    defaultProvider: ledgerDefaultProvider,
+    providerMap: ledgerProviderMap,
+    providers: ledgerProviders,
+  });
+  const verifierProvider = credentialLedgerAdapter.resolveProviderName(config.networkMode);
+  const verifierUsesFabric = config.networkMode !== 'test' && ['fabric', 'multi'].includes(verifierProvider);
+  const localClearingHouseVerifier = buildLocalClearingHouseVerifier({ network: config.networkMode, ledgerKind: verifierUsesFabric ? 'fabric' : 'memory',
+    tenants: tenantManager, ledger: verifierUsesFabric ? credentialLedgerFabric : credentialLedgerMem,
+    vaultRepository, kmsService, cryptography: cryptographyService, authorize: (request, identity) => openIdAuthManager.verifyCurrentConsentContext(request, identity) });
+  const clearingHouseService = new ClearingHouseService({ cryptography: cryptographyService, localVerifier: localClearingHouseVerifier,
+    signClientAssertion: async ({ tenantDid, tenantVaultId, audience, requestHash }) => {
+      const vaultId = tenantVaultId || (tenantDid === hostRuntime.hostDid ? 'host' : getTenantVaultIdFromIss(tenantDid));
+      if ((await tenantManager.getDidDocument(vaultId))?.id !== tenantDid) throw new Error('Verifier requester vault does not match its registered DID.');
+      const key = await kmsService.getPublicVerificationKey(vaultId, undefined, 'comm_sig');
+      if (!key?.kid) throw new Error('Verifier client signing key is unavailable.');
+      const now = Math.floor(Date.now() / 1000);
+      return kmsService.createCompactJws({ iss: tenantDid, sub: tenantDid, aud: audience, iat: now, exp: now + 60, jti: randomUUID(), request_hash: requestHash }, key.kid, vaultId, 'comm_sig', { typ: 'JWT' });
+    },
+  });
+  const activationIssuerTrust = (issuer: string) => {
+    const entries = JSON.parse(process.env.CREDENTIAL_TRUSTED_ISSUERS_JSON || '{}');
+    if (!Object.prototype.hasOwnProperty.call(entries, issuer) || !Array.isArray(entries[issuer]?.jwks?.keys)
+      || entries[issuer].status !== 'active' || typeof entries[issuer].statusEndpointTemplate !== 'string') throw new Error('Active ICA issuer keys and credential status endpoint must be configured.');
+    return entries[issuer];
+  };
+  const icaStatusClient = new IcaCredentialStatusClient({ resolveEndpoint: issuer => activationIssuerTrust(issuer).statusEndpointTemplate });
+  const activationClearingHouseService = buildActivationClearingHouse({ hostDid: hostRuntime.hostDid, cryptography: cryptographyService,
+    allowLegacyRepresentativeBootstrap: process.env.HOST_LEGACY_REPRESENTATIVE_CONTROLLER === 'true',
+    resolveIssuer: async issuer => activationIssuerTrust(issuer), checkCredentialStatus: credential => icaStatusClient.check(credential) });
   const hostingManager = new HostingManager(
     vaultRepository,
     kmsService,
@@ -104,7 +148,7 @@ export function buildManagers(options: {
     logger,
     config,
     hostRuntime,
-    clearingHouseService,
+    activationClearingHouseService,
     undefined,
     cryptographyService,
   );
@@ -122,20 +166,7 @@ export function buildManagers(options: {
   const blockchainAdapter: IBlockchainAdapter = blockchainAdapterFabric
     ? new BlockchainAdapterMulti({ discoveryAdapter: blockchainAdapterMem, writeAdapter: blockchainAdapterFabric })
     : blockchainAdapterMem;
-  const credentialLedgerMem = new CredentialLedgerAdapterMem();
-  const credentialLedgerFabric = new CredentialLedgerAdapterFabric();
-  const ledgerProviderMap = parseLedgerProviderMap(process.env.LEDGER_PROVIDER_MAP);
-  const ledgerDefaultProvider = process.env.LEDGER_PROVIDER_DEFAULT || 'mem';
-  const ledgerProviders: Record<string, ICredentialLedgerAdapter> = {
-    mem: credentialLedgerMem,
-    fabric: credentialLedgerFabric,
-    multi: new CredentialLedgerAdapterMulti([credentialLedgerMem, credentialLedgerFabric]),
-  };
-  const credentialLedgerAdapter: ICredentialLedgerAdapter = new CredentialLedgerResolver({
-    defaultProvider: ledgerDefaultProvider,
-    providerMap: ledgerProviderMap,
-    providers: ledgerProviders,
-  });
+
 
   const individualManager = new IndividualManager(
     vaultRepository,
@@ -183,6 +214,8 @@ export function buildManagers(options: {
     vaultRepository,
     clearingHouseService,
     buildBreakGlassAuthorizer(blockchainAdapter, vaultRepository),
+    { cryptography: cryptographyService, apiBaseUrl: config.apiBaseUrl,
+      resolveClientRegistrationVault: (actorDid, fallbackVault) => resolveProfessionalHomeVault(tenantManager, actorDid, fallbackVault) },
   );
   const observationManager = new ObservationManager(vaultRepository, blockchainAdapter, tenantManager);
   const medicationStatementManager = new MedicationStatementManager(vaultRepository, tenantManager, blockchainAdapter);
@@ -216,6 +249,7 @@ export function buildManagers(options: {
     relatedPersonManager,
     consentManager,
     discoveryService,
+    localClearingHouseVerifier,
     clearingHouseService,
   };
 }

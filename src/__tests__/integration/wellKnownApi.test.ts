@@ -272,6 +272,8 @@ describe('Well-Known DID Discovery API', () => {
     expect(JSON.parse(response.text)).toEqual(expect.objectContaining({
       issuer: 'https://host.example.com',
       token_endpoint: `${operationalUrl}/identity/openid/smart/token`,
+      introspection_endpoint: `${operationalUrl}/identity/openid/smart/token/_verify`,
+      introspection_endpoint_auth_methods_supported: ['private_key_jwt'],
     }));
   });
 

@@ -10,6 +10,10 @@ export class ManageAssetProfessionalAssignment extends ManageAsset {
     });
   }
 
+  protected override getReadFunction(): string { return 'getProfessionalAssignment'; }
+
+  protected override getHistoryFunction(): string { return 'getProfessionalAssignmentHistory'; }
+
   public async upsertProfessionalAssignment(
     mspId: string,
     assignmentLink: string,

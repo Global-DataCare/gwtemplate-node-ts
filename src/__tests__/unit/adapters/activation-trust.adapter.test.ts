@@ -1,4 +1,4 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: delegate activation verification to the receiving host, bind submitted credentials to the verified presentation, and preserve shared ICA controller policy.
 import { describe, expect, it, jest } from '@jest/globals';
 import {
   EXAMPLE_ORG_ACTIVATION_LEGAL_REPRESENTATIVE_CREDENTIAL,
@@ -13,18 +13,57 @@ import { DefaultActivationTrustAdapter } from '../../../adapters/activation-trus
 import { IClearingHouseService } from '../../../services/ClearingHouseService';
 import { ITrustRegistryAdapter } from '../../../adapters/trust-registry.adapter';
 import { buildDeterministicVpTokenFixture } from '../../utils/deterministic-jwt-fixtures';
+import { deriveDeterministicEcJwkPair } from '../../utils/deterministic-jwt-fixtures';
 
 const TEST_ORGANIZATION_DID = 'did:web:provider.example:health-care:organization:taxid:VATES-ESB00112233';
 describe('DefaultActivationTrustAdapter', () => {
   const previousEnv = process.env;
-  const vpTokenCompact = [
+  const vpTokenFor = (...credentials: any[]) => [
     Buffer.from(JSON.stringify({ alg: 'ML-DSA-44', typ: 'JWT' })).toString('base64url'),
-    Buffer.from(JSON.stringify({ sub: 'did:web:controller.example.com' })).toString('base64url'),
+    Buffer.from(JSON.stringify({ sub: 'did:web:controller.example.com', vp: { verifiableCredential: credentials.filter(Boolean) } })).toString('base64url'),
     'mock-signature',
   ].join('.');
 
   afterEach(() => {
     process.env = previousEnv;
+  });
+
+  it('routes activation to the receiving host rather than the unregistered organization', async () => {
+    process.env = { ...previousEnv, SECURITY_MODE: 'strict', NETWORK_MODE: 'test' };
+    const organizationCredential: any = cloneExample(EXAMPLE_ORG_ACTIVATION_ORGANIZATION_CREDENTIAL);
+    organizationCredential.credentialSubject.id = TEST_ORGANIZATION_DID;
+    const vp = await buildDeterministicVpTokenFixture({ seed: 'activation-host-routing', issuerDid: TEST_ORGANIZATION_DID,
+      audience: 'did:web:host.demo.example', credentials: [organizationCredential] });
+    const verify = jest.fn(async () => ({ acr: 'urn:test:acr', ledgerVerified: false }));
+    const registry: ITrustRegistryAdapter = { verifyActivationTrust: jest.fn(async () => ({ revocationChecked: true, issuerKeyStatusChecked: true, subjectKeyStatusChecked: true, onChainChecked: false })) };
+    await new DefaultActivationTrustAdapter({ verifyVpToken: verify }, registry).evaluate({ networkMode: 'test', vpToken: vp.compactToken,
+      primaryDid: TEST_ORGANIZATION_DID, organizationCredential, verifierTenantDid: 'did:web:host.demo.example' } as any);
+    expect(verify).toHaveBeenCalledWith(expect.objectContaining({ tenantDid: 'did:web:host.demo.example', tenantVaultId: 'host' }));
+  });
+
+  it('rejects a body credential substituted after the presentation was signed', async () => {
+    process.env = { ...previousEnv, SECURITY_MODE: 'strict', NETWORK_MODE: 'test' };
+    const organizationCredential: any = cloneExample(EXAMPLE_ORG_ACTIVATION_ORGANIZATION_CREDENTIAL);
+    organizationCredential.credentialSubject.id = TEST_ORGANIZATION_DID;
+    const vp = await buildDeterministicVpTokenFixture({ seed: 'activation-body-binding', issuerDid: TEST_ORGANIZATION_DID,
+      audience: 'did:web:host.demo.example', credentials: [organizationCredential] });
+    organizationCredential.credentialSubject.legalName = 'substituted';
+    const adapter = new DefaultActivationTrustAdapter({ verifyVpToken: async () => ({ acr: 'urn:test:acr', ledgerVerified: true }) },
+      { verifyActivationTrust: async () => ({ revocationChecked: true, issuerKeyStatusChecked: true, subjectKeyStatusChecked: true, onChainChecked: false }) });
+    await expect(adapter.evaluate({ networkMode: 'test', vpToken: vp.compactToken, organizationCredential,
+      verifierTenantDid: 'did:web:host.demo.example' } as any)).rejects.toThrow(/presentation|credential.*match/i);
+  });
+
+  it('rejects a different controller registration key after successful presentation verification', async () => {
+    process.env = { ...previousEnv, SECURITY_MODE: 'strict', NETWORK_MODE: 'test' };
+    const organizationCredential: any = cloneExample(EXAMPLE_ORG_ACTIVATION_ORGANIZATION_CREDENTIAL);
+    organizationCredential.credentialSubject.id = TEST_ORGANIZATION_DID;
+    const vp = await buildDeterministicVpTokenFixture({ seed: 'activation-controller-binding', issuerDid: TEST_ORGANIZATION_DID,
+      audience: 'did:web:host.demo.example', credentials: [organizationCredential] });
+    const adapter = new DefaultActivationTrustAdapter({ verifyVpToken: async () => ({ acr: 'urn:test:acr', ledgerVerified: true }) },
+      { verifyActivationTrust: async () => ({ revocationChecked: true, issuerKeyStatusChecked: true, subjectKeyStatusChecked: true, onChainChecked: false }) });
+    await expect(adapter.evaluate({ networkMode: 'test', vpToken: vp.compactToken, organizationCredential,
+      verifierTenantDid: 'did:web:host.demo.example', controllerBinding: { publicKeyJwk: deriveDeterministicEcJwkPair({ seed: 'other-controller', purpose: 'activation' }).publicJwk } } as any)).rejects.toThrow(/controller|signing key/i);
   });
 
   it('marks strict trust checks in test-network/network and delegates VP verification', async () => {
@@ -54,7 +93,8 @@ describe('DefaultActivationTrustAdapter', () => {
     delete representativeCredential.credentialSubject.hasCredential;
     const result = await adapter.evaluate({
       networkMode: 'test-network',
-      vpToken: vpTokenCompact,
+      verifierTenantDid: 'did:web:host.demo.example',
+      vpToken: vpTokenFor(organizationCredential, representativeCredential, controllerCredential),
       organizationCredential,
       representativeCredential,
       controllerCredential,
@@ -93,7 +133,8 @@ describe('DefaultActivationTrustAdapter', () => {
 
     await expect(adapter.evaluate({
       networkMode: 'network',
-      vpToken: vpTokenCompact,
+      verifierTenantDid: 'did:web:host.demo.example',
+      vpToken: vpTokenFor(organizationCredential),
       organizationCredential,
     })).resolves.toMatchObject({
       organizationDid: TEST_ORGANIZATION_DID,
@@ -126,7 +167,8 @@ describe('DefaultActivationTrustAdapter', () => {
 
     await expect(adapter.evaluate({
       networkMode: 'test-network',
-      vpToken: vpTokenCompact,
+      verifierTenantDid: 'did:web:host.demo.example',
+      vpToken: vpTokenFor(organizationCredential, legacyRepresentative),
       organizationCredential,
       representativeCredential: legacyRepresentative,
     })).resolves.toMatchObject({ organizationDid: TEST_ORGANIZATION_DID });
@@ -137,7 +179,8 @@ describe('DefaultActivationTrustAdapter', () => {
     };
     await expect(adapter.evaluate({
       networkMode: 'test-network',
-      vpToken: vpTokenCompact,
+      verifierTenantDid: 'did:web:host.demo.example',
+      vpToken: vpTokenFor(organizationCredential, legacyRepresentative),
       organizationCredential,
       representativeCredential: legacyRepresentative,
     })).rejects.toThrow('controller role RESPRSN in credentialSubject.hasOccupation');
@@ -183,6 +226,7 @@ describe('DefaultActivationTrustAdapter', () => {
     await expect(adapter.evaluate({
       networkMode: 'test-network',
       vpToken: vpFixture.compactToken,
+      verifierTenantDid: 'did:web:host.demo.example',
       organizationCredential,
       representativeCredential,
       controllerCredential,
