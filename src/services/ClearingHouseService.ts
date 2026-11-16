@@ -24,7 +24,10 @@ export type ClearingHouseVerificationRequest = {
   tokenPurpose?: string;
   consentIdentifiers?: string[];
 };
-export type ClearingHouseVerificationResult = { acr: string; amr?: string[]; vpHash?: string; ledgerVerified: boolean; trustChecks?: TrustRegistryVerificationResult };
+export type ClearingHouseVerificationResult = {
+  /** Native, in-process activation authority. Remote receipts never populate this field. */
+  activationEvidenceSource?: 'ica';
+  acr: string; amr?: string[]; vpHash?: string; ledgerVerified: boolean; trustChecks?: TrustRegistryVerificationResult };
 export interface IClearingHouseService {
   verifyVpToken(request: ClearingHouseVerificationRequest): Promise<ClearingHouseVerificationResult>;
 }
@@ -53,7 +56,12 @@ export async function verifyPinnedJwt(
   } else {
     ({ payload } = await jwtVerify(compact, createLocalJWKSet({ keys }), { algorithms: [String(header.alg)], currentDate: new Date(now * 1000) }));
   }
-  if ((payload.iss ?? (typeof payload.issuer === 'string' ? payload.issuer : undefined)) !== issuer) throw new Error('Clearing House JWT issuer mismatch.');
+  // VC-JOSE can carry the W3C issuer object instead of duplicating it as iss.
+  // This alternative applies only to the credential profile, never bearer JWTs.
+  const credentialIssuer = typeof payload.issuer === 'string' ? payload.issuer
+    : options.requireJwtTimes === false && payload.issuer && typeof payload.issuer === 'object'
+      ? (payload.issuer as { id?: unknown }).id : undefined;
+  if ((payload.iss ?? credentialIssuer) !== issuer) throw new Error('Clearing House JWT issuer mismatch.');
   if (options.audience && payload.aud !== options.audience) throw new Error('Clearing House JWT audience mismatch.');
   if (options.requireJwtTimes !== false && (typeof payload.iat !== 'number' || typeof payload.exp !== 'number' || !payload.jti)) {
     throw new Error('Clearing House JWT requires issued-at, expiry and unique identifier.');

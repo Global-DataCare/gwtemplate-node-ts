@@ -1,5 +1,6 @@
 import { isLocalDemoSecurityMode } from '../security/runtime-security-policy';
 import canonicalize from 'canonicalize';
+import { createHash } from 'node:crypto';
 import { getVpCredentials } from 'gdc-common-utils-ts/utils/vp-token';
 import { toJwkThumbprintSha256Urn } from 'gdc-common-utils-ts/utils/jwk-thumbprint';
 import type { PublicJwk } from 'gdc-common-utils-ts/interfaces/Cryptography.types';
@@ -188,6 +189,12 @@ export class DefaultActivationTrustAdapter implements IActivationTrustAdapter {
       ],
     });
 
+    if (clearingHouse.activationEvidenceSource === 'ica'
+      && (clearingHouse.ledgerVerified !== false || !clearingHouse.amr?.includes('ica')
+        || clearingHouse.vpHash !== createHash('sha256').update(input.vpToken).digest('hex'))) {
+      throw new ManagerError('Native ICA verification evidence does not match this activation presentation.', IssueType.Security);
+    }
+
     let controllerSigningKey: PublicJwk | undefined;
     if (!isLocalDemoSecurityMode()) {
       controllerSigningKey = decodeProtectedHeader(input.vpToken).jwk as PublicJwk | undefined;
@@ -200,6 +207,7 @@ export class DefaultActivationTrustAdapter implements IActivationTrustAdapter {
     const trustPolicy = await this.trustRegistryAdapter.verifyActivationTrust({
       networkMode: input.networkMode,
       verificationEvidence: clearingHouse.trustChecks,
+      activationEvidenceSource: clearingHouse.activationEvidenceSource,
       jurisdiction: input.jurisdiction,
       sector: input.sector,
       organizationDid: consistency.organizationDid,

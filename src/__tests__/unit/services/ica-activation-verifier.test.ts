@@ -5,12 +5,15 @@ import { createServer, type Server } from 'node:http';
 import { FlattenedSign, importJWK } from 'jose';
 import { EXAMPLE_ORG_ACTIVATION_ORGANIZATION_CREDENTIAL, EXAMPLE_ORG_ACTIVATION_LEGAL_REPRESENTATIVE_CREDENTIAL, EXAMPLE_ORG_ACTIVATION_CONTROLLER_CREDENTIAL, EXAMPLE_CONTROLLER_DID, EXAMPLE_PROVIDER_ORGANIZATION_DID, cloneExample } from 'gdc-common-utils-ts';
 import { toJwkThumbprintSha256Urn } from 'gdc-common-utils-ts/utils/jwk-thumbprint';
-import { IcaActivationVerifier } from '../../../services/IcaActivationVerifier';
+import { DefaultActivationTrustAdapter } from '../../../adapters/activation-trust.adapter';
+import { buildActivationClearingHouse } from '../../../bootstrap/build-activation-clearing-house';
 import { IcaCredentialStatusClient } from '../../../services/IcaCredentialStatusClient';
 import { buildDeterministicSignedJwt, deriveDeterministicEcJwkPair } from '../../utils/deterministic-jwt-fixtures';
 
 describe('ICA activation without Fabric', () => {
   const listeners: Server[] = [];
+  const savedEnv = { ...process.env };
+  afterEach(() => { process.env = { ...savedEnv }; });
   afterEach(async () => { for (const server of listeners.splice(0)) await new Promise<void>(resolve => { server.close(() => resolve()); server.closeAllConnections(); }); });
   async function fixture(options: { expired?: boolean; noExpiry?: boolean; wrongKey?: boolean; tampered?: boolean; wrongAudience?: boolean; inactiveIssuer?: boolean } = {}) {
     const now = Math.floor(Date.now() / 1000);
@@ -55,17 +58,40 @@ describe('ICA activation without Fabric', () => {
     const address = server.address(); if (!address || typeof address === 'string') throw new Error('Owned ICA listener is unavailable.');
     origin = `http://127.0.0.1:${address.port}`;
     const client = new IcaCredentialStatusClient({ allowLocalTestEndpoint: true, resolveEndpoint: () => `${origin}/ica/cds-ES/v1/health-care/network/credentials/{credentialType}/_status` });
-    const verifier = new IcaActivationVerifier({ hostDid: EXAMPLE_CONTROLLER_DID,
+    const verifier = buildActivationClearingHouse({ hostDid: EXAMPLE_CONTROLLER_DID,
       resolveIssuer: async () => ({ jwks: { keys: [root.publicJwk] }, status: options.inactiveIssuer ? 'inactive' : 'active' }),
       checkCredentialStatus: credential => client.check(credential),
     });
     return { verifier, request: { tenantDid: EXAMPLE_CONTROLLER_DID, vpToken: vp.compactToken, acrValues: ['urn:antifraud:acr:openid4vp:employee'] },
-      checked, setStatus: (value: string) => { status = value; } };
+      credentials, checked, setStatus: (value: string) => { status = value; } };
   }
   it('verifies the original three ICA credentials and reports no Fabric check', async () => {
     const f = await fixture();
     await expect(f.verifier.verifyVpToken(f.request)).resolves.toMatchObject({ ledgerVerified: false, trustChecks: { revocationChecked: true, issuerKeyStatusChecked: true, subjectKeyStatusChecked: true, onChainChecked: false } });
     expect(f.checked).toHaveLength(3);
+  });
+  it.each(['test', 'local-network', 'test-network', 'network'] as const)('activates an ICA-authorized first controller in %s without claiming a Fabric check', async networkMode => {
+    process.env.SECURITY_MODE = 'strict'; process.env.NETWORK_MODE = networkMode;
+    // An operational presentation selector must not replace first-controller ICA proof.
+    process.env.CLEARING_HOUSE_MODE = 'stub';
+    const f = await fixture();
+    const adapter = new DefaultActivationTrustAdapter(f.verifier);
+    const input = { networkMode, vpToken: f.request.vpToken, verifierTenantDid: EXAMPLE_CONTROLLER_DID,
+      organizationCredential: f.credentials[0], representativeCredential: f.credentials[1], controllerCredential: f.credentials[2] };
+    await expect(adapter.evaluate(input)).resolves.toMatchObject({ clearingHouse: { ledgerVerified: false },
+      trustPolicy: { revocationChecked: true, issuerKeyStatusChecked: true, subjectKeyStatusChecked: true, onChainChecked: false } });
+    expect(f.checked).toHaveLength(3);
+    f.setStatus('revoked');
+    await expect(adapter.evaluate(input)).rejects.toThrow(/status|active|revoked/i);
+  });
+  it('rejects native ICA evidence attached to another presentation', async () => {
+    process.env.SECURITY_MODE = 'strict'; process.env.NETWORK_MODE = 'network';
+    const f = await fixture();
+    const adapter = new DefaultActivationTrustAdapter({ verifyVpToken: async request => ({
+      ...await f.verifier.verifyVpToken(request), vpHash: 'different-presentation',
+    }) });
+    await expect(adapter.evaluate({ networkMode: 'network', vpToken: f.request.vpToken, verifierTenantDid: EXAMPLE_CONTROLLER_DID,
+      organizationCredential: f.credentials[0], representativeCredential: f.credentials[1], controllerCredential: f.credentials[2] })).rejects.toThrow(/evidence.*presentation/i);
   });
   it('accepts an ICA credential without an optional expiry only after checking its current status', async () => {
     const f = await fixture({ noExpiry: true });

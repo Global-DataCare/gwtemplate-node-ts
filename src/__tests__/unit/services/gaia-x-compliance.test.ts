@@ -1,6 +1,7 @@
 // Flow contract: send the tenant-signed VP using the GXDCH VC-API media types; accept only a pinned issuer's signed SC label for the configured rules version and exact credential digests; reject invalid, expired, substituted or incomplete results.
 import canonicalize from 'canonicalize';
 import { createHash } from 'node:crypto';
+import { verifyPinnedJwt } from '../../../services/ClearingHouseService';
 import { GaiaXComplianceService } from '../../../services/GaiaXComplianceService';
 import { createGaiaXLegalParticipantCredential } from '../../../utils/credential-generators';
 import { buildDeterministicSignedJwt } from '../../utils/deterministic-jwt-fixtures';
@@ -22,11 +23,23 @@ describe('GXDCH standard-compliance VC-API', () => {
     } });
     fetchMock.mockResolvedValue(new Response(result.compactToken, { status: 201, headers: { 'content-type': 'application/vc+jwt' } }));
     const service = new GaiaXComplianceService({ now: () => now, resolveTrust: async () => ({ endpoint: 'https://verifier.example/api/credential-offers/standard-compliance', issuer: EXAMPLE_PROVIDER_ORGANIZATION_DID, jwks: { keys: [result.publicJwk] }, rulesVersion: 'CD25.03' }), resolveTenantKeys: async () => ({ keys: [vp.publicJwk] }) });
-    return { service, vp: vp.compactToken, result: result.compactToken };
+    return { service, vp: vp.compactToken, result: result.compactToken, resultKey: result.publicJwk };
   }
   it('returns the exact verified GXDCH credential without replacing the issuer signature', async () => {
     const f = await fixture(); expect((await f.service.verifyPresentation({ tenantDid: EXAMPLE_CONTROLLER_DID, vpToken: f.vp })).credentialJwt).toBe(f.result);
     expect(fetchMock).toHaveBeenCalledWith(expect.any(URL), expect.objectContaining({ body: f.vp, headers: { 'content-type': 'application/vp+jwt', accept: 'application/vc+jwt' } }));
+  });
+  it.each([EXAMPLE_PROVIDER_ORGANIZATION_DID, { id: EXAMPLE_PROVIDER_ORGANIZATION_DID }])('accepts a VC-JOSE issuer without duplicating it as iss: %p', async issuer => {
+    const f = await fixture({}, { iss: undefined, issuer });
+    expect((await f.service.verifyPresentation({ tenantDid: EXAMPLE_CONTROLLER_DID, vpToken: f.vp })).credentialJwt).toBe(f.result);
+  });
+  it('does not accept the VC issuer object as a bearer JWT issuer', async () => {
+    const f = await fixture({}, { iss: undefined, issuer: { id: EXAMPLE_PROVIDER_ORGANIZATION_DID } });
+    await expect(verifyPinnedJwt(f.result, { keys: [f.resultKey] }, EXAMPLE_PROVIDER_ORGANIZATION_DID, now)).rejects.toThrow(/issuer/i);
+  });
+  it('rejects a VC issuer object outside the pinned trust configuration', async () => {
+    const f = await fixture({}, { iss: undefined, issuer: { id: EXAMPLE_CONTROLLER_DID } });
+    await expect(f.service.verifyPresentation({ tenantDid: EXAMPLE_CONTROLLER_DID, vpToken: f.vp })).rejects.toThrow(/issuer/i);
   });
   it.each([
     ['wrong rules', { 'gx:rulesVersion': 'other-rules' }],

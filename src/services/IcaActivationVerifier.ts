@@ -82,7 +82,7 @@ export class IcaActivationVerifier implements IClearingHouseService {
     if (!binding || binding !== toJwkThumbprintSha256Urn(actorKey as any)) throw new Error('ICA-authorized controller key does not match the presentation signer.');
     const acr = 'urn:antifraud:acr:openid4vp:employee';
     if (!request.acrValues.includes(acr)) throw new Error('Controller assurance was not requested.');
-    return { acr, amr: ['vp', 'ica'], vpHash: createHash('sha256').update(request.vpToken).digest('hex'), ledgerVerified: false,
+    return { activationEvidenceSource: 'ica', acr, amr: ['vp', 'ica'], vpHash: createHash('sha256').update(request.vpToken).digest('hex'), ledgerVerified: false,
       trustChecks: { revocationChecked: true, issuerKeyStatusChecked: true, subjectKeyStatusChecked: true, onChainChecked: false } };
   }
 }

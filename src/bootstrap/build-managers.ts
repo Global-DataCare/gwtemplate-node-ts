@@ -1,5 +1,5 @@
 import { resolveProfessionalHomeVault } from './resolve-professional-home-vault';
-import { IcaActivationVerifier } from '../services/IcaActivationVerifier';
+import { buildActivationClearingHouse } from './build-activation-clearing-house';
 import { IcaCredentialStatusClient } from '../services/IcaCredentialStatusClient';
 import { randomUUID } from 'node:crypto';
 import { getTenantVaultIdFromIss } from '../utils/tenant';
@@ -137,11 +137,9 @@ export function buildManagers(options: {
     return entries[issuer];
   };
   const icaStatusClient = new IcaCredentialStatusClient({ resolveEndpoint: issuer => activationIssuerTrust(issuer).statusEndpointTemplate });
-  const activationVerifier = new IcaActivationVerifier({ hostDid: hostRuntime.hostDid, cryptography: cryptographyService,
+  const activationClearingHouseService = buildActivationClearingHouse({ hostDid: hostRuntime.hostDid, cryptography: cryptographyService,
     allowLegacyRepresentativeBootstrap: process.env.HOST_LEGACY_REPRESENTATIVE_CONTROLLER === 'true',
     resolveIssuer: async issuer => activationIssuerTrust(issuer), checkCredentialStatus: credential => icaStatusClient.check(credential) });
-  const activationClearingHouseService = config.networkMode === 'test'
-    ? new ClearingHouseService({ cryptography: cryptographyService, localVerifier: activationVerifier }) : clearingHouseService;
   const hostingManager = new HostingManager(
     vaultRepository,
     kmsService,

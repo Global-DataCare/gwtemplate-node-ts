@@ -12,6 +12,8 @@ export type TrustRegistryVerificationInput = {
   controllerCredential?: any;
   now?: Date;
   verificationEvidence?: TrustRegistryVerificationResult;
+  /** Supplied by native activation verification, never by the registration body. */
+  activationEvidenceSource?: 'ica';
 };
 
 export type TrustRegistryVerificationResult = {
@@ -31,8 +33,8 @@ export class DefaultTrustRegistryAdapter implements ITrustRegistryAdapter {
     if (isLocalDemoSecurityMode() && input.networkMode === 'test') return { revocationChecked: false, issuerKeyStatusChecked: false, subjectKeyStatusChecked: false, onChainChecked: false };
     const evidence = input.verificationEvidence;
     if (!evidence || evidence.revocationChecked !== true || evidence.issuerKeyStatusChecked !== true
-      || evidence.subjectKeyStatusChecked !== true || (input.networkMode !== 'test' && evidence.onChainChecked !== true)) {
-      throw new Error('Trust registry verification requires explicit, verified current ledger evidence.');
+      || evidence.subjectKeyStatusChecked !== true || (input.networkMode !== 'test' && input.activationEvidenceSource !== 'ica' && evidence.onChainChecked !== true)) {
+      throw new Error('Trust registry verification requires explicit, verified current ICA or ledger evidence.');
     }
     return { ...evidence };
   }
