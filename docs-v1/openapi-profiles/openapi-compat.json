@@ -3116,6 +3116,125 @@
         "x-profile": "core"
       }
     },
+    "/{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/smart/token/_verify": {
+      "post": {
+        "tags": [
+          "2.2 SMART Token"
+        ],
+        "summary": "Verify a foreign index-provider SMART token for one registered custodian EHR",
+        "description": "The EHR authenticates with its DCR-registered private key. The custodian validates the\nindex-provider signature, the original professional presentation and the referenced\nconsent evidence. The signed result preserves the original subject, purpose, scope and\nexpiration and cannot increase the authorization granted by the index provider.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "token",
+                  "client_assertion_type",
+                  "client_assertion"
+                ],
+                "properties": {
+                  "token": {
+                    "type": "string"
+                  },
+                  "token_type_hint": {
+                    "type": "string",
+                    "enum": [
+                      "access_token"
+                    ]
+                  },
+                  "client_assertion_type": {
+                    "type": "string"
+                  },
+                  "client_assertion": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Signed token-introspection response addressed to the registered EHR.",
+            "content": {
+              "application/token-introspection+jwt": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request."
+          },
+          "401": {
+            "description": "EHR client authentication failed."
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/gaia-x/standard-compliance": {
+      "post": {
+        "summary": "Submit a tenant-signed VP to the tenant-configured GXDCH and verify the original signed result",
+        "description": "Gateway extension using registered private_key_jwt client authentication. The upstream request uses application/vp+jwt; its result uses application/vc+jwt. The request never selects the GXDCH endpoint, issuer, keys or rules version.",
+        "responses": {
+          "201": {
+            "description": "Verified original GXDCH VC-JWT"
+          },
+          "400": {
+            "description": "Invalid presentation or compliance result"
+          },
+          "415": {
+            "description": "Unsupported request media type"
+          },
+          "503": {
+            "description": "Tenant GXDCH integration is not configured"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/openid/presentation/_verify": {
+      "post": {
+        "tags": [
+          "2.2 SMART Token"
+        ],
+        "summary": "Verify a presentation for an explicitly trusted tenant backend",
+        "description": "Gateway extension. Requires a short-lived backend JWT with exact audience, replay protection and a canonical SHA-256 request hash. Returns a signed current-state result. Requesters and keys are selected by server configuration.",
+        "responses": {
+          "200": {
+            "description": "Tenant-signed verification JWT"
+          },
+          "401": {
+            "description": "Missing backend assertion"
+          },
+          "403": {
+            "description": "Untrusted request or invalid current evidence"
+          },
+          "415": {
+            "description": "Expected application/json"
+          },
+          "503": {
+            "description": "Verifier unavailable"
+          }
+        },
+        "x-profile": "compat"
+      }
+    },
     "/{tenantId}/cds-{jurisdiction}/v1/{sector}/identity/oidc/credential": {
       "post": {
         "tags": [

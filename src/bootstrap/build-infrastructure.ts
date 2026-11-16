@@ -1,3 +1,4 @@
+import { isLocalDemoSecurityMode } from '../security/runtime-security-policy';
 import { getFirestore } from 'firebase-admin/firestore';
 import type { IServerConfig } from '../config';
 import type { IVaultRepository } from '../database/repositories/vault/vault.repository';
@@ -109,7 +110,7 @@ export async function buildInfrastructure(options: {
     console.warn('[GW-API] Envelope provider is memory. Use this only for dev/test.');
   }
   console.log(`[GW-API] Using envelope provider: ${envelopeProvider}`);
-  if (config.nodeEnv === 'demo') {
+  if (config.nodeEnv === 'demo' && isLocalDemoSecurityMode({ ...process.env, SECURITY_MODE: config.securityMode, NETWORK_MODE: config.networkMode, NODE_ENV: config.nodeEnv })) {
     const realKmsService = new KmsService(cryptographyService, tenantManager, {
       wrappedKeyRepository,
       envelopeAdapter,

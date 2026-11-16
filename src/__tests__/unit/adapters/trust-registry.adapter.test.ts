@@ -1,32 +1,12 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
-import { describe, expect, it } from '@jest/globals';
+// Flow contract: local test and network labels cannot manufacture trust checks; only explicit demo may relax checks, and real environments require authenticated current evidence.
 import { DefaultTrustRegistryAdapter } from '../../../adapters/trust-registry.adapter';
 
 describe('DefaultTrustRegistryAdapter', () => {
-  it('returns relaxed policy in test mode', async () => {
-    const adapter = new DefaultTrustRegistryAdapter();
-    const result = await adapter.verifyActivationTrust({
-      networkMode: 'test',
-      organizationDid: 'did:web:org.example',
-    });
-
-    expect(result.revocationChecked).toBe(false);
-    expect(result.issuerKeyStatusChecked).toBe(false);
-    expect(result.subjectKeyStatusChecked).toBe(false);
-    expect(result.onChainChecked).toBe(false);
+  it.each(['test', 'local-network', 'test-network', 'network'] as const)('rejects absent evidence in %s', async networkMode => {
+    await expect(new DefaultTrustRegistryAdapter().verifyActivationTrust({ networkMode, organizationDid: 'did:web:org.example' })).rejects.toThrow(/evidence/);
   });
-
-  it('returns strict policy in network mode', async () => {
-    const adapter = new DefaultTrustRegistryAdapter();
-    const result = await adapter.verifyActivationTrust({
-      networkMode: 'network',
-      organizationDid: 'did:web:org.example',
-      representativeDid: 'did:web:rep.example',
-    });
-
-    expect(result.revocationChecked).toBe(true);
-    expect(result.issuerKeyStatusChecked).toBe(true);
-    expect(result.subjectKeyStatusChecked).toBe(true);
-    expect(result.onChainChecked).toBe(true);
+  it('preserves explicit positive checks supplied by the authenticated verifier', async () => {
+    const evidence = { revocationChecked: true, issuerKeyStatusChecked: true, subjectKeyStatusChecked: true, onChainChecked: true };
+    expect(await new DefaultTrustRegistryAdapter().verifyActivationTrust({ networkMode: 'test-network', organizationDid: 'did:web:org.example', verificationEvidence: evidence })).toEqual(evidence);
   });
 });

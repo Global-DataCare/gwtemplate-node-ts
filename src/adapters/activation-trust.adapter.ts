@@ -1,3 +1,9 @@
+import { isLocalDemoSecurityMode } from '../security/runtime-security-policy';
+import canonicalize from 'canonicalize';
+import { getVpCredentials } from 'gdc-common-utils-ts/utils/vp-token';
+import { toJwkThumbprintSha256Urn } from 'gdc-common-utils-ts/utils/jwk-thumbprint';
+import type { PublicJwk } from 'gdc-common-utils-ts/interfaces/Cryptography.types';
+import { isSignatureJwk } from '../managers/hosting/registration-keys';
 import { IssueType } from 'gdc-common-utils-ts/models/issue';
 import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
 import {
@@ -22,6 +28,9 @@ export type ActivationTrustEvaluationInput = {
   representativeCredential?: any;
   controllerCredential?: any;
   primaryDid?: string;
+  /** Receiving host identity supplied by the hosting manager, never by the request body. */
+  verifierTenantDid?: string;
+  controllerBinding?: { publicKeyJwk?: PublicJwk; jwks?: { keys: PublicJwk[] } };
   jurisdiction?: string;
   sector?: string;
   /** Deployment-wide historical first-controller compatibility only. */
@@ -32,6 +41,8 @@ export type ActivationTrustEvaluationResult = {
   organizationDid: string;
   representativeDid?: string;
   clearingHouse: ClearingHouseVerificationResult;
+  /** Business signing key whose ICA authorization was checked by the verifier. */
+  controllerSigningKey?: PublicJwk;
   trustPolicy: {
     networkMode: ActivationNetworkMode;
     revocationChecked: boolean;
@@ -45,11 +56,7 @@ export interface IActivationTrustAdapter {
   evaluate(input: ActivationTrustEvaluationInput): Promise<ActivationTrustEvaluationResult>;
 }
 
-function isDemoSecurityMode(): boolean {
-  const securityMode = String(process.env.SECURITY_MODE || '').trim().toLowerCase();
-  const nodeEnv = String(process.env.NODE_ENV || '').trim().toLowerCase();
-  return securityMode === 'demo' || nodeEnv === 'demo';
-}
+
 
 async function verifyVpTokenProof(vpToken: string): Promise<void> {
   const compact = String(vpToken || '').trim();
@@ -74,7 +81,7 @@ async function verifyVpTokenProof(vpToken: string): Promise<void> {
   }
 }
 
-function assertActivationCredentialConsistency(params: {
+export function assertActivationCredentialConsistency(params: {
   primaryDid?: string;
   organizationCredential?: any;
   representativeCredential?: any;
@@ -151,8 +158,15 @@ export class DefaultActivationTrustAdapter implements IActivationTrustAdapter {
   }
 
   async evaluate(input: ActivationTrustEvaluationInput): Promise<ActivationTrustEvaluationResult> {
-    if (!isDemoSecurityMode()) {
+    if (!isLocalDemoSecurityMode()) {
+      if (!input.verifierTenantDid) throw new ManagerError('Activation requires the receiving host verification context.', IssueType.Security);
       await verifyVpTokenProof(input.vpToken);
+      const presented = getVpCredentials(input.vpToken);
+      for (const credential of [input.organizationCredential, input.representativeCredential, input.controllerCredential]) {
+        if (credential && !presented.some(candidate => canonicalize(candidate) === canonicalize(credential))) {
+          throw new ManagerError('Submitted activation credential does not match the signed presentation.', IssueType.Security);
+        }
+      }
     }
 
     const consistency = assertActivationCredentialConsistency({
@@ -164,6 +178,8 @@ export class DefaultActivationTrustAdapter implements IActivationTrustAdapter {
     });
 
     const clearingHouse = await this.clearingHouseService.verifyVpToken({
+      tenantDid: input.verifierTenantDid,
+      tenantVaultId: 'host',
       vpToken: input.vpToken,
       presentationSubmission: input.presentationSubmission,
       acrValues: [
@@ -172,8 +188,18 @@ export class DefaultActivationTrustAdapter implements IActivationTrustAdapter {
       ],
     });
 
+    let controllerSigningKey: PublicJwk | undefined;
+    if (!isLocalDemoSecurityMode()) {
+      controllerSigningKey = decodeProtectedHeader(input.vpToken).jwk as PublicJwk | undefined;
+      const suppliedKeys = [input.controllerBinding?.publicKeyJwk, ...(input.controllerBinding?.jwks?.keys || []).filter(isSignatureJwk)].filter(Boolean) as PublicJwk[];
+      if (suppliedKeys.length && (!controllerSigningKey || suppliedKeys.some(key => toJwkThumbprintSha256Urn(key as any) !== toJwkThumbprintSha256Urn(controllerSigningKey as any)))) {
+        throw new ManagerError('Controller registration signing key does not match the ICA-authorized presentation signer.', IssueType.Security);
+      }
+    }
+
     const trustPolicy = await this.trustRegistryAdapter.verifyActivationTrust({
       networkMode: input.networkMode,
+      verificationEvidence: clearingHouse.trustChecks,
       jurisdiction: input.jurisdiction,
       sector: input.sector,
       organizationDid: consistency.organizationDid,
@@ -187,6 +213,7 @@ export class DefaultActivationTrustAdapter implements IActivationTrustAdapter {
       organizationDid: consistency.organizationDid,
       representativeDid: consistency.representativeDid,
       clearingHouse,
+      ...(controllerSigningKey ? { controllerSigningKey } : {}),
       trustPolicy: {
         networkMode: input.networkMode,
         ...trustPolicy,

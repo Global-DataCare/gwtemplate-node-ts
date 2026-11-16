@@ -140,7 +140,7 @@ export class DiscoveryService {
   }
 
   /**
-   * Generates a placeholder SMART on FHIR configuration.
+   * Generates tenant-scoped SMART on FHIR token and verification metadata.
    * @param vaultId The unique vault identifier of the tenant.
    * @returns A partial SMART configuration object, or undefined if not found.
    */
@@ -164,7 +164,8 @@ export class DiscoveryService {
     return {
       issuer: tenantUrl,
       token_endpoint: new URL('identity/openid/smart/token', ensureTrailingSlash(operationalUrl)).toString(),
-      // Additional SMART on FHIR metadata would be populated here.
+      introspection_endpoint: new URL('identity/openid/smart/token/_verify', ensureTrailingSlash(operationalUrl)).toString(),
+      introspection_endpoint_auth_methods_supported: ['private_key_jwt'],
     };
   }
 

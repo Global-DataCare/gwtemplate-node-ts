@@ -14,6 +14,11 @@ if (!isTestEnv && (process.env.DB_PROVIDER === 'firestore' || process.env.STORAG
 
 import { Worker } from './worker';
 import { createApiRouter } from './routes/api';
+import { FederatedSmartVerificationManager } from './managers/FederatedSmartVerificationManager';
+import { TenantPresentationVerificationManager } from './managers/TenantPresentationVerificationManager';
+import { GaiaXComplianceManager } from './managers/GaiaXComplianceManager';
+import { GaiaXComplianceService } from './services/GaiaXComplianceService';
+import type { JSONWebKeySet } from 'jose';
 import { createDiscoveryRouter } from './routes/discovery';
 import { DiscoveryService } from './services/DiscoveryService';
 import { IKmsService } from './gdc-backend-utils-node/models/IKmsService';
@@ -76,7 +81,6 @@ import { generatePkiChainFromEnv } from './utils/pki-chain';
 import {
   IReplayProtectionStore,
   ReplayProtectionStoreMem,
-  ReplayProtectionStoreNoop,
   ReplayProtectionStoreRedis,
 } from './adapters/replay-protection-store';
 import { getConfig, resetServerConfig } from './config/server-config';
@@ -237,6 +241,8 @@ async function startServer(options?: StartServerOptions) {
     relatedPersonManager,
     consentManager,
     discoveryService,
+    localClearingHouseVerifier,
+    clearingHouseService,
   } = buildManagers({
     config,
     vaultRepository,
@@ -326,7 +332,7 @@ async function startServer(options?: StartServerOptions) {
   const worker = new Worker(managerRegistry, config.apiBaseUrl, kmsService);
   const asyncResponseStore = new AsyncResponseStoreMem();
   const queueAdapter = new QueueAdapterMem(asyncResponseStore, worker);
-  const replayProvider = (process.env.REPLAY_PROTECTION_PROVIDER || 'none').toLowerCase();
+  const replayProvider = (process.env.REPLAY_PROTECTION_PROVIDER || 'mem').toLowerCase();
   const replayProtectionStore: IReplayProtectionStore =
     replayProvider === 'mem'
       ? new ReplayProtectionStoreMem()
@@ -335,7 +341,7 @@ async function startServer(options?: StartServerOptions) {
             redisUrl: process.env.REDIS_URL,
             keyPrefix: process.env.REPLAY_REDIS_KEY_PREFIX || 'replay:jti',
           })
-        : new ReplayProtectionStoreNoop();
+        : new ReplayProtectionStoreMem();
   
   // This is the FHIR-specific AuthorizationManager, not our AppAuthorizationManager.
   const authManager: IAuthorizationManager = options?.authManager || new SmartAuthorizationManager();
@@ -372,6 +378,34 @@ async function startServer(options?: StartServerOptions) {
   const authorityRouter = Object.keys(authorityArtifacts).length
     ? createAuthorityRouter(authorityArtifacts, asyncResponseStore)
     : undefined;
+  const federatedSmartVerificationManager = new FederatedSmartVerificationManager({
+    kmsService, cryptography: cryptographyService, tenantsManager: tenantManager, vaultRepository, clearingHouseService, replayProtectionStore,
+  });
+  const gaiaXComplianceService = new GaiaXComplianceService({ cryptography: cryptographyService,
+    resolveTrust: async tenantDid => {
+      const entries = JSON.parse(process.env.GXDCH_TENANTS_JSON || '{}');
+      if (!Object.prototype.hasOwnProperty.call(entries, tenantDid)) throw new Error('Tenant GXDCH trust is not configured.');
+      return entries[tenantDid];
+    },
+    resolveTenantKeys: async (tenantDid, vaultId) => {
+      if (!vaultId || (await tenantManager.getDidDocument(vaultId))?.id !== tenantDid) throw new Error('GXDCH tenant vault does not match its registered DID.');
+      return await kmsService.getPublicJwks(vaultId) as unknown as JSONWebKeySet;
+    },
+  });
+  const gaiaXComplianceManager = new GaiaXComplianceManager(tenantManager, federatedSmartVerificationManager, gaiaXComplianceService);
+  const tenantPresentationVerificationManager = new TenantPresentationVerificationManager({
+    tenants: tenantManager, verifier: localClearingHouseVerifier, replay: replayProtectionStore, cryptography: cryptographyService,
+    resolveRequester: (recipient, requester) => {
+      const entries = JSON.parse(process.env.CLEARING_HOUSE_REQUESTERS_JSON || '{}');
+      if (!Object.prototype.hasOwnProperty.call(entries, recipient) || !Object.prototype.hasOwnProperty.call(entries[recipient], requester)) throw new Error('Backend requester is not trusted.');
+      return entries[recipient][requester];
+    },
+    signResult: async (vaultId, payload) => {
+      const key = await kmsService.getPublicVerificationKey(vaultId, undefined, 'comm_sig');
+      if (!key?.kid) throw new Error('Verifier signing key is unavailable.');
+      return kmsService.createCompactJws(payload, key.kid, vaultId, 'comm_sig', { typ: 'JWT' });
+    },
+  });
   const apiRouter = createApiRouter(
     queueAdapter,
     tenantManager,
@@ -383,6 +417,9 @@ async function startServer(options?: StartServerOptions) {
     appAuthManager,
     replayProtectionStore,
     individualManager,
+    federatedSmartVerificationManager,
+    gaiaXComplianceManager,
+    tenantPresentationVerificationManager,
   );
   const networkRouter = createNetworkRouter(queueAdapter, kmsService);
   const fhirRouter = createFhirRouter(queueAdapter, authManager);

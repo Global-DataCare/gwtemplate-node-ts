@@ -1,4 +1,4 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: publish canonical tenant metadata pointers and preserve callable endpoint routing without changing DID keys or identities.
 // src/__tests__/unit/utils/did-document.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
@@ -7,6 +7,23 @@ import { Sector } from 'gdc-common-utils-ts/models/urlPath';
 import { initializeTenantServicesConfig } from '../../../utils/services';
 
 describe('populateDidDocumentServices', () => {
+
+  it('does not advertise tenant identity metadata on the host network registry', () => {
+    const services = populateDidDocumentServices('did:web:gateway.com', 'https://gateway.com', [], false,
+      { alternateName: 'host', jurisdiction: 'EU', version: 'v1', sector: 'test' });
+    expect(services.some(service => service.id.endsWith('#smart-configuration') || service.id.endsWith('#openid-configuration'))).toBe(false);
+  });
+
+  it('links to compact OpenID and SMART metadata instead of adding verification operations to the DID', () => {
+    const did = 'did:web:gateway.com:acme:cds-es:v1:health-care';
+    const services = populateDidDocumentServices(did, 'https://gateway.com', [], true,
+      { alternateName: 'acme', jurisdiction: 'es', version: 'v1', sector: Sector.HEALTH_CARE });
+    expect(services).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: `${did}#openid-configuration`, type: 'OpenIdProvider', serviceEndpoint: 'https://gateway.com/acme/cds-es/v1/health-care/.well-known/openid-configuration' }),
+      expect.objectContaining({ id: `${did}#smart-configuration`, type: 'SmartOnFhirConfiguration', serviceEndpoint: 'https://gateway.com/acme/cds-es/v1/health-care/.well-known/smart-configuration' }),
+    ]));
+    expect(services.some(service => String(service.serviceEndpoint).endsWith('/token/_verify'))).toBe(false);
+  });
 
   it('should correctly multiplex services for a HOSTED tenant', () => {
     // --- Arrange ---

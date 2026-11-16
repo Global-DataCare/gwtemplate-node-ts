@@ -10,12 +10,16 @@ import type { ITenantsManager } from './ITenantsManager';
 import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
 import { IssueType } from 'gdc-common-utils-ts/models/issue';
 import { Content } from 'gdc-common-utils-ts/utils/content';
-import { getTenantVaultId } from '../utils/tenant';
+import { getTenantVaultIdFromIss, getTenantVaultId } from '../utils/tenant';
 import { IVaultRepository } from '../database/repositories/vault/vault.repository';
 import { getClaimValue } from '../utils/claims';
 import { parseActorFromSub } from 'gdc-common-utils-ts/utils/actor';
 import { getIndividualSectionId } from '../utils/individual-sections';
-import { IClearingHouseService } from '../services/ClearingHouseService';
+import type { ClearingHouseVerificationRequest } from '../services/ClearingHouseService';
+import { verifyPinnedJwt, type IClearingHouseService } from '../services/ClearingHouseService';
+import type { ICryptography } from 'gdc-common-utils-ts/interfaces/ICryptography';
+import { ReplayProtectionStoreMem, type IReplayProtectionStore } from '../adapters/replay-protection-store';
+import { tryGetJwkThumbprint } from '../utils/ledger-organization-registration-helpers';
 import { normalizeCodeSystemAndValue } from '../utils/normalize-codeAndSystem';
 import { expandConsentActorRoles, normalizeConsentActorRole } from '../utils/consent';
 import { getMatchingInterTenantAccessContractFromVpToken } from 'gdc-common-utils-ts/utils/inter-tenant-access-contract';
@@ -25,7 +29,7 @@ import { getEnvSectionId } from '../utils/section-env';
 import { ServiceCapability } from 'gdc-common-utils-ts/constants/service-capabilities';
 import { HealthcareConsentPurposes } from 'gdc-common-utils-ts/constants/healthcare';
 import { deriveGrantedSmartScopes } from 'gdc-common-utils-ts/utils/smart-scope';
-import { ClaimConsent, type ConsentRule } from 'gdc-common-utils-ts/models/consent-rule';
+import { ClaimConsent, ConsentStatuses, type ConsentRule } from 'gdc-common-utils-ts/models/consent-rule';
 import { getMatchingIndividualMemberCredentialFromVpToken } from 'gdc-common-utils-ts/utils/individual-smart';
 import type { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
 import { getOrCreateDigitalTwinSubjectId } from '../utils/digital-twin-research-projection';
@@ -37,6 +41,8 @@ import { normalizeIndexedEmail } from '../utils/indexed-contact';
 import { getPersonOccupationClaim } from '../utils/occupation';
 import { parseTenantUrn } from '../utils/urn';
 import { parseProfessionalDidIdentity } from '../utils/professional-did-identity';
+import { createHash, randomUUID } from 'node:crypto';
+import { isLocalDemoSecurityMode } from '../security/runtime-security-policy';
 import { ActorKinds } from 'gdc-common-utils-ts/constants/actor-session';
 import { DeviceBindingStatuses } from 'gdc-common-utils-ts/constants/device';
 import { SmartClientAssertionTypes } from 'gdc-common-utils-ts/constants/identity-auth';
@@ -77,13 +83,15 @@ type ParsedPermission = {
 };
 
 export class OpenIdAuthManager implements IJobProcessor {
+  private readonly assertionReplay: IReplayProtectionStore;
   constructor(
     private readonly kmsService: IKmsService,
     private readonly tenantsCacheManager: ITenantsManager,
     private readonly vaultRepository: IVaultRepository,
     private readonly clearingHouseService: IClearingHouseService,
     private readonly breakGlassAuthorizer?: BreakGlassAuthorizer,
-  ) {}
+    private readonly securityOptions: { cryptography?: ICryptography; replayProtectionStore?: IReplayProtectionStore; apiBaseUrl?: string; resolveClientRegistrationVault?: (actorDid: string, requestedVaultId: string) => Promise<string> } = {},
+  ) { this.assertionReplay = securityOptions.replayProtectionStore || new ReplayProtectionStoreMem(); }
 
   public async process(job: JobRequest): Promise<IDecodedDidcommPayload> {
     const thid = job.content?.thid;
@@ -134,6 +142,7 @@ export class OpenIdAuthManager implements IJobProcessor {
       clientId,
       issuerDid,
       tenantVaultId,
+      requestUrl: this.securityOptions.apiBaseUrl ? new URL(`/${job.tenantId}/cds-${job.jurisdiction}/v1/${job.sector}/identity/openid/smart/token`, this.securityOptions.apiBaseUrl).href : undefined,
     });
 
     // --- Consent Rule Check (MVP) ---
@@ -166,6 +175,7 @@ export class OpenIdAuthManager implements IJobProcessor {
     const vpToken = body.vp_token?.trim();
     const accessProof = await this.resolveAccessProof({
       acrValues,
+      tenantVaultId,
       actorOrganizationDid: actor.organization,
       issuerDid,
       purpose,
@@ -445,6 +455,10 @@ export class OpenIdAuthManager implements IJobProcessor {
       acr: accessProof.acr,
       amr: accessProof.amr,
       vp_hash: accessProof.vpHash,
+      vp_token: vpToken,
+      client_id: registeredDeviceProfile?.clientId,
+      jti: randomUUID(),
+      consent_ids: Array.from(new Set(evaluation.applicableRules.map(rule => String(getClaimValue(rule, ClaimConsent.identifier) || '')).filter(Boolean))),
       ledger_verified: accessProof.ledgerVerified,
       emergency: breakGlassAuthorization ? true : undefined,
       emergency_consent_id: breakGlassAuthorization?.emergencyConsentId,
@@ -486,8 +500,29 @@ export class OpenIdAuthManager implements IJobProcessor {
     };
   }
 
+  /** Re-evaluates current local consent; a previously issued token is never the current decision. */
+  public async verifyCurrentConsentContext(request: ClearingHouseVerificationRequest): Promise<void> {
+    if (!request.tokenIssuer || !request.tokenSubject || !request.tokenScope || !request.consentIdentifiers?.length) {
+      throw new ManagerError('Current authorization requires issuer, professional, scope and consent identifiers.', IssueType.Required);
+    }
+    const vaultId = getTenantVaultIdFromIss(request.tokenIssuer);
+    if (!await this.tenantsCacheManager.tenantExists(vaultId) || !await this.tenantsCacheManager.isTenantOperational(vaultId)) throw new ManagerError('Authoritative consent tenant is unavailable.', IssueType.Forbidden);
+    const did = await this.tenantsCacheManager.getDidDocument(vaultId);
+    if (did?.id !== request.tokenIssuer) throw new ManagerError('Consent issuer mismatch.', IssueType.Forbidden);
+    const { subject } = this.extractPinnedSubjectAndSections(request.tokenScope);
+    const actor = parseActorFromSub(request.tokenSubject);
+    const rules = await this.vaultRepository.getContainersInSection<any>(vaultId, getIndividualSectionId(subject, 'rules'));
+    const activeRules = rules.filter(rule => getClaimValue(rule, ClaimConsent.status) === ConsentStatuses.Active && this.isRuleTimeActive(rule));
+    const evaluation = this.evaluateRequestedConsent({ rules: activeRules, subject, actor: { ...actor, organization: getOrganizationDidFromIndividualDid(actor.sub) },
+      purpose: request.tokenPurpose, requestedPermissions: this.parseRequestedScopePermissions(request.tokenScope),
+      jurisdiction: request.tokenIssuer.split(':').find(value => value.startsWith('cds-'))?.slice(4) || '', actorSubjectAliases: new Set([actor.sub]) });
+    const ids = new Set(evaluation.applicableRules.map(rule => String(getClaimValue(rule, ClaimConsent.identifier) || '')).filter(Boolean));
+    if (!evaluation.allowed || !request.consentIdentifiers.every(id => ids.has(id))) throw new ManagerError('Current consent does not authorize this request.', IssueType.Forbidden);
+  }
+
   private async resolveAccessProof(params: {
     acrValues: string[];
+    tenantVaultId?: string;
     actorOrganizationDid?: string;
     issuerDid: string;
     purpose?: string;
@@ -501,12 +536,17 @@ export class OpenIdAuthManager implements IJobProcessor {
   }): Promise<AccessProofResult> {
     if (params.vpToken) {
       const clearingResult = await this.clearingHouseService.verifyVpToken({
+        tenantDid: params.issuerDid,
+        tenantVaultId: params.tenantVaultId,
+        tokenSubject: params.actorDid,
+        authenticatedClientId: params.registeredDeviceProfile?.clientId,
+        holderVaultId: params.registeredDeviceProfile?.registeredAtVaultId,
         vpToken: params.vpToken,
         presentationSubmission: params.presentationSubmission,
         acrValues: params.acrValues,
       });
 
-      if (!params.acrValues.includes(clearingResult.acr)) {
+      if (clearingResult.ledgerVerified !== true || clearingResult.vpHash !== createHash('sha256').update(params.vpToken).digest('hex') || !params.acrValues.includes(clearingResult.acr)) {
         throw new ManagerError('Clearing House returned an unexpected acr value.', IssueType.Forbidden);
       }
 
@@ -607,6 +647,7 @@ export class OpenIdAuthManager implements IJobProcessor {
     clientId?: string;
     issuerDid: string;
     tenantVaultId: string;
+    requestUrl?: string;
   }): Promise<Record<string, any> | undefined> {
     const clientAssertion = params.body.client_assertion?.trim();
     const clientAssertionType = params.body.client_assertion_type?.trim();
@@ -624,6 +665,8 @@ export class OpenIdAuthManager implements IJobProcessor {
       throw new ManagerError(`Unsupported client_assertion_type '${clientAssertionType}'.`, IssueType.NotSupported);
     }
 
+    if (!isLocalDemoSecurityMode()) return this.validateRegisteredClientAssertion({ ...params, actorDid: params.body.sub }, clientAssertion);
+    if (!params.clientId && !isLocalDemoSecurityMode()) throw new ManagerError('client_assertion requires a registered client_id.', IssueType.Required);
     const payload = await this.verifyClientAssertionSignature(clientAssertion, params.clientId, params.tenantVaultId);
     const assertionClientId = String(payload?.iss || '').trim();
     if (!assertionClientId) {
@@ -651,15 +694,45 @@ export class OpenIdAuthManager implements IJobProcessor {
       params.clientId,
       getEnvSectionId('device-profiles'),
     );
-    if (!deviceProfileDoc || String(deviceProfileDoc.status || DeviceBindingStatuses.Active) !== DeviceBindingStatuses.Active) {
-      return undefined;
+    if (!deviceProfileDoc || deviceProfileDoc.status !== DeviceBindingStatuses.Active) {
+      if (isLocalDemoSecurityMode()) return undefined;
+      throw new ManagerError('SMART client registration is missing or inactive.', IssueType.Forbidden);
     }
     const profile = this.kmsService.unprotectConfidentialData
       ? await this.kmsService.unprotectConfidentialData<any>(deviceProfileDoc, params.tenantVaultId).catch(() => undefined)
       : deviceProfileDoc?.content;
-    if (!profile || typeof profile !== 'object') return undefined;
+    if (!profile || typeof profile !== 'object' || (!isLocalDemoSecurityMode() && profile.clientId !== params.clientId)) throw new ManagerError('SMART client registration does not match its assertion.', IssueType.Forbidden);
     await this.assertClientAssertionUsesRegisteredKey(clientAssertion, profile);
     return profile;
+  }
+
+  private async validateRegisteredClientAssertion(params: { clientId?: string; issuerDid: string; tenantVaultId: string; requestUrl?: string; actorDid?: string }, compact: string): Promise<Record<string, any>> {
+    const clientId = params.clientId;
+    if (!clientId) throw new ManagerError('client_assertion requires a registered client_id.', IssueType.Required);
+    let registrationVaultId = params.tenantVaultId;
+    let document = await this.vaultRepository.get<any>(registrationVaultId, clientId, getEnvSectionId('device-profiles'));
+    if (!document && params.actorDid && this.securityOptions.resolveClientRegistrationVault) {
+      registrationVaultId = await this.securityOptions.resolveClientRegistrationVault(params.actorDid, params.tenantVaultId);
+      document = await this.vaultRepository.get<any>(registrationVaultId, clientId, getEnvSectionId('device-profiles'));
+    }
+    if (document?.status !== DeviceBindingStatuses.Active) throw new ManagerError('SMART client registration is missing or inactive.', IssueType.Forbidden);
+    const profile = await this.kmsService.unprotectConfidentialData<any>(document, registrationVaultId);
+    if (profile?.clientId !== clientId || !Array.isArray(profile.jwks?.keys)) throw new ManagerError('SMART client registration does not match its assertion.', IssueType.Forbidden);
+    const header = decodeProtectedHeader(compact);
+    const candidates = profile.jwks.keys.filter((key: JWK) => !header.kid || key.kid === header.kid);
+    const now = Math.floor(Date.now() / 1000);
+    let payload: Record<string, any> | undefined;
+    for (const key of candidates) {
+      if (header.jwk && tryGetJwkThumbprint(header.jwk as any) !== tryGetJwkThumbprint(key)) continue;
+      try {
+        payload = await verifyPinnedJwt(compact, { keys: [key] }, clientId, now, { cryptography: this.securityOptions.cryptography, allowMissingKid: true });
+        break;
+      } catch { /* Only the currently registered keys can authenticate this client. */ }
+    }
+    if (!payload || payload.sub !== clientId || (payload.aud !== params.issuerDid && (!params.requestUrl || payload.aud !== params.requestUrl))
+      || payload.exp <= payload.iat || payload.exp - payload.iat > 300) throw new ManagerError('SMART client assertion signature, validity or target is invalid.', IssueType.Security);
+    if (!await this.assertionReplay.reserveIfNotExists(`${registrationVaultId}:smart-client:${clientId}:${payload.jti}`, payload.exp - now)) throw new ManagerError('SMART client assertion replay detected.', IssueType.Conflict);
+    return { ...profile, registeredAtVaultId: registrationVaultId };
   }
 
   private async assertClientAssertionUsesRegisteredKey(
@@ -776,6 +849,7 @@ export class OpenIdAuthManager implements IJobProcessor {
 
   private resolveExternalResearchBearerProof(params: {
     acrValues: string[];
+    tenantVaultId?: string;
     actorOrganizationDid?: string;
     issuerDid: string;
     purpose?: string;
@@ -845,9 +919,7 @@ export class OpenIdAuthManager implements IJobProcessor {
       amr: this.readStringValues(payload, ['amr']).length
         ? this.readStringValues(payload, ['amr'])
         : ['external_bearer', 'data_access_token'],
-      ledgerVerified: typeof payload.ledger_verified === 'boolean'
-        ? payload.ledger_verified
-        : true,
+      ledgerVerified: payload.ledger_verified === true,
     };
   }
 

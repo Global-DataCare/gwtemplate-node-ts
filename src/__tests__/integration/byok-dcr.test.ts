@@ -12,6 +12,8 @@ process.env.DB_PROVIDER = 'mem';
 process.env.STORAGE_PROVIDER = 'mem';
 process.env.QUEUE_PROVIDER = 'mem';
 process.env.SECURITY_MODE = 'demo';
+process.env.NETWORK_MODE = 'test';
+process.env.AUTH_TOKEN_VERIFIER = 'demo';
 process.env.ALLOWED_SECTORS = 'health-care,test';
 process.env.HOST_EXTERNAL_DOMAIN = 'provider.com';
 

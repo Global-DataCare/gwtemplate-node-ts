@@ -1,3 +1,4 @@
+// Flow contract: explicit local demo delegates real signatures and keeps its simulated storage isolated from other runtime profiles.
 // TDD contract: write this test red first; make it green only with the complete real behavior.
 // src/__tests__/unit/services/DemoKmsService.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
@@ -17,7 +18,10 @@ describe('DemoKmsService', () => {
     let devKmsService: DemoKmsService;
     let realKmsService: KmsService;
 
+    const savedEnvironment = { ...process.env };
+    afterEach(() => { realKmsService?.destroy(); process.env = { ...savedEnvironment }; });
     beforeEach(() => {
+        process.env.NODE_ENV = 'demo'; process.env.SECURITY_MODE = 'demo'; process.env.NETWORK_MODE = 'test'; delete process.env.DEPLOYMENT_ENV;
         // To test the DemoKmsService decorator, we need a real KmsService to wrap.
         const cryptoService = new CryptographyService(new AdapterCryptoSdkNode());
         const vaultRepository = new VaultMemRepository();

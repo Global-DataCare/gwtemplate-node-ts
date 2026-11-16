@@ -1,3 +1,4 @@
+import { isLocalDemoSecurityMode } from '../security/runtime-security-policy';
 // src/services/DemoKmsService.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
@@ -29,6 +30,7 @@ export class DemoKmsService implements IKmsService {
 
   // The Demo service now wraps a real KMS instance to handle key generation and signing.
   constructor(realKmsService: IKmsService) {
+    if (!isLocalDemoSecurityMode()) throw new Error('Demo key custody requires explicit local demo.');
     this._realKmsService = realKmsService;
   }
 

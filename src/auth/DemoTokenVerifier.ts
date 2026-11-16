@@ -1,3 +1,4 @@
+import { isLocalDemoSecurityMode } from '../security/runtime-security-policy';
 // src/auth/DemoTokenVerifier.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 
@@ -18,6 +19,7 @@ export class DemoTokenVerifier implements ITokenVerifier {
    * @returns A promise that resolves to a VerificationResult.
    */
   public async verify(token: string): Promise<VerificationResult> {
+    if (!isLocalDemoSecurityMode()) return { valid: false, error: 'Demo authentication is unavailable outside explicit local demo.' };
     try {
       // Split the JWT into its three parts.
       const parts = token.split('.');

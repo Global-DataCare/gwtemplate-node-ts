@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+- Link tenant DIDs to OpenID/SMART discovery metadata and publish the
+  registered-client SMART verification endpoint as `introspection_endpoint`.
+- Verify ICA-backed first-controller activation without Fabric in `test`:
+  validate issuer signatures and current ICA credential status, bind the
+  controller key and submitted credentials to the signed presentation, and
+  preserve the receiving host as verification audience.
+- Restrict simulated authentication, Clearing House results and demo KMS
+  custody to explicit local demo; local `test` no longer implies demo.
+- Add authenticated tenant presentation verification and federated SMART
+  introspection with registered-client keys, replay protection, current-state
+  evidence, ES384/ML-DSA verification and tenant-signed EHR presentations.
+- Verify GXDCH VC-API responses against tenant-pinned issuers, rules versions
+  and exact credential digests, preserving the provider's original signature.
+- Reject inactive SMART client registrations and Clearing House receipts
+  for a different presentation; keep DCR initial access tokens on their own
+  verifier path.
 - Extend E9 with version-bound GW CORE 1.26.0 evidence: 100 source-policy and
   real-signature identity checks plus eight published-image journeys against
   isolated local Fabric. Preserve historical counts, disclose three unrelated

@@ -8,6 +8,19 @@ import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource
 import { Format } from 'gdc-common-utils-ts/models/urlPath';
 
 describe('DiscoveryService', () => {
+  it('advertises tenant SMART verification through standard introspection metadata', async () => {
+    const registry = {
+      getTenantDomainUrl: async () => 'https://public.acme.org',
+      getTenantOperationalUrl: async () => 'https://operator.gateway.net/acme/cds-es/v1/health-care',
+    } as any;
+    const configuration = await new DiscoveryService(registry).getSmartConfiguration('health-care_acme');
+    expect(configuration).toMatchObject({
+      issuer: 'https://public.acme.org',
+      token_endpoint: 'https://operator.gateway.net/acme/cds-es/v1/health-care/identity/openid/smart/token',
+      introspection_endpoint: 'https://operator.gateway.net/acme/cds-es/v1/health-care/identity/openid/smart/token/_verify',
+      introspection_endpoint_auth_methods_supported: ['private_key_jwt'],
+    });
+  });
   it('should publish public issuer urls and operational token endpoints independently', async () => {
     const tenantsCacheManager = {
       getDidDocument: jest.fn(async () => ({

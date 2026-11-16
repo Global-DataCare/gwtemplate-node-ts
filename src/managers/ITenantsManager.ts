@@ -51,6 +51,9 @@ export interface ITenantsManager {
    */
   tenantExists(vaultId: string): Promise<boolean>;
 
+  /** Exact, unambiguous DID-to-registration lookup; returns no decrypted tenant payload. */
+  findTenantVaultIdByDid(did: string): Promise<string | undefined>;
+
   /**
    * Returns the physical collection name for a tenant vault.
    *

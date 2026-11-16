@@ -1,3 +1,4 @@
+// Flow contract: explicit local demo serves seeded memory-ledger status/history, while ordinary test profiles remain isolated from Fabric.
 // TDD contract: write this test red first; make it green only with the complete real behavior.
 // src/__tests__/integration/credentialLedger.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
@@ -45,6 +46,9 @@ describe('Credential ledger endpoints (demo, mem)', () => {
 
   it('should return sync and async status/history from the ledger', async () => {
     process.env.NODE_ENV = 'demo';
+    process.env.SECURITY_MODE = 'demo';
+    process.env.NETWORK_MODE = 'test';
+    delete process.env.DEPLOYMENT_ENV;
     process.env.DB_PROVIDER = 'mem';
     process.env.STORAGE_PROVIDER = 'mem';
     process.env.QUEUE_PROVIDER = 'mem';
