@@ -72,6 +72,10 @@ import { registerProfessionalAssignmentOnLedger } from '../utils/professional-as
 import { resolveRoleLicenseOrganizationOfficialId } from '../utils/ledger-organization-registration-helpers';
 import { encodeMultibase58btc } from 'gdc-common-utils-ts/utils/multibase58';
 import { uuidToBytes } from '../utils/uuid';
+import { resolveLegacyControllerLicenseBinding, type LegacyControllerLicenseBinding } from '../utils/legacy-controller-license-binding';
+import { ClaimsPersonSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { HealthcareActorRoles } from 'gdc-common-utils-ts/constants/healthcare';
+import { EntityLifecycleStatus } from '../gdc-backend-utils-node/models/enums';
 
 /**
  * Manages the business logic for a single device registration (DCR) request,
@@ -183,7 +187,7 @@ export class DeviceRegistrationManager implements IJobProcessor {
       const vaultId = getTenantVaultId(sector as any, tenantId);
       const openedLicense = await this.resolveLicenseByActivationCode(code as string, vaultId);
       const licenseDoc = openedLicense?.document;
-      const license = openedLicense?.license;
+      const license = openedLicense?.license ? { ...openedLicense.license } : undefined;
       const individualAuthorization = license?.userClass === LICENSE_USER_CLASS_INDIVIDUAL
         ? this.validateIndividualMemberRegistration({
           job,
@@ -207,6 +211,9 @@ export class DeviceRegistrationManager implements IJobProcessor {
         licenseDoc: licenseDoc && license ? { ...licenseDoc, content: license } : undefined,
         clientId,
       });
+      if (license?.userClass === LICENSE_USER_CLASS_EMPLOYEE && deviceIdentityContext && !license.subjectId) {
+        license.subjectId = deviceIdentityContext.subjectId;
+      }
       if (license?.userClass === LICENSE_USER_CLASS_EMPLOYEE && license.subjectId && !deviceIdentityContext) {
         throw new ManagerError(
           'DCR could not bind the device keys to the licensed controller identity.',
@@ -661,7 +668,17 @@ export class DeviceRegistrationManager implements IJobProcessor {
     previousVerificationMethods: VerificationMethod[];
     newVerificationMethods: VerificationMethod[];
   } | undefined> {
-    const subjectId = String((params.licenseDoc?.content as any)?.subjectId || '').trim();
+    const licenseContent = params.licenseDoc?.content as DeviceLicense & Record<string, any> | undefined;
+    let subjectId = String(licenseContent?.subjectId || '').trim();
+    let controllerBinding: LegacyControllerLicenseBinding | undefined;
+    if (!subjectId && licenseContent?.userClass === LICENSE_USER_CLASS_EMPLOYEE
+      && licenseContent.issuedToEmail && licenseContent.issuedToRole) {
+      controllerBinding = await resolveLegacyControllerLicenseBinding({
+        tenantVaultId: params.vaultId, license: licenseContent,
+        vaultRepository: this.vaultRepository, kmsService: this.kmsService,
+      });
+      subjectId = controllerBinding.subjectId;
+    }
     if (!subjectId) return undefined;
 
     const employeeCollectionName = await this.resolveEmployeeCollectionName(params.vaultId);
@@ -672,17 +689,28 @@ export class DeviceRegistrationManager implements IJobProcessor {
     );
     if (!employeeDoc) return undefined;
 
-    const employeeContent = this.kmsService
+    let employeeContent = this.kmsService
       ? await this.kmsService.unprotectConfidentialData<EntityConfig>(employeeDoc, params.vaultId)
       : (employeeDoc.content as EntityConfig);
     if (!employeeContent?.didDocument?.id) return undefined;
+    if (employeeContent.status !== EntityLifecycleStatus.Active
+      || employeeDoc.status === EntityLifecycleStatus.Inactive || employeeDoc.status === 'revoked') {
+      throw new ManagerError('DCR requires an active licensed employee.', IssueType.Forbidden);
+    }
+    if (employeeContent.claims?.[ClaimsPersonSchemaorg.additionalType] === HealthcareActorRoles.Controller && !controllerBinding) {
+      controllerBinding = await resolveLegacyControllerLicenseBinding({
+        tenantVaultId: params.vaultId, license: licenseContent!,
+        vaultRepository: this.vaultRepository, kmsService: this.kmsService,
+      });
+    }
 
     const license = (params.licenseDoc?.content || {}) as DeviceLicense & Record<string, any>;
     const actorIdentifier = String(license.activatedBy || '').trim();
     if (!/^urn:multibase:z[^:]+$/.test(actorIdentifier)) {
       throw new ManagerError('DCR license is missing its stable actor identifier.', IssueType.BusinessRule);
     }
-    const employeeUrn = resolveRoleBearingEmployeeUrn(employeeContent.didDocument);
+    const employeeUrn = resolveRoleBearingEmployeeUrn(employeeContent.didDocument, String(license.issuedToRole || ''))
+      || controllerBinding?.employeeUrn;
     if (!employeeUrn) {
       throw new ManagerError('DCR employee identity is missing its role-bearing employee URN.', IssueType.BusinessRule);
     }
@@ -690,6 +718,14 @@ export class DeviceRegistrationManager implements IJobProcessor {
     if (getEmployeeRoleFromUrn(employeeUrn) !== normalizeEmployeeRole(licensedRole)) {
       throw new ManagerError('DCR licence role does not match the role-bearing employee identity.', IssueType.Conflict);
     }
+    if (controllerBinding && !employeeContent.didDocument.alsoKnownAs?.includes(employeeUrn)) {
+      employeeContent = {
+        ...employeeContent,
+        didDocument: { ...employeeContent.didDocument, alsoKnownAs: [...(employeeContent.didDocument.alsoKnownAs || []), employeeUrn] },
+      };
+    }
+    const employeeDidDocument = employeeContent.didDocument;
+    if (!employeeDidDocument?.id) return undefined;
     const employeeTenantUrn = parseTenantUrn(getTenantIdentifierUrnPrefix(employeeUrn));
     const jurisdiction = String(params.job.jurisdiction || employeeTenantUrn?.jurisdiction || '').trim();
     const organizationId = String(employeeTenantUrn?.idValue || params.job.tenantId || params.vaultId).trim();
@@ -731,11 +767,11 @@ export class DeviceRegistrationManager implements IJobProcessor {
       previousDeviceId,
       previousDeviceProfileDoc,
       previousVerificationMethods: this.extractVerificationMethodsFromProfile(
-        employeeContent.didDocument,
+        employeeDidDocument,
         previousDeviceProfileContent,
       ),
       newVerificationMethods: this.buildVerificationMethodsForDid(
-        employeeContent.didDocument.id,
+        employeeDidDocument.id,
         params.registrationRequest.jwks,
       ),
     };
@@ -1115,7 +1151,7 @@ export class DeviceRegistrationManager implements IJobProcessor {
           ? await this.kmsService.unprotectConfidentialData<EntityConfig>(employeeDoc, vaultId)
           : employeeDoc.content as EntityConfig;
         if (employee.didDocument) {
-          const employeeUrn = resolveRoleBearingEmployeeUrn(employee.didDocument);
+          const employeeUrn = resolveRoleBearingEmployeeUrn(employee.didDocument, String(license.issuedToRole || ''));
           if (!employeeUrn) {
             throw new ManagerError('DCR employee identity is missing its role-bearing employee URN.', IssueType.BusinessRule);
           }

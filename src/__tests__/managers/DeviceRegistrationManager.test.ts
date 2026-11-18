@@ -6,17 +6,21 @@ import cloneDeep from 'lodash.clonedeep';
 import { validate as uuidValidate } from 'uuid';
 import { BundleEntryResponse, BundleJsonApi, ErrorEntry } from 'gdc-common-utils-ts/models/bundle';
 import { DeviceRegistrationManager } from '../../managers/DeviceRegistrationManager';
+import { CryptographyService } from 'gdc-common-utils-ts/CryptographyService';
+import { AdapterCryptoSdkNode } from '../../gdc-backend-utils-node/adapters/node/crypto';
+import { RandomAlice32BytesBase64Url, RandomBob32BytesBase64Url } from '../data/crypto.data';
 import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 import { DCR_REGISTRATION_JOB } from '../data/example-jobs';
 import { VaultMemRepository } from '../../database/repositories/vault/vault.mem.repository';
 import { mockKmsService } from '../mocks/kms.mock';
-import { getTenantVaultId } from '../../utils/tenant';
+import { getTenantVaultId, generateTenantCollectionNameFromClaims } from '../../utils/tenant';
+import { resolveHostPhysicalCollectionName } from '../../config/storage-layout';
 import { getEnvSectionId } from '../../utils/section-env';
 import type { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 import type { DeviceLicense } from 'gdc-common-utils-ts/models/device-license';
 import { EntityLifecycleStatus, EntityType } from '../../gdc-backend-utils-node/models/enums';
 import type { EntityConfig } from '../../gdc-backend-utils-node/models/entity';
-import { ClaimsPersonSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { ClaimsPersonSchemaorg, ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { ManageAssetCryptographicKey } from '../../blockchain/fabric/v3/manageAssetCryptographicKey';
 import { ManageAssetSubjectKeyBinding } from '../../blockchain/fabric/v3/manageAssetSubjectKeyBinding';
 import { ManageAssetProfessionalAssignment } from '../../blockchain/fabric/v3/manageAssetProfessionalAssignment';
@@ -602,7 +606,7 @@ describe('DeviceRegistrationManager', () => {
       ]));
     });
 
-    it('should normalize the canonical organization owner when binding two devices to one employee seat', async () => {
+    it.each([false, true])('preserves both device bindings and the original licensed occupation (legacy missing link: %s)', async (legacyMissingLink) => {
       Object.assign(process.env, FABRIC_LEDGER_TEST_ENV);
 
       const registerKeySpy = jest.spyOn(ManageAssetCryptographicKey.prototype, 'registerKey').mockResolvedValue({} as any);
@@ -611,6 +615,7 @@ describe('DeviceRegistrationManager', () => {
       const assignmentSpy = jest.spyOn(ManageAssetProfessionalAssignment.prototype, 'upsertProfessionalAssignment').mockResolvedValue({} as any);
 
       const job = cloneDeep(DCR_REGISTRATION_JOB);
+      Object.assign(job, EXAMPLE_TENANT_ROUTE_CONTEXT);
       const actorDid = EXAMPLE_CONTROLLER_DID;
       Object.assign(job.content!.body as any, {
         [IdentityDcrMetadataFields.ActorDid]: actorDid,
@@ -639,6 +644,16 @@ describe('DeviceRegistrationManager', () => {
       const activationCode = (job.content?.body as any)?.code as string;
       const vaultId = getTenantVaultId(job.sector as any, job.tenantId as string);
 
+      const tenantClaims = {
+        [ClaimsOrganizationSchemaorg.alternateName]: job.tenantId,
+        [ClaimsOrganizationSchemaorg.addressCountry]: EXAMPLE_TENANT_ROUTE_CONTEXT.jurisdiction,
+        [ClaimsOrganizationSchemaorg.identifierType]: URN_ORGANIZATION_ID_TYPE,
+        [ClaimsOrganizationSchemaorg.identifierValue]: EXAMPLE_LEGAL_ORGANIZATION_TAX_ID,
+        [ClaimsServiceSchemaorg.category]: EXAMPLE_TENANT_ROUTE_CONTEXT.sector,
+      };
+      const employeeCollectionName = generateTenantCollectionNameFromClaims(tenantClaims);
+      manager = new DeviceRegistrationManager(TEST_API_BASE_URL, vaultRepository, mockKmsService, {getCollectionName: async () => employeeCollectionName});
+      await vaultRepository.put(resolveHostPhysicalCollectionName(), [await mockKmsService.protectConfidentialData({id:vaultId,status:'active',sequence:0,content:{status:'active',claims:tenantClaims,didDocument:{controller:[EXAMPLE_CONTROLLER_DID]}}} as any,'host')],getEnvSectionId('tenants'));
       const employeeId = `urn:uuid:${EXAMPLE_KYC_CONTROLLER_USER_UUID}`;
       const employeeDid = EXAMPLE_CONTROLLER_DID;
       const employeeUrn = createEmployeeUrn({
@@ -653,12 +668,13 @@ describe('DeviceRegistrationManager', () => {
         role: HealthcareActorRoles.GeneralistMedicalPractitioner,
       });
       const employeeConfig: EntityConfig = {
-        id: employeeId,
+        id: legacyMissingLink ? employeeDid : employeeId,
         type: EntityType.Person,
         status: EntityLifecycleStatus.Active,
         claims: {
           [ClaimsPersonSchemaorg.email]: EXAMPLE_EMAIL_PROFESSIONAL,
           [ClaimsPersonSchemaorg.hasOccupation]: HealthcareActorRoles.GeneralistMedicalPractitioner,
+          [ClaimsPersonSchemaorg.additionalType]: HealthcareActorRoles.Controller,
         } as any,
         didDocument: {
           '@context': 'https://www.w3.org/ns/did/v1',
@@ -698,13 +714,13 @@ describe('DeviceRegistrationManager', () => {
         meta: { lastUpdated: '2026-06-01T00:00:00.000Z' },
       };
       const protectedEmployeeDoc = await mockKmsService.protectConfidentialData({
-        id: employeeId,
+        id: legacyMissingLink ? employeeDid : employeeId,
         status: employeeConfig.status,
         sequence: 0,
         content: employeeConfig,
         indexed: { attributes: [{ name: 'protected-kid', value: 'protected-old-kid' }] },
       } as ConfidentialStorageDoc, vaultId);
-      await vaultRepository.put(vaultId, [protectedEmployeeDoc], getEnvSectionId('employees'));
+      await vaultRepository.put(employeeCollectionName, [protectedEmployeeDoc], getEnvSectionId('employees'));
 
       const previousDeviceId = 'old-device-001';
       const protectedPreviousProfile = await mockKmsService.protectConfidentialData({
@@ -737,7 +753,8 @@ describe('DeviceRegistrationManager', () => {
         renewalCycle: '12m',
         reactivationEnabled: false,
         exp: Math.floor(Date.now() / 1000) + 3600,
-        subjectId: employeeId,
+        subjectId: legacyMissingLink ? undefined : employeeId,
+        issuedToEmail: EXAMPLE_EMAIL_PROFESSIONAL,
         activatedBy: normalizeSameAsHash(EXAMPLE_EMAIL_PROFESSIONAL),
         ownerOrganizationId: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_PROVIDER_ORGANIZATION_URN,
         issuedToRole: HealthcareActorRoles.GeneralistMedicalPractitioner,
@@ -769,9 +786,9 @@ describe('DeviceRegistrationManager', () => {
 
       const result = await manager.process(job);
       const responseEntry = (result.body as BundleJsonApi).data[0] as BundleEntryResponse;
+      expect(responseEntry.response.status).toBe('201');
       const newClientId = String((responseEntry.resource as any).client_id || '');
 
-      expect(responseEntry.response.status).toBe('201');
       expect(newClientId).toBeTruthy();
       expect(newClientId).not.toBe(previousDeviceId);
 
@@ -783,8 +800,8 @@ describe('DeviceRegistrationManager', () => {
       expect(previousProfileDoc?.status).toBe('active');
 
       const updatedEmployeeDoc = await vaultRepository.get<ConfidentialStorageDoc>(
-        vaultId,
-        employeeId,
+        employeeCollectionName,
+        legacyMissingLink ? employeeDid : employeeId,
         getEnvSectionId('employees'),
       );
       const updatedEmployee = await mockKmsService.unprotectConfidentialData<EntityConfig>(updatedEmployeeDoc!, vaultId);
@@ -807,12 +824,15 @@ describe('DeviceRegistrationManager', () => {
       const updatedLicense = await vaultRepository.get<ConfidentialStorageDoc>(
         vaultId, license.id, getEnvSectionId('device-licenses'),
       );
+      expect((updatedLicense?.content as any).subjectId).toBe(legacyMissingLink ? employeeDid : employeeId);
+      expect((updatedLicense?.content as any).activationCode).toBe(activationCode);
       expect((updatedLicense?.content as any).deviceId).toBe(previousDeviceId);
       expect((updatedLicense?.content as any).deviceBindings.filter((binding: any) => binding.status === 'active')).toHaveLength(2);
 
       expect(registerKeySpy).toHaveBeenCalledTimes(2);
       expect(keySubmitSpy).not.toHaveBeenCalled();
       expect(bindingSpy).toHaveBeenCalled();
+      if (!legacyMissingLink) {
       expect(assignmentSpy).toHaveBeenCalledWith(
         'Host1MSP',
         buildClinicalLedgerReferenceId(clinicalCreatorBinding.authorIdentifier),
@@ -822,6 +842,9 @@ describe('DeviceRegistrationManager', () => {
           organizationLink: buildClinicalLedgerReferenceId(clinicalCreatorBinding.ownerIdentifier),
         }),
       );
+      } else {
+        expect(assignmentSpy).not.toHaveBeenCalled();
+      }
       expect(bindingSpy).toHaveBeenCalledWith(
         expect.any(String),
         expect.stringContaining(employeeUrn),
@@ -834,9 +857,9 @@ describe('DeviceRegistrationManager', () => {
             stableContactIdentifier: normalizeSameAsHash(EXAMPLE_EMAIL_PROFESSIONAL),
             licensedRole: HealthcareActorRoles.GeneralistMedicalPractitioner,
           }),
-          professionalAssignmentLink: buildClinicalLedgerReferenceId(clinicalCreatorBinding.authorIdentifier),
+          ...(!legacyMissingLink ? {professionalAssignmentLink: buildClinicalLedgerReferenceId(clinicalCreatorBinding.authorIdentifier),
           employeeLink: buildClinicalLedgerReferenceId(clinicalCreatorBinding.actorIdentifier),
-          organizationLink: buildClinicalLedgerReferenceId(clinicalCreatorBinding.ownerIdentifier),
+          organizationLink: buildClinicalLedgerReferenceId(clinicalCreatorBinding.ownerIdentifier)} : {}),
           meta: expect.objectContaining({
             attributes: expect.objectContaining({ did: employeeDid }),
           }),
@@ -847,12 +870,16 @@ describe('DeviceRegistrationManager', () => {
         clinicalCreatorBinding.authorIdentifier,
         getClinicalCreatorBindingsSectionId(),
       );
+      if (legacyMissingLink) {
+        expect(linkedClinicalCreator).toEqual(clinicalCreatorBinding);
+      } else {
       expect(linkedClinicalCreator).toEqual(expect.objectContaining({
         ...clinicalCreatorBinding,
         actorDids: [actorDid],
         dcrClientIds: expect.arrayContaining([newClientId, (job.content!.body as any).ext_device_info.device_id]),
         keyIds: expect.arrayContaining((job.content!.body as any).jwks.keys.map((key: any) => key.kid)),
       }));
+      }
     });
 
     it('should reject a third installation when the seat allowance is two', async () => {
@@ -874,8 +901,10 @@ describe('DeviceRegistrationManager', () => {
       expect(((result.body as BundleJsonApi).data[0] as ErrorEntry).response.status).toBe(ExampleHttpStatusText.Conflict);
     });
 
-    it('revokes one selected installation and keeps the other device active on the same seat', async () => {
+    it.each([false, true])('revokes one selected installation without affecting its sibling (mixed controller aliases: %s)', async (mixedControllerAliases) => {
+      if (mixedControllerAliases) Object.assign(process.env, FABRIC_LEDGER_TEST_ENV);
       const job = cloneDeep(DCR_REGISTRATION_JOB);
+      Object.assign(job, EXAMPLE_TENANT_ROUTE_CONTEXT);
       job.action = IdentityAuthActions.Revoke;
       job.content!.body = {
         [IdentityAuthRequestFields.LicenseId]: EXAMPLE_LICENSE_ACTIVE_RECORD.id,
@@ -888,14 +917,30 @@ describe('DeviceRegistrationManager', () => {
           type: 'web', status: 'active', plan: 'default', renewalCycle: '12m',
           reactivationEnabled: false, exp: Math.floor(Date.now() / 1000) + 3600, maxDevices: 2,
           deviceBindings: EXAMPLE_EMPLOYEE_ACTIVE_DEVICE_BINDINGS,
+          ...(mixedControllerAliases ? {subjectId: EXAMPLE_CONTROLLER_DID, issuedToRole: HealthcareActorRoles.Controller, activatedBy: normalizeSameAsHash(EXAMPLE_EMAIL_PROFESSIONAL)} : {}),
         },
       } as ConfidentialStorageDoc, vaultId);
       await vaultRepository.put(vaultId, [protectedLicense], getEnvSectionId('device-licenses'));
+      const cryptography = new CryptographyService(new AdapterCryptoSdkNode());
+      const keyPairs = mixedControllerAliases ? await Promise.all([RandomAlice32BytesBase64Url, RandomBob32BytesBase64Url].map(seed => cryptography.generateKeyPairMlDsa(new Uint8Array(Buffer.from(seed, 'base64url'))))) : [];
+      const methodIds = keyPairs.map(pair => `${EXAMPLE_CONTROLLER_DID}#${pair.publicJWKey.kid}`);
+      for (const pair of keyPairs) pair.secretKeyBytes.fill(0);
       const profile = await mockKmsService.protectConfidentialData({
         id: EXAMPLE_EMPLOYEE_DEVICE_CLIENT_ID_PRIMARY, status: DeviceBindingStatuses.Active, sequence: 0,
-        content: { clientId: EXAMPLE_EMPLOYEE_DEVICE_CLIENT_ID_PRIMARY, verificationMethodIds: [] },
+        content: { clientId: EXAMPLE_EMPLOYEE_DEVICE_CLIENT_ID_PRIMARY, verificationMethodIds: mixedControllerAliases ? [methodIds[0]] : [] },
       } as ConfidentialStorageDoc, vaultId);
       await vaultRepository.put(vaultId, [profile], getEnvSectionId('device-profiles'));
+
+      let employeeUrn: string | undefined;
+      const ledgerKeyUpdate = jest.spyOn(ManageAssetCryptographicKey.prototype, 'submit').mockResolvedValue({} as any);
+      const bindingUpdate = jest.spyOn(ManageAssetSubjectKeyBinding.prototype, 'upsertSubjectKeyBinding').mockResolvedValue({} as any);
+      if (mixedControllerAliases) {
+        const buildUrn = (role: string) => createEmployeeUrn({namespace: URN_NAMESPACE, network: URN_NETWORK, jurisdiction: job.jurisdiction!, version: URN_VERSION, sector: job.sector!, idType: URN_ORGANIZATION_ID_TYPE, idValue: EXAMPLE_LEGAL_ORGANIZATION_TAX_ID, email: EXAMPLE_EMAIL_PROFESSIONAL, role});
+        employeeUrn = buildUrn(HealthcareActorRoles.Controller);
+        const employee = {id: EXAMPLE_CONTROLLER_DID, status: EntityLifecycleStatus.Active, claims: {[ClaimsPersonSchemaorg.hasOccupation]: HealthcareActorRoles.GeneralistMedicalPractitioner}, didDocument: {id: EXAMPLE_CONTROLLER_DID, alsoKnownAs: [buildUrn(HealthcareActorRoles.GeneralistMedicalPractitioner), employeeUrn], verificationMethod: keyPairs.map((pair, index) => ({id: methodIds[index], type: 'JsonWebKey2020', controller: EXAMPLE_CONTROLLER_DID, publicKeyJwk: {...pair.publicJWKey}})), authentication: methodIds}};
+        const protectedEmployee = await mockKmsService.protectConfidentialData({id: employee.id, status: employee.status, sequence: 0, content: employee} as ConfidentialStorageDoc, vaultId);
+        await vaultRepository.put(vaultId, [protectedEmployee], getEnvSectionId('employees'));
+      }
 
       const result = await manager.process(job);
       expect(((result.body as BundleJsonApi).data[0] as BundleEntryResponse).response.status).toBe(ExampleHttpStatusText.Ok);
@@ -914,6 +959,14 @@ describe('DeviceRegistrationManager', () => {
         vaultId, EXAMPLE_EMPLOYEE_DEVICE_CLIENT_ID_PRIMARY, getEnvSectionId('device-profiles'),
       );
       expect(revokedProfile?.status).toBe(DeviceBindingStatuses.Revoked);
+      if (mixedControllerAliases) {
+        const row = await vaultRepository.get<ConfidentialStorageDoc>(vaultId, EXAMPLE_CONTROLLER_DID, getEnvSectionId('employees'));
+        const employee = await mockKmsService.unprotectConfidentialData<EntityConfig>(row!, vaultId);
+        expect(employee.didDocument?.verificationMethod?.map(method => method.id)).toEqual([methodIds[1]]);
+        expect(bindingUpdate).toHaveBeenCalledWith(expect.anything(), expect.any(String), expect.objectContaining({subjectId: employeeUrn, licensedRole: HealthcareActorRoles.Controller, status: 'revoked'}));
+        expect(ledgerKeyUpdate).toHaveBeenCalled();
+      }
+
     });
 
     it('should return a 400 error if redirect_uris are missing', async () => {
