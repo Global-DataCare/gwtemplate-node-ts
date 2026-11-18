@@ -24,6 +24,12 @@ resolve_sdk_root() {
   return 1
 }
 
+# The supervisor owns one detached process group and one atomic loopback lease.
+if [[ -z "${CORE_E2E_OWNED_RUNTIME:-}" ]]; then
+  exec node "${SCRIPT_DIR}/secure-e2e-owned-runtime.mjs" run-script "$0" "$@"
+fi
+CORE_E2E_PROCESS_GROUP="$$"
+
 SDK_PROJECT_ROOT="$(resolve_sdk_root || true)"
 if [[ -z "$SDK_PROJECT_ROOT" || ! -f "${SDK_PROJECT_ROOT}/package.json" ]]; then
   echo 'ERROR: gdc-sdk-node-ts was not found; set GDC_SDK_NODE_ROOT to its checkout.' >&2
@@ -74,9 +80,9 @@ HOST_ADMIN_ROLE="${HOST_ADMIN_ROLE:-ISCO-08|1111}"
 HOST_TERMS_URL="${HOST_TERMS_URL:-https://example.com/terms}"
 TENANT_ID="${TENANT_ID:-livee2e-${RUN_ID}}"
 TENANT_ROUTE_ID="${TENANT_ROUTE_ID:-${TENANT_ID}}"
-BASE_URL="${BASE_URL:-http://127.0.0.1:3000}"
-ICA_PORT="${ICA_PORT:-3310}"
-ICA_BASE_URL="${ICA_BASE_URL:-http://127.0.0.1:${ICA_PORT}}"
+BASE_URL="http://127.0.0.1:${CORE_E2E_GW_PORT:?The owned local runtime must allocate the gateway port.}"
+ICA_PORT="${CORE_E2E_ICA_PORT:?The owned local runtime must allocate the ICA port.}"
+ICA_BASE_URL="http://127.0.0.1:${ICA_PORT}"
 ICA_JURISDICTION="${ICA_JURISDICTION:-ES}"
 GW_API_SCRIPT="${LIVE_GW_API_SCRIPT:-api:local-demo}"
 RESULTS_DIR="${LIVE_GW_RESULTS_DIR:-${GW_PROJECT_ROOT}/test-results}"
@@ -87,23 +93,23 @@ mkdir -p "$RESULTS_DIR"
 
 cleanup_gw() {
   if [[ -n "${GW_PID:-}" ]]; then
-    kill "$GW_PID" >/dev/null 2>&1 || true
+    node "${SCRIPT_DIR}/secure-e2e-owned-runtime.mjs" stop-tree "$GW_PID" "$CORE_E2E_PROCESS_GROUP"
     wait "$GW_PID" >/dev/null 2>&1 || true
     GW_PID=''
   fi
-  (cd "$GW_PROJECT_ROOT" && bash ./scripts/local-close.sh) >/dev/null 2>&1 || true
 }
 
 cleanup() {
   cleanup_gw
   if [[ -n "${ICA_PID:-}" ]]; then
-    pkill -TERM -P "$ICA_PID" >/dev/null 2>&1 || true
-    kill "$ICA_PID" >/dev/null 2>&1 || true
+    node "${SCRIPT_DIR}/secure-e2e-owned-runtime.mjs" stop-tree "$ICA_PID" "$CORE_E2E_PROCESS_GROUP"
     wait "$ICA_PID" >/dev/null 2>&1 || true
     ICA_PID=''
   fi
 }
 trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 start_local_ica() {
   if curl -fsS "${ICA_BASE_URL}/" >/dev/null 2>&1; then
@@ -124,6 +130,7 @@ start_local_ica() {
   local ready='false'
   for _ in $(seq 1 90); do
     if curl -fsS "${ICA_BASE_URL}/" >/dev/null 2>&1; then
+      node "${SCRIPT_DIR}/secure-e2e-owned-runtime.mjs" assert-listener "$ICA_PORT" "$CORE_E2E_PROCESS_GROUP"
       ready='true'
       break
     fi
@@ -150,7 +157,6 @@ run_e2e_pass() {
   local gw_log_file="${GW_LOG_FILE_BASE%.log}-${pass_name}.log"
   local e2e_log_file="${E2E_LOG_FILE_BASE%.log}-${pass_name}.log"
 
-  (cd "$GW_PROJECT_ROOT" && bash ./scripts/local-close.sh)
   (
     cd "$GW_PROJECT_ROOT"
     NODE_ENV=demo \
@@ -164,7 +170,7 @@ run_e2e_pass() {
     QUEUE_PROVIDER=mem \
     ALLOWED_SECTORS=health-care,health-research,health-index,test \
     HOST_INTERNAL_IP=127.0.0.1 \
-    HOST_INTERNAL_PORT=3000 \
+    HOST_INTERNAL_PORT="$CORE_E2E_GW_PORT" \
     HOST_LEGAL_NAME="$HOST_LEGAL_NAME" \
     HOST_JURISDICTION="$HOST_JURISDICTION" \
     HOST_ID_TYPE="$HOST_ID_TYPE" \
@@ -183,6 +189,7 @@ run_e2e_pass() {
   local ready='false'
   for _ in $(seq 1 120); do
     if curl -fsS "${BASE_URL}/host/ping" >/dev/null 2>&1; then
+      node "${SCRIPT_DIR}/secure-e2e-owned-runtime.mjs" assert-listener "$CORE_E2E_GW_PORT" "$CORE_E2E_PROCESS_GROUP"
       ready='true'
       break
     fi

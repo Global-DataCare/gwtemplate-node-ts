@@ -134,12 +134,13 @@ export function createEmployeeUrnFromStableActorIdentifier(params: StableEmploye
 export function resolveRoleBearingEmployeeUrn(input: Readonly<{
   id?: string;
   alsoKnownAs?: readonly string[];
-}>): string | undefined {
+}>, requiredRole?: string): string | undefined {
   return [input.id, ...(input.alsoKnownAs || [])]
     .map((candidate) => String(candidate || '').trim())
     .find((candidate) => candidate.startsWith('urn:')
       && candidate.includes(EMPLOYEE_URN_SEGMENT)
-      && candidate.includes(EMPLOYEE_ROLE_URN_SEGMENT));
+      && candidate.includes(EMPLOYEE_ROLE_URN_SEGMENT)
+      && (!requiredRole || getEmployeeRoleFromUrn(candidate) === normalizeEmployeeRole(requiredRole)));
 }
 
 /**

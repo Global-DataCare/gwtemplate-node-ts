@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+## [1.26.2] - 2026-11-18
+
+- Reconcile older controller licences with the protected current tenant and
+  active controller when issuing an existing activation code or enrolling an
+  additional device. Preserve the code, original occupation, existing devices
+  and ICA credentials; reject conflicting or inactive bindings.
+- Select the employee alias for the licensed role and publish additional
+  registered keys through the existing DID and ledger finalization. A distinct
+  installation retains earlier device keys; replacement keeps its existing
+  installation-specific semantics.
+- Isolate the local SDK E2E launcher with leased loopback ports and owned
+  process groups, including failed startup and signal cleanup. Preserve the
+  two existing SDK journeys without stopping unrelated listeners.
+
 ## [1.26.1] - 2026-11-16
 
 - Verify personal SMART access using current encrypted individual-member

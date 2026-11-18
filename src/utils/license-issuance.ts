@@ -19,6 +19,10 @@ import {
 } from '../constants/domain';
 import { normalizeIndexedEmail } from './indexed-contact';
 import { normalizeCodeSystemAndValue } from './normalize-codeAndSystem';
+import { resolveLegacyControllerLicenseSubject } from './legacy-controller-license-binding';
+import { openDeviceLicenseDocument, prepareDeviceLicenseDocumentForWrite } from './device-license-storage';
+import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
+import { IssueType } from 'gdc-common-utils-ts/models/issue';
 
 export type IssueActivationCodeParams = {
   vaultRepository: IVaultRepository;
@@ -258,7 +262,12 @@ export async function issueActivationCodeFromPool(params: IssueActivationCodePar
     subjectDid,
   } = params;
 
-  const all = await vaultRepository.getContainersInSection<ConfidentialStorageDoc>(tenantVaultId, getEnvSectionId('device-licenses'));
+  const storedDocuments = await vaultRepository.getContainersInSection<ConfidentialStorageDoc>(tenantVaultId, getEnvSectionId('device-licenses'));
+  const all = await Promise.all(storedDocuments.map(async document => {
+    if (document.content || (!document.jwe && !document.blob)) return document;
+    const opened = await openDeviceLicenseDocument(document, tenantVaultId, kmsService);
+    return { ...document, content: opened.license } as ConfidentialStorageDoc;
+  }));
   const normalizedEmail = normalizeIndexedEmail(email || '');
   const normalizedPhone = String(phone || '').replace(/[\s()-]/g, '');
   const normalizedRole = normalizeCodeSystemAndValue(role);
@@ -299,12 +308,30 @@ export async function issueActivationCodeFromPool(params: IssueActivationCodePar
 
   // Order polling and browser retries may ask for the same representative
   // access after the tenant is already active. Return the original material
-  // without rotating it or mutating the seat; the following Token exchange is
-  // the operation that consumes it.
+  // without rotating it. A protected reconciliation may repair the subject
+  // link; the following Token exchange still verifies the current actor.
   const existingActivationCode = String(
     (existingMatch?.content as DeviceLicense & Record<string, unknown> | undefined)?.activationCode || '',
   ).trim();
   if (existingMatch && existingActivationCode) {
+    const existingLicense = existingMatch.content as DeviceLicense & Record<string, any>;
+    if (subjectId && existingLicense.subjectId && existingLicense.subjectId !== subjectId) {
+      throw new ManagerError('Existing licence belongs to a different employee.', IssueType.Conflict);
+    }
+    if (userClass === LICENSE_USER_CLASS_EMPLOYEE && subjectId && !existingLicense.subjectId) {
+      const resolvedSubjectId = await resolveLegacyControllerLicenseSubject({
+        tenantVaultId, license: existingLicense, vaultRepository, kmsService,
+      });
+      if (resolvedSubjectId !== subjectId) {
+        throw new ManagerError('Requested employee does not match the current controller.', IssueType.Forbidden);
+      }
+      const updatedDocument = await prepareDeviceLicenseDocumentForWrite({
+        document: { ...existingMatch, sequence: (existingMatch.sequence || 0) + 1 },
+        license: { ...existingLicense, subjectId: resolvedSubjectId },
+        vaultId: tenantVaultId, kmsService,
+      });
+      await vaultRepository.put(tenantVaultId, [updatedDocument], getEnvSectionId('device-licenses'));
+    }
     const configuredAllowance = Number(
       (existingMatch.content as DeviceLicense & Record<string, unknown>).maxDevices,
     );

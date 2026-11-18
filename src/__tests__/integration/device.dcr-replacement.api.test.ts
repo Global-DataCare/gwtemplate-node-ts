@@ -44,7 +44,7 @@ import { generateTenantCollectionNameFromClaims, getTenantVaultId } from '../../
 import { getEnvSectionId } from '../../utils/section-env';
 import { invokeExpress } from './helpers/invokeExpress';
 import { testClaimsHostInitialization, testClaimsTenant1Registration } from '../data/end-to-end.data';
-import { ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { ClaimsOrganizationSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { EntityLifecycleStatus, EntityType } from '../../gdc-backend-utils-node/models/enums';
 import type { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
 import type { EntityConfig } from '../../gdc-backend-utils-node/models/entity';
@@ -74,8 +74,7 @@ import {
 import { DCR_REGISTRATION_JOB } from '../data/example-jobs';
 import { testTenant1AlternateName } from '../data/organization.data';
 import { HealthcareActorRoles } from 'gdc-common-utils-ts/constants/healthcare';
-import { createEmployeeUrn } from '../../utils/urn';
-import { URN_NAMESPACE, URN_NETWORK, URN_ORGANIZATION_ID_TYPE, URN_VERSION } from '../data/urn.data';
+import { createEmployeeUrnFromStableActorIdentifier } from '../../utils/urn';
 import { IdentityDcrMetadataFields } from 'gdc-common-utils-ts/constants/identity-auth';
 import { FhirIpsCreatorKinds } from 'gdc-common-utils-ts/utils/fhir-ips-creator-identity';
 import { testIndividualControllerDcrIdentity } from '../data/identity.data';
@@ -83,7 +82,6 @@ import { getClinicalCreatorBindingsSectionId } from '../../utils/clinical-creato
 import {
   EXAMPLE_CONTROLLER_DID,
   EXAMPLE_LEGAL_ORGANIZATION_TAX_ID,
-  EXAMPLE_TENANT_ROUTE_CONTEXT,
 } from 'gdc-common-utils-ts/examples/shared';
 
 describe('Device DCR replacement route story', () => {
@@ -217,7 +215,7 @@ describe('Device DCR replacement route story', () => {
     await vaultRepository.put(hostCollectionName, [secureTenantRegistrationDoc], getEnvSectionId('tenants'));
     await tenantManager.refreshTenant(tenantVaultId);
 
-    const deviceRegistrationManager = new DeviceRegistrationManager(mockConfig.apiBaseUrl, vaultRepository, kmsService);
+    const deviceRegistrationManager = new DeviceRegistrationManager(mockConfig.apiBaseUrl, vaultRepository, kmsService, tenantManager);
     const worker = new Worker({
       hostingManager: { process: async () => { throw new Error('not used'); } } as any,
       deviceRegistrationManager,
@@ -321,22 +319,27 @@ describe('Device DCR replacement route story', () => {
     expect(addJob).not.toHaveBeenCalled();
   });
 
-  it('replaces the previous employee device through Device/_dcr and keeps the same license seat', async () => {
+  it.each(['replace', 'additional', 'legacy-additional'] as const)('%s employee device through Device/_dcr preserves the licensed identity', async (mode) => {
+    const additional = mode !== 'replace';
+    const legacy = mode === 'legacy-additional';
     const registerKeySpy = jest.spyOn(ManageAssetCryptographicKey.prototype, 'registerKey').mockResolvedValue({} as any);
     const keySubmitSpy = jest.spyOn(ManageAssetCryptographicKey.prototype, 'submit').mockResolvedValue({} as any);
     const bindingSpy = jest.spyOn(ManageAssetSubjectKeyBinding.prototype, 'upsertSubjectKeyBinding').mockResolvedValue({} as any);
 
-    const employeeId = 'employee-1';
     const employeeDid = EXAMPLE_CONTROLLER_DID;
-    const employeeUrn = createEmployeeUrn({
-      namespace: URN_NAMESPACE,
-      network: URN_NETWORK,
-      jurisdiction: EXAMPLE_TENANT_ROUTE_CONTEXT.jurisdiction,
-      version: URN_VERSION,
-      sector: EXAMPLE_TENANT_ROUTE_CONTEXT.sector,
-      idType: URN_ORGANIZATION_ID_TYPE,
-      idValue: EXAMPLE_LEGAL_ORGANIZATION_TAX_ID,
-      email: EXAMPLE_EMAIL_PROFESSIONAL,
+    const employeeId = legacy ? employeeDid : 'employee-1';
+    const employeeCollectionName = generateTenantCollectionNameFromClaims(testClaimsTenant1Registration);
+    if (legacy) {
+      const storedTenant = await vaultRepository.get<ConfidentialStorageDoc>(resolveHostPhysicalCollectionName(), tenantVaultId, getEnvSectionId('tenants'));
+      const tenant = await kmsService.unprotectConfidentialData<EntityConfig>(storedTenant!, 'host');
+      tenant.didDocument!.controller = [employeeDid];
+      const protectedTenant = await kmsService.protectConfidentialData({...storedTenant!, content: tenant}, 'host');
+      await vaultRepository.put(resolveHostPhysicalCollectionName(), [protectedTenant], getEnvSectionId('tenants'));
+      await tenantManager.refreshTenant(tenantVaultId);
+    }
+    const employeeUrn = createEmployeeUrnFromStableActorIdentifier({
+      organizationUrn: String(testClaimsTenant1Registration[ClaimsOrganizationSchemaorg.identifier]),
+      stableActorIdentifier: normalizeSameAsHash(EXAMPLE_EMAIL_PROFESSIONAL),
       role: HealthcareActorRoles.GeneralistMedicalPractitioner,
     });
     const employeeConfig: EntityConfig = {
@@ -346,6 +349,7 @@ describe('Device DCR replacement route story', () => {
       claims: {
         [ClaimsPersonSchemaorg.email]: EXAMPLE_EMAIL_PROFESSIONAL,
         [ClaimsPersonSchemaorg.hasOccupation]: HealthcareActorRoles.GeneralistMedicalPractitioner,
+        ...(legacy ? {[ClaimsPersonSchemaorg.additionalType]: HealthcareActorRoles.Controller} : {}),
       } as any,
       didDocument: {
         '@context': 'https://www.w3.org/ns/did/v1',
@@ -378,7 +382,7 @@ describe('Device DCR replacement route story', () => {
       sequence: 0,
       content: employeeConfig,
     } as ConfidentialStorageDoc, tenantVaultId);
-    await vaultRepository.put(tenantVaultId, [secureEmployeeDoc], getEnvSectionId('employees'));
+    await vaultRepository.put(employeeCollectionName, [secureEmployeeDoc], getEnvSectionId('employees'));
 
     const previousDeviceId = 'old-device-001';
     const securePreviousProfile = await kmsService.protectConfidentialData({
@@ -412,7 +416,9 @@ describe('Device DCR replacement route story', () => {
       renewalCycle: '12m',
       reactivationEnabled: false,
       exp: Math.floor(Date.now() / 1000) + 3600,
-      subjectId: employeeId,
+      subjectId: legacy ? undefined : employeeId,
+      issuedToEmail: EXAMPLE_EMAIL_PROFESSIONAL,
+      maxDevices: 5,
       activatedBy: normalizeSameAsHash(EXAMPLE_EMAIL_PROFESSIONAL),
       ownerOrganizationId: EXAMPLE_LEGAL_ORGANIZATION_TAX_ID,
       issuedToRole: HealthcareActorRoles.GeneralistMedicalPractitioner,
@@ -448,7 +454,7 @@ describe('Device DCR replacement route story', () => {
             ],
           },
           ext_device_info: {
-            device_id: previousDeviceId,
+            device_id: additional ? 'second-independent-installation' : previousDeviceId,
             device_name: 'Dr Phone',
             os: 'iOS',
             os_version: '18.0',
@@ -483,7 +489,9 @@ describe('Device DCR replacement route story', () => {
       getEnvSectionId('device-licenses'),
     );
     const updatedLicense = await readStoredContent<any>(updatedLicenseDoc);
-    expect(updatedLicense.deviceId).toBe(newClientId);
+    expect(updatedLicense.deviceId).toBe(additional ? previousDeviceId : newClientId);
+    expect(updatedLicense.activationCode).toBe(activationCode);
+    expect(updatedLicense.subjectId).toBe(employeeId);
     expect(updatedLicense.status).toBe('active');
 
     const revokedProfileDoc = await vaultRepository.get<ConfidentialStorageDoc>(
@@ -492,11 +500,11 @@ describe('Device DCR replacement route story', () => {
       getEnvSectionId('device-profiles'),
     );
     const revokedProfile = await readStoredContent<any>(revokedProfileDoc);
-    expect(revokedProfileDoc?.status).toBe('revoked');
-    expect(revokedProfile.replacedByClientId).toBe(newClientId);
+    expect(revokedProfileDoc?.status).toBe(additional ? 'active' : 'revoked');
+    expect(revokedProfile.replacedByClientId).toBe(additional ? undefined : newClientId);
 
     const updatedEmployeeDoc = await vaultRepository.get<ConfidentialStorageDoc>(
-      tenantVaultId,
+      employeeCollectionName,
       employeeId,
       getEnvSectionId('employees'),
     );
@@ -504,12 +512,17 @@ describe('Device DCR replacement route story', () => {
     expect(updatedEmployee.didDocument?.verificationMethod?.map((method) => method.id)).toEqual(
       expect.arrayContaining([`${employeeDid}#sig-new`, `${employeeDid}#enc-new`]),
     );
-    expect(updatedEmployee.didDocument?.verificationMethod?.map((method) => method.id)).not.toEqual(
-      expect.arrayContaining([`${employeeDid}#sig-old`, `${employeeDid}#enc-old`]),
-    );
+    const oldMethods = expect.arrayContaining([`${employeeDid}#sig-old`, `${employeeDid}#enc-old`]);
+    if (additional) {
+      expect(updatedEmployee.didDocument?.verificationMethod?.map((method) => method.id)).toEqual(oldMethods);
+      expect(updatedLicense.deviceBindings.filter((binding: any) => binding.status === 'active')).toHaveLength(2);
+    } else {
+      expect(updatedEmployee.didDocument?.verificationMethod?.map((method) => method.id)).not.toEqual(oldMethods);
+    }
 
     expect(registerKeySpy).toHaveBeenCalledTimes(2);
-    expect(keySubmitSpy).toHaveBeenCalledWith('Host1MSP', 'UpdateKeyStatus', expect.any(String), 'revoked', expect.any(String));
+    if (additional) expect(keySubmitSpy).not.toHaveBeenCalled();
+    else expect(keySubmitSpy).toHaveBeenCalledWith('Host1MSP', 'UpdateKeyStatus', expect.any(String), 'revoked', expect.any(String));
     expect(bindingSpy).toHaveBeenCalled();
   });
 
