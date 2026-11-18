@@ -5,7 +5,6 @@ import { summarizeIndividualMemberIdentityCredential } from 'gdc-common-utils-ts
 import { normalizeCodeSystemAndValue } from '../utils/normalize-codeAndSystem';
 import { ManageAssetSubjectKeyBinding } from '../blockchain/fabric/v3/manageAssetSubjectKeyBinding';
 import { ManageAssetProfessionalAssignment } from '../blockchain/fabric/v3/manageAssetProfessionalAssignment';
-import { ManageAsset } from '../blockchain/fabric/v3/manageAsset';
 import type { ICryptography } from 'gdc-common-utils-ts/interfaces/ICryptography';
 import type { JSONWebKeySet, JWK } from 'jose';
 import type { IVaultRepository } from '../database/repositories/vault/vault.repository';
@@ -108,12 +107,10 @@ export function buildLocalClearingHouseVerifier(options: {
         const channelName = resolveOrganizationIdentityChannel(process.env.HOST_JURISDICTION);
         const binding = await new ManageAssetSubjectKeyBinding({ chaincodeName: SubjectKeyBindingIdentityChaincode, channelName })
           .read(mspId, `employee_${identity.employeeUrn}__${keyId}`) as Record<string, any>;
-        if (binding?.status !== 'active' || binding.keyId !== keyId || binding.subjectId !== identity.employeeUrn
-          || normalizeCodeSystemAndValue(binding.licensedRole) !== normalizeCodeSystemAndValue(identity.role)
-          || !binding.roleLicenseId || !binding.professionalAssignmentLink) throw new Error('Professional key binding is not currently active on Fabric.');
-        const licence = await new ManageAsset('roleLicense', { chaincodeName: 'rolelicense-sc', channelName }).read(mspId, binding.roleLicenseId) as Record<string, any>;
-        if (licence?.status !== 'active' || licence.stableContactIdentifier !== identity.stableActorIdentifier
-          || normalizeCodeSystemAndValue(licence.licensedRole) !== normalizeCodeSystemAndValue(identity.role)) throw new Error('Professional role licence is not currently active on Fabric.');
+        // Current protected licence and employment authorize the role/device; Fabric binds that employee and key to its active assignment.
+        if (binding?.status !== 'active' || binding.subjectType !== 'employee'
+          || binding.keyId !== keyId || binding.subjectId !== identity.employeeUrn
+          || !binding.professionalAssignmentLink || !binding.employeeLink || !binding.organizationLink) throw new Error('Professional key binding is not currently active on Fabric.');
         const assignment = await new ManageAssetProfessionalAssignment({ channelName }).read(mspId, binding.professionalAssignmentLink) as Record<string, any>;
         if (assignment?.status !== 'active' || assignment.assignmentLink !== binding.professionalAssignmentLink
           || !binding.employeeLink || assignment.employeeLink !== binding.employeeLink

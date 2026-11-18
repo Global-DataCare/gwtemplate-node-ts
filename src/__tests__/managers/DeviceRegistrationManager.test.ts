@@ -33,6 +33,7 @@ import {
 } from 'gdc-common-utils-ts/constants/identity-auth';
 import {
   EXAMPLE_CONTROLLER_DID,
+  EXAMPLE_PROFESSIONAL_DID,
   EXAMPLE_RELATED_PERSON_INACTIVE_RELATIONSHIP,
   EXAMPLE_EMAIL_PROFESSIONAL,
   EXAMPLE_EMAIL_CONTROLLER_INDIVIDUAL,
@@ -116,6 +117,35 @@ describe('DeviceRegistrationManager', () => {
   
   it('should be defined', () => {
     expect(manager).toBeDefined();
+  });
+
+  it.each([
+    ['raw UUID', EXAMPLE_KYC_CONTROLLER_USER_UUID, true],
+    ['UUID URN', `urn:uuid:${EXAMPLE_KYC_CONTROLLER_USER_UUID}`, true],
+    ['another employee', EXAMPLE_KYC_CONTROLLER_UUID, false],
+  ])('resolves only the licensed professional assignment for %s', async (_label, subjectId, matches) => {
+    const job = cloneDeep(DCR_REGISTRATION_JOB);
+    const vaultId = getTenantVaultId(job.sector as any, job.tenantId as string);
+    const binding = {
+      id: `urn:uuid:${EXAMPLE_KYC_CONTROLLER_UUID}`,
+      kind: FhirIpsCreatorKinds.Professional,
+      actorIdentifier: `urn:uuid:${EXAMPLE_KYC_CONTROLLER_USER_UUID}`,
+      authorIdentifier: `urn:uuid:${EXAMPLE_KYC_CONTROLLER_UUID}`,
+      ownerIdentifier: EXAMPLE_INTER_TENANT_ACCESS_CONTRACT_PROVIDER_ORGANIZATION_URN,
+      role: HealthcareActorRoles.GeneralistMedicalPractitioner,
+    };
+    await vaultRepository.put(vaultId, [binding], getClinicalCreatorBindingsSectionId());
+    const result = await (manager as any).prepareClinicalCreatorBinding({
+      vaultId,
+      registrationRequest: { ...(job.content?.body as object), [IdentityDcrMetadataFields.ActorDid]: EXAMPLE_PROFESSIONAL_DID },
+      license: { userClass: DeviceUserClasses.Employee, subjectId, issuedToRole: binding.role },
+      clientId: EXAMPLE_EMPLOYEE_DEVICE_CLIENT_ID_PRIMARY,
+      clientInstanceId: EXAMPLE_EMPLOYEE_DEVICE_INSTANCE_ID_TERTIARY,
+    });
+    if (matches) {
+      expect(result).toMatchObject({ actorIdentifier: binding.actorIdentifier, authorIdentifier: binding.authorIdentifier });
+      expect(result.dcrClientIds).toContain(EXAMPLE_EMPLOYEE_DEVICE_CLIENT_ID_PRIMARY);
+    } else expect(result).toBeUndefined();
   });
 
   describe('process', () => {

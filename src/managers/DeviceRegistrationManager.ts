@@ -454,11 +454,11 @@ export class DeviceRegistrationManager implements IJobProcessor {
       params.license?.userClass === LICENSE_USER_CLASS_EMPLOYEE
       && String(params.license.subjectId || '').trim()
     ) {
-      const subjectId = String(params.license.subjectId).trim().toLowerCase();
+      const subjectId = normalizeUuid(String(params.license.subjectId).trim());
       const issuedRole = String(params.license.issuedToRole || '').trim();
       const matches = (await this.vaultRepository.listContainersInSection<any>(params.vaultId, sectionId))
         .filter(isClinicalCreatorBinding)
-        .filter((binding) => binding.actorIdentifier.toLowerCase() === subjectId)
+        .filter((binding) => Boolean(subjectId) && normalizeUuid(binding.actorIdentifier) === subjectId)
         .filter((binding) => !issuedRole || binding.role === issuedRole);
       if (matches.length > 1) {
         throw new ManagerError(

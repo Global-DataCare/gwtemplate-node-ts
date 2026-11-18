@@ -11,6 +11,7 @@ import { IKmsService } from './gdc-backend-utils-node/models/IKmsService';
 import { getTenantVaultId } from './utils/tenant';
 import { JWK } from 'gdc-common-utils-ts/models/jwk';
 import { SUBJECT_SECTION_INDIVIDUAL } from './constants/domain';
+import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
 
 /**
  * The Worker is the heart of the background processing logic.
@@ -236,11 +237,37 @@ export class Worker {
     } catch (error: any) {
       console.error(`[Worker Job '${jobName}' failed for thid ${job.content?.thid}]`, error.message);
       
-      const errorBundle = createErrorBundle(error.message, jobInfo?.action, job.content?.body?.data?.[0]?.type);
+      const managerError = error instanceof ManagerError ? error : undefined;
+      const errorBundle = createErrorBundle(managerError?.message || 'Gateway operation failed.', jobInfo?.action, job.content?.body?.data?.[0]?.type);
+      if (managerError) {
+        const response = errorBundle.data[0]?.response;
+        if (response) {
+          response.status = String(managerError.status);
+          const issue = response.outcome?.issue?.[0];
+          if (issue) issue.code = managerError.code;
+        }
+      }
+      let errorSenderVaultId = 'host';
+      let errorIssuer = composeHostDidWebId(this.apiBaseUrl);
+      if (managerError && job.tenantId && job.tenantId !== 'host' && job.sector) {
+        const tenantVaultId = getTenantVaultId(job.sector, job.tenantId);
+        try {
+          if (await this.managers.tenantManager?.isTenantOperational(tenantVaultId)) {
+            const document = await this.managers.tenantManager.getDidDocument(tenantVaultId);
+            if (typeof document?.id === 'string' && document.id.startsWith('did:')) {
+              errorSenderVaultId = tenantVaultId;
+              errorIssuer = document.id;
+            }
+          }
+        } catch {
+          // An unavailable tenant cannot supply the response authority.
+        }
+      }
       const errorResponse = {
         thid: job.content?.thid || 'unknown-thid',
-        iss: composeHostDidWebId(this.apiBaseUrl),
+        iss: errorIssuer,
         aud: job.content?.iss || 'unknown-aud',
+        jti: job.content?.jti,
         exp: Math.floor(Date.now() / 1000) + 300,
         body: errorBundle,
       };
@@ -250,8 +277,7 @@ export class Worker {
       const recipientKey = job.content?.meta?.jwe?.header?.jwk;
       if (recipientKey) {
         try {
-          // The issuer of a catastrophic error is always the host.
-          return await this.kmsService.encodeResponse(errorResponse, [recipientKey], 'host');
+          return await this.kmsService.encodeResponse(errorResponse, [recipientKey], errorSenderVaultId);
         } catch {
           return JSON.stringify(errorResponse);
         }
