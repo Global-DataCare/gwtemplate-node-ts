@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+## [1.26.3] - 2026-11-18
+
+- Align professional Clearing House verification with the canonical Fabric
+  subject-key binding and professional assignment records. Preserve current
+  protected employee, licence and registered-device authorization checks.
+- Resolve UUID and UUID-URN references to the same existing professional
+  assignment during device enrollment.
+- Preserve typed policy-denial codes and request correlation in responses
+  protected under the current tenant response authority. Keep unexpected failures host-scoped with
+  generic client diagnostics.
+
 ## [1.26.2] - 2026-11-18
 
 - Reconcile older controller licences with the protected current tenant and

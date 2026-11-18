@@ -160,7 +160,7 @@ describe('Worker', () => {
     // ASSERT
     expect(mockIndividualManager.process).not.toHaveBeenCalled();
     const errorIssue = response.body.data[0].response.outcome.issue![0];
-    expect(errorIssue.diagnostics).toContain(`No manager configured for resourceType '${resourceType}'`);
+    expect(errorIssue.diagnostics).toBe('Gateway operation failed.');
   });
 
   it('routes FHIR R5 Subscription jobs to the configured subscription manager', async () => {
