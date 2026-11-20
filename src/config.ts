@@ -157,6 +157,8 @@ export interface IServerConfig {
     adminEmail?: string;
     adminUid?: string;
     adminRole?: string;
+    termsUrl?: string;
+    termsSha256?: string;
   };
   mongo: {
     uri?: string;

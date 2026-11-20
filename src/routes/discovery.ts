@@ -43,6 +43,7 @@ import { TenantStatusService } from '../services/TenantStatusService';
 const STATUS_LIST_BITS = 16384;
 const STATUS_LIST_PURPOSE = 'revocation' as const;
 const STATUS_LIST_INDEX = 0;
+const HOSTING_OFFERING_FILENAME = 'service-offering-hosting.json';
 
 /**
  * Restores canonical casing for VAT-based tenant route identifiers produced by
@@ -69,6 +70,8 @@ export function createDiscoveryRouter(
   kmsService: IKmsService,
   logger: ILogger,
   vaultRepository: IVaultRepository,
+  gatewayPublicUrl?: string,
+  hostTerms?: Readonly<{ termsUrl?: string; termsSha256?: string }>,
 ): express.Router {
   const router = express.Router();
   const tenantStatusService = new TenantStatusService(tenantsCacheManager, vaultRepository, kmsService);
@@ -168,6 +171,7 @@ export function createDiscoveryRouter(
   /**
    * Builds the absolute public origin of the current request.
    */
+  const configuredPublicUrl = URL.parse(gatewayPublicUrl ?? '');
   const buildPublicOrigin = (req: express.Request): string => `${req.protocol}://${req.get('host')}`;
 
   /**
@@ -317,7 +321,8 @@ export function createDiscoveryRouter(
     'dcat:keyword': offering.serviceTypes.length ? offering.serviceTypes : undefined,
   });
 
-  const buildCatalog = (catalogBaseUrl: string, publicOrigin: string, datasets: ProviderDataset[]) => ({
+  const buildCatalog = (catalogBaseUrl: string, publicOrigin: string, datasets: ProviderDataset[],
+    hostingService?: ReturnType<typeof toServiceOfferingNode>) => ({
     '@context': {
       dcat: 'https://www.w3.org/ns/dcat#',
       dcterms: 'http://purl.org/dc/terms/',
@@ -325,7 +330,8 @@ export function createDiscoveryRouter(
     },
     '@id': `${catalogBaseUrl}`,
     '@type': 'dcat:Catalog',
-    'dcat:service': datasets.flatMap((dataset) => buildServiceOfferings(dataset, publicOrigin).map(toServiceOfferingNode)),
+    'dcat:service': [...datasets.flatMap((dataset) => buildServiceOfferings(dataset, publicOrigin).map(toServiceOfferingNode)),
+      ...(hostingService ? [hostingService] : [])],
     'dcat:dataset': datasets.map((dataset) => ({
       '@id': `${catalogBaseUrl}/datasets/${dataset.datasetId}`,
       '@type': 'dcat:Dataset',
@@ -504,6 +510,55 @@ export function createDiscoveryRouter(
       termsAndConditionsHash: dataset.termsOfServiceHash,
       validFrom: new Date().toISOString(),
     });
+  };
+
+  /** Projects the host's own service from its configured legal identity and terms. */
+  const readHostHostingOffering = async (req: express.Request, hostDid: string) => {
+    const host = await tenantsCacheManager.getTenant('host');
+    // Runtime configuration supplies both values together so a document
+    // change cannot accidentally reuse the hash of the previous version.
+    const { termsUrl, termsSha256: termsHash } = hostTerms?.termsSha256 ? hostTerms : {
+      termsUrl: getTenantServiceClaim(host, ClaimsServiceSchemaorg.termsOfService),
+      termsSha256: getTenantServiceClaim(host, `${ClaimsServiceSchemaorg.termsOfService}#hash`),
+    };
+    if (!host?.governanceVc || !termsUrl || !termsHash || !/^[a-f0-9]{64}$/iu.test(termsHash)) {
+      return undefined;
+    }
+
+    const { hostCoverageScope, version, hostNetwork } = req.params;
+    const scope = { participantId: 'host' as const, jurisdiction: hostCoverageScope, version, hostNetwork };
+    const origin = configuredPublicUrl?.protocol === 'https:'
+      ? configuredPublicUrl.origin
+      : hostDid.startsWith('did:web:') ? getBaseUrlFromDidWeb(hostDid) : undefined;
+    if (!origin) return undefined;
+    const baseUrl = buildAbsoluteUrl(origin, buildGwDataspaceBasePath(scope).replace(/\/dsp$/, ''));
+    const id = `${baseUrl}/.well-known/${HOSTING_OFFERING_FILENAME}`;
+    const configuredTitle = host.claims?.[ClaimsOrganizationSchemaorg.legalName]
+      || host.claims?.[ClaimsOrganizationSchemaorg.name] || hostDid;
+    const title = `${configuredTitle} Hosting Service`;
+    const endpointUrl = getTenantServiceClaim(host, ClaimsServiceSchemaorg.url)
+      || buildAbsoluteUrl(origin, buildGwDspaceVersionWellKnownPath(scope));
+    const service = {
+      '@id': id,
+      '@type': 'dcat:DataService',
+      'dcterms:title': title,
+      'dcterms:publisher': { '@id': hostDid },
+      'dcat:endpointURL': endpointUrl,
+      'dcat:theme': undefined,
+      'dcterms:spatial': hostCoverageScope,
+      'dcat:keyword': undefined,
+    };
+    const credential = buildGaiaXServiceOfferingCredentialDraft({
+      claims: { [ClaimsServiceSchemaorg.name]: title, [ClaimsServiceSchemaorg.url]: endpointUrl },
+      credentialId: id,
+      subjectId: `${id}#service`,
+      issuerId: hostDid,
+      providedByCredentialId: `${baseUrl}/.well-known/legal-participant.vc.json`,
+      termsAndConditionsUrl: termsUrl,
+      termsAndConditionsHash: termsHash,
+      validFrom: new Date().toISOString(),
+    });
+    return { service, credential };
   };
 
   /** Signs a Gaia-X VC draft as the VC-JWT enveloped credential required by ICAM 25.11. */
@@ -1041,6 +1096,32 @@ export function createDiscoveryRouter(
     res.json(await signGaiaXEnvelopedCredential(vc, res.locals.vaultId));
   });
 
+  /**
+   * @openapi
+   * /host/cds-{hostCoverageScope}/{version}/{hostNetwork}/.well-known/service-offering-hosting.json:
+   *   get:
+   *     tags: [Discovery]
+   *     summary: Read the signed hosting service offering of the host operator
+   *     parameters:
+   *       - $ref: '#/components/parameters/HostCoverageScope'
+   *       - $ref: '#/components/parameters/Version'
+   *       - $ref: '#/components/parameters/HostRegistrySector'
+   *     responses:
+   *       '200': { description: Signed Gaia-X hosting service offering }
+   *       '404': { description: Hosting offering is not configured }
+   *       '503': { description: Host publication is unavailable }
+   */
+  router.get(`${hostScopedWellKnownPrefix}/${HOSTING_OFFERING_FILENAME}`, async (req, res) => {
+    if (!(await isDiscoveryPublicationOperational('host'))) {
+      return res.status(503).type('text').send('Service Unavailable');
+    }
+    const hostDid = await tenantsCacheManager.getDidDocument('host');
+    if (!hostDid?.id) return res.status(503).type('text').send('Service Unavailable');
+    const offering = await readHostHostingOffering(req, hostDid.id);
+    if (!offering) return res.status(404).type('text').send('Not Found');
+    return res.json(await signGaiaXEnvelopedCredential(offering.credential, 'host'));
+  });
+
   router.get(`${tenantWellKnownPrefix}/service-offering-index.json`, resolveTenant, async (req, res) => {
     const tenantConfig = await tenantsCacheManager.getTenant(res.locals.vaultId);
     const dataset = tenantConfig ? toProviderDataset(tenantConfig) : null;
@@ -1224,7 +1305,8 @@ export function createDiscoveryRouter(
       version: req.params.version,
       hostNetwork: req.params.hostNetwork,
     }));
-    res.json(buildCatalog(catalogBaseUrl, publicOrigin, filtered));
+    const hosting = await readHostHostingOffering(req, hostDid.id);
+    res.json(buildCatalog(catalogBaseUrl, publicOrigin, filtered, hosting?.service));
   });
 
   router.get(buildGwDspaceVersionWellKnownPath({
@@ -1330,7 +1412,8 @@ export function createDiscoveryRouter(
       version: req.params.version,
       hostNetwork: req.params.hostNetwork,
     }));
-    res.json(buildCatalog(catalogBaseUrl, publicOrigin, datasets));
+    const hosting = await readHostHostingOffering(req, hostDid.id);
+    res.json(buildCatalog(catalogBaseUrl, publicOrigin, datasets, hosting?.service));
   });
 
   router.get(buildGwCatalogDatasetPath({

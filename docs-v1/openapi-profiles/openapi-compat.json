@@ -8022,6 +8022,37 @@
         "x-profile": "core"
       }
     },
+    "/host/cds-{hostCoverageScope}/{version}/{hostNetwork}/.well-known/service-offering-hosting.json": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Read the signed hosting service offering of the host operator",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/HostCoverageScope"
+          },
+          {
+            "$ref": "#/components/parameters/Version"
+          },
+          {
+            "$ref": "#/components/parameters/HostRegistrySector"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Signed Gaia-X hosting service offering"
+          },
+          "404": {
+            "description": "Hosting offering is not configured"
+          },
+          "503": {
+            "description": "Host publication is unavailable"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
     "/host/cds-{hostCoverageScope}/{version}/{hostNetwork}/.well-known/dspace-version": {
       "get": {
         "tags": [
