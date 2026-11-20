@@ -2,6 +2,7 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // Always create JSDoc, do not use strings inline in keys nor values, use types instead, and reuse the data test examples.
 
+import type { PublicOfferingCatalogManager } from '../managers/PublicOfferingCatalogManager';
 import * as express from 'express';
 import type { IDiscoveryTenantRegistry } from '../managers/IDiscoveryTenantRegistry';
 import { DiscoveryService } from '../services/DiscoveryService';
@@ -72,6 +73,7 @@ export function createDiscoveryRouter(
   vaultRepository: IVaultRepository,
   gatewayPublicUrl?: string,
   hostTerms?: Readonly<{ termsUrl?: string; termsSha256?: string }>,
+  offeringCatalog?: Pick<PublicOfferingCatalogManager, 'read' | 'hasPublications'>,
 ): express.Router {
   const router = express.Router();
   const tenantStatusService = new TenantStatusService(tenantsCacheManager, vaultRepository, kmsService);
@@ -172,7 +174,9 @@ export function createDiscoveryRouter(
    * Builds the absolute public origin of the current request.
    */
   const configuredPublicUrl = URL.parse(gatewayPublicUrl ?? '');
-  const buildPublicOrigin = (req: express.Request): string => `${req.protocol}://${req.get('host')}`;
+  const buildPublicOrigin = (req: express.Request): string => configuredPublicUrl?.protocol === 'https:'
+    ? configuredPublicUrl.origin
+    : `${req.protocol}://${req.get('host')}`;
 
   /**
    * Returns whether the resolved participant is currently allowed to publish
@@ -322,16 +326,21 @@ export function createDiscoveryRouter(
   });
 
   const buildCatalog = (catalogBaseUrl: string, publicOrigin: string, datasets: ProviderDataset[],
-    hostingService?: ReturnType<typeof toServiceOfferingNode>) => ({
+    hostingService?: ReturnType<typeof toServiceOfferingNode>,
+    commercialServices: ReadonlyArray<Record<string, unknown>> = [],
+    tenantCatalogs: ReadonlyArray<{ '@id': string }> = [],
+  ) => ({
     '@context': {
       dcat: 'https://www.w3.org/ns/dcat#',
       dcterms: 'http://purl.org/dc/terms/',
       odrl: 'http://www.w3.org/ns/odrl/2/',
+      'dcat:endpointURL': { '@type': '@id' },
     },
     '@id': `${catalogBaseUrl}`,
     '@type': 'dcat:Catalog',
     'dcat:service': [...datasets.flatMap((dataset) => buildServiceOfferings(dataset, publicOrigin).map(toServiceOfferingNode)),
-      ...(hostingService ? [hostingService] : [])],
+      ...(hostingService ? [hostingService] : []), ...commercialServices],
+    ...(tenantCatalogs.length ? { 'dcat:catalog': tenantCatalogs } : {}),
     'dcat:dataset': datasets.map((dataset) => ({
       '@id': `${catalogBaseUrl}/datasets/${dataset.datasetId}`,
       '@type': 'dcat:Dataset',
@@ -362,6 +371,35 @@ export function createDiscoveryRouter(
       if (jurisdictionFilter && (dataset.jurisdiction || '').toUpperCase() !== jurisdictionFilter) return false;
       return true;
     });
+  };
+
+  const tenantCatalogRoute = {
+    tenantId: ':tenantId', jurisdiction: ':jurisdiction', version: ':version', sector: ':sector',
+  };
+  const offeringFeedPath = (scope: Parameters<typeof buildGwCatalogCollectionPath>[0]): string =>
+    buildGwCatalogCollectionPath(scope) + '/offerings.json';
+
+  const tenantCatalogueServices = async (req: express.Request, vaultId: string, dataset: ProviderDataset) => {
+    const jurisdiction = dataset.jurisdiction;
+    if (!offeringCatalog || vaultId === 'host' || jurisdiction?.toUpperCase() !== req.params.jurisdiction.toUpperCase()
+      || !await offeringCatalog.hasPublications(vaultId)) return [];
+    const endpoint = buildAbsoluteUrl(buildPublicOrigin(req), offeringFeedPath({
+      tenantId: req.params.tenantId, jurisdiction: req.params.jurisdiction, version: req.params.version, sector: req.params.sector,
+    }));
+    return [{ '@id': endpoint, '@type': 'dcat:DataService', 'dcterms:title': dataset.title + ' offering catalogue',
+      'dcterms:publisher': { '@id': dataset.publisherDid }, 'dcat:endpointURL': endpoint }];
+  };
+
+  const publishedTenantCatalogues = async (origin: string, candidates: ProviderDataset[]) => {
+    if (!offeringCatalog) return [];
+    const links = await Promise.all(candidates.map(async (tenant) => {
+      if (!tenant.alternateName || !tenant.sector || !tenant.jurisdiction
+        || !await offeringCatalog.hasPublications(getTenantVaultId(tenant.sector, tenant.alternateName))) return undefined;
+      return { '@id': buildAbsoluteUrl(origin, buildGwCatalogArtifactPath({
+        tenantId: tenant.alternateName, jurisdiction: tenant.jurisdiction, version: 'v1', sector: tenant.sector,
+      })) };
+    }));
+    return links.filter(link => link !== undefined);
   };
 
   const filterProviderDatasets = (datasets: ProviderDataset[]): ProviderDataset[] =>
@@ -1306,7 +1344,8 @@ export function createDiscoveryRouter(
       hostNetwork: req.params.hostNetwork,
     }));
     const hosting = await readHostHostingOffering(req, hostDid.id);
-    res.json(buildCatalog(catalogBaseUrl, publicOrigin, filtered, hosting?.service));
+    const publishedCatalogues = await publishedTenantCatalogues(publicOrigin, filterDatasets(allTenants.map(toProviderDataset).filter(d => d !== null), req.body?.filters));
+    res.json(buildCatalog(catalogBaseUrl, publicOrigin, filtered, hosting?.service, [], publishedCatalogues));
   });
 
   router.get(buildGwDspaceVersionWellKnownPath({
@@ -1413,7 +1452,8 @@ export function createDiscoveryRouter(
       hostNetwork: req.params.hostNetwork,
     }));
     const hosting = await readHostHostingOffering(req, hostDid.id);
-    res.json(buildCatalog(catalogBaseUrl, publicOrigin, datasets, hosting?.service));
+    const publishedCatalogues = await publishedTenantCatalogues(publicOrigin, allTenants.map(toProviderDataset).filter(d => d !== null));
+    res.json(buildCatalog(catalogBaseUrl, publicOrigin, datasets, hosting?.service, [], publishedCatalogues));
   });
 
   router.get(buildGwCatalogDatasetPath({
@@ -1464,6 +1504,25 @@ export function createDiscoveryRouter(
     })));
   });
 
+  /**
+   * @openapi
+   * /{tenantId}/cds-{jurisdiction}/{version}/{sector}/dsp/catalog/offerings.json:
+   *   get:
+   *     tags: [Discovery]
+   *     summary: Read the tenant's published product and service listings
+   *     responses:
+   *       '200': { description: The current public listings }
+   *       '404': { description: Tenant unavailable or outside its jurisdiction }
+   */
+  router.get(offeringFeedPath(tenantCatalogRoute), resolveTenant, async (req, res) => {
+    const { vaultId } = res.locals;
+    const tenant = await tenantsCacheManager.getTenant(vaultId);
+    const jurisdiction = parseJurisdiction(tenant?.claims?.[ClaimsOrganizationSchemaorg.addressCountry]);
+    if (!offeringCatalog || vaultId === 'host' || jurisdiction?.toUpperCase() !== req.params.jurisdiction.toUpperCase()
+      || !await isDiscoveryPublicationOperational(vaultId)) return res.status(404).type('text').send('Not Found');
+    return res.set('Cache-Control', 'no-store').json(await offeringCatalog.read(vaultId));
+  });
+
   router.post(buildGwCatalogRequestPath({
     tenantId: ':tenantId',
     jurisdiction: ':jurisdiction',
@@ -1485,7 +1544,8 @@ export function createDiscoveryRouter(
       version: req.params.version,
       sector: req.params.sector,
     }));
-    res.json(buildCatalog(catalogBaseUrl, publicOrigin, filtered));
+    const offerings = filtered.length ? await tenantCatalogueServices(req, res.locals.vaultId, dataset) : [];
+    res.set('Cache-Control', 'no-store').json(buildCatalog(catalogBaseUrl, publicOrigin, filtered, undefined, offerings));
   });
 
   router.get(buildGwCatalogArtifactPath({
@@ -1508,7 +1568,8 @@ export function createDiscoveryRouter(
       version: req.params.version,
       sector: req.params.sector,
     }));
-    res.json(buildCatalog(catalogBaseUrl, publicOrigin, [dataset]));
+    const offerings = await tenantCatalogueServices(req, res.locals.vaultId, dataset);
+    res.set('Cache-Control', 'no-store').json(buildCatalog(catalogBaseUrl, publicOrigin, [dataset], undefined, offerings));
   });
 
   router.get(buildGwCatalogDatasetPath({

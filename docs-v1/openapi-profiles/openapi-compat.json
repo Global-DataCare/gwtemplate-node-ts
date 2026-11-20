@@ -3299,6 +3299,110 @@
         "x-profile": "core"
       }
     },
+    "/{tenantId}/cds-{jurisdiction}/v1/{sector}/organization/org.schema/Catalog/_upsert": {
+      "post": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Publish a reviewed batch of products or services",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "request"
+                ],
+                "properties": {
+                  "request": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted. Poll the Location URL."
+          },
+          "401": {
+            "description": "Authentication required."
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/v1/{sector}/organization/org.schema/Catalog/_upsert-response": {
+      "post": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Read the publication result",
+        "responses": {
+          "200": {
+            "description": "Completed with a publication count or a typed error."
+          },
+          "202": {
+            "description": "Pending."
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/v1/{sector}/organization/org.schema/Catalog/_publish": {
+      "post": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Replace the imported catalogue snapshot",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "request"
+                ],
+                "properties": {
+                  "request": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted. Poll the Location URL."
+          },
+          "401": {
+            "description": "Authentication required."
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/v1/{sector}/organization/org.schema/Catalog/_publish-response": {
+      "post": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Read the publication result",
+        "responses": {
+          "200": {
+            "description": "Completed with a publication count or a typed error."
+          },
+          "202": {
+            "description": "Pending."
+          }
+        },
+        "x-profile": "core"
+      }
+    },
     "/host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_search": {
       "post": {
         "tags": [
@@ -8433,6 +8537,23 @@
           },
           "503": {
             "description": "Host DID document is unavailable"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/dsp/catalog/offerings.json": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Read the tenant's published product and service listings",
+        "responses": {
+          "200": {
+            "description": "The current public listings"
+          },
+          "404": {
+            "description": "Tenant unavailable or outside its jurisdiction"
           }
         },
         "x-profile": "core"

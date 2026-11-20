@@ -47,6 +47,7 @@ export interface ManagerRegistry {
   openIdAuthManager?: IJobProcessor;
   icaManager?: IJobProcessor;
   messagingManager?: IJobProcessor;
+  publicOfferingCatalogManager?: IJobProcessor;
   // groupManager?: IJobProcessor;
   // listManager?: IJobProcessor;
 }

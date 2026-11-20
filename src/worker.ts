@@ -134,6 +134,9 @@ export class Worker {
             ? this.managers.hostingManager
             : this.managers.documentReferenceManager;
           break;
+        case 'Catalog':
+          manager = this.managers.publicOfferingCatalogManager;
+          break;
         case 'Consent':
           manager = this.managers.consentManager;
           break;

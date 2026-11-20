@@ -1,3 +1,4 @@
+import { PublicOfferingCatalogManager } from '../managers/PublicOfferingCatalogManager';
 import { resolveProfessionalHomeVault } from './resolve-professional-home-vault';
 import { buildActivationClearingHouse } from './build-activation-clearing-house';
 import { IcaCredentialStatusClient } from '../services/IcaCredentialStatusClient';
@@ -223,8 +224,11 @@ export function buildManagers(options: {
   const consentManager = new ConsentManager({ vaultRepository, blockchainAdapter, tenantsCacheManager: tenantManager });
   const discoveryService = new DiscoveryService(tenantManager);
 
+  const publicOfferingCatalogManager = new PublicOfferingCatalogManager({ repository: vaultRepository, protection: kmsService, tenantManager });
+
   return {
     hostingManager,
+    publicOfferingCatalogManager,
     icaManager,
     messagingManager,
     employeeManager,

@@ -243,6 +243,7 @@ async function startServer(options?: StartServerOptions) {
     discoveryService,
     localClearingHouseVerifier,
     clearingHouseService,
+    publicOfferingCatalogManager,
   } = buildManagers({
     config,
     vaultRepository,
@@ -308,6 +309,7 @@ async function startServer(options?: StartServerOptions) {
   }
 
   const managerRegistry: ManagerRegistry = {
+    publicOfferingCatalogManager,
     hostingManager,
     tenantManager,
     icaManager,
@@ -347,7 +349,7 @@ async function startServer(options?: StartServerOptions) {
   const authManager: IAuthorizationManager = options?.authManager || new SmartAuthorizationManager();
 
   const discoveryRouter = createDiscoveryRouter(
-    tenantManager, discoveryService, kmsService, logger, vaultRepository, config.apiBaseUrl, config.host,
+    tenantManager, discoveryService, kmsService, logger, vaultRepository, config.apiBaseUrl, config.host, publicOfferingCatalogManager,
   );
 
   const authorityArtifacts: Record<string, ReturnType<typeof loadAuthorityArtifacts>> = {};
