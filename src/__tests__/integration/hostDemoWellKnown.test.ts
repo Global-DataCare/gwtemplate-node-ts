@@ -1,6 +1,13 @@
 // Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 // src/__tests__/integration/hostDemoWellKnown.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
+import { createHash } from 'node:crypto';
+import { CryptographyService } from 'gdc-common-utils-ts/CryptographyService';
+import { Content } from 'gdc-common-utils-ts/utils/content';
+import { ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { EXAMPLE_SIGNED_TERMS_PDF_URL } from 'gdc-common-utils-ts/examples/shared';
+import { AdapterCryptoSdkNode } from '../../gdc-backend-utils-node/adapters/node/crypto';
+import { ORGANIZATION_REGISTRATION_REQUEST } from '../data/example-payloads';
 import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
 
 import { invokeExpress } from './helpers/invokeExpress';
@@ -31,7 +38,12 @@ describe('Host well-known endpoints (demo, mem)', () => {
     process.env.ORG_HOST_ADMIN_EMAIL = 'admin@host.com';
     process.env.ORG_HOST_ADMIN_UID = 'host-admin-001';
     process.env.ORG_HOST_ADMIN_ROLE = 'ISCO-08|1111';
-    process.env.ORG_HOST_TERMS_URL = 'https://example.org/terms.pdf';
+    const previousTermsUrl = process.env.HOST_TERMS_URL;
+    const previousTermsHash = process.env.HOST_TERMS_SHA256;
+    const terms = ORGANIZATION_REGISTRATION_REQUEST.body.data[0]!.resource.meta.claims[ClaimsServiceSchemaorg.termsOfService];
+    const termsHash = createHash('sha256').update(Buffer.from(terms.split(',')[1]!, 'base64')).digest('hex');
+    process.env.HOST_TERMS_URL = EXAMPLE_SIGNED_TERMS_PDF_URL;
+    process.env.HOST_TERMS_SHA256 = termsHash;
 
     resetServerConfig();
 
@@ -59,6 +71,34 @@ describe('Host well-known endpoints (demo, mem)', () => {
       const jwksJson = JSON.parse(jwks.text);
       expect(jwksJson.keys.find((key: any) => key.alg === 'ES384')).toBeDefined();
 
+      const offerPath = `${HOST_WELL_KNOWN_PREFIX}/service-offering-hosting.json`;
+      const offer = await invokeExpress(app, { method: HttpRequestMethods.Get, url: offerPath });
+      expect(offer.status).toBe(200);
+      const offerUrl = new URL(offerPath, 'http://localhost:3000').href;
+      const compact = JSON.parse(offer.text).proof.id.split(',')[1];
+      const header = Content.base64UrlSafeToJSON(compact.split('.')[0]);
+      const verificationKey = jwksJson.keys.find((key: { kid: string }) => key.kid === header.kid);
+      const cryptography = new CryptographyService(new AdapterCryptoSdkNode());
+      expect(await cryptography.verifyJws(compact, verificationKey)).toBe(true);
+      expect(Content.base64UrlSafeToJSON(compact.split('.')[1])).toMatchObject({
+        id: offerUrl,
+        issuer: HOST_DID,
+        credentialSubject: {
+          type: 'gx:ServiceOffering',
+          'gx:serviceOfferingTermsAndConditions': [{ 'gx:url': EXAMPLE_SIGNED_TERMS_PDF_URL, 'gx:hash': termsHash }],
+        },
+      });
+
+      const catalogPath = HOST_WELL_KNOWN_PREFIX.replace('/.well-known', '/dsp/catalog/dcat.json');
+      const catalog = await invokeExpress(app, {
+        method: HttpRequestMethods.Get, url: catalogPath, headers: { host: 'localhost:3000' },
+      });
+      expect(catalog.status).toBe(200);
+      expect(JSON.parse(catalog.text)['dcat:service']).toContainEqual(expect.objectContaining({
+        '@id': offerUrl,
+        'dcterms:publisher': { '@id': HOST_DID },
+      }));
+
       const openidIssuer = await invokeExpress(app, { method: HttpRequestMethods.Get, url: `${HOST_WELL_KNOWN_PREFIX}/openid-credential-issuer` });
       expect(openidIssuer.status).toBe(200);
       const openidIssuerJson = JSON.parse(openidIssuer.text);
@@ -75,6 +115,11 @@ describe('Host well-known endpoints (demo, mem)', () => {
       expect(issuedVcJson.issuer).toBe(HOST_DID);
     } finally {
       queueAdapter.stop();
+      if (previousTermsUrl === undefined) delete process.env.HOST_TERMS_URL;
+      else process.env.HOST_TERMS_URL = previousTermsUrl;
+      if (previousTermsHash === undefined) delete process.env.HOST_TERMS_SHA256;
+      else process.env.HOST_TERMS_SHA256 = previousTermsHash;
+      resetServerConfig();
     }
   });
 });

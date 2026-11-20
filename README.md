@@ -762,6 +762,30 @@ npm run check:portal-web-go-no-go
 
 This command is a route smoke check. It renders canonical GW example fixtures and verifies that the portal-facing routes exist and accept the expected payload shapes; it is not a replacement for the full flow runner or live E2E validation.
 
+## Read the host organization registry
+
+The BFF submits the host operator's directory query to
+`POST /host/cds-{jurisdiction}/v1/{network}/registry/org.schema/Organization/_search`
+and polls its `_search-response` with the same transaction identifier.
+The gateway checks the verified token subject against the configured host
+operator. Paginated results contain bounded organization claims for the
+selected filters. Use the separate lifecycle endpoints for the exact
+organization selected from this directory.
+
+## Discover the host's hosting service
+
+Configure the public terms document with `HOST_TERMS_URL` and supply the
+SHA-256 digest of the document bytes in `HOST_TERMS_SHA256`. The host also
+needs its published legal participant credential. The DCAT catalogue at
+`/host/cds-{coverage}/v1/{network}/dsp/catalog/dcat.json` links the signed
+hosting offer at
+`/host/cds-{coverage}/v1/{network}/.well-known/service-offering-hosting.json`.
+
+Use the host's public keys to verify the offer and follow its provider
+reference to the legal participant credential. Updating tenant catalogue
+entries affects the tenant catalogue. Changes to an assertion in a signed
+service offer, such as its terms, require an updated credential.
+
 ## API Integrators Flow Runner
 
 Use this runner to validate the journey documented in

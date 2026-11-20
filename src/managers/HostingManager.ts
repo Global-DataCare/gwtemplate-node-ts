@@ -69,6 +69,7 @@ import {
   readProjectedOfferOrderClaims,
 } from '../utils/offer-order-read-model';
 import { HostingOfferOrderService } from './hosting/HostingOfferOrderService';
+import { HostTenantDirectoryService } from './hosting/HostTenantDirectoryService';
 import { HostingLifecycleService } from './hosting/HostingLifecycleService';
 import { canonicalizeBundleEntryMetadata } from '../utils/canonical-entry-metadata';
 import { processHostOrderEntry } from './hosting/process-order-entry';
@@ -286,6 +287,7 @@ export class HostingManager {
   private activationTrustAdapter: IActivationTrustAdapter;
   private offerOrderService: HostingOfferOrderService;
   private lifecycleService: HostingLifecycleService;
+  private tenantDirectoryService: HostTenantDirectoryService;
   private cryptographyService?: ICryptography;
 
   constructor(
@@ -329,6 +331,10 @@ export class HostingManager {
       this.storageAdapter,
       (error, type, meta) => this.handleError(error, type, meta),
     );
+    this.tenantDirectoryService = new HostTenantDirectoryService(this.tenantsCacheManager, {
+      hostAdminUid: this.config.host.adminUid,
+      hostDid: this.hostRuntime.hostDid,
+    });
   }
 
   public async bootstrapHost(hostClaims: ClaimsRecord): Promise<void> {
@@ -803,6 +809,9 @@ export class HostingManager {
     try {
       switch (job.resourceType) {
         case 'Organization':
+          if (job.action === '_search' && job.tenantId === 'host' && job.section === 'registry' && job.format === 'org.schema') {
+            return await this.tenantDirectoryService.search(job);
+          }
           if (job.action === '_transaction') {
             return await this.processOrganizationVerificationTransaction(job);
           }

@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+- Expose the paginated hosted-organization directory to the authenticated host
+  operator through the asynchronous organization registry search.
+
+- Improve discovery of the host by publishing its signed hosting service
+  offering and linking it from its public catalogue.
+
 ## [1.26.3] - 2026-11-18
 
 - Align professional Clearing House verification with the canonical Fabric

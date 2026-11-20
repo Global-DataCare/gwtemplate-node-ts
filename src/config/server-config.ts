@@ -480,6 +480,8 @@ export function getConfig(): IServerConfig {
         adminEmail: getHostEnv('ADMIN_EMAIL'),
         adminUid: getHostEnv('ADMIN_UID'),
         adminRole: getHostEnv('ADMIN_ROLE'),
+        termsUrl: getHostEnv('TERMS_URL'),
+        termsSha256: getHostEnv('TERMS_SHA256'),
       },
       mongo: {
         uri: process.env.MONGO_URI,

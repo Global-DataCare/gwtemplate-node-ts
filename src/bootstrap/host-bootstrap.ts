@@ -4,12 +4,6 @@ import { ClaimsOrganizationSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchema
 import { ServiceCapability } from 'gdc-common-utils-ts/constants/service-capabilities';
 import { ClaimsRecord } from 'gdc-common-utils-ts/models/resource-document';
 
-function getHostEnv(key: string): string | undefined {
-  const newKey = `HOST_${key}`;
-  const legacyKey = `ORG_HOST_${key}`;
-  return process.env[newKey] ?? process.env[legacyKey];
-}
-
 export async function bootstrapHost(hostingManager: HostingManager, bootConfig: IServerConfig): Promise<void> {
   const hostClaims: ClaimsRecord = {
     [ClaimsOrganizationSchemaorg.identifierType]: bootConfig.host.idType,
@@ -24,7 +18,7 @@ export async function bootstrapHost(hostingManager: HostingManager, bootConfig: 
     [ClaimsServiceSchemaorg.identifier]: `urn:uuid:${bootConfig.host.idValue}-service`,
     [ClaimsServiceSchemaorg.serviceType]: ServiceCapability.OrganizationRegistryProvider,
   };
-  const termsUrl = getHostEnv('TERMS_URL');
+  const termsUrl = bootConfig.host.termsUrl;
   if (termsUrl) {
     hostClaims[ClaimsServiceSchemaorg.termsOfService] = termsUrl;
   }

@@ -251,7 +251,7 @@ describe('Organization Registration API', () => {
       dbProvider: 'mem',
       queueProvider: 'mem',
       storageProvider: 'mem',
-      host: { legalName: 'Test Host', jurisdiction: 'us', idType: 'test-id', idValue: '12345' },
+      host: { legalName: 'Test Host', jurisdiction: 'us', idType: 'test-id', idValue: '12345', adminUid: 'host-operator-directory-test' },
       mongo: { dbName: 'test' },
       firebase: {},
       allowedPaymentMethods: ['Stripe'],
@@ -610,6 +610,33 @@ describe('Organization Registration API', () => {
         tenantId: 'BC1234567',
         sector: String(testClaimsTenant1Registration[ClaimsServiceSchemaorg.category]),
       });
+    });
+
+    it('uses the host registry search for the controller directory and denies a tenant bearer', async () => {
+      const tenant = await activateTenantDirectly();
+      const body = { body: { data: [{ resource: { meta: { claims: {
+        [ClaimsOrganizationSchemaorg.identifierValue]: testClaimsTenant1Registration[ClaimsOrganizationSchemaorg.identifierValue],
+      } } } }], meta: { pagination: { pageSize: 1 } } } };
+      const call = async (sub: string) => {
+        const token = [Buffer.from('{"alg":"none"}').toString('base64url'), Buffer.from(JSON.stringify({ sub })).toString('base64url'), 'demo'].join('.');
+        mockQueueAdapter.addJob.mockClear();
+        const response = await invokeExpress(app, {
+          method: HttpRequestMethods.Post,
+          url: '/host/cds-es/v1/test/registry/org.schema/Organization/_search',
+          headers: { 'Content-Type': 'application/json', 'App-ID': 'test-app', 'App-Version': '1.0.0', Authorization: `Bearer ${token}` },
+          body: { ...body, thid: uuidv4() },
+        });
+        expect(response.status).toBe(202);
+        expect(response.headers.location).toContain('/Organization/_search-response');
+        return hostingManager.process((mockQueueAdapter.addJob as jest.Mock).mock.calls[0][1] as JobRequest);
+      };
+      const result = await call(mockConfig.host.adminUid!);
+      expect(result.body).toMatchObject({ type: 'searchset', total: 1, data: [{
+        resource: { meta: { claims: { [ClaimsOrganizationSchemaorg.sameAs]: tenant.tenantDid } } },
+      }] });
+      const denied = await call('tenant-controller');
+      expect(JSON.stringify(denied.body)).toMatch(/configured host operator/i);
+      expect(JSON.stringify(denied.body)).not.toContain(tenant.tenantDid);
     });
 
     it('should route signed organization lifecycle preflight through the host registry queue', async () => {
