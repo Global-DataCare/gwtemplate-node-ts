@@ -19,6 +19,24 @@ Purpose:
 
 This is the v2 guide.
 
+## Catalogue data from external publishers
+
+The publisher's BFF owns external publication and receives the resulting
+asset identifier. For a resolved Ocean DDO, use the
+[catalogue conversion guide](https://github.com/Global-DataCare/gdc-common-utils-ts#ocean-catalogue-exchange)
+to prepare the public `Dataset` and `DataService` entries. The BFF signs and
+sends the DIDComm message to an authorized receiver that supports that import.
+
+The host and tenant DSP `catalog/request` operations read the public
+discovery catalogue. A portal cannot use these operations to register or update
+an external dataset. The external dataset notification has no write operation
+in the current Gateway Core catalogue contract.
+
+Participant onboarding and credential updates continue through the documented
+[organization activation](./11-host-organization-activation.md) and
+[controller lifecycle](./19-organization-controller-lifecycle.md) flows.
+Discovery reads the resulting operational tenant records.
+
 Current user-story boundary:
 
 - the first profile/runtime/login step is owned by `gdc-sdk-node-ts` or
