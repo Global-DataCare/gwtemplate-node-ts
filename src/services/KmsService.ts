@@ -654,9 +654,15 @@ export class KmsService implements IKmsService {
    * @param recipientJwks An array of public ML-KEM keys for the recipients.
    * @param senderId The `entityId` of the internal entity sending the response (e.g., 'host'),
    * used to include its `skid` (sender key id) in the protected header.
+   * @param sign Whether to sign the payload with the sender communication key before encryption.
    * @returns The encrypted JWE as a compact string (for a single recipient) or a JSON string (for multiple).
    */
-  async encodeResponse(payload: any, recipientJwks: JWK[], senderVaultId: string): Promise<string> {
+  async encodeResponse(payload: any, recipientJwks: JWK[], senderVaultId: string, sign = false): Promise<string> {
+    if (sign) {
+      const signer = await this.getPublicVerificationKey(senderVaultId, undefined, 'comm_sig');
+      if (!signer?.kid) throw new Error('Response sender has no communication signing key.');
+      payload = await this.createCompactJws(payload, signer.kid, senderVaultId, 'comm_sig');
+    }
     const senderKeys = await this.getEntityKeys(senderVaultId, 'encryption');
     const senderPrivKey: MlkemPrivateJwk = {
       ...senderKeys.encryptionKeyPair.publicJWKey,
@@ -667,6 +673,7 @@ export class KmsService implements IKmsService {
       enc: 'A256GCM',
       alg: 'ML-KEM-768',
       skid: senderPrivKey.kid,
+      ...(sign && { cty: 'JWS' }),
     };
 
     const kemRecipientJwks = recipientJwks as MlkemPublicJwk[];

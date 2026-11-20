@@ -5,6 +5,7 @@
 - Let registered organization controllers publish and update product and
   service listings on their tenant. Publish the offering feed in the tenant
   DCAT catalogue and link participating tenant catalogues from the host.
+  Sign secure catalogue publication receipts with the tenant communication key.
 
 ## [1.26.4] - 2026-11-20
 

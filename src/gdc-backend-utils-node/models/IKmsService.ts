@@ -165,9 +165,10 @@ export interface IKmsService {
    * @param recipientJwks An array of public keys for the recipients.
    * @param senderId The `entityId` of the internal entity sending the response (e.g., 'host'),
    * used to locate the private encryption key for including its `skid` (sender key id) in the protected header.
+   * @param sign Whether to sign the payload with the sender communication key before encryption.
    * @returns The encrypted JWE as a compact string (for one recipient) or a JSON string (for multiple).
    */
-  encodeResponse(payload: any, recipientJwks: JWK[], senderVaultId: string): Promise<string>;
+  encodeResponse(payload: any, recipientJwks: JWK[], senderVaultId: string, sign?: boolean): Promise<string>;
 
   // --- At-Rest Data Protection ---
 

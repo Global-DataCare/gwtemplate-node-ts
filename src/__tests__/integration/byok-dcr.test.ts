@@ -365,7 +365,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
         recipient,
       );
     };
-    const pollEncryptedResponse = async (location: string, thid: string) => {
+    const pollEncryptedResponse = async (location: string, thid: string, requireTenantSignature = false) => {
       let response: { status: number; headers: any; text: string } | undefined;
       for (let attempt = 0; attempt < 30; attempt += 1) {
         await (queueAdapter as InstanceType<typeof QueueAdapterMem>).waitForEmptyQueue();
@@ -382,8 +382,27 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
       const compactResponse = response!.text.startsWith('response=')
         ? response!.text.slice('response='.length)
         : response!.text;
-      const { decryptedBytes } = await cryptoService.decryptJwe(compactResponse, externalEncrypter);
-      return JSON.parse(Content.bytesToStringUTF8(decryptedBytes)) as IDecodedDidcommPayload;
+      const { decryptedBytes, protectedHeader } = await cryptoService.decryptJwe(compactResponse, externalEncrypter);
+      const plaintext = Content.bytesToStringUTF8(decryptedBytes);
+      if (requireTenantSignature) {
+        expect(protectedHeader).toMatchObject({ cty: 'JWS' });
+        const discovery = await invokeExpress(app, {
+          method: HttpRequestMethods.Get,
+          url: `/${testTenant1AlternateName}/cds-ES/v1/health-care/.well-known/did.json`,
+        });
+        expect(discovery.status).toBe(HttpStatusCodes.Ok);
+        const didDocument = JSON.parse(discovery.text);
+        const [header, payload] = plaintext.split('.');
+        const { kid } = Content.base64UrlSafeToJSON(header!);
+        const signer = didDocument.verificationMethod.find(
+          (method: { id: string; publicKeyJwk?: { kid?: string } }) =>
+            didDocument.authentication.includes(method.id) && method.publicKeyJwk?.kid === kid,
+        );
+        expect(signer).toBeDefined();
+        expect(await cryptoService.verifyJws(plaintext, signer.publicKeyJwk)).toBe(true);
+        return Content.base64UrlSafeToJSON(payload!) as IDecodedDidcommPayload;
+      }
+      return JSON.parse(plaintext) as IDecodedDidcommPayload;
     };
 
     const accountToken = `eyJhbGciOiJub25lIn0.${Buffer.from(JSON.stringify({
@@ -535,7 +554,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
         headers: { 'content-type': 'application/x-www-form-urlencoded', authorization: `Bearer ${accountToken}` }, body: { request },
       });
       expect(queued.status).toBe(HttpStatusCodes.Accepted);
-      const result = await pollEncryptedResponse(queued.headers.location, thread);
+      const result = await pollEncryptedResponse(queued.headers.location, thread, true);
       expect(result).toMatchObject({ thid: thread, body: { total: 1 } });
     };
     await publish('_publish', exampleOffering);
