@@ -134,6 +134,9 @@ export class Worker {
             ? this.managers.hostingManager
             : this.managers.documentReferenceManager;
           break;
+        case 'Catalog':
+          manager = this.managers.publicOfferingCatalogManager;
+          break;
         case 'Consent':
           manager = this.managers.consentManager;
           break;
@@ -232,6 +235,9 @@ export class Worker {
         recipientJwks = [encryptionKey as JWK];
       }
 
+      if (isSecureFlow && job.section === 'organization' && job.format === 'org.schema' && jobInfo.resourceType === 'Catalog') {
+        return this.kmsService.encodeResponse(payloadResponse, recipientJwks, responseSenderVaultId, true);
+      }
       return this.kmsService.encodeResponse(payloadResponse, recipientJwks, responseSenderVaultId);
       
     } catch (error: any) {

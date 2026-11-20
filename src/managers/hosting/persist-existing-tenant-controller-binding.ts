@@ -116,7 +116,7 @@ export async function persistExistingTenantControllerBinding(
     tenantVaultId,
     getEnvSectionId('tenants'),
   );
-  if (!tenantRegistrationDoc?.content) {
+  if (!tenantRegistrationDoc) {
     throw new ManagerError(`Tenant registry document not found for '${tenantVaultId}'.`, IssueType.NotFound);
   }
   const tenantCollectionName = await deps.tenantsCacheManager.getCollectionName(tenantVaultId);
@@ -180,8 +180,10 @@ export async function persistExistingTenantControllerBinding(
       lastUpdated: now,
     },
   };
+  const { jwe: _jwe, blob: _blob, ...registryMetadata } = tenantRegistrationDoc;
   const updatedDoc = {
-    ...tenantRegistrationDoc,
+    ...registryMetadata,
+    sequence: registryMetadata.sequence + 1,
     status: updatedConfig.status,
     content: updatedConfig,
   };

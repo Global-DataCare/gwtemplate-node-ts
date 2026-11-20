@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { ClaimsOrganizationSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
+import { HttpStatusCodes } from 'gdc-common-utils-ts/constants/http';
 import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
 import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
 import { IssueType } from 'gdc-common-utils-ts/models/issue';
@@ -105,13 +106,13 @@ export class HostTenantDirectoryService {
         total: summaries.length,
         data: page.map(summary => ({
           id: summary.id,
-          type: 'Organization-search-response-v1.0',
+          type: `${ResourceTypesFhirR4.Organization}-search-response-v1.0`,
           resource: {
             resourceType: ResourceTypesFhirR4.Organization,
             id: summary.id,
             meta: { claims: summary.claims },
           },
-          response: { status: '200' },
+          response: { status: String(HttpStatusCodes.Ok) },
         })),
         meta: {
           pagination: {

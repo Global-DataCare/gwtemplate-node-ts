@@ -174,14 +174,15 @@ export class DemoKmsService implements IKmsService {
     return result;
   }
 
-  async encodeResponse(payload: any, recipientJwks: JWK[], senderId: string): Promise<string> {
+  async encodeResponse(payload: any, recipientJwks: JWK[], senderId: string, sign = false): Promise<string> {
     const hasStandardsBasedRecipient = recipientJwks.some((jwk) => Boolean(
       jwk?.kty && ((jwk as any).pub || (jwk as any).x || (jwk as any).n),
     ));
     if (hasStandardsBasedRecipient) {
       console.warn('[DemoKmsService] Delegating standards-based Compact JWE encryption.');
-      return this._realKmsService.encodeResponse(payload, recipientJwks, senderId);
+      return this._realKmsService.encodeResponse(payload, recipientJwks, senderId, ...(sign ? [true] as const : []));
     }
+    if (sign) throw new Error('A signed response requires a standards-based recipient key.');
     console.warn(`[DemoKmsService] Bypassing encryption. Returning Compact JWE representation.`);
     
     // This simulates the JARM response format (response=<JWE>) by creating a structurally valid

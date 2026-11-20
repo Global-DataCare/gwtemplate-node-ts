@@ -1,4 +1,4 @@
-// TDD contract: write this test red first; make it green only with the complete real behavior.
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 import { describe, expect, it, jest } from '@jest/globals';
 import { ClaimsOrganizationSchemaorg, ClaimsPersonSchemaorg, ClaimsServiceSchemaorg } from 'gdc-common-utils-ts/constants/schemaorg';
 import { getEnvSectionId } from '../../../utils/section-env';
@@ -42,7 +42,7 @@ describe('persistExistingTenantControllerBinding', () => {
       },
       meta: { existing: true, controllerDidDocument: { id: EXISTING_CONTROLLER_DID } },
     };
-    const tenantRegistrationDoc = { id: TENANT_VAULT_ID, status: 'active', sequence: 0, content: tenantConfig };
+    const tenantRegistrationDoc = { id: TENANT_VAULT_ID, status: 'active', sequence: 0, jwe: { ciphertext: 'protected-tenant' } };
     const vaultRepository = {
       get: jest.fn(async () => tenantRegistrationDoc),
       query: jest.fn(async () => [{ content: {
@@ -110,7 +110,12 @@ describe('persistExistingTenantControllerBinding', () => {
       registerControllerKeysOnLedger,
     });
 
-    const persisted = (vaultRepository.put as any).mock.calls.find((call: any[]) => call[2] === getEnvSectionId('tenants'))[1][0].content;
+    const storedRegistration = (vaultRepository.put as any).mock.calls.find(
+      (call: any[]) => call[2] === getEnvSectionId('tenants'),
+    )[1][0];
+    expect(storedRegistration.sequence).toBe(1);
+    expect(storedRegistration.jwe).toBeUndefined();
+    const persisted = storedRegistration.content;
     expect(persisted.didDocument.controller).toEqual([EXISTING_CONTROLLER_DID, CONTROLLER_DID]);
     expect(persisted.meta.controllerDidDocument).toBeUndefined();
     const employee = (vaultRepository.put as any).mock.calls.find((call: any[]) => call[2] === getEnvSectionId('employees'))[1][0];

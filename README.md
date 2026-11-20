@@ -7,6 +7,8 @@ La [documentación pública de los entregables en español](./deliverables/READM
 agrupa la guía Markdown, su fuente HTML editable y el Word para reproducir el
 host completo con Docker, Fabric, ICA, chaincodes, PostgreSQL/IPFS y Helm.
 
+Integrators can [publish and verify tenant catalogue listings](docs-v1/02-API-AND-ENDPOINTS/02.I-TENANT-CATALOGUE-PUBLICATION.md) from their portal backend.
+
 ## GW CORE runtime profile
 
 GW CORE is the application service of a portable data-space host. The portable

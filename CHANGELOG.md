@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+- Let registered organization controllers publish and update product and
+  service listings on their tenant. Publish the offering feed in the tenant
+  DCAT catalogue and link participating tenant catalogues from the host.
+  Sign secure catalogue publication receipts with the tenant communication key.
+  Resolve bare encryption-key thumbprints against the registered controller DID.
+- Allow a verified controller binding to update an existing encrypted tenant registration.
+
 ## [1.26.4] - 2026-11-20
 
 - Expose the paginated hosted-organization directory to the authenticated host

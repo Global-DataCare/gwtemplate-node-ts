@@ -2,6 +2,7 @@
 // src/__tests__/integration/end-to-end-flow.test.ts
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 import { GatewayRequestEntryTypes } from 'gdc-common-utils-ts/constants/gateway-response';
+import { exampleOffering } from '../data/public-offering.data';
 import { HttpStatusCodes } from 'gdc-common-utils-ts/constants/http';
 import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
 import { ResourceTypesFhirR4 } from 'gdc-common-utils-ts/constants/fhir-resource-types';
@@ -48,7 +49,7 @@ const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 describe('End-to-End API Flow (BYOK Onboarding)', () => {
   // Journey: 1) verify bootstrap JWS, 2) accept Offer, 3) accept pre-DCR Order,
   // 4) exchange its controller activation code, 5) complete signed Device DCR,
-  // 6) prove that DCR persisted the registered device profile.
+  // 6) prove that DCR persisted the registered device profile, 7) publish and read back a tenant catalogue revision.
   // Authorization invariant: embedded keys prove possession only during the
   // explicit pre-DCR bootstrap. Persistence invariant: DCR stores the keys
   // that later requests must resolve rather than replace from their envelope.
@@ -334,7 +335,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
     // authorization or incomplete asynchronous result fails this one test.
     expect(controllerActivationCode).toBeTruthy();
 
-    const makeEncryptedRequest = async (payload: Record<string, any>) => {
+    const makeEncryptedRequest = async (payload: Record<string, any>, recipient = hostEncryptionKey) => {
       const jwsHeader = {
         alg: externalSigner.alg,
         kid: externalSigner.kid,
@@ -361,10 +362,10 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
           },
         },
         externalEncrypter,
-        hostEncryptionKey,
+        recipient,
       );
     };
-    const pollEncryptedResponse = async (location: string, thid: string) => {
+    const pollEncryptedResponse = async (location: string, thid: string, requireTenantSignature = false) => {
       let response: { status: number; headers: any; text: string } | undefined;
       for (let attempt = 0; attempt < 30; attempt += 1) {
         await (queueAdapter as InstanceType<typeof QueueAdapterMem>).waitForEmptyQueue();
@@ -381,8 +382,27 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
       const compactResponse = response!.text.startsWith('response=')
         ? response!.text.slice('response='.length)
         : response!.text;
-      const { decryptedBytes } = await cryptoService.decryptJwe(compactResponse, externalEncrypter);
-      return JSON.parse(Content.bytesToStringUTF8(decryptedBytes)) as IDecodedDidcommPayload;
+      const { decryptedBytes, protectedHeader } = await cryptoService.decryptJwe(compactResponse, externalEncrypter);
+      const plaintext = Content.bytesToStringUTF8(decryptedBytes);
+      if (requireTenantSignature) {
+        expect(protectedHeader).toMatchObject({ cty: 'JWS' });
+        const discovery = await invokeExpress(app, {
+          method: HttpRequestMethods.Get,
+          url: `/${testTenant1AlternateName}/cds-ES/v1/health-care/.well-known/did.json`,
+        });
+        expect(discovery.status).toBe(HttpStatusCodes.Ok);
+        const didDocument = JSON.parse(discovery.text);
+        const [header, payload] = plaintext.split('.');
+        const { kid } = Content.base64UrlSafeToJSON(header!);
+        const signer = didDocument.verificationMethod.find(
+          (method: { id: string; publicKeyJwk?: { kid?: string } }) =>
+            didDocument.authentication.includes(method.id) && method.publicKeyJwk?.kid === kid,
+        );
+        expect(signer).toBeDefined();
+        expect(await cryptoService.verifyJws(plaintext, signer.publicKeyJwk)).toBe(true);
+        return Content.base64UrlSafeToJSON(payload!) as IDecodedDidcommPayload;
+      }
+      return JSON.parse(plaintext) as IDecodedDidcommPayload;
     };
 
     const accountToken = `eyJhbGciOiJub25lIn0.${Buffer.from(JSON.stringify({
@@ -512,5 +532,55 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
         status: 'active',
       }),
     ]));
+
+    const tenantBase = `/${testTenant1AlternateName}/cds-ES/v1/health-care`;
+    const feed = tenantBase + '/dsp/catalog/offerings.json';
+    const empty = await invokeExpress(app, { method: HttpRequestMethods.Get, url: feed });
+    expect(empty.status).toBe(HttpStatusCodes.Ok);
+    expect(JSON.parse(empty.text)).toEqual([]);
+    const tenantEncryptionKey = await kmsService.getPublicEncryptionKey(testTenant1VaultId) as MlkemPublicJwk;
+    const controllers = (await tenantManager.getDidDocument(testTenant1VaultId))?.controller;
+    const controller = Array.isArray(controllers) ? controllers[0] : controllers;
+    expect(controller).toMatch(/:RESPRSN$/u);
+
+    const publish = async (action: '_publish' | '_upsert', entry: { id: string; type: string; attributes: Record<string, unknown> }) => {
+      const thread = `${testPayloadCreateTenant1.thid}-catalog-${action}-${entry.type}`;
+      const request = await makeEncryptedRequest({
+        thid: thread, iss: controller, aud: tenantDid, client_id: clientId, type: 'application/didcomm-plain+json',
+        body: { jsonapi: { version: '1.1' }, data: [entry] },
+      }, tenantEncryptionKey);
+      const queued = await invokeExpress(app, { method: HttpRequestMethods.Post,
+        url: tenantBase + '/organization/org.schema/Catalog/' + action,
+        headers: { 'content-type': 'application/x-www-form-urlencoded', authorization: `Bearer ${accountToken}` }, body: { request },
+      });
+      expect(queued.status).toBe(HttpStatusCodes.Accepted);
+      const result = await pollEncryptedResponse(queued.headers.location, thread, true);
+      expect(result).toMatchObject({ thid: thread, body: { total: 1 } });
+    };
+    await publish('_publish', exampleOffering);
+    const changed = { ...exampleOffering.attributes, name: exampleOffering.attributes.name + ' updated' };
+    await publish('_upsert', { ...exampleOffering, attributes: changed });
+    const { manufacturer: _manufacturer, ...serviceAttributes } = exampleOffering.attributes;
+    await publish('_upsert', { ...exampleOffering, type: 'Service', attributes: serviceAttributes });
+    const published = await invokeExpress(app, { method: HttpRequestMethods.Get, url: feed });
+    expect(published.status).toBe(HttpStatusCodes.Ok);
+    expect(JSON.parse(published.text)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: exampleOffering.id, type: 'Product', name: changed.name, publisher: expect.objectContaining({ id: tenantDid }) }),
+      expect.objectContaining({ id: exampleOffering.id, type: 'Service', publisher: expect.objectContaining({ id: tenantDid }) }),
+    ]));
+    expect(JSON.parse(published.text)).toHaveLength(2);
+    const dcAT = await invokeExpress(app, { method: HttpRequestMethods.Get, url: tenantBase + '/dsp/catalog/dcat.json' });
+    expect(dcAT.status).toBe(HttpStatusCodes.Ok);
+    expect(JSON.parse(dcAT.text)['dcat:service']).toContainEqual(expect.objectContaining({ 'dcat:endpointURL': expect.stringContaining(feed) }));
+    const hostCatalogue = await invokeExpress(app, { method: HttpRequestMethods.Get,
+      url: '/host/cds-EU/v1/test/dsp/catalog/dcat.json',
+    });
+    expect(hostCatalogue.status).toBe(HttpStatusCodes.Ok);
+    expect(JSON.parse(hostCatalogue.text)['dcat:catalog']).toContainEqual({
+      '@id': expect.stringContaining(tenantBase + '/dsp/catalog/dcat.json'),
+    });
+    const foreignCatalogue = await invokeExpress(app, { method: HttpRequestMethods.Get, url: feed.replace('cds-ES', 'cds-CA') });
+    expect(foreignCatalogue.status).toBe(HttpStatusCodes.NotFound);
+
   });
 });

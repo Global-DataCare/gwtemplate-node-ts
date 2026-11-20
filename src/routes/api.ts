@@ -47,6 +47,7 @@ import { ClaimsOfferSchemaorg, ClaimsOrderSchemaorg } from 'gdc-common-utils-ts/
 import { getClaimValue } from '../utils/claims';
 import { isEncryptionJwk, isSignatureJwk } from '../managers/hosting/registration-keys';
 import { DeviceBindingStatuses } from 'gdc-common-utils-ts/constants/device';
+import { toJwkThumbprintSha256Urn } from 'gdc-common-utils-ts/utils/jwk-thumbprint';
 import { isVerifiedBearerBoundToActorDid } from '../utils/authenticated-job-actor';
 import { requiresVerifiedBearerActorBindingForSecureRoute } from '../utils/secure-route-bearer-binding';
 import { resolveHostRegistrySector } from '../utils/services';
@@ -1067,6 +1068,48 @@ export function createApiRouter(
 
   /**
    * @openapi
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/organization/org.schema/Catalog/_upsert:
+   *   post:
+   *     tags: [Discovery]
+   *     summary: Publish a reviewed batch of products or services
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/x-www-form-urlencoded:
+   *           schema: { type: object, required: [request], properties: { request: { type: string } } }
+   *     responses:
+   *       '202': { description: Accepted. Poll the Location URL. }
+   *       '401': { description: Authentication required. }
+   *
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/organization/org.schema/Catalog/_upsert-response:
+   *   post:
+   *     tags: [Discovery]
+   *     summary: Read the publication result
+   *     responses:
+   *       '200': { description: Completed with a publication count or a typed error. }
+   *       '202': { description: Pending. }
+   *
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/organization/org.schema/Catalog/_publish:
+   *   post:
+   *     tags: [Discovery]
+   *     summary: Replace the imported catalogue snapshot
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/x-www-form-urlencoded:
+   *           schema: { type: object, required: [request], properties: { request: { type: string } } }
+   *     responses:
+   *       '202': { description: Accepted. Poll the Location URL. }
+   *       '401': { description: Authentication required. }
+   *
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/organization/org.schema/Catalog/_publish-response:
+   *   post:
+   *     tags: [Discovery]
+   *     summary: Read the publication result
+   *     responses:
+   *       '200': { description: Completed with a publication count or a typed error. }
+   *       '202': { description: Pending. }
+   *
    * /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_search:
    *   post:
    *     tags: [1.1 Organization Registration]
@@ -4010,6 +4053,10 @@ export function createApiRouter(
             // 4a. Employee controllers resolve from their protected tenant DID.
             const employeeDoc = queryResult[0];
             employeeConfig ||= await kmsService.unprotectConfidentialData<EntityConfig>(employeeDoc, vaultId);
+            if (section === 'organization' && req.params.format === 'org.schema' && resourceType === 'Catalog'
+              && employeeConfig.didDocument?.id !== senderDid) {
+              throw new Error('The catalogue signing key does not belong to the registered controller.');
+            }
             const signingVerificationMethod = employeeConfig.didDocument?.verificationMethod?.find(
               (vm: VerificationMethod) => vm.id.endsWith(`#${senderSigningKeyId}`)
             );
@@ -4018,6 +4065,19 @@ export function createApiRouter(
             );
             senderSigningKey = signingVerificationMethod?.publicKeyJwk;
             senderEncryptionKey = encryptionVerificationMethod?.publicKeyJwk;
+            if (!senderEncryptionKey && section === 'organization' && req.params.format === 'org.schema'
+              && resourceType === 'Catalog' && /^[A-Za-z0-9_-]{43}$/u.test(senderEncryptionKeyId)) {
+              // The registered DID uses a thumbprint URI, while some clients send its bare digest as skid.
+              const canonicalMethod = employeeConfig.didDocument?.verificationMethod?.find((method: VerificationMethod) => {
+                const key = method.publicKeyJwk;
+                if (!key || !isEncryptionJwk(key)) return false;
+                const thumbprintUri = toJwkThumbprintSha256Urn(key);
+                return method.id.endsWith(`#${thumbprintUri}`) && thumbprintUri.endsWith(`:${senderEncryptionKeyId}`);
+              });
+              if (canonicalMethod?.publicKeyJwk) {
+                senderEncryptionKey = { ...canonicalMethod.publicKeyJwk, kid: senderEncryptionKeyId };
+              }
+            }
           } else {
             // 4b. A non-employee controller authenticates with the exact DCR
             // client named by the secure message and a bearer bound to the
