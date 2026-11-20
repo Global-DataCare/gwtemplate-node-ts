@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.26.4] - 2026-11-20
+
 - Expose the paginated hosted-organization directory to the authenticated host
   operator through the asynchronous organization registry search.
 
