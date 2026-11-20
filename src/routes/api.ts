@@ -47,6 +47,7 @@ import { ClaimsOfferSchemaorg, ClaimsOrderSchemaorg } from 'gdc-common-utils-ts/
 import { getClaimValue } from '../utils/claims';
 import { isEncryptionJwk, isSignatureJwk } from '../managers/hosting/registration-keys';
 import { DeviceBindingStatuses } from 'gdc-common-utils-ts/constants/device';
+import { toJwkThumbprintSha256Urn } from 'gdc-common-utils-ts/utils/jwk-thumbprint';
 import { isVerifiedBearerBoundToActorDid } from '../utils/authenticated-job-actor';
 import { requiresVerifiedBearerActorBindingForSecureRoute } from '../utils/secure-route-bearer-binding';
 import { resolveHostRegistrySector } from '../utils/services';
@@ -4064,6 +4065,19 @@ export function createApiRouter(
             );
             senderSigningKey = signingVerificationMethod?.publicKeyJwk;
             senderEncryptionKey = encryptionVerificationMethod?.publicKeyJwk;
+            if (!senderEncryptionKey && section === 'organization' && req.params.format === 'org.schema'
+              && resourceType === 'Catalog' && /^[A-Za-z0-9_-]{43}$/u.test(senderEncryptionKeyId)) {
+              // The registered DID uses a thumbprint URI, while some clients send its bare digest as skid.
+              const canonicalMethod = employeeConfig.didDocument?.verificationMethod?.find((method: VerificationMethod) => {
+                const key = method.publicKeyJwk;
+                if (!key || !isEncryptionJwk(key)) return false;
+                const thumbprintUri = toJwkThumbprintSha256Urn(key);
+                return method.id.endsWith(`#${thumbprintUri}`) && thumbprintUri.endsWith(`:${senderEncryptionKeyId}`);
+              });
+              if (canonicalMethod?.publicKeyJwk) {
+                senderEncryptionKey = { ...canonicalMethod.publicKeyJwk, kid: senderEncryptionKeyId };
+              }
+            }
           } else {
             // 4b. A non-employee controller authenticates with the exact DCR
             // client named by the secure message and a bearer bound to the
