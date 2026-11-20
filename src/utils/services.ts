@@ -24,7 +24,7 @@ import { isFhirSector, isResearchSector } from './sector';
 import {
   ACTION_DISABLE,
   ACTION_ENABLE,
-  ACTION_PURGE,
+  ACTION_PURGE, ACTION_STATUS,
   SUBJECT_SECTION_INDIVIDUAL,
 } from '../constants/domain';
 import { mergeServiceCapabilityClaims } from './service-capability-claims';
@@ -599,7 +599,7 @@ export function initializeHostServicesConfig(sectorsAllowed: Sector[], nodeEnv: 
     createDidEndpointConfigFromSelector(
       { sector: hostRegistrySector as any, section: 'registry', format: 'org.schema' },
       ['Organization'],
-      ['_batch', '_transaction', '_issue', '_activate', ACTION_DISABLE, ACTION_ENABLE, ACTION_PURGE],
+      ['_batch', '_transaction', '_issue', '_activate', '_search', ACTION_STATUS, ACTION_DISABLE, ACTION_ENABLE, ACTION_PURGE],
     ),
   );
   services.push(

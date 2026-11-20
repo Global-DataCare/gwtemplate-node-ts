@@ -22,6 +22,9 @@
  *   still exposes full registration reads and cache refresh
  */
 export interface IHostingTenantRegistry {
+  /** Reads registrations for a host-authorized directory projection. */
+  listRegisteredTenants(): Promise<any[]>;
+
   /**
    * Reads the full tenant registration/configuration object.
    *

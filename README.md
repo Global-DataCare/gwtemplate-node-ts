@@ -762,6 +762,16 @@ npm run check:portal-web-go-no-go
 
 This command is a route smoke check. It renders canonical GW example fixtures and verifies that the portal-facing routes exist and accept the expected payload shapes; it is not a replacement for the full flow runner or live E2E validation.
 
+## Read the host organization registry
+
+The BFF submits the host operator's directory query to
+`POST /host/cds-{jurisdiction}/v1/{network}/registry/org.schema/Organization/_search`
+and polls its `_search-response` with the same transaction identifier.
+The gateway checks the verified token subject against the configured host
+operator. Paginated results contain bounded organization claims for the
+selected filters. Use the separate lifecycle endpoints for the exact
+organization selected from this directory.
+
 ## Discover the host's hosting service
 
 Configure the public terms document with `HOST_TERMS_URL` and supply the

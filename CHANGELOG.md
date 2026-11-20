@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Expose the paginated hosted-organization directory to the authenticated host
+  operator through the asynchronous organization registry search.
+
 - Improve discovery of the host by publishing its signed hosting service
   offering and linking it from its public catalogue.
 
