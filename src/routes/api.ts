@@ -781,7 +781,24 @@ export function createApiRouter(
    *   post:
    *     tags: [2.2 SMART Token]
    *     summary: Verify a presentation for an explicitly trusted tenant backend
-   *     description: Gateway extension. Requires a short-lived backend JWT with exact audience, replay protection and a canonical SHA-256 request hash. Returns a signed current-state result. Requesters and keys are selected by server configuration.
+   *     description: |
+   *       A trusted backend forwards the signed presentation it received. Its short-lived JWT binds
+   *       the exact request URL and canonical SHA-256 body hash. The organization-controller profile
+   *       verifies ICA-issued organization credentials and the tenant's current controller signing key.
+   *       The requester's registration and verification capability are resolved by the host.
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required: [nonce, vp_token]
+   *             properties:
+   *               nonce: { type: string, maxLength: 256 }
+   *               vp_token: { type: string, description: Original signed presentation from the controller or requester }
+   *               verification_profile: { type: string, enum: [organization-controller], description: Selects organization controller verification }
+   *               tenant_did: { type: string, description: Required for the established SMART context }
+   *               acr_values: { type: array, items: { type: string }, description: Required for the established SMART context }
    *     responses:
    *       '200': { description: Tenant-signed verification JWT }
    *       '401': { description: Missing backend assertion }
@@ -796,7 +813,7 @@ export function createApiRouter(
     if (!/^Bearer \S+$/i.test(authorization)) return res.status(401).json({ error: 'invalid_client' });
     try {
       const compact = await tenantPresentationVerificationManager.verify({ tenantId: String(req.params.tenantId), sector: String(req.params.sector),
-        requestUrl: new URL(req.originalUrl, apiBaseUrl).href, assertion: authorization.slice(7), body: req.body });
+        jurisdiction: String(req.params.jurisdiction), requestUrl: new URL(req.originalUrl, apiBaseUrl).href, assertion: authorization.slice(7), body: req.body });
       res.set('Cache-Control', 'no-store');
       return res.status(200).type('application/jwt').send(compact);
     } catch {

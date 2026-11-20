@@ -242,6 +242,7 @@ async function startServer(options?: StartServerOptions) {
     consentManager,
     discoveryService,
     localClearingHouseVerifier,
+    verifyOrganizationController,
     clearingHouseService,
   } = buildManagers({
     config,
@@ -394,7 +395,7 @@ async function startServer(options?: StartServerOptions) {
   });
   const gaiaXComplianceManager = new GaiaXComplianceManager(tenantManager, federatedSmartVerificationManager, gaiaXComplianceService);
   const tenantPresentationVerificationManager = new TenantPresentationVerificationManager({
-    tenants: tenantManager, verifier: localClearingHouseVerifier, replay: replayProtectionStore, cryptography: cryptographyService,
+    tenants: tenantManager, verifier: localClearingHouseVerifier, verifyOrganizationController, replay: replayProtectionStore, cryptography: cryptographyService,
     resolveRequester: (recipient, requester) => {
       const entries = JSON.parse(process.env.CLEARING_HOUSE_REQUESTERS_JSON || '{}');
       if (!Object.prototype.hasOwnProperty.call(entries, recipient) || !Object.prototype.hasOwnProperty.call(entries[recipient], requester)) throw new Error('Backend requester is not trusted.');

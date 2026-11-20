@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { decodeJwt, decodeProtectedHeader, type JSONWebKeySet, type JWK } from 'jose';
 import type { ICryptography } from 'gdc-common-utils-ts/interfaces/ICryptography';
 import { ORGANIZATION_ACTIVATION_VC_TYPES, REPRESENTATIVE_ACTIVATION_VC_TYPES, SERVICE_CONTROLLER_ACTIVATION_VC_TYPES } from 'gdc-common-utils-ts/constants/verifiable-credentials';
-import { extractRepresentativeCredentialBinding, validateActivationRepresentativePolicy } from 'gdc-common-utils-ts/utils/activation-policy';
+import { extractOrganizationLegalIdentifier, extractRepresentativeCredentialBinding, legalOrganizationIdentifiersMatch, validateActivationRepresentativePolicy, type LegalOrganizationIdentifier } from 'gdc-common-utils-ts/utils/activation-policy';
 import { toJwkThumbprintSha256Urn } from 'gdc-common-utils-ts/utils/jwk-thumbprint';
 import { verifyPinnedDetachedJws, verifyPinnedJwt, type IClearingHouseService, type ClearingHouseVerificationRequest, type ClearingHouseVerificationResult } from './ClearingHouseService';
 
@@ -19,16 +19,33 @@ export class IcaActivationVerifier implements IClearingHouseService {
 
   async verifyVpToken(request: ClearingHouseVerificationRequest): Promise<ClearingHouseVerificationResult> {
     if (request.tenantDid !== this.options.hostDid) throw new Error('Activation verifier audience must be the receiving host.');
+    await this.verifyControllerProof(request.vpToken, this.options.hostDid);
+    const acr = 'urn:antifraud:acr:openid4vp:employee';
+    if (!request.acrValues.includes(acr)) throw new Error('Controller assurance was not requested.');
+    return { activationEvidenceSource: 'ica', acr, amr: ['vp', 'ica'], vpHash: createHash('sha256').update(request.vpToken).digest('hex'), ledgerVerified: false,
+      trustChecks: { revocationChecked: true, issuerKeyStatusChecked: true, subjectKeyStatusChecked: true, onChainChecked: false } };
+  }
+
+  /** Verifies organization credentials previously presented to a relying service. */
+  async verifyServicePresentation(vpToken: string, audience: string, tenantId: string, legalId: LegalOrganizationIdentifier) {
+    return this.verifyControllerProof(vpToken, audience, { tenantId, legalId });
+  }
+
+  private async verifyControllerProof(vpToken: string, audience: string, tenant?: { tenantId: string; legalId: LegalOrganizationIdentifier }) {
     const now = Math.floor(Date.now() / 1000);
-    const header = decodeProtectedHeader(request.vpToken);
+    const header = decodeProtectedHeader(vpToken);
     const actorKey = header.jwk as JWK | undefined;
     if (!actorKey || !actorKey.kid || actorKey.d || actorKey.k || actorKey.kty === 'oct') throw new Error('Activation presentation requires its public actor signing key.');
     // An embedded key proves possession only. Authority is established below by
     // the current ICA-signed controller credential's key binding.
-    const issuer = decodeJwt(request.vpToken).iss;
+    const issuer = decodeJwt(vpToken).iss;
     if (!issuer) throw new Error('Activation presentation issuer is missing.');
-    const payload = await verifyPinnedJwt(request.vpToken, { keys: [actorKey] }, issuer, now,
-      { audience: this.options.hostDid, cryptography: this.options.cryptography });
+    const payload = await verifyPinnedJwt(vpToken, { keys: [actorKey] }, issuer, now,
+      { audience, cryptography: this.options.cryptography });
+    if (tenant && (payload.sub !== tenant.tenantId || issuer !== actorKey.kid || payload.exp! <= payload.iat!
+      || typeof payload.jti !== 'string' || payload.jti.length > 256)) {
+      throw new Error('Controller presentation does not match the tenant or signer.');
+    }
     if (payload.exp! - payload.iat! > 300) throw new Error('Activation presentation validity exceeds five minutes.');
     const inputs = (payload.vp as any)?.verifiableCredential;
     if (!Array.isArray(inputs) || inputs.length < 2 || inputs.length > 8) throw new Error('Activation requires its ICA credential set.');
@@ -75,14 +92,14 @@ export class IcaActivationVerifier implements IClearingHouseService {
     const organization = select(ORGANIZATION_ACTIVATION_VC_TYPES);
     const representative = select(REPRESENTATIVE_ACTIVATION_VC_TYPES);
     const controller = select(SERVICE_CONTROLLER_ACTIVATION_VC_TYPES);
-    if (!organization || !representative || (!controller && !this.options.allowLegacyRepresentativeBootstrap)) throw new Error('ICA activation credential set is incomplete.');
+    if (!organization || !representative || (!controller && (tenant || !this.options.allowLegacyRepresentativeBootstrap))) throw new Error('ICA activation credential set is incomplete.');
     const errors = validateActivationRepresentativePolicy({ organizationCredential: organization, representativeCredential: representative, controllerCredential: controller });
     if (errors.length) throw new Error(errors[0].message);
     const binding = controller ? extractRepresentativeCredentialBinding({ credentialSubject: controller.credentialSubject?.owner }) : extractRepresentativeCredentialBinding(representative);
     if (!binding || binding !== toJwkThumbprintSha256Urn(actorKey as any)) throw new Error('ICA-authorized controller key does not match the presentation signer.');
-    const acr = 'urn:antifraud:acr:openid4vp:employee';
-    if (!request.acrValues.includes(acr)) throw new Error('Controller assurance was not requested.');
-    return { activationEvidenceSource: 'ica', acr, amr: ['vp', 'ica'], vpHash: createHash('sha256').update(request.vpToken).digest('hex'), ledgerVerified: false,
-      trustChecks: { revocationChecked: true, issuerKeyStatusChecked: true, subjectKeyStatusChecked: true, onChainChecked: false } };
+    if (tenant && !legalOrganizationIdentifiersMatch(extractOrganizationLegalIdentifier(organization), tenant.legalId)) {
+      throw new Error('ICA organization credential belongs to a different tenant.');
+    }
+    return { issuer, id: payload.jti!, expiresAt: payload.exp!, actorKey };
   }
 }

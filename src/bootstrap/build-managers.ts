@@ -1,3 +1,5 @@
+import { buildOrganizationControllerPresentationVerifier } from './build-organization-controller-presentation-verifier';
+import { IcaActivationVerifier } from '../services/IcaActivationVerifier';
 import { resolveProfessionalHomeVault } from './resolve-professional-home-vault';
 import { buildActivationClearingHouse } from './build-activation-clearing-house';
 import { IcaCredentialStatusClient } from '../services/IcaCredentialStatusClient';
@@ -137,9 +139,19 @@ export function buildManagers(options: {
     return entries[issuer];
   };
   const icaStatusClient = new IcaCredentialStatusClient({ resolveEndpoint: issuer => activationIssuerTrust(issuer).statusEndpointTemplate });
-  const activationClearingHouseService = buildActivationClearingHouse({ hostDid: hostRuntime.hostDid, cryptography: cryptographyService,
+  const icaVerifierOptions = {
+    hostDid: hostRuntime.hostDid, cryptography: cryptographyService,
+    resolveIssuer: async (issuer: string) => activationIssuerTrust(issuer),
+    checkCredentialStatus: (credential: Record<string, any>) => icaStatusClient.check(credential),
+  };
+  const activationClearingHouseService = buildActivationClearingHouse({
+    ...icaVerifierOptions,
     allowLegacyRepresentativeBootstrap: process.env.HOST_LEGACY_REPRESENTATIVE_CONTROLLER === 'true',
-    resolveIssuer: async issuer => activationIssuerTrust(issuer), checkCredentialStatus: credential => icaStatusClient.check(credential) });
+  });
+  const verifyOrganizationController = buildOrganizationControllerPresentationVerifier({
+    network: config.networkMode, tenantManager, vaultRepository, kmsService,
+    icaVerifier: new IcaActivationVerifier(icaVerifierOptions),
+  });
   const hostingManager = new HostingManager(
     vaultRepository,
     kmsService,
@@ -250,6 +262,7 @@ export function buildManagers(options: {
     consentManager,
     discoveryService,
     localClearingHouseVerifier,
+    verifyOrganizationController,
     clearingHouseService,
   };
 }

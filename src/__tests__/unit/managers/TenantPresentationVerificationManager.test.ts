@@ -12,29 +12,58 @@ describe('authenticated tenant presentation verifier', () => {
   const recipient = 'did:web:verifier.example';
   const url = 'https://verifier.example/hospital/cds-ES/v1/health-care/identity/openid/presentation/_verify';
   const body = { nonce: 'verification-request-nonce', tenant_did: requester, vp_token: 'original.professional.presentation', acr_values: ['employee'], token_scope: 'original-scope' };
-  async function fixture(overrides: Record<string, unknown> = {}) {
+  async function fixture(overrides: Record<string, unknown> = {}, requestBody: Record<string, unknown> = body,
+    capabilities = ['verifier']) {
     const assertion = await buildDeterministicSignedJwt({ seed: requester, purpose: 'backend-verifier-request', payload: {
       iss: requester, sub: requester, aud: url, iat: now, exp: now + 60, jti: 'request-1',
-      request_hash: createHash('sha256').update(canonicalize(body)!).digest('hex'), ...overrides,
+      request_hash: createHash('sha256').update(canonicalize(requestBody)!).digest('hex'), ...overrides,
     } });
     const verifier = { verifyVpToken: jest.fn().mockResolvedValue({ acr: 'employee', amr: ['vc'], vpHash: createHash('sha256').update(body.vp_token).digest('hex'), ledgerVerified: true }) };
+    const verifyOrganizationController = jest.fn().mockResolvedValue({ issuer: requester, id: 'controller-vp', expiresAt: now + 40 });
     let operational = true;
     const manager = new TenantPresentationVerificationManager({
       tenants: { tenantExists: async () => true, isTenantOperational: async () => operational, getDidDocument: async () => ({ id: recipient }) } as any,
-      verifier, replay: new ReplayProtectionStoreMem(), now: () => now,
+      verifier, verifyOrganizationController, replay: new ReplayProtectionStoreMem(), now: () => now,
       resolveRequester: async (tenant, caller) => {
         if (tenant !== recipient || caller !== requester) throw new Error('Requester is not trusted.');
-        return { jwks: { keys: [assertion.publicJwk] }, capabilities: ['verifier'] };
+        return { jwks: { keys: [assertion.publicJwk] }, capabilities };
       },
       signResult: async (_vault, payload) => (await buildDeterministicSignedJwt({ seed: recipient, purpose: 'backend-verifier-result', payload })).compactToken,
     });
-    return { manager, verifier, disable: () => { operational = false; }, input: { tenantId: 'hospital', sector: 'health-care', requestUrl: url, assertion: assertion.compactToken, body } };
+    return { manager, verifier, verifyOrganizationController, disable: () => { operational = false; }, input: { tenantId: 'hospital', jurisdiction: 'ES', sector: 'health-care', requestUrl: url, assertion: assertion.compactToken, body: requestBody } };
   }
   it('authenticates and binds the caller before performing current-state verification', async () => {
     const f = await fixture();
     const payload = decodeJwt(await f.manager.verify(f.input));
     expect(payload).toMatchObject({ iss: recipient, aud: requester, ledger_verified: true, token_scope: body.token_scope });
     expect(f.verifier.verifyVpToken).toHaveBeenCalledWith(expect.objectContaining({ tenantDid: recipient, vpToken: body.vp_token }));
+  });
+  const controllerBody = {nonce: body.nonce, vp_token: 'controller.organization.presentation',
+    verification_profile: 'organization-controller'};
+  it('returns a scoped signed receipt when a trusted service asks about a controller presentation', async () => {
+    const f = await fixture({}, controllerBody, ['organization-controller-verifier']);
+    const receipt = decodeJwt(await f.manager.verify(f.input));
+    expect(f.verifyOrganizationController).toHaveBeenCalledWith(expect.objectContaining({
+      audience: requester, tenantId: 'hospital', jurisdiction: 'ES', sector: 'health-care', vpToken: controllerBody.vp_token,
+    }));
+    expect(f.verifier.verifyVpToken).not.toHaveBeenCalled();
+    expect(receipt).toMatchObject({ iss: recipient, aud: requester, verified: true, verification_profile: 'organization-controller',
+      nonce: body.nonce, exp: now + 40, vp_hash: createHash('sha256').update(controllerBody.vp_token).digest('hex') });
+    expect(receipt.ledger_verified).toBeUndefined();
+  });
+  it('requires specific relying service trust for organization controller presentations', async () => {
+    const f = await fixture({}, controllerBody);
+    await expect(f.manager.verify(f.input)).rejects.toThrow(/organization.controller.*capability/i);
+    expect(f.verifyOrganizationController).not.toHaveBeenCalled();
+  });
+  it('cannot wrap a previously verified controller presentation in a new service assertion', async () => {
+    const f = await fixture({}, controllerBody, ['organization-controller-verifier']);
+    await f.manager.verify(f.input);
+    const assertion = await buildDeterministicSignedJwt({ seed: requester, purpose: 'backend-verifier-request', payload: {
+      iss: requester, sub: requester, aud: url, iat: now, exp: now + 60, jti: 'request-2',
+      request_hash: createHash('sha256').update(canonicalize(controllerBody)!).digest('hex'),
+    } });
+    await expect(f.manager.verify({ ...f.input, assertion: assertion.compactToken })).rejects.toThrow(/presentation replay/i);
   });
   it('rejects a disabled tenant before any presentation verification', async () => { const f = await fixture(); f.disable(); await expect(f.manager.verify(f.input)).rejects.toThrow(/active|disabled/i); expect(f.verifier.verifyVpToken).not.toHaveBeenCalled(); });
   it('rejects a replay before running the verifier again', async () => {

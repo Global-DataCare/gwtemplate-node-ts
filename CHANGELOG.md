@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Improve credential verification in the Clearing House. An authorized service
+  can forward a technical controller's signed presentation to the host and
+  receive a signed result scoped to that service and organization.
+
 ## [1.26.3] - 2026-11-18
 
 - Align professional Clearing House verification with the canonical Fabric
