@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto';
 import { createServer, type Server } from 'node:http';
 import { FlattenedSign, importJWK } from 'jose';
 import { EXAMPLE_ORG_ACTIVATION_ORGANIZATION_CREDENTIAL, EXAMPLE_ORG_ACTIVATION_LEGAL_REPRESENTATIVE_CREDENTIAL, EXAMPLE_ORG_ACTIVATION_CONTROLLER_CREDENTIAL, EXAMPLE_CONTROLLER_DID, EXAMPLE_PROVIDER_ORGANIZATION_DID, cloneExample } from 'gdc-common-utils-ts';
+import { HttpStatusCodes } from 'gdc-common-utils-ts/constants/http';
 import { toJwkThumbprintSha256Urn } from 'gdc-common-utils-ts/utils/jwk-thumbprint';
 import { DefaultActivationTrustAdapter } from '../../../adapters/activation-trust.adapter';
 import { buildActivationClearingHouse } from '../../../bootstrap/build-activation-clearing-house';
@@ -55,7 +56,7 @@ describe('ICA activation without Fabric', () => {
       } else {
         const id = url.searchParams.get('credentialId')!; checked.push(id);
         res.setHeader('content-type', 'application/didcomm-plain+json');
-        res.end(JSON.stringify({ body: { data: [{ response: { status: '200' }, resource: { status: 'resolved', thid: url.searchParams.get('thid'),
+        res.end(JSON.stringify({ body: { data: [{ response: { status: String(HttpStatusCodes.Ok) }, resource: { status: 'resolved', thid: url.searchParams.get('thid'),
           credentialType: url.pathname.split('/').at(-2), content: [{ credentialId: id, status, checkedAt: new Date().toISOString() }] } }] } }));
       }
     });
