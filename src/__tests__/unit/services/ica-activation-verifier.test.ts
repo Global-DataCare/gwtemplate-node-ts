@@ -1,3 +1,4 @@
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 // Flow contract: a non-demo host without Fabric authenticates ICA-issued activation credentials and their current status, binds the controller signing key to ICA authority, and rejects expired, revoked, substituted or incorrectly addressed presentations.
 import canonicalize from 'canonicalize';
 import { randomUUID } from 'node:crypto';
@@ -13,6 +14,10 @@ import { buildDeterministicSignedJwt, deriveDeterministicEcJwkPair } from '../..
 describe('ICA activation without Fabric', () => {
   const listeners: Server[] = [];
   const savedEnv = { ...process.env };
+  beforeEach(() => {
+    process.env.SECURITY_MODE = 'strict';
+    process.env.NETWORK_MODE = 'test';
+  });
   afterEach(() => { process.env = { ...savedEnv }; });
   afterEach(async () => { for (const server of listeners.splice(0)) await new Promise<void>(resolve => { server.close(() => resolve()); server.closeAllConnections(); }); });
   async function fixture(options: { expired?: boolean; noExpiry?: boolean; wrongKey?: boolean; tampered?: boolean; wrongAudience?: boolean; inactiveIssuer?: boolean } = {}) {

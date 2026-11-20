@@ -1,3 +1,4 @@
+// Flow contract: reuse shared test fixtures and canonical types; do not introduce duplicated literals.
 // Flow contract: deployed network profiles reject demo authentication and insecure bearer overrides.
 // TDD contract: write this test red first; make it green only with the complete real behavior.
 /**
@@ -513,6 +514,7 @@ describe('server-config sector resolution', () => {
           ...previousEnv,
           SECURITY_MODE: securityMode,
           NETWORK_MODE: networkMode,
+          DEMO_ALLOW_INSECURE_BEARER: 'false',
         };
         resetServerConfig();
         if (securityMode === 'demo' && networkMode !== 'test') {
