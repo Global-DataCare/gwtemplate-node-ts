@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Document adding and updating service and product listings, replacing the
+  imported catalogue snapshot, checking public readback, and the limits of
+  catalogue withdrawal.
+
 ## [1.26.5] - 2026-11-20
 
 - Let registered organization controllers publish and update product and
