@@ -3,6 +3,7 @@
 // Always create JSDoc, do not use strings inline in keys nor values, use types instead, and reuse the data test examples.
 
 import type { PublicOfferingCatalogManager } from '../managers/PublicOfferingCatalogManager';
+import type { LegacyPublicTenantReader } from '../services/legacy-public-tenant-artifacts';
 import * as express from 'express';
 import type { IDiscoveryTenantRegistry } from '../managers/IDiscoveryTenantRegistry';
 import { DiscoveryService } from '../services/DiscoveryService';
@@ -74,6 +75,7 @@ export function createDiscoveryRouter(
   gatewayPublicUrl?: string,
   hostTerms?: Readonly<{ termsUrl?: string; termsSha256?: string }>,
   offeringCatalog?: Pick<PublicOfferingCatalogManager, 'read' | 'hasPublications'>,
+  legacyPublicTenantReader?: LegacyPublicTenantReader,
 ): express.Router {
   const router = express.Router();
   const tenantStatusService = new TenantStatusService(tenantsCacheManager, vaultRepository, kmsService);
@@ -863,6 +865,17 @@ export function createDiscoveryRouter(
 
     const canonicalTenantId = canonicalizeHostedTenantRouteId(tenantId);
     const vaultId = getTenantVaultId(sector, canonicalTenantId);
+
+    const artifactName = req.path.split('/').at(-1);
+    if (legacyPublicTenantReader && (artifactName === 'did.json' || artifactName === 'legal-participant.vc.json')) {
+      const legacy = await legacyPublicTenantReader({ tenantId: canonicalTenantId, jurisdiction, version, sector });
+      const artifact = artifactName === 'did.json' ? legacy?.did : legacy?.credential;
+      if (artifact) {
+        res.json(artifact);
+        return;
+      }
+    }
+
     
     // Use the public getDidDocument method to check for the tenant's existence.
     // This avoids exposing the entire internal EntityConfig in the middleware.
