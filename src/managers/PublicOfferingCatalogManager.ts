@@ -8,6 +8,7 @@ import type { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confiden
 import { ManagerError } from 'gdc-common-utils-ts/utils/manager-error';
 import type { IVaultRepository } from '../database/repositories/vault/vault.repository';
 import { isVerifiedBearerBoundToActorDid } from '../utils/authenticated-job-actor';
+import { canonicalize } from '../utils/json-canon';
 import { getTenantVaultId } from '../utils/tenant';
 import { getTenantAuthorizationStatus } from '../utils/tenant-lifecycle';
 import type { IJobProcessor } from './registry';
@@ -35,6 +36,39 @@ const section = 'public-offering-catalog';
 const snapshotId = 'current';
 const legacyIndividualSection = 'public-offering-entries';
 const individualSection = 'public-offering-listings';
+const historicalStatus = 'historical';
+
+type Offering = ReturnType<typeof readPublicOfferingCatalog>[number];
+type OfferingReference = Pick<Offering, 'type' | 'id'>;
+type CatalogContent = {
+  offerings: readonly Offering[];
+  versions?: Record<string, string>;
+  withdrawn?: OfferingReference;
+};
+type CurrentOffering = { offering: Offering; versionId: string };
+
+function digest(value: string): string {
+  return createHash('sha256').update(value).digest('hex');
+}
+
+function offeringContentHash(offering: Offering): string {
+  return digest(canonicalize(offering));
+}
+
+function offeringVersionId(content: CatalogContent, offering: Offering): string {
+  return content.versions?.[digest(publicOfferingResourceKey(offering))] ?? offeringContentHash(offering);
+}
+
+function readReference(body: unknown): OfferingReference {
+  const data = (body as { data?: unknown } | undefined)?.data;
+  const entry = (Array.isArray(data) && data.length === 1 ? data[0] : data) as Partial<OfferingReference> | undefined;
+  if (!entry || (entry.type !== 'Product' && entry.type !== 'Service')
+    || typeof entry.id !== 'string' || !entry.id || entry.id.length > 2000
+    || entry.id.trim() !== entry.id || entry.id === '*' || Object.keys(entry).length !== 2) {
+    throw new ManagerError('Specify one Product or Service by its exact type and ID.', IssueType.Invalid);
+  }
+  return { type: entry.type, id: entry.id };
+}
 
 /** The imported snapshot and each individual edit have independent protected write targets. */
 export class PublicOfferingCatalogManager implements IJobProcessor {
@@ -42,7 +76,10 @@ export class PublicOfferingCatalogManager implements IJobProcessor {
 
   async process(job: JobRequest): Promise<IDecodedDidcommPayload> {
     const upsert = job.action === '_upsert';
-    if (job.section !== 'organization' || job.format !== 'org.schema' || job.resourceType !== 'Catalog' || (!upsert && job.action !== '_publish')) {
+    const history = job.action === '_history';
+    const unpublish = job.action === '_unpublish';
+    if (job.section !== 'organization' || job.format !== 'org.schema' || job.resourceType !== 'Catalog'
+      || (!upsert && !unpublish && !history && job.action !== '_publish')) {
       throw new ManagerError('Use the organization Schema.org catalogue publication route.', IssueType.NotSupported);
     }
     if (!job.content?.thid || !job.tenantId || job.tenantId === 'host' || !job.sector || !job.jurisdiction) {
@@ -74,6 +111,24 @@ export class PublicOfferingCatalogManager implements IJobProcessor {
       throw new ManagerError('Catalogue publication requires a signed controller request.', IssueType.Forbidden);
     }
     if (!actor || !controllers.includes(actor)) throw new ManagerError('Only the organization controller may publish its catalogue.', IssueType.Forbidden);
+
+    if (history) {
+      return this.receipt(job, 'org.schema.catalog-history', { versions: await this.readHistory(collection, vaultId, readReference(job.content.body)) });
+    }
+    if (unpublish) {
+      const reference = readReference(job.content.body);
+      const id = digest(publicOfferingResourceKey(reference));
+      const current = await this.deps.repository.get<ConfidentialStorageDoc>(collection, id, individualSection);
+      if (current?.status !== 'inactive') {
+        const selected = (await this.readCurrent(collection, vaultId)).find(item => publicOfferingResourceKey(item.offering) === publicOfferingResourceKey(reference));
+        if (!selected) throw new ManagerError('The published offering was not found.', IssueType.NotFound);
+        // Keep the version being withdrawn, including when it was published before version tracking.
+        await this.write(collection, vaultId, individualSection, [{
+          id, offerings: [selected.offering], withdrawn: reference, versions: { [id]: selected.versionId },
+        }]);
+      }
+      return this.receipt(job, 'org.schema.catalog-publication', { total: 1 });
+    }
     const publisherId = tenant?.didDocument?.id;
     const publisherName = tenant?.claims?.[ClaimsOrganizationSchemaorg.legalName] ?? tenant?.claims?.[ClaimsOrganizationSchemaorg.name];
     if (!publisherId || typeof publisherName !== 'string' || !publisherName.trim()) {
@@ -93,21 +148,74 @@ export class PublicOfferingCatalogManager implements IJobProcessor {
       }
     }
     const batches = upsert
-      ? offerings.map(offering => ({ id: createHash('sha256').update(publicOfferingResourceKey(offering)).digest('hex'), offerings: [offering] }))
+      ? offerings.map(offering => ({ id: digest(publicOfferingResourceKey(offering)), offerings: [offering] }))
       : [{ id: snapshotId, offerings }];
+    await this.write(collection, vaultId, upsert ? individualSection : section, batches);
+    return this.receipt(job, 'org.schema.catalog-publication', { total: offerings.length });
+  }
+
+  private async write(collection: string, vaultId: string, targetSection: string, batches: readonly (CatalogContent & { id: string })[]) {
     const updated = new Date().toISOString();
-    const protectedDocs: ConfidentialStorageDoc[] = [];
+    const documents: ConfidentialStorageDoc[] = [];
     for (const batch of batches) {
-      protectedDocs.push(await this.deps.protection.protectConfidentialData({
-        id: batch.id, status: 'active', sequence: 1, content: { claims: { offerings: batch.offerings } },
-        audit: { updated } as ConfidentialStorageDoc['audit'],
-      }, vaultId));
+      const { id, offerings, withdrawn } = batch;
+      const previous = await this.deps.repository.get<ConfidentialStorageDoc>(collection, id, targetSection);
+      let preceding: CatalogContent | undefined;
+      if (previous?.status === 'active') {
+        preceding = await this.readContent(previous, vaultId);
+        if (!preceding.versions) {
+          const baseline = digest(canonicalize({ id, offerings: preceding.offerings }));
+          documents.push({ id: `history-${baseline}`, status: historicalStatus, sequence: 1, content: { claims: preceding }, audit: previous.audit });
+        }
+      }
+      const oldOfferings = new Map(preceding?.offerings.map(offering => [publicOfferingResourceKey(offering), offering]));
+      const versions = batch.versions ?? Object.fromEntries(offerings.map(offering => {
+        const key = publicOfferingResourceKey(offering);
+        const old = oldOfferings.get(key);
+        const version = old && preceding && offeringContentHash(old) === offeringContentHash(offering)
+          ? offeringVersionId(preceding, old) : randomUUID();
+        return [digest(key), version];
+      }));
+      const content = { claims: { offerings, versions, ...(withdrawn ? { withdrawn } : {}) } };
+      const audit = { updated } as ConfidentialStorageDoc['audit'];
+      documents.push(
+        { id: `history-${randomUUID()}`, status: historicalStatus, sequence: 1, content, audit },
+        { id, status: withdrawn ? 'inactive' : 'active', sequence: 1, content, audit },
+      );
     }
-    if (!await this.deps.repository.put(collection, protectedDocs, upsert ? individualSection : section)) {
+    const protectedDocs = await Promise.all(documents.map(doc => this.deps.protection.protectConfidentialData(doc, vaultId)));
+    if (!await this.deps.repository.put(collection, protectedDocs, targetSection)) {
       throw new ManagerError('The catalogue could not be persisted.', IssueType.NoStore);
     }
-    return { jti: randomUUID(), thid: job.content.thid, type: 'org.schema.catalog-publication',
-      iss: job.content.aud as string, aud: job.content.iss as string, body: { total: offerings.length } };
+  }
+
+  private receipt(job: JobRequest, type: string, body: Record<string, unknown>): IDecodedDidcommPayload {
+    return { jti: randomUUID(), thid: job.content!.thid, type,
+      iss: job.content!.aud as string, aud: job.content!.iss as string, body };
+  }
+
+  private async readContent(doc: ConfidentialStorageDoc, vaultId: string): Promise<CatalogContent> {
+    const content = await this.deps.protection.unprotectConfidentialData<CatalogContent & { claims?: CatalogContent }>(doc, vaultId);
+    return content.claims ?? content;
+  }
+
+  private async readHistory(collection: string, vaultId: string, reference: OfferingReference) {
+    const scopes = [section, legacyIndividualSection, individualSection];
+    const sections = await Promise.all(scopes.map(scope => this.deps.repository.getContainersInSection<ConfidentialStorageDoc>(collection, scope)));
+    const key = publicOfferingResourceKey(reference);
+    const candidates = sections.flatMap((records, index) => records
+      .filter(doc => doc.status === historicalStatus || doc.status === 'active')
+      .map(doc => ({ doc, imported: scopes[index] === section })));
+    const versions = await Promise.all(candidates.map(async ({ doc, imported }) => {
+      const content = await this.readContent(doc, vaultId);
+      if (doc.status === 'active' && content.versions) return undefined;
+      const offering = readPublicOfferingCatalog(content.offerings).find(item => publicOfferingResourceKey(item) === key);
+      if (!offering) return undefined;
+      const status = content.withdrawn ? 'withdrawn' : imported ? 'imported' : 'published';
+      return { versionId: offeringVersionId(content, offering), contentHash: offeringContentHash(offering), status,
+        ...(doc.audit?.updated ? { recordedAt: doc.audit.updated } : {}), offering };
+    }));
+    return versions.flatMap(version => version ? [version] : []).sort((a, b) => (a.recordedAt ?? '').localeCompare(b.recordedAt ?? ''));
   }
 
   /** Checks publication metadata without decrypting or hydrating the offerings. */
@@ -119,24 +227,34 @@ export class PublicOfferingCatalogManager implements IJobProcessor {
       this.deps.repository.listContainersInSection<ConfidentialStorageDoc>(collection, legacyIndividualSection),
       this.deps.repository.listContainersInSection<ConfidentialStorageDoc>(collection, individualSection),
     ]);
-    return snapshots.some(doc => doc.id === snapshotId && doc.status === 'active')
-      || legacyEntries.some(doc => doc.status === 'active')
-      || individualEntries.some(doc => doc.status === 'active');
+    if (individualEntries.some(doc => doc.status === 'active')) return true;
+    const hasImportedListings = snapshots.some(doc => doc.id === snapshotId && doc.status === 'active')
+      || legacyEntries.some(doc => doc.status === 'active');
+    if (!hasImportedListings) return false;
+    return !individualEntries.some(doc => doc.status === 'inactive') || (await this.read(vaultId)).length > 0;
   }
 
   /** Reads the latest projection after the caller has resolved tenant discovery eligibility. */
   async read(vaultId: string) {
     const collection = await this.deps.tenantManager.getCollectionName(vaultId);
-    if (!collection) return [];
+    return collection ? (await this.readCurrent(collection, vaultId)).map(({ offering }) => offering) : [];
+  }
+
+  private async readCurrent(collection: string, vaultId: string): Promise<CurrentOffering[]> {
     const [snapshot, legacyRecords, records] = await Promise.all([
       this.deps.repository.get<ConfidentialStorageDoc>(collection, snapshotId, section),
       this.deps.repository.getContainersInSection<ConfidentialStorageDoc>(collection, legacyIndividualSection),
-      this.deps.repository.getContainersInSection<ConfidentialStorageDoc>(collection, individualSection),
+      this.deps.repository.listContainersInSection<ConfidentialStorageDoc>(collection, individualSection),
     ]);
-    const published = await Promise.all([snapshot, ...legacyRecords, ...records].flatMap(doc => doc?.status === 'active' ? [doc] : []).map(async doc => {
-      const content = await this.deps.protection.unprotectConfidentialData<{ claims?: { offerings: unknown }; offerings?: unknown }>(doc, vaultId);
-      return readPublicOfferingCatalog(content.claims?.offerings ?? content.offerings);
+    const current = await Promise.all(records.filter(doc => doc.status === 'active' || doc.status === 'inactive').map(doc =>
+      this.deps.repository.get<ConfidentialStorageDoc>(collection, doc.id, individualSection)));
+    const published = await Promise.all([snapshot, ...legacyRecords, ...current].flatMap(doc => doc?.status === 'active' ? [doc] : []).map(async doc => {
+      const content = await this.readContent(doc, vaultId);
+      return readPublicOfferingCatalog(content.offerings).map(offering => ({ offering, versionId: offeringVersionId(content, offering) }));
     }));
-    return [...new Map(published.flat().map(offering => [publicOfferingResourceKey(offering), offering])).values()];
+    const withdrawn = new Set(current.flatMap(doc => doc?.status === 'inactive' ? [doc.id] : []));
+    return [...new Map(published.flat().map(item => [publicOfferingResourceKey(item.offering), item])).entries()]
+      .filter(([key]) => !withdrawn.has(digest(key)))
+      .map(([, item]) => item);
   }
 }

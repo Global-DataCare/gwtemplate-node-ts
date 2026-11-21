@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [1.26.6] - 2026-11-21
+
+- Keep the version history of products and services under the same listing
+  ID. Add signed controller operations to withdraw one listing and read its
+  previous versions.
+
 - Document adding and updating service and product listings, replacing the
   imported catalogue snapshot, checking public readback, and the limits of
   catalogue withdrawal.

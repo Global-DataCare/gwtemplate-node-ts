@@ -543,7 +543,7 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
     const controller = Array.isArray(controllers) ? controllers[0] : controllers;
     expect(controller).toMatch(/:RESPRSN$/u);
 
-    const publish = async (action: '_publish' | '_upsert', entry: { id: string; type: string; attributes: Record<string, unknown> }) => {
+    const exchangeCatalogue = async (action: '_publish' | '_upsert' | '_unpublish' | '_history', entry: { id: string; type: string; attributes?: Record<string, unknown> }) => {
       const thread = `${testPayloadCreateTenant1.thid}-catalog-${action}-${entry.type}`;
       const request = await makeEncryptedRequest({
         thid: thread, iss: controller, aud: tenantDid, client_id: clientId, type: 'application/didcomm-plain+json',
@@ -555,7 +555,11 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
       });
       expect(queued.status).toBe(HttpStatusCodes.Accepted);
       const result = await pollEncryptedResponse(queued.headers.location, thread, true);
-      expect(result).toMatchObject({ thid: thread, body: { total: 1 } });
+      expect(result).toMatchObject({ thid: thread });
+      return result;
+    };
+    const publish = async (action: '_publish' | '_upsert', entry: Parameters<typeof exchangeCatalogue>[1]) => {
+      expect(await exchangeCatalogue(action, entry)).toMatchObject({ body: { total: 1 } });
     };
     await publish('_publish', exampleOffering);
     const changed = { ...exampleOffering.attributes, name: exampleOffering.attributes.name + ' updated' };
@@ -581,6 +585,16 @@ describe('End-to-End API Flow (BYOK Onboarding)', () => {
     });
     const foreignCatalogue = await invokeExpress(app, { method: HttpRequestMethods.Get, url: feed.replace('cds-ES', 'cds-CA') });
     expect(foreignCatalogue.status).toBe(HttpStatusCodes.NotFound);
+    const reference = { id: exampleOffering.id, type: exampleOffering.type };
+    expect(await exchangeCatalogue('_unpublish', reference)).toMatchObject({ body: { total: 1 } });
+    const history = await exchangeCatalogue('_history', reference);
+    expect(history).toMatchObject({ type: 'org.schema.catalog-history', body: { versions: expect.arrayContaining([
+      expect.objectContaining({ offering: expect.objectContaining({ id: reference.id, name: exampleOffering.attributes.name }) }),
+      expect.objectContaining({ offering: expect.objectContaining({ id: reference.id, name: changed.name }), status: 'withdrawn' }),
+    ]) } });
+    const remaining = await invokeExpress(app, { method: HttpRequestMethods.Get, url: feed });
+    expect(remaining.status).toBe(HttpStatusCodes.Ok);
+    expect(JSON.parse(remaining.text)).toEqual([expect.objectContaining({ id: reference.id, type: 'Service' })]);
 
   });
 });
