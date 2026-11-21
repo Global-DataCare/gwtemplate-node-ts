@@ -136,7 +136,7 @@ function generateDefaultBusinessServices(sector: Sector): DidService[] {
   const individualResources = ['Person', 'Organization', 'Order', 'Composition', 'Communication', 'RelatedPerson', 'Bundle'];
 
   services.push(createDidEndpointConfigFromSelector(
-    { sector, section: 'organization', format: 'org.schema' }, ['Catalog'], ['_publish', '_upsert'],
+    { sector, section: 'organization', format: 'org.schema' }, ['Catalog'], ['_publish', '_upsert', '_unpublish', '_history'],
   ));
 
   if (isFhir) {

@@ -1110,6 +1110,50 @@ export function createApiRouter(
    *       '200': { description: Completed with a publication count or a typed error. }
    *       '202': { description: Pending. }
    *
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/organization/org.schema/Catalog/_unpublish:
+   *   post:
+   *     tags: [Discovery]
+   *     summary: Withdraw a product or service by type and ID
+   *     description: Submit a signed controller message with one JSON:API resource identifier in body.data.
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/x-www-form-urlencoded:
+   *           schema: { type: object, required: [request], properties: { request: { type: string } } }
+   *     responses:
+   *       '202': { description: Accepted. Poll the Location URL. }
+   *       '401': { description: Authentication required. }
+   *
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/organization/org.schema/Catalog/_unpublish-response:
+   *   post:
+   *     tags: [Discovery]
+   *     summary: Read the offering withdrawal result
+   *     responses:
+   *       '200': { description: Completed with a withdrawal count or a typed error. }
+   *       '202': { description: Pending. }
+   *
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/organization/org.schema/Catalog/_history:
+   *   post:
+   *     tags: [Discovery]
+   *     summary: Read one offering's version history as its controller
+   *     description: Submit a signed controller message with one JSON:API resource identifier in body.data.
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/x-www-form-urlencoded:
+   *           schema: { type: object, required: [request], properties: { request: { type: string } } }
+   *     responses:
+   *       '202': { description: Accepted. Poll the Location URL. }
+   *       '401': { description: Authentication required. }
+   *
+   * /{tenantId}/cds-{jurisdiction}/v1/{sector}/organization/org.schema/Catalog/_history-response:
+   *   post:
+   *     tags: [Discovery]
+   *     summary: Read the offering history result
+   *     responses:
+   *       '200': { description: Completed with recorded versions or a typed error. }
+   *       '202': { description: Pending. }
+   *
    * /host/cds-{jurisdiction}/v1/{sector}/registry/org.schema/Organization/_search:
    *   post:
    *     tags: [1.1 Organization Registration]
