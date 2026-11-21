@@ -43,7 +43,7 @@ export interface IKmsService {
    * Initializes the service, ensuring essential keys (like for the 'host') are provisioned.
    * MUST be called before any other methods.
    */
-  init(): Promise<void>;  
+  init(options?: { readOnly?: boolean }): Promise<void>;
 
   // --- Key Lifecycle Management ---
 

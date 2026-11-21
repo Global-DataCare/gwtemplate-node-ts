@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [1.26.7] - 2026-11-21
+
+- Restore read-only discovery of archived tenant DID documents and original
+  legal participant credentials in legacy staging. Require explicit archived
+  record fingerprints and preserve the current tenant authorization boundary.
+
 ## [1.26.6] - 2026-11-21
 
 - Keep the version history of products and services under the same listing

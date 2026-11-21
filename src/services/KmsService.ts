@@ -130,13 +130,14 @@ export class KmsService implements IKmsService {
    * Initializes the KmsService by provisioning the essential keys for the 'host' entity.
    * This method MUST be called before any other methods are used.
    */
-  async init(): Promise<void> {
+  async init(options?: { readOnly?: boolean }): Promise<void> {
     if (this.isHostInitialized) {
       return;
     }
     try {
       await this.getEntityKeys('host', 'all');
-    } catch {
+    } catch (error) {
+      if (options?.readOnly) throw error;
       await this.provisionKeys('host');
     }
     this.isHostInitialized = true;

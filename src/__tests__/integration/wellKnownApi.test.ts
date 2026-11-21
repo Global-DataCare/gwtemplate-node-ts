@@ -6,8 +6,10 @@ import { HttpRequestMethods } from 'gdc-common-utils-ts/constants/http';
 import { EXAMPLE_VERIFY_RESPONSE_ORG_PUBLIC_KEY_JWK } from 'gdc-common-utils-ts/examples/ica-verify-response';
 
 import { jest } from '@jest/globals';
+import { createHash } from 'node:crypto';
 import express from 'express';
 import { createDiscoveryRouter } from '../../routes/discovery';
+import { createLegacyPublicTenantReader } from '../../services/legacy-public-tenant-artifacts';
 import { DiscoveryService } from '../../services/DiscoveryService';
 import type { TenantsCacheManager } from '../../managers/TenantsCacheManager';
 import { testTenant1AlternateName, testTenant1DidWebHosted, testTenant1IdentifierUrn, testTenant1VaultId } from '../data/organization.data';
@@ -103,6 +105,51 @@ describe('Well-Known DID Discovery API', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+  });
+
+  it('serves archived public artifacts without admitting the tenant into the runtime registry', async () => {
+    const scope = parseTenantUrn(testTenant1IdentifierUrn)!;
+    const prefix = `/${testTenant1AlternateName}/cds-${scope.jurisdiction}/${scope.version}/${scope.sector}/.well-known`;
+    const did = { id: testTenant1DidWebHosted };
+    const credential = { credentialSubject: { id: did.id } };
+    const readLegacy = jest.fn(async () => ({ did, credential }));
+    const isolated = express();
+    isolated.use(createDiscoveryRouter(mockTenantsCacheManager, discoveryService, mockKmsService, mockLogger,
+      mockVaultRepository, undefined, undefined, undefined, readLegacy));
+    mockTenantsCacheManager.getDidDocument.mockResolvedValue(undefined);
+    const request = (artifact: string) => invokeExpress(isolated, { method: 'GET', url: `${prefix}/${artifact}` });
+    expect(JSON.parse((await request('did.json')).text)).toEqual(did);
+    expect(JSON.parse((await request('legal-participant.vc.json')).text)).toEqual(credential);
+    expect((await request('jwks.json')).status).toBe(404);
+    expect(readLegacy).toHaveBeenCalledTimes(2);
+    expect(mockKmsService.createCompactJws).not.toHaveBeenCalled();
+  });
+
+  it('binds legacy publication to a pinned record and the original tenant jurisdiction', async () => {
+    const scope = parseTenantUrn(testTenant1IdentifierUrn)!;
+    const request = { tenantId: testTenant1AlternateName, sector: scope.sector, jurisdiction: scope.jurisdiction, version: scope.version };
+    const did = { id: testTenant1DidWebHosted };
+    const ciphertext = Buffer.from(JSON.stringify({
+      claims: {
+        [ClaimsOrganizationSchemaorg.alternateName]: request.tenantId,
+        [ClaimsOrganizationSchemaorg.addressCountry]: request.jurisdiction,
+        [ClaimsServiceSchemaorg.category]: request.sector,
+      },
+      didDocument: did,
+    })).toString('base64url');
+    const vault = {
+      get: jest.fn().mockImplementation(async () => ({
+        id: testTenant1VaultId, status: 'active', jwe: { ciphertext, iv: '_iv_', tag: '_tag_' },
+      })),
+    } as unknown as jest.Mocked<Pick<IVaultRepository, 'get'>>;
+    const fingerprint = createHash('sha256').update(ciphertext).digest('hex');
+    const read = createLegacyPublicTenantReader(vault, testTenant1VaultId, JSON.stringify({ [testTenant1VaultId]: fingerprint }));
+    await expect(read(request)).resolves.toMatchObject({ did });
+    await expect(read({ ...request, jurisdiction: EXAMPLE_COVERAGE_SCOPE_EU })).resolves.toBeUndefined();
+    vault.get.mockResolvedValueOnce({
+      id: testTenant1VaultId, status: 'active', jwe: { ciphertext: ciphertext + 'A', iv: '_iv_', tag: '_tag_' },
+    });
+    await expect(read(request)).resolves.toBeUndefined();
   });
 
   it('should return the correct DID Document for a hosted tenant via the cds-style path', async () => {

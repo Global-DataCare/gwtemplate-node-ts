@@ -85,6 +85,8 @@ import {
 } from './adapters/replay-protection-store';
 import { getConfig, resetServerConfig } from './config/server-config';
 import { bootstrapHost } from './bootstrap/host-bootstrap';
+import { createLegacyPublicTenantReader } from './services/legacy-public-tenant-artifacts';
+import { resolveKmsProvider } from './services/envelope-adapter-factory';
 import { registerCoreRouters } from './bootstrap/register-core-routers';
 import { buildInfrastructure } from './bootstrap/build-infrastructure';
 import { buildManagers } from './bootstrap/build-managers';
@@ -181,6 +183,14 @@ async function startServer(options?: StartServerOptions) {
   
   // --- DEPENDENCY INJECTION ---
   const storageScope = resolveStorageScope();
+  const legacyPublicTenantPins = process.env.LEGACY_PUBLIC_TENANT_REGISTRY_PINS;
+  if (legacyPublicTenantPins && (
+    config.nodeEnv !== 'staging' || config.networkMode !== 'test' || config.dbProvider !== 'firestore'
+    || storageScope.layout !== 'legacy-v1' || resolveKmsProvider(config) !== 'local'
+    || !process.env.HOST_LEGACY_PHYSICAL_COLLECTION
+  )) {
+    throw new Error('Legacy public tenant recovery requires staging with the original Firestore layout and key custody.');
+  }
   let observedLedgerBindings;
   if (storageScope.layout === 'scoped-v2') {
     const verifyGenesis = String(process.env.LEDGER_GENESIS_VERIFICATION || '')
@@ -205,6 +215,9 @@ async function startServer(options?: StartServerOptions) {
     tenantManager,
     kmsService,
   } = await buildInfrastructure({ config, hostCollectionName, initializeKms: false });
+  const legacyPublicTenantReader = legacyPublicTenantPins
+    ? createLegacyPublicTenantReader(vaultRepository, hostCollectionName, legacyPublicTenantPins)
+    : undefined;
 
   if (observedLedgerBindings) {
     await initializeRuntimeAfterLedgerProtection({
@@ -214,7 +227,8 @@ async function startServer(options?: StartServerOptions) {
       initializeRuntime: () => kmsService.init(),
     });
   } else {
-    await kmsService.init();
+    if (legacyPublicTenantReader) await kmsService.init({ readOnly: true });
+    else await kmsService.init();
   }
   const {
     hostingManager,
@@ -270,6 +284,7 @@ async function startServer(options?: StartServerOptions) {
   try {
     await tenantManager.loadHost();
     const hostTenant = await tenantManager.getTenant('host');
+    if (legacyPublicTenantReader && !hostTenant) throw new Error('Legacy public tenant recovery requires an existing host.');
     if (!hostTenant) {
       console.log('[GW-API] Host tenant not found. Bootstrapping...');
       await bootstrapHost(hostingManager, config);
@@ -277,27 +292,29 @@ async function startServer(options?: StartServerOptions) {
       // full-read path to preserve the previous startup semantics.
       console.log('[GW-API] Warming up host cache after bootstrap...');
       await tenantManager.getTenant('host');
-    } else {
+    } else if (!legacyPublicTenantReader) {
       const updated = await hostingManager.reconcilePersistedHostRuntimeConfig();
       if (updated) {
         console.log('[GW-API] Reconciled persisted host runtime service config.');
       }
     }
-    const reconciledRepresentativeInventories = await hostingManager.reconcileLegacyRepresentativeSeatInventories();
-    if (reconciledRepresentativeInventories > 0) {
-      console.log(`[GW-API] Reconciled ${reconciledRepresentativeInventories} historical representative seat inventories.`);
-    }
-    const reconciledTenantDidKeySets = await hostingManager.reconcileTenantDidKeyMaterial();
-    if (reconciledTenantDidKeySets > 0) {
-      console.log(`[GW-API] Reconciled DID key material for ${reconciledTenantDidKeySets} tenants.`);
-    }
-    const reconciledTenantServiceRoutes = await hostingManager.reconcileTenantServiceRoutes();
-    if (reconciledTenantServiceRoutes > 0) {
-      console.log(`[GW-API] Reconciled split-runtime DID services for ${reconciledTenantServiceRoutes} tenants.`);
+    if (!legacyPublicTenantReader) {
+      const reconciledRepresentativeInventories = await hostingManager.reconcileLegacyRepresentativeSeatInventories();
+      if (reconciledRepresentativeInventories > 0) {
+        console.log(`[GW-API] Reconciled ${reconciledRepresentativeInventories} historical representative seat inventories.`);
+      }
+      const reconciledTenantDidKeySets = await hostingManager.reconcileTenantDidKeyMaterial();
+      if (reconciledTenantDidKeySets > 0) {
+        console.log(`[GW-API] Reconciled DID key material for ${reconciledTenantDidKeySets} tenants.`);
+      }
+      const reconciledTenantServiceRoutes = await hostingManager.reconcileTenantServiceRoutes();
+      if (reconciledTenantServiceRoutes > 0) {
+        console.log(`[GW-API] Reconciled split-runtime DID services for ${reconciledTenantServiceRoutes} tenants.`);
+      }
     }
   } catch (error) {
-    const allowStartupWithoutHostWarmup =
-      String(process.env.STARTUP_SKIP_HOST_CACHE_WARMUP_ON_ERROR || '').trim().toLowerCase() === 'true';
+    const allowStartupWithoutHostWarmup = !legacyPublicTenantReader
+      && String(process.env.STARTUP_SKIP_HOST_CACHE_WARMUP_ON_ERROR || '').trim().toLowerCase() === 'true';
     console.warn(
       '[GW-API] Host startup cache warmup failed.'
       + (allowStartupWithoutHostWarmup ? ' Continuing because STARTUP_SKIP_HOST_CACHE_WARMUP_ON_ERROR=true.' : ''),
@@ -350,6 +367,7 @@ async function startServer(options?: StartServerOptions) {
 
   const discoveryRouter = createDiscoveryRouter(
     tenantManager, discoveryService, kmsService, logger, vaultRepository, config.apiBaseUrl, config.host, publicOfferingCatalogManager,
+    legacyPublicTenantReader,
   );
 
   const authorityArtifacts: Record<string, ReturnType<typeof loadAuthorityArtifacts>> = {};

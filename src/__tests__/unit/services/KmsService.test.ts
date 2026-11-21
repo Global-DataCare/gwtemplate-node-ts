@@ -100,6 +100,16 @@ describe('KmsService', () => {
   });
 
   describe('init', () => {
+    it('refuses to provision missing host keys when starting in read-only mode', async () => {
+      const provisionSpy = jest.spyOn(kmsService, 'provisionKeys');
+      try {
+        await expect(kmsService.init({ readOnly: true })).rejects.toThrow();
+        expect(provisionSpy).not.toHaveBeenCalled();
+      } finally {
+        provisionSpy.mockRestore();
+      }
+    });
+
     it('should provision keys for the "host" entity', async () => {
       // We spy on the method in the same class we are testing
       const provisionSpy = jest.spyOn(kmsService, 'provisionKeys');
