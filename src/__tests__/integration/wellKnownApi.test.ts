@@ -442,42 +442,72 @@ describe('Well-Known Tenant Artifacts API', () => {
     jest.clearAllMocks();
   });
 
-  it('should return the stored legal participant VC (legal-participant.vc.json) for a hosted tenant', async () => {
-    const urnParts = parseTenantUrn(testTenant1IdentifierUrn)!;
-    const tenantId = testTenant1AlternateName;
-    const expectedUrl = `/${tenantId}/cds-${urnParts.jurisdiction}/${urnParts.version}/${urnParts.sector}/.well-known/legal-participant.vc.json`;
-
-    const expectedVc = { '@context': ['https://www.w3.org/2018/credentials/v1'], type: ['VerifiableCredential'], issuer: 'did:web:host' };
-    mockTenantsCacheManager.getDidDocument.mockResolvedValue({ id: testTenant1IdentifierUrn } as any);
-    mockTenantsCacheManager.getTenant.mockResolvedValue({ governanceVc: expectedVc } as any);
+  it('publishes the same participant-signed Gaia-X statement in JSON and in a JWT container', async () => {
+    const urn = parseTenantUrn(testTenant1IdentifierUrn)!;
+    const base = `/${testTenant1AlternateName}/cds-${urn.jurisdiction}/${urn.version}/${urn.sector}/.well-known`;
+    const did = testTenant1DidWebHosted;
+    const statement = {
+      '@context': ['https://www.w3.org/ns/credentials/v2'],
+      type: ['VerifiableCredential', 'LegalPerson'],
+      issuer: did,
+      credentialSubject: { id: did, type: 'gx:LegalPerson' },
+    };
+    const signed = { ...statement, proof: { verificationMethod: `${did}#test-key`, jws: 'header..signature' } };
+    mockTenantsCacheManager.getDidDocument.mockResolvedValue({ id: did } as any);
+    mockTenantsCacheManager.getTenant.mockResolvedValue({ didDocument: { id: did }, selfDescriptionVc: signed } as any);
     mockKmsService.getPublicJwks.mockResolvedValue({ keys: [{ kid: 'tenant-vc-sign', use: 'sig', purpose: 'vc_sign' }] } as any);
     mockKmsService.createCompactJws.mockResolvedValue('header.payload.signature');
 
-    const response = await invokeExpress(app, { method: HttpRequestMethods.Get, url: expectedUrl });
-    expect(response.status).toBe(200);
-    expect(JSON.parse(response.text)).toEqual({
-      ...expectedVc,
-      proof: {
-        type: 'EnvelopedVerifiableCredential',
-        id: 'data:application/vc+jwt,header.payload.signature',
-      },
+    const json = await invokeExpress(app, { method: HttpRequestMethods.Get, url: base + '/vc.json' });
+    expect(JSON.parse(json.text)).toEqual(signed);
+    const jwt = await invokeExpress(app, { method: HttpRequestMethods.Get, url: base + '/legal-participant.vc.json' });
+    expect(JSON.parse(jwt.text)).toEqual({
+      '@context': 'https://www.w3.org/ns/credentials/v2',
+      type: 'EnvelopedVerifiableCredential',
+      id: 'data:application/vc+jwt,header.payload.signature',
     });
-    expect(mockTenantsCacheManager.getTenant).toHaveBeenCalledWith(testTenant1VaultId);
+    expect(mockKmsService.createCompactJws).toHaveBeenCalledWith(
+      { ...statement, '@context': [...statement['@context'], 'https://w3id.org/gaia-x/development#'] },
+      'tenant-vc-sign', testTenant1VaultId, 'vc_sign', expect.any(Object),
+    );
   });
 
-  it('should return the stored legal participant VC via the legacy vc.json alias', async () => {
-    const urnParts = parseTenantUrn(testTenant1IdentifierUrn)!;
-    const tenantId = testTenant1AlternateName;
-    const expectedUrl = `/${tenantId}/cds-${urnParts.jurisdiction}/${urnParts.version}/${urnParts.sector}/.well-known/vc.json`;
+  it('serves only the original ICA organization credential at organization.json', async () => {
+    const urn = parseTenantUrn(testTenant1IdentifierUrn)!;
+    const base = `/${testTenant1AlternateName}/cds-${urn.jurisdiction}/${urn.version}/${urn.sector}/.well-known`;
+    const organization = {
+      '@context': ['https://www.w3.org/ns/credentials/v2', 'https://schema.org'],
+      type: ['VerifiableCredential', 'OrganizationCredential'],
+      issuer: testTenant1IdentifierUrn,
+      credentialSubject: { id: testTenant1DidWebHosted, '@type': 'Organization' },
+      proof: { verificationMethod: `${testTenant1IdentifierUrn}#test-key`, jws: 'header..signature' },
+    };
+    mockTenantsCacheManager.getDidDocument.mockResolvedValue({ id: testTenant1DidWebHosted } as any);
+    mockTenantsCacheManager.getTenant.mockResolvedValue({ governanceVc: organization } as any);
 
-    const expectedVc = { '@context': ['https://www.w3.org/2018/credentials/v1'], type: ['VerifiableCredential'], issuer: 'did:web:host' };
-    mockTenantsCacheManager.getDidDocument.mockResolvedValue({ id: testTenant1IdentifierUrn } as any);
-    mockTenantsCacheManager.getTenant.mockResolvedValue({ governanceVc: expectedVc } as any);
-
-    const response = await invokeExpress(app, { method: HttpRequestMethods.Get, url: expectedUrl });
+    const response = await invokeExpress(app, { method: HttpRequestMethods.Get, url: base + '/organization.json' });
     expect(response.status).toBe(200);
-    expect(JSON.parse(response.text)).toEqual(expectedVc);
-    expect(mockTenantsCacheManager.getTenant).toHaveBeenCalledWith(testTenant1VaultId);
+    expect(JSON.parse(response.text)).toEqual(organization);
+    expect(mockKmsService.createCompactJws).not.toHaveBeenCalled();
+    expect(mockKmsService.createDetachedJws).not.toHaveBeenCalled();
+
+    const hostBase = `/host/cds-${EXAMPLE_COVERAGE_SCOPE_EU}/v1/${HostNetworkTypes.Test}/.well-known`;
+    const hostDid = testTenant1DidWebHosted;
+    mockTenantsCacheManager.getDidDocument.mockResolvedValue({ id: hostDid } as any);
+    mockTenantsCacheManager.getTenant.mockResolvedValue({
+      didDocument: { id: hostDid },
+      organizationCredential: organization,
+      governanceVc: { issuer: hostDid, type: ['VerifiableCredential', 'LegalPerson'], credentialSubject: { id: hostDid, type: 'gx:LegalPerson' } },
+    } as any);
+    const host = await invokeExpress(app, { method: HttpRequestMethods.Get, url: hostBase + '/organization.json' });
+    expect(host.status).toBe(200);
+    expect(JSON.parse(host.text)).toEqual(organization);
+    const legacy = await invokeExpress(app, { method: HttpRequestMethods.Get, url: hostBase + '/vc.json' });
+    expect(JSON.parse(legacy.text).type).toContain('LegalPerson');
+
+    mockTenantsCacheManager.getTenant.mockResolvedValue({ governanceVc: { ...organization, issuer: hostDid } } as any);
+    const missing = await invokeExpress(app, { method: HttpRequestMethods.Get, url: hostBase + '/organization.json' });
+    expect(missing.status).toBe(404);
   });
 
   it('should return the stored self-description (self-description.json) for a hosted tenant', async () => {
@@ -607,7 +637,7 @@ describe('Well-Known Legal Participant VC API', () => {
     const hostDidDoc = { id: 'did:web:host' };
     const hostEntityConfig = {
       didDocument: hostDidDoc,
-      governanceVc: { id: 'urn:uuid:host-legal-participant', issuer: 'did:web:host' },
+      governanceVc: { id: 'urn:uuid:host-legal-participant', issuer: hostDidDoc.id, credentialSubject: { id: hostDidDoc.id, type: 'gx:LegalPerson' } },
     };
 
     mockTenantsCacheManager.getTenant.mockResolvedValue(hostEntityConfig);
@@ -621,11 +651,9 @@ describe('Well-Known Legal Participant VC API', () => {
     expect(response.status).toBe(200);
     const parsed = JSON.parse(response.text);
     expect(parsed).toEqual({
-      ...hostEntityConfig.governanceVc,
-      proof: {
-        type: 'EnvelopedVerifiableCredential',
-        id: 'data:application/vc+jwt,header.payload.signature',
-      },
+      '@context': 'https://www.w3.org/ns/credentials/v2',
+      type: 'EnvelopedVerifiableCredential',
+      id: 'data:application/vc+jwt,header.payload.signature',
     });
     expect(mockTenantsCacheManager.getTenant).toHaveBeenCalledWith('host');
   });

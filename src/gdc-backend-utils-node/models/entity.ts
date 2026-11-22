@@ -74,6 +74,9 @@ export interface OrganizationConfig extends EntityConfig {
    */
   governanceVc?: VerifiableCredentialV2;
 
+  /** Original ICA-issued organization VC stored separately from the legacy Gaia-X artifacts. */
+  organizationCredential?: VerifiableCredentialV2;
+
   /**
    * A Verifiable Presentation, which may be required for certain
    * network interactions in the future (vp.json).

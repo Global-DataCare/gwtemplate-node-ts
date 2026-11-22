@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Separate ICA organization JSON from the two participant-signed Gaia-X publications. Preserve pinned historical tenant read compatibility.
+
 ## [1.26.7] - 2026-11-21
 
 - Restore read-only discovery of archived tenant DID documents and original
