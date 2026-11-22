@@ -3,7 +3,7 @@
 // Always create JSDoc, do not use strings inline in keys nor values, use types instead, and reuse the data test examples.
 
 import type { VerifiableCredentialV2 } from 'gdc-common-utils-ts/models/verifiable-credential';
-import { getParticipantGaiaXCredential, isIssuedOrganizationCredential } from '../utils/organization-discovery-credential';
+import { buildHostOrganizationStatement, getParticipantGaiaXCredential, isIssuedOrganizationCredential, readStoredParticipantJwt } from '../utils/organization-discovery-credential';
 import type { PublicOfferingCatalogManager } from '../managers/PublicOfferingCatalogManager';
 import type { LegacyPublicTenantReader } from '../services/legacy-public-tenant-artifacts';
 import * as express from 'express';
@@ -604,12 +604,17 @@ export function createDiscoveryRouter(
   };
 
   /** Signs a Gaia-X VC draft as the VC-JWT enveloped credential required by ICAM 25.11. */
-  const signGaiaXEnvelopedCredential = async (credential: Record<string, unknown>, vaultId: string) => {
+  const getCredentialSignerKid = async (vaultId: string) => {
     const jwks = await kmsService.getPublicJwks(vaultId);
     const signer = jwks.keys.find((key: any) => key.use === 'sig' && key.purpose === 'vc_sign')
       || jwks.keys.find((key: any) => key.use === 'sig');
     if (!signer?.kid) throw new Error(`No VC signing key found for '${vaultId}'.`);
-    const jwt = await kmsService.createCompactJws(credential, signer.kid, vaultId, 'vc_sign', {
+    return signer.kid;
+  };
+
+  const signGaiaXEnvelopedCredential = async (credential: Record<string, unknown>, vaultId: string) => {
+    const kid = await getCredentialSignerKid(vaultId);
+    const jwt = await kmsService.createCompactJws(credential, kid, vaultId, 'vc_sign', {
       typ: 'vc+ld+json+jwt',
       cty: 'vc+ld+json',
     });
@@ -874,7 +879,8 @@ export function createDiscoveryRouter(
       const original = legacy?.credential as VerifiableCredentialV2 | undefined;
       const artifact = artifactName === 'did.json' ? legacy?.did
         : artifactName === 'organization.json' && !isIssuedOrganizationCredential(original) ? undefined
-          : original;
+          : artifactName === 'legal-participant.vc.json' ? readStoredParticipantJwt(original) ?? original
+            : original;
       if (artifact) {
         res.json(artifact);
         return;
@@ -1065,13 +1071,13 @@ export function createDiscoveryRouter(
    * /host/cds-{hostCoverageScope}/{version}/{hostNetwork}/.well-known/organization.json:
    *   get:
    *     tags: [Discovery]
-   *     summary: Original ICA-issued organization credential for the host operator
+   *     summary: Signed organization identity for the host operator
    *     parameters:
    *       - $ref: '#/components/parameters/HostCoverageScope'
    *       - $ref: '#/components/parameters/Version'
    *       - $ref: '#/components/parameters/HostRegistrySector'
    *     responses:
-   *       '200': { description: Original signed OrganizationCredential with a schema.org Organization subject }
+   *       '200': { description: ICA-issued credential or host-signed OrganizationCredential with a schema.org Organization subject }
    *       '404': { description: Organization credential unavailable }
    * /{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/organization.json:
    *   get:
@@ -1087,10 +1093,23 @@ export function createDiscoveryRouter(
    *       '404': { description: Organization credential unavailable }
    */
   router.get([`${hostScopedWellKnownPrefix}/organization.json`, `${tenantWellKnownPrefix}/organization.json`], resolveTenant, async (_req, res) => {
-    const entity = await tenantsCacheManager.getTenant(res.locals.vaultId);
-    const credential = entity?.organizationCredential ?? entity?.governanceVc;
-    if (!isIssuedOrganizationCredential(credential)) return res.status(404).type('text').send('Not Found');
-    return res.json(credential);
+    const vaultId = res.locals.vaultId;
+    const entity = await tenantsCacheManager.getTenant(vaultId);
+    const credential = [entity?.organizationCredential, entity?.governanceVc].find(isIssuedOrganizationCredential);
+    if (credential) return res.json(credential);
+    const statement = vaultId === 'host' ? buildHostOrganizationStatement(entity) : undefined;
+    if (!statement) return res.status(404).type('text').send('Not Found');
+    const kid = await getCredentialSignerKid(vaultId);
+    return res.json({
+      ...statement,
+      proof: [{
+        type: 'JsonWebSignature2020',
+        created: new Date().toISOString(),
+        proofPurpose: 'assertionMethod',
+        verificationMethod: `${statement.issuer}#${kid}`,
+        jws: await kmsService.createDetachedJws(statement, kid, vaultId, 'vc_sign'),
+      }],
+    });
   });
 
   // Published Gaia-X declaration with its participant's original detached proof.

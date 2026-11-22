@@ -84,6 +84,22 @@ describe('Host well-known endpoints (demo, mem)', () => {
       const header = Content.base64UrlSafeToJSON(compact.split('.')[0]);
       const verificationKey = jwksJson.keys.find((key: { kid: string }) => key.kid === header.kid);
       const cryptography = new CryptographyService(new AdapterCryptoSdkNode());
+
+      const organization = await invokeExpress(app, { method: HttpRequestMethods.Get, url: `${HOST_WELL_KNOWN_PREFIX}/organization.json` });
+      expect(organization.status).toBe(200);
+      const { proof, ...organizationClaims } = JSON.parse(organization.text);
+      expect(organizationClaims).toMatchObject({
+        issuer: HOST_DID,
+        credentialSubject: { id: HOST_DID, '@type': 'Organization' },
+      });
+      const [organizationHeader, , organizationSignature] = proof[0].jws.split('.');
+      const { kid: organizationKid } = Content.base64UrlSafeToJSON(organizationHeader);
+      const organizationKey = jwksJson.keys.find((key: { kid: string }) => key.kid === organizationKid);
+      expect(proof[0].verificationMethod).toBe(`${HOST_DID}#${organizationKid}`);
+      expect(JSON.parse(rootDid.text).assertionMethod).toContain(proof[0].verificationMethod);
+      const organizationPayload = Buffer.from(JSON.stringify(organizationClaims)).toString('base64url');
+      expect(await cryptography.verifyJws(`${organizationHeader}.${organizationPayload}.${organizationSignature}`, organizationKey)).toBe(true);
+
       expect(await cryptography.verifyJws(compact, verificationKey)).toBe(true);
       expect(Content.base64UrlSafeToJSON(compact.split('.')[1])).toMatchObject({
         id: offerUrl,

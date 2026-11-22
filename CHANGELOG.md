@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- Publish the host's signed organization identity at `organization.json` and
+  preserve the original ICA credential when one is available.
+- Return archived participant JWTs in the W3C envelope without changing the
+  signed token.
+
 - Separate ICA organization JSON from the two participant-signed Gaia-X publications. Preserve pinned historical tenant read compatibility.
 
 ## [1.26.7] - 2026-11-21
