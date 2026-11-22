@@ -8314,6 +8314,65 @@
         "x-profile": "core"
       }
     },
+    "/host/cds-{hostCoverageScope}/{version}/{hostNetwork}/.well-known/organization.json": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Original ICA-issued organization credential for the host operator",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/HostCoverageScope"
+          },
+          {
+            "$ref": "#/components/parameters/Version"
+          },
+          {
+            "$ref": "#/components/parameters/HostRegistrySector"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Original signed OrganizationCredential with a schema.org Organization subject"
+          },
+          "404": {
+            "description": "Organization credential unavailable"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
+    "/{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/organization.json": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Original ICA-issued organization credential for the tenant",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/TenantId"
+          },
+          {
+            "$ref": "#/components/parameters/Jurisdiction"
+          },
+          {
+            "$ref": "#/components/parameters/Version"
+          },
+          {
+            "$ref": "#/components/parameters/Sector"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Original signed OrganizationCredential with a schema.org Organization subject"
+          },
+          "404": {
+            "description": "Organization credential unavailable"
+          }
+        },
+        "x-profile": "core"
+      }
+    },
     "/host/cds-{hostCoverageScope}/{version}/{hostNetwork}/.well-known/service-offering-hosting.json": {
       "get": {
         "tags": [

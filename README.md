@@ -1033,3 +1033,28 @@ Notes:
 ## Entregable E9 — pruebas unitarias y testeo
 
 El [Entregable E9: pruebas unitarias y testeo](deliverables/E9_PRUEBAS_UNITARIAS_Y_TESTEO_SEDIA_ES.md) recoge la validación local completa del 11 de noviembre. Su [expediente de evidencia](deliverables/e9-testing/20261111T121038Z/README.md) contiene la matriz superada y los registros.
+
+
+## Public organization credentials
+
+Use the host base path `/host/cds-{coverage}/{version}/{network}` or the tenant
+base path `/{tenantId}/cds-{jurisdiction}/{version}/{sector}`.
+
+- `GET {basePath}/.well-known/organization.json` returns the original
+  ICA-issued JSON, with `OrganizationCredential` in the credential type and
+  `Organization` in `credentialSubject.@type`. The gateway preserves the
+  issuer and signature. The route returns HTTP 404 when no issued credential
+  is available.
+- `GET {basePath}/.well-known/vc.json` returns the participant-signed Gaia-X
+  `gx:LegalPerson` as credential JSON with its original detached proof.
+- `GET {basePath}/.well-known/legal-participant.vc.json` returns the
+  participant-signed Gaia-X declaration as a JWT in a W3C
+  `EnvelopedVerifiableCredential`. Read the token after
+  `data:application/vc+jwt,` in the top-level `id`.
+  Older gateway revisions provided the JWT under `proof.id`. Update
+  discovery readers to understand both locations before rollout.
+
+The organization credential describes the legal entity. A hosting service
+credential describes the service provided by that entity.
+
+Pinned historical tenant records retain their original read-only DID and legal-participant responses. The organization route can serve a historical ICA-issued organization credential when the pinned record contains one.

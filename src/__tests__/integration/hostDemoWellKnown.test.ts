@@ -64,7 +64,12 @@ describe('Host well-known endpoints (demo, mem)', () => {
       const legalParticipant = await invokeExpress(app, { method: HttpRequestMethods.Get, url: `${HOST_WELL_KNOWN_PREFIX}/legal-participant.vc.json` });
       expect(legalParticipant.status).toBe(200);
       const legalParticipantJson = JSON.parse(legalParticipant.text);
-      expect(legalParticipantJson.issuer).toBe(HOST_DID);
+      expect(legalParticipantJson.type).toBe('EnvelopedVerifiableCredential');
+      const legalJwt = legalParticipantJson.id.split(',')[1];
+      expect(Content.base64UrlSafeToJSON(legalJwt.split('.')[1])).toMatchObject({
+        issuer: HOST_DID,
+        credentialSubject: { id: HOST_DID, type: 'gx:LegalPerson' },
+      });
 
       const jwks = await invokeExpress(app, { method: HttpRequestMethods.Get, url: `${HOST_WELL_KNOWN_PREFIX}/jwks.json` });
       expect(jwks.status).toBe(200);

@@ -2,6 +2,8 @@
 // Copyright 2025 Antifraud Services Inc. under the Apache License, Version 2.0.
 // Always create JSDoc, do not use strings inline in keys nor values, use types instead, and reuse the data test examples.
 
+import type { VerifiableCredentialV2 } from 'gdc-common-utils-ts/models/verifiable-credential';
+import { getParticipantGaiaXCredential, isIssuedOrganizationCredential } from '../utils/organization-discovery-credential';
 import type { PublicOfferingCatalogManager } from '../managers/PublicOfferingCatalogManager';
 import type { LegacyPublicTenantReader } from '../services/legacy-public-tenant-artifacts';
 import * as express from 'express';
@@ -867,9 +869,12 @@ export function createDiscoveryRouter(
     const vaultId = getTenantVaultId(sector, canonicalTenantId);
 
     const artifactName = req.path.split('/').at(-1);
-    if (legacyPublicTenantReader && (artifactName === 'did.json' || artifactName === 'legal-participant.vc.json')) {
+    if (legacyPublicTenantReader && (artifactName === 'did.json' || artifactName === 'legal-participant.vc.json' || artifactName === 'organization.json')) {
       const legacy = await legacyPublicTenantReader({ tenantId: canonicalTenantId, jurisdiction, version, sector });
-      const artifact = artifactName === 'did.json' ? legacy?.did : legacy?.credential;
+      const original = legacy?.credential as VerifiableCredentialV2 | undefined;
+      const artifact = artifactName === 'did.json' ? legacy?.did
+        : artifactName === 'organization.json' && !isIssuedOrganizationCredential(original) ? undefined
+          : original;
       if (artifact) {
         res.json(artifact);
         return;
@@ -1055,11 +1060,43 @@ export function createDiscoveryRouter(
     res.type('application/pkix-cert').send(derBytes);
   });
 
-  // Legacy/dev-friendly: return the tenant's stored legal-participant VC and self-description (if present).
-  // Some clients rely on vc.json; serve it as a deprecated alias.
+  /**
+   * @openapi
+   * /host/cds-{hostCoverageScope}/{version}/{hostNetwork}/.well-known/organization.json:
+   *   get:
+   *     tags: [Discovery]
+   *     summary: Original ICA-issued organization credential for the host operator
+   *     parameters:
+   *       - $ref: '#/components/parameters/HostCoverageScope'
+   *       - $ref: '#/components/parameters/Version'
+   *       - $ref: '#/components/parameters/HostRegistrySector'
+   *     responses:
+   *       '200': { description: Original signed OrganizationCredential with a schema.org Organization subject }
+   *       '404': { description: Organization credential unavailable }
+   * /{tenantId}/cds-{jurisdiction}/{version}/{sector}/.well-known/organization.json:
+   *   get:
+   *     tags: [Discovery]
+   *     summary: Original ICA-issued organization credential for the tenant
+   *     parameters:
+   *       - $ref: '#/components/parameters/TenantId'
+   *       - $ref: '#/components/parameters/Jurisdiction'
+   *       - $ref: '#/components/parameters/Version'
+   *       - $ref: '#/components/parameters/Sector'
+   *     responses:
+   *       '200': { description: Original signed OrganizationCredential with a schema.org Organization subject }
+   *       '404': { description: Organization credential unavailable }
+   */
+  router.get([`${hostScopedWellKnownPrefix}/organization.json`, `${tenantWellKnownPrefix}/organization.json`], resolveTenant, async (_req, res) => {
+    const entity = await tenantsCacheManager.getTenant(res.locals.vaultId);
+    const credential = entity?.organizationCredential ?? entity?.governanceVc;
+    if (!isIssuedOrganizationCredential(credential)) return res.status(404).type('text').send('Not Found');
+    return res.json(credential);
+  });
+
+  // Published Gaia-X declaration with its participant's original detached proof.
   router.get([`${hostScopedWellKnownPrefix}/vc.json`, `${tenantWellKnownPrefix}/vc.json`], resolveTenant, async (req, res) => {
     const entityConfig = await tenantsCacheManager.getTenant(res.locals.vaultId);
-    const vc = entityConfig?.governanceVc;
+    const vc = getParticipantGaiaXCredential(entityConfig);
     if (!vc) return res.status(404).type('text').send('Not Found');
     res.json(vc);
   });
@@ -1140,11 +1177,15 @@ export function createDiscoveryRouter(
     }
   });
 
-  router.get([`${hostScopedWellKnownPrefix}/legal-participant.vc.json`, `${tenantWellKnownPrefix}/legal-participant.vc.json`], resolveTenant, async (req, res) => {
-    const entityConfig = await tenantsCacheManager.getTenant(res.locals.vaultId);
-    const vc = entityConfig?.governanceVc;
-    if (!vc) return res.status(404).type('text').send('Not Found');
-    res.json(await signGaiaXEnvelopedCredential(vc, res.locals.vaultId));
+  router.get([`${hostScopedWellKnownPrefix}/legal-participant.vc.json`, `${tenantWellKnownPrefix}/legal-participant.vc.json`], resolveTenant, async (_req, res) => {
+    const vaultId = res.locals.vaultId;
+    const entity = await tenantsCacheManager.getTenant(vaultId);
+    const credential = getParticipantGaiaXCredential(entity);
+    if (!credential) return res.status(404).type('text').send('Not Found');
+    const { proof, ...statement } = credential;
+    const contexts = [...new Set([...(statement['@context'] ?? []), 'https://w3id.org/gaia-x/development#'])];
+    const wrapped = await signGaiaXEnvelopedCredential({ ...statement, '@context': contexts }, vaultId);
+    return res.json({ '@context': 'https://www.w3.org/ns/credentials/v2', ...wrapped.proof });
   });
 
   /**
