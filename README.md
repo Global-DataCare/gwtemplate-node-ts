@@ -1037,6 +1037,8 @@ El [Entregable E9: pruebas unitarias y testeo](deliverables/E9_PRUEBAS_UNITARIAS
 
 ## Public organization credentials
 
+See [Public organization and professional credential contracts](docs-v1/06-AUDIT-AND-EVIDENCE/06.I-PUBLIC-CREDENTIALS.md) for the four URLs, signing authority, authenticated wallet delivery and SMART Health Cards.
+
 Use the host base path `/host/cds-{coverage}/{version}/{network}` or the tenant
 base path `/{tenantId}/cds-{jurisdiction}/{version}/{sector}`.
 
