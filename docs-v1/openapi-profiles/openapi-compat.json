@@ -8319,7 +8319,7 @@
         "tags": [
           "Discovery"
         ],
-        "summary": "Original ICA-issued organization credential for the host operator",
+        "summary": "Signed organization identity for the host operator",
         "parameters": [
           {
             "$ref": "#/components/parameters/HostCoverageScope"
@@ -8333,7 +8333,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Original signed OrganizationCredential with a schema.org Organization subject"
+            "description": "ICA-issued credential or host-signed OrganizationCredential with a schema.org Organization subject"
           },
           "404": {
             "description": "Organization credential unavailable"

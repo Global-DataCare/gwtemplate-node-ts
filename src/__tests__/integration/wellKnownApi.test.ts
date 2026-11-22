@@ -12,7 +12,7 @@ import { createDiscoveryRouter } from '../../routes/discovery';
 import { createLegacyPublicTenantReader } from '../../services/legacy-public-tenant-artifacts';
 import { DiscoveryService } from '../../services/DiscoveryService';
 import type { TenantsCacheManager } from '../../managers/TenantsCacheManager';
-import { testTenant1AlternateName, testTenant1DidWebHosted, testTenant1IdentifierUrn, testTenant1VaultId } from '../data/organization.data';
+import { testClaimsRegisterTenantExpanded, testTenant1AlternateName, testTenant1DidWebHosted, testTenant1IdentifierUrn, testTenant1VaultId } from '../data/organization.data';
 import { DidDocument } from '../../gdc-backend-utils-node/models/did';
 import { IKmsService } from '../../gdc-backend-utils-node/models/IKmsService';
 import type { ConfidentialStorageDoc } from 'gdc-common-utils-ts/models/confidential-storage';
@@ -120,8 +120,14 @@ describe('Well-Known DID Discovery API', () => {
     const request = (artifact: string) => invokeExpress(isolated, { method: 'GET', url: `${prefix}/${artifact}` });
     expect(JSON.parse((await request('did.json')).text)).toEqual(did);
     expect(JSON.parse((await request('legal-participant.vc.json')).text)).toEqual(credential);
+    const type = 'EnvelopedVerifiableCredential';
+    const id = 'data:application/vc+jwt,header.payload.signature';
+    readLegacy.mockResolvedValueOnce({ did, credential: { ...credential, proof: { type, id } } as typeof credential });
+    expect(JSON.parse((await request('legal-participant.vc.json')).text)).toEqual({
+      '@context': 'https://www.w3.org/ns/credentials/v2', type, id,
+    });
     expect((await request('jwks.json')).status).toBe(404);
-    expect(readLegacy).toHaveBeenCalledTimes(2);
+    expect(readLegacy).toHaveBeenCalledTimes(3);
     expect(mockKmsService.createCompactJws).not.toHaveBeenCalled();
   });
 
@@ -508,6 +514,30 @@ describe('Well-Known Tenant Artifacts API', () => {
     mockTenantsCacheManager.getTenant.mockResolvedValue({ governanceVc: { ...organization, issuer: hostDid } } as any);
     const missing = await invokeExpress(app, { method: HttpRequestMethods.Get, url: hostBase + '/organization.json' });
     expect(missing.status).toBe(404);
+  });
+
+  it('publishes a provisional host organization statement without issuing one for tenants', async () => {
+    const urn = parseTenantUrn(testTenant1IdentifierUrn)!;
+    const tenantBase = `/${testTenant1AlternateName}/cds-${urn.jurisdiction}/${urn.version}/${urn.sector}/.well-known`;
+    const hostBase = `/host/cds-${EXAMPLE_COVERAGE_SCOPE_EU}/v1/${HostNetworkTypes.Test}/.well-known`;
+    const did = testTenant1DidWebHosted;
+    mockTenantsCacheManager.getDidDocument.mockResolvedValue({ id: did } as any);
+    mockTenantsCacheManager.getTenant.mockResolvedValue({
+      didDocument: { id: did }, claims: testClaimsRegisterTenantExpanded,
+    } as any);
+    mockKmsService.getPublicJwks.mockResolvedValue({ keys: [{ kid: 'test-key', use: 'sig', purpose: 'vc_sign' }] } as any);
+    mockKmsService.createDetachedJws.mockResolvedValue('header..signature');
+    const host = await invokeExpress(app, { method: HttpRequestMethods.Get, url: `${hostBase}/organization.json` });
+    expect(host.status).toBe(200);
+    const { proof, ...statement } = JSON.parse(host.text);
+    expect(statement.issuer).toBe(did);
+    expect(statement.type).toContain('OrganizationCredential');
+    expect(statement.credentialSubject).toMatchObject({ id: did, '@type': 'Organization', taxID: testTenant1AlternateName });
+    expect(statement.evidence).toBeUndefined();
+    expect(proof[0].verificationMethod).toBe(`${did}#test-key`);
+    expect(mockKmsService.createDetachedJws).toHaveBeenCalledWith(statement, 'test-key', 'host', 'vc_sign');
+    const tenant = await invokeExpress(app, { method: HttpRequestMethods.Get, url: `${tenantBase}/organization.json` });
+    expect(tenant.status).toBe(404);
   });
 
   it('should return the stored self-description (self-description.json) for a hosted tenant', async () => {

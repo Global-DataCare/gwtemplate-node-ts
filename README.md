@@ -1040,11 +1040,12 @@ El [Entregable E9: pruebas unitarias y testeo](deliverables/E9_PRUEBAS_UNITARIAS
 Use the host base path `/host/cds-{coverage}/{version}/{network}` or the tenant
 base path `/{tenantId}/cds-{jurisdiction}/{version}/{sector}`.
 
-- `GET {basePath}/.well-known/organization.json` returns the original
-  ICA-issued JSON, with `OrganizationCredential` in the credential type and
-  `Organization` in `credentialSubject.@type`. The gateway preserves the
-  issuer and signature. The route returns HTTP 404 when no issued credential
-  is available.
+- `GET {basePath}/.well-known/organization.json` publishes the organization's
+  legal identifier and any evidence included in the signed credential. Its type
+  is `OrganizationCredential` and its Schema.org subject is `Organization`.
+  The host may sign its own statement. Where an ICA credential is available,
+  the gateway publishes the original with its issuer, evidence and proofs.
+  For tenants, the route publishes the admitted ICA credential.
 - `GET {basePath}/.well-known/vc.json` returns the participant-signed Gaia-X
   `gx:LegalPerson` as credential JSON with its original detached proof.
 - `GET {basePath}/.well-known/legal-participant.vc.json` returns the
@@ -1057,4 +1058,16 @@ base path `/{tenantId}/cds-{jurisdiction}/{version}/{sector}`.
 The organization credential describes the legal entity. A hosting service
 credential describes the service provided by that entity.
 
-Pinned historical tenant records retain their original read-only DID and legal-participant responses. The organization route can serve a historical ICA-issued organization credential when the pinned record contains one.
+Verify each `proof.verificationMethod` against the appropriate signer's DID.
+A host self-signature establishes who made the statement and protects its
+contents. An ICA proof authenticates the ICA's attestation. Additional proofs
+can be verified against the same credential and assessed according to the
+signers' authority. Review `evidence` when present to determine what was checked.
+Evidence of PDF enrollment can describe signature and certificate checks using
+the [OpenID Identity Assurance evidence model](https://openid.net/specs/openid-ida-verified-claims-1_0.html).
+
+Pinned historical tenant records retain their read-only DID and credential
+access. An archived participant JWT is returned unchanged inside the
+three-field W3C envelope. Other historical credential formats remain readable
+where present. The organization route can serve the original ICA-issued
+organization credential from a pinned record.
